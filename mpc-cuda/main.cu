@@ -50,6 +50,10 @@ using std::string;
 
 #define TPB 1024  /* do not change */
 
+#if (CUDART_VERSION >= 9000)
+#define __shfl_up(v, d) __shfl_up_sync(0xffffffff, v, d)
+#endif
+
 static inline __device__
 void prefixsum(int &val, int sbuf[TPB])
 {

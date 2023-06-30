@@ -10,6 +10,29 @@
 #include <time.h>
 #include "bucketsort.h"
 
+constexpr sycl::access::mode sycl_read       = sycl::access::mode::read;
+constexpr sycl::access::mode sycl_write      = sycl::access::mode::write;
+constexpr sycl::access::mode sycl_read_write = sycl::access::mode::read_write;
+
+inline unsigned int atomicAdd(unsigned int &val, unsigned int operand) 
+{
+  auto atm = sycl::atomic_ref<unsigned int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::work_group,
+    sycl::access::address_space::local_space>(val);
+  return atm.fetch_add(operand);
+}
+
+inline unsigned int atomicAddGlobal(unsigned int &val, unsigned int operand) 
+{
+  auto atm = sycl::atomic_ref<unsigned int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(val);
+  return atm.fetch_add(operand);
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Forward declarations
 ////////////////////////////////////////////////////////////////////////////////
@@ -21,7 +44,7 @@ void calcPivotPoints(float *histogram, int histosize, int listsize,
 // Given the input array of floats and the min and max of the distribution,
 // sort the elements into float4 aligned buckets of roughly equal size
 ////////////////////////////////////////////////////////////////////////////////
-void bucketSort(queue &q, float *d_input, float *d_output, int listsize,
+void bucketSort(sycl::queue &q, float *d_input, float *d_output, int listsize,
     int *sizes, int *nullElements, float minimum, float maximum,
     unsigned int *origOffsets)
 {
@@ -39,9 +62,9 @@ void bucketSort(queue &q, float *d_input, float *d_output, int listsize,
 
   int blocks = ((listsize - 1) / (BUCKET_THREAD_N * BUCKET_BAND)) + 1;
 
-  const property_list props = property::buffer::use_host_ptr();
-  buffer<float,1> d_input_buff (d_input, listsize + DIVISIONS*4, props);
-  buffer<unsigned int,1> d_offsets_buff (h_offsets, DIVISIONS , props);
+  const sycl::property_list props = sycl::property::buffer::use_host_ptr();
+  sycl::buffer<float,1> d_input_buff (d_input, listsize + DIVISIONS*4, props);
+  sycl::buffer<unsigned int,1> d_offsets_buff (h_offsets, DIVISIONS , props);
   d_offsets_buff.set_final_data(nullptr);
 
   size_t global_histogram = 6144;
@@ -51,29 +74,26 @@ void bucketSort(queue &q, float *d_input, float *d_output, int listsize,
 #else
   size_t local_histogram = 96;
 #endif
-  q.submit([&](handler& cgh) {
+  q.submit([&](sycl::handler& cgh) {
+    auto histoOutput_acc = d_offsets_buff.get_access<sycl_read_write>(cgh);
+    auto histoInput_acc = d_input_buff.get_access<sycl_read>(cgh, sycl::range<1>(listsize));
+    sycl::local_accessor <unsigned int, 1> s_Hist (sycl::range<1>(HISTOGRAM_BLOCK_MEMORY), cgh);
 
-      auto histoOutput_acc = d_offsets_buff.get_access<sycl_atomic>(cgh);
-      auto histoInput_acc = d_input_buff.get_access<sycl_read>(cgh, range<1>(listsize));
-      accessor <unsigned int, 1, sycl_atomic, access::target::local> 
-      s_Hist (HISTOGRAM_BLOCK_MEMORY, cgh);
+    cgh.parallel_for<class histogram1024>(
+      sycl::nd_range<1>(sycl::range<1>(global_histogram), sycl::range<1>(local_histogram)),
+      [=] (sycl::nd_item<1> item) {
+        #include "kernel_histogram.sycl"
+    });
+  });
 
-      cgh.parallel_for<class histogram1024>(
-          nd_range<1>(range<1>(global_histogram), range<1>(local_histogram)), [=] (nd_item<1> item) {
-#include "kernel_histogram.sycl"
-          });
-      });
-
-  q.submit([&](handler& cgh) {
-      auto histoOutput_acc = d_offsets_buff.get_access<sycl_read>(cgh);
-      cgh.copy(histoOutput_acc, h_offsets);
-      });
-  q.wait();
+  q.submit([&](sycl::handler& cgh) {
+    auto histoOutput_acc = d_offsets_buff.get_access<sycl_read>(cgh);
+    cgh.copy(histoOutput_acc, h_offsets);
+  }).wait();
 
   for(int i=0; i<histosize; i++) {
     historesult[i] = (float)h_offsets[i];
   }
-
 
   //  ///////////////////////////////////////////////////////////////////////////
   //  // Calculate pivot points (CPU algorithm)
@@ -87,27 +107,26 @@ void bucketSort(queue &q, float *d_input, float *d_output, int listsize,
   //  ///////////////////////////////////////////////////////////////////////////
 
 
-  buffer<float,1> l_pivotpoints_buff(pivotPoints, DIVISIONS, props);
-  buffer<int,1> d_indice_buff(listsize);
-  buffer<unsigned int,1> d_prefixoffsets_buff(blocks * BUCKET_BLOCK_MEMORY);
+  sycl::buffer<float,1> l_pivotpoints_buff(pivotPoints, DIVISIONS, props);
+  sycl::buffer<int,1> d_indice_buff(listsize);
+  sycl::buffer<unsigned int,1> d_prefixoffsets_buff(blocks * BUCKET_BLOCK_MEMORY);
 
   //int blocks =((listsize -1) / (BUCKET_THREAD_N*BUCKET_BAND)) + 1;
   size_t global_count = blocks*BUCKET_THREAD_N;
   size_t local_count = BUCKET_THREAD_N;
 
-  q.submit([&](handler& cgh) {
-
-      auto input_acc = d_input_buff.get_access<sycl_read>(cgh);
-      auto indice_acc = d_indice_buff.get_access<sycl_write>(cgh);
-      auto d_prefixoffsets_acc = d_prefixoffsets_buff.get_access<sycl_write>(cgh);
-      auto l_pivotpoints_acc = l_pivotpoints_buff.get_access<sycl_read>(cgh);
-      accessor <unsigned int, 1, sycl_atomic, access::target::local> s_offset (BUCKET_BLOCK_MEMORY, cgh);
-
-      cgh.parallel_for<class bucketcount>(
-          nd_range<1>(range<1>(global_count), range<1>(local_count)), [=] (nd_item<1> item) {
-#include "kernel_bucketcount.sycl"
-          });
-      });
+  q.submit([&](sycl::handler& cgh) {
+    auto input_acc = d_input_buff.get_access<sycl_read>(cgh);
+    auto indice_acc = d_indice_buff.get_access<sycl_write>(cgh);
+    auto d_prefixoffsets_acc = d_prefixoffsets_buff.get_access<sycl_write>(cgh);
+    auto l_pivotpoints_acc = l_pivotpoints_buff.get_access<sycl_read>(cgh);
+    sycl::local_accessor <unsigned int, 1> s_offset (sycl::range<1>(BUCKET_BLOCK_MEMORY), cgh);
+    cgh.parallel_for<class bucketcount>(
+      sycl::nd_range<1>(sycl::range<1>(global_count), sycl::range<1>(local_count)),
+      [=] (sycl::nd_item<1> item) {
+      #include "kernel_bucketcount.sycl"
+    });
+  });
 
   //
   //  ///////////////////////////////////////////////////////////////////////////
@@ -121,23 +140,20 @@ void bucketSort(queue &q, float *d_input, float *d_output, int listsize,
 #endif
   size_t globalpre = DIVISIONS;
 
-  q.submit([&](handler& cgh) {
-
-      auto d_prefixoffsets_acc = d_prefixoffsets_buff.get_access<sycl_read_write>(cgh);
-      auto d_offsets_acc = d_offsets_buff.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class prefix>(
-          nd_range<1>(range<1>(globalpre), range<1>(localpre)), [=] (nd_item<1> item) {
-#include "kernel_bucketprefix.sycl"
-          });
-      });
-
+  q.submit([&](sycl::handler& cgh) {
+    auto d_prefixoffsets_acc = d_prefixoffsets_buff.get_access<sycl_read_write>(cgh);
+    auto d_offsets_acc = d_offsets_buff.get_access<sycl_write>(cgh);
+    cgh.parallel_for<class prefix>(
+      sycl::nd_range<1>(sycl::range<1>(globalpre), sycl::range<1>(localpre)), [=] (sycl::nd_item<1> item) {
+      #include "kernel_bucketprefix.sycl"
+    });
+  });
 
   // copy the sizes from device to host
-  q.submit([&](handler& cgh) {
-      auto d_offsets_buff_acc = d_offsets_buff.get_access<sycl_read>(cgh);
-      cgh.copy(d_offsets_buff_acc, h_offsets);
-      });
-  q.wait();
+  q.submit([&](sycl::handler& cgh) {
+    auto d_offsets_buff_acc = d_offsets_buff.get_access<sycl_read>(cgh);
+    cgh.copy(d_offsets_buff_acc, h_offsets);
+  }).wait();
 
   origOffsets[0] = 0;
   for(int i=0; i<DIVISIONS; i++){
@@ -161,33 +177,30 @@ void bucketSort(queue &q, float *d_input, float *d_output, int listsize,
   //  ///////////////////////////////////////////////////////////////////////////
 
   // update the h_offsets on the device
-  q.submit([&](handler& cgh) {
-      auto d_offsets_buff_acc = d_offsets_buff.get_access<sycl_write>(cgh);
-      cgh.copy(h_offsets, d_offsets_buff_acc);
-      });
+  q.submit([&](sycl::handler& cgh) {
+    auto d_offsets_buff_acc = d_offsets_buff.get_access<sycl_write>(cgh);
+    cgh.copy(h_offsets, d_offsets_buff_acc);
+  });
 
-  buffer<float,1> d_bucketOutput(d_output, listsize + DIVISIONS*4, props);
+  sycl::buffer<float,1> d_bucketOutput(d_output, listsize + DIVISIONS*4, props);
 
   size_t localfinal = BUCKET_THREAD_N;
   size_t globalfinal = blocks*BUCKET_THREAD_N;
 
-  q.submit([&](handler& cgh) {
+  q.submit([&](sycl::handler& cgh) {
+    auto input_acc = d_input_buff.get_access<sycl_read>(cgh);
+    auto indice_acc = d_indice_buff.get_access<sycl_read>(cgh);
+    auto output_acc = d_bucketOutput.get_access<sycl_write>(cgh);
+    auto d_prefixoffsets_acc = d_prefixoffsets_buff.get_access<sycl_read>(cgh);
+    auto l_offsets_acc = d_offsets_buff.get_access<sycl_read>(cgh);
+    sycl::local_accessor <unsigned int, 1> s_offset (sycl::range<1>(BUCKET_BLOCK_MEMORY), cgh);
 
-      auto input_acc = d_input_buff.get_access<sycl_read>(cgh);
-      auto indice_acc = d_indice_buff.get_access<sycl_read>(cgh);
-      auto output_acc = d_bucketOutput.get_access<sycl_write>(cgh);
-      auto d_prefixoffsets_acc = d_prefixoffsets_buff.get_access<sycl_read>(cgh);
-      auto l_offsets_acc = d_offsets_buff.get_access<sycl_read>(cgh);
-      accessor <unsigned int, 1, sycl_read_write, access::target::local> 
-      s_offset (BUCKET_BLOCK_MEMORY, cgh);
-
-      cgh.parallel_for<class bucketsort>(
-          nd_range<1>(range<1>(globalfinal),
-            range<1>(localfinal)), [=] (nd_item<1> item) {
-#include "kernel_bucketsort.sycl"
-          });
-      });
-  q.wait();
+    cgh.parallel_for<class bucketsort>(
+      sycl::nd_range<1>(sycl::range<1>(globalfinal), sycl::range<1>(localfinal)),
+      [=] (sycl::nd_item<1> item) {
+      #include "kernel_bucketsort.sycl"
+    });
+  }).wait();
 
   free(pivotPoints);
   free(historesult);

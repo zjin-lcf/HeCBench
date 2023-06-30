@@ -19,17 +19,14 @@
   on 15/03/2011
  ***********************************************/
 
+#include <sycl/sycl.hpp>
 #include "streamcluster.h"
 
-#include "common.h"
-
 #ifdef USE_GPU
-gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-
-queue q(dev_sel);
 
 #include "streamcluster_cl.h"
 
@@ -78,7 +75,7 @@ double time_shuffle;
 double time_gain_dist;
 double time_gain_init;
 double time_FL;
-#endif 
+#endif
 
 double gettime() {
   struct timeval t;
@@ -89,7 +86,7 @@ double gettime() {
 void inttofile(int data, char *filename){
   FILE *fp = fopen(filename, "w");
   fprintf(fp, "%d ", data);
-  fclose(fp);  
+  fclose(fp);
 }
 
 int isIdentical(float *i, float *j, int D){
@@ -107,7 +104,7 @@ int isIdentical(float *i, float *j, int D){
 
 }
 
-/* comparator for floating point numbers 
+/* comparator for floating point numbers
    static int floatcomp(const void *i, const void *j)
    {
    float a, b;
@@ -201,7 +198,7 @@ float pspeedy(Points *points, float z, long *kcenter, int pid, pthread_barrier_t
   static float totalcost;
 
   static bool open = false;
-  static float* costs; //cost for each thread. 
+  static float* costs; //cost for each thread.
   static int i;
 
 #ifdef ENABLE_THREADS
@@ -248,9 +245,9 @@ float pspeedy(Points *points, float z, long *kcenter, int pid, pthread_barrier_t
       pthread_barrier_wait(barrier);
       pthread_barrier_wait(barrier);
 #endif
-    } 
+    }
   }
-  else  { // I am the master thread. I decide whether to open a center and notify others if so. 
+  else  { // I am the master thread. I decide whether to open a center and notify others if so.
     for(i = 1; i < points->num; i++ )  {
       bool to_open = ((float)lrand48()/(float)INT_MAX)<(points->p[i].cost/z); //--cambine: what standard?
       if( to_open )  {
@@ -307,7 +304,7 @@ float pspeedy(Points *points, float z, long *kcenter, int pid, pthread_barrier_t
     for( int i = 0; i < nproc; i++ )
     {
       totalcost += costs[i];
-    } 
+    }
     free(costs);
   }
 #ifdef ENABLE_THREADS
@@ -341,7 +338,7 @@ float pspeedy(Points *points, float z, long *kcenter, int pid, pthread_barrier_t
 /* feasible is an array of numfeasible points which may be centers */
 
 float pFL(Points *points, int *feasible, int numfeasible,
-    float z, long *k, int kmax, float cost, long iter, float e, 
+    float z, long *k, int kmax, float cost, long iter, float e,
     int pid, pthread_barrier_t* barrier)
 {
 #ifdef PROFILE_TMP
@@ -374,7 +371,7 @@ float pFL(Points *points, int *feasible, int numfeasible,
       x = i%numfeasible;
       change += pgain(feasible[x], points, z, k, kmax, is_center, center_table, switch_membership,
           &serial, &cpu_gpu_memcpy, &memcpy_back, &gpu_malloc, &kernel_time);
-    }    
+    }
     cost -= change;
 #ifdef PRINTINFO
     if( pid == 0 ) {
@@ -407,14 +404,14 @@ int selectfeasible_fast(Points *points, int **feasible, int kmin, int pid, pthre
   float* accumweight;
   float totalweight;
 
-  /* 
-     Calcuate my block. 
-     For now this routine does not seem to be the bottleneck, so it is not parallelized. 
-     When necessary, this can be parallelized by setting k1 and k2 to 
+  /*
+     Calcuate my block.
+     For now this routine does not seem to be the bottleneck, so it is not parallelized.
+     When necessary, this can be parallelized by setting k1 and k2 to
      proper values and calling this routine from all threads ( it is called only
-     by thread 0 for now ). 
+     by thread 0 for now ).
      Note that when parallelized, the randomization might not be the same and it might
-     not be difficult to measure the parallel speed-up for the whole program. 
+     not be difficult to measure the parallel speed-up for the whole program.
      */
   //  long bsize = numfeasible;
   long k1 = 0;
@@ -443,22 +440,22 @@ int selectfeasible_fast(Points *points, int **feasible, int kmin, int pid, pthre
     //binary search
     l=0;
     r=points->num-1;
-    if( accumweight[0] > w )  { 
-      (*feasible)[i]=0; 
+    if( accumweight[0] > w )  {
+      (*feasible)[i]=0;
       continue;
     }
     while( l+1 < r ) {
       k = (l+r)/2;
       if( accumweight[k] > w ) {
         r = k;
-      } 
+      }
       else {
         l=k;
       }
     }
     (*feasible)[i]=r;
   }
-  free(accumweight); 
+  free(accumweight);
 #ifdef PROFILE_TMP
   double t2 = gettime();
   time_select_feasible += t2-t1;
@@ -508,7 +505,7 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
   }
   hizs[pid] = myhiz;
 
-#ifdef ENABLE_THREADS  
+#ifdef ENABLE_THREADS
   pthread_barrier_wait(barrier);
 #endif
 
@@ -526,7 +523,7 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
     }
     cost = 0;
     if( pid== 0 ) {
-      free(hizs); 
+      free(hizs);
       *kfinal = k;
     }
     return cost;
@@ -548,7 +545,7 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
 #ifdef PRINTINFO
   if( pid==0)
     printf("thread %d: second call to speedy, cost=%lf, k=%d\n",pid,cost,k);
-#endif 
+#endif
   /* if still not enough facilities, assume z is too high */
   while (k < kmin) {
 #ifdef PRINTINFO
@@ -589,7 +586,7 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
     }
 #endif
     /* first get a rough estimate on the FL solution */
-    //    pthread_barrier_wait(barrier);    
+    //    pthread_barrier_wait(barrier);
     cost = pFL(points, feasible, numfeasible,
         z, &k, kmax, cost, (long)(ITER*kmax*log((float)kmax)), 0.1, pid, barrier);
     /* if number of centers seems good, try a more accurate FL */
@@ -624,7 +621,7 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
     /* if k is good, return the result */
     /* if we're stuck, just give up and return what we have */
     if (((k <= kmax)&&(k >= kmin))||((loz >= (0.999)*hiz)) )
-    { 
+    {
       break;
     }
 #ifdef ENABLE_THREADS
@@ -634,7 +631,7 @@ float pkmedian(Points *points, long kmin, long kmax, long* kfinal,
 
   //clean up...
   if( pid==0 ) {
-    free(feasible); 
+    free(feasible);
     free(hizs);
     *kfinal = k;
   }
@@ -773,7 +770,7 @@ void outcenterIDs( Points* centers, long* centerIDs, char* outfile ) {
   fclose(fp);
 }
 
-void streamCluster( PStream* stream, 
+void streamCluster( PStream* stream,
     long kmin, long kmax, int dim,
     long chunksize, long centersize, char* outfile )
 {
@@ -782,7 +779,7 @@ void streamCluster( PStream* stream,
   float* centerBlock = (float*)malloc(centersize*dim*sizeof(float) );
   long* centerIDs = (long*)malloc(centersize*dim*sizeof(long));
 
-  if( block == NULL ) { 
+  if( block == NULL ) {
     fprintf(stderr,"not enough memory for a chunk!\n");
     exit(1);
   }
@@ -792,7 +789,7 @@ void streamCluster( PStream* stream,
   points.num = chunksize;
   points.p = (Point *)malloc(chunksize*sizeof(Point));
   for( int i = 0; i < chunksize; i++ ) {
-    points.p[i].coord = &block[i*dim];    
+    points.p[i].coord = &block[i*dim];
   }
 
   Points centers;
@@ -809,7 +806,7 @@ void streamCluster( PStream* stream,
   long kfinal;
   while(1) {
 
-    size_t numRead  = stream->read(block, dim, chunksize ); 
+    size_t numRead  = stream->read(block, dim, chunksize );
     fprintf(stderr,"read %zu points\n",numRead);
 
     if( stream->ferror() || (numRead < (unsigned int)chunksize && !stream->feof()) ) {
@@ -831,7 +828,7 @@ void streamCluster( PStream* stream,
     fprintf(stderr,"finish local search\n");
     contcenters(&points);
     if( kfinal + centers.num > centersize ) {
-      //here we don't handle the situation where # of centers gets too large. 
+      //here we don't handle the situation where # of centers gets too large.
       fprintf(stderr,"oops! no more space for centers\n");
       exit(1);
     }
@@ -844,7 +841,7 @@ void streamCluster( PStream* stream,
     IDoffset += numRead;
 
 #ifdef PRINTINFO
-    printf("finish copy centers\n"); 
+    printf("finish copy centers\n");
 #endif
     free(is_center);
     free(switch_membership);
@@ -942,13 +939,18 @@ int main(int argc, char **argv)
   __parsec_roi_end();
 #endif
 
-#ifdef PROFILE_TMP 
+#ifdef PROFILE_TMP
   gpu_free = gettime();
 #endif
   free(coord_h);
   free(gl_lower);
   free(work_mem_h);
   free(p_h);
+  sycl::free(work_mem_d, q);
+  sycl::free(coord_d, q);
+  sycl::free(center_table_d, q);
+  sycl::free(switch_membership_d, q);
+  sycl::free(p_d, q);
 
 #ifdef PROFILE_TMP
   gpu_free = gettime() - gpu_free;

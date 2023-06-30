@@ -1,5 +1,5 @@
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 inline int _timestep(float t, float dt)
 {
@@ -57,46 +57,46 @@ void neurongroup_stateupdater (
   const float _lio_33 = expf(-100.0f*dt);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   size_t size = _N * sizeof(float);
 
-  float *d_h  = malloc_device<float>(_N, q);
+  float *d_h  = sycl::malloc_device<float>(_N, q);
   q.memcpy(d_h, _ptr_array_neurongroup_h, size);
 
-  float *d_m  = malloc_device<float>(_N, q);
+  float *d_m  = sycl::malloc_device<float>(_N, q);
   q.memcpy(d_m, _ptr_array_neurongroup_m, size);
 
-  float *d_n  = malloc_device<float>(_N, q);
+  float *d_n  = sycl::malloc_device<float>(_N, q);
   q.memcpy(d_n, _ptr_array_neurongroup_n, size);
 
-  float *d_ge = malloc_device<float>(_N, q);
+  float *d_ge = sycl::malloc_device<float>(_N, q);
   q.memcpy(d_ge, _ptr_array_neurongroup_ge, size);
 
-  float *d_v  = malloc_device<float>(_N, q);
+  float *d_v  = sycl::malloc_device<float>(_N, q);
   q.memcpy(d_v, _ptr_array_neurongroup_v, size); 
 
-  float *d_gi = malloc_device<float>(_N, q);
+  float *d_gi = sycl::malloc_device<float>(_N, q);
   q.memcpy(d_gi, _ptr_array_neurongroup_gi, size); 
 
-  float *d_lastspike = malloc_device<float>(_N, q);
+  float *d_lastspike = sycl::malloc_device<float>(_N, q);
   q.memcpy(d_lastspike, _ptr_array_neurongroup_lastspike, size); 
 
-  char *d_not_refractory = malloc_device<char>(_N, q);
+  char *d_not_refractory = sycl::malloc_device<char>(_N, q);
 
-  range<1> gws ((_N+255)/256*256);
-  range<1> lws (256);
+  sycl::range<1> gws ((_N+255)/256*256);
+  sycl::range<1> lws (256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iteration; i++) {
-    q.submit([&] (handler &h) {
-      h.parallel_for<class nstep>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class nstep>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int _idx = item.get_global_id(0);
         if (_idx >= _N) return;
         float h = d_h[_idx];
@@ -143,12 +143,12 @@ void neurongroup_stateupdater (
   q.memcpy(_ptr_array_neurongroup_not_refractory, d_not_refractory, _N*sizeof(char));
   q.wait();
 
-  free(d_h, q);
-  free(d_m, q);
-  free(d_n, q);
-  free(d_ge, q);
-  free(d_gi, q);
-  free(d_v, q);
-  free(d_lastspike, q);
-  free(d_not_refractory, q);
+  sycl::free(d_h, q);
+  sycl::free(d_m, q);
+  sycl::free(d_n, q);
+  sycl::free(d_ge, q);
+  sycl::free(d_gi, q);
+  sycl::free(d_v, q);
+  sycl::free(d_lastspike, q);
+  sycl::free(d_not_refractory, q);
 }

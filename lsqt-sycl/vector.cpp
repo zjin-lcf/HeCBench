@@ -17,15 +17,15 @@
     along with GPUQT.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "vector.h"
 #include <string.h>    // memcpy
+#include "vector.h"
 #define BLOCK_SIZE 256
 
 #ifndef CPU_ONLY
 void gpu_set_zero(
-  nd_item<1> &item, 
-  const int number_of_elements, 
-  real* __restrict g_state_real, 
+  sycl::nd_item<1> &item,
+  const int number_of_elements,
+  real* __restrict g_state_real,
   real* __restrict g_state_imag)
 {
   int n = item.get_global_id(0);
@@ -48,6 +48,9 @@ void cpu_set_zero(int number_of_elements, real* g_state_real, real* g_state_imag
 void Vector::initialize_gpu(int n)
 {
   this->n = n;
+  array_size = n * sizeof(real);
+  real_part = sycl::malloc_device<real>(n, q);
+  imag_part = sycl::malloc_device<real>(n, q);
 }
 #else
 void Vector::initialize_cpu(int n)
@@ -59,22 +62,20 @@ void Vector::initialize_cpu(int n)
 }
 #endif
 
-Vector::Vector(int n) 
-#ifndef CPU_ONLY
-: real_part{n}, imag_part{n} 
-#endif
+Vector::Vector(int n)
 {
 #ifndef CPU_ONLY
   initialize_gpu(n);
 
-  range<1> gws (((n - 1) / BLOCK_SIZE + 1) * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (((n - 1) / BLOCK_SIZE + 1) * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
-  q.submit([&] (handler &cgh) {
-    auto real_part_acc = real_part.get_access<sycl_discard_write>(cgh);
-    auto imag_part_acc = imag_part.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class reset>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      gpu_set_zero(item, n, real_part_acc.get_pointer(), imag_part_acc.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto real_part_t = real_part;
+    auto imag_part_t = imag_part;
+    cgh.parallel_for<class reset>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      gpu_set_zero(item, n, real_part_t, imag_part_t);
     });
   });
 #else
@@ -84,11 +85,12 @@ Vector::Vector(int n)
 }
 
 #ifndef CPU_ONLY
-void gpu_copy_state(nd_item<1> &item,
+void gpu_copy_state(
+  sycl::nd_item<1> &item,
   const int n,
   const real* __restrict in_real,
-  const real* __restrict in_imag, 
-        real* __restrict out_real, 
+  const real* __restrict in_imag,
+        real* __restrict out_real,
         real* __restrict out_imag)
 {
   int i = item.get_global_id(0);
@@ -107,10 +109,7 @@ void cpu_copy_state(int N, real* in_real, real* in_imag, real* out_real, real* o
 }
 #endif
 
-Vector::Vector(Vector& original) 
-#ifndef CPU_ONLY
-: real_part{original.n}, imag_part{original.n}  
-#endif
+Vector::Vector(Vector& original)
 {
   // Just teach myself: one can access private members of another instance
   // of the class from within the class
@@ -118,17 +117,18 @@ Vector::Vector(Vector& original)
   const int size = original.n;  // implicit capture of 'this'(i.e. n) is not allowed for kernel functions
   initialize_gpu(size);
 
-  range<1> gws (((size - 1) / BLOCK_SIZE + 1) * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (((size - 1) / BLOCK_SIZE + 1) * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
-  q.submit([&] (handler &cgh) {
-    auto real_part_dst = real_part.get_access<sycl_discard_write>(cgh);
-    auto imag_part_dst = imag_part.get_access<sycl_discard_write>(cgh);
-    auto real_part_src = original.real_part.get_access<sycl_read>(cgh);
-    auto imag_part_src = original.imag_part.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class copy>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      gpu_copy_state(item, size, real_part_src.get_pointer(), imag_part_src.get_pointer(), 
-                     real_part_dst.get_pointer(), imag_part_dst.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto real_part_dst = real_part;
+    auto imag_part_dst = imag_part;
+    auto real_part_src = original.real_part;
+    auto imag_part_src = original.imag_part;
+    cgh.parallel_for<class copy>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      gpu_copy_state(item, size, real_part_src, imag_part_src,
+                     real_part_dst, imag_part_dst);
     });
   });
 #else
@@ -140,6 +140,8 @@ Vector::Vector(Vector& original)
 Vector::~Vector()
 {
 #ifndef CPU_ONLY
+  sycl::free(real_part, q);
+  sycl::free(imag_part, q);
 #else
   delete[] real_part;
   delete[] imag_part;
@@ -147,11 +149,12 @@ Vector::~Vector()
 }
 
 #ifndef CPU_ONLY
-void gpu_add_state(nd_item<1> &item,
-  const int n, 
+void gpu_add_state(
+  sycl::nd_item<1> &item,
+  const int n,
   const real*__restrict in_real,
-  const real*__restrict in_imag, 
-        real*__restrict out_real, 
+  const real*__restrict in_imag,
+        real*__restrict out_real,
         real*__restrict out_imag)
 {
   int i = item.get_global_id(0);
@@ -175,19 +178,20 @@ void Vector::add(Vector& other)
 #ifndef CPU_ONLY
   const int size = n;
 
-  range<1> gws (((size - 1) / BLOCK_SIZE + 1) * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (((size - 1) / BLOCK_SIZE + 1) * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
-  q.submit([&] (handler &cgh) {
-    auto real_part_dst = real_part.get_access<sycl_read_write>(cgh);
-    auto imag_part_dst = imag_part.get_access<sycl_read_write>(cgh);
-    auto real_part_src = other.real_part.get_access<sycl_read>(cgh);
-    auto imag_part_src = other.imag_part.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class add2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      gpu_add_state( 
+  q.submit([&] (sycl::handler &cgh) {
+    auto real_part_dst = real_part;
+    auto imag_part_dst = imag_part;
+    auto real_part_src = other.real_part;
+    auto imag_part_src = other.imag_part;
+    cgh.parallel_for<class add2>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      gpu_add_state(
         item,
-        size, real_part_src.get_pointer(), imag_part_src.get_pointer(), 
-        real_part_dst.get_pointer(), imag_part_dst.get_pointer());
+        size, real_part_src, imag_part_src,
+        real_part_dst, imag_part_dst);
     });
   });
 #else
@@ -199,17 +203,18 @@ void Vector::copy(Vector& other)
 {
 #ifndef CPU_ONLY
   const int size = n;
-  range<1> gws (((size - 1) / BLOCK_SIZE + 1) * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (((size - 1) / BLOCK_SIZE + 1) * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
-  q.submit([&] (handler &cgh) {
-    auto real_part_dst = real_part.get_access<sycl_discard_write>(cgh);
-    auto imag_part_dst = imag_part.get_access<sycl_discard_write>(cgh);
-    auto real_part_src = other.real_part.get_access<sycl_read>(cgh);
-    auto imag_part_src = other.imag_part.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class copy2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      gpu_copy_state(item, size, real_part_src.get_pointer(), imag_part_src.get_pointer(), 
-                     real_part_dst.get_pointer(), imag_part_dst.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto real_part_dst = real_part;
+    auto imag_part_dst = imag_part;
+    auto real_part_src = other.real_part;
+    auto imag_part_src = other.imag_part;
+    cgh.parallel_for<class copy2>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      gpu_copy_state(item, size, real_part_src, imag_part_src,
+                     real_part_dst, imag_part_dst);
     });
   });
 #else
@@ -218,11 +223,12 @@ void Vector::copy(Vector& other)
 }
 
 #ifndef CPU_ONLY
-void gpu_apply_sz(nd_item<1> &item, 
-  const int n, 
-  const real* __restrict in_real, 
-  const real* __restrict in_imag, 
-        real* __restrict out_real, 
+void gpu_apply_sz(
+  sycl::nd_item<1> &item,
+  const int n,
+  const real* __restrict in_real,
+  const real* __restrict in_imag,
+        real* __restrict out_real,
         real* __restrict out_imag)
 {
   int i = item.get_global_id(0);
@@ -255,17 +261,18 @@ void Vector::apply_sz(Vector& other)
 {
 #ifndef CPU_ONLY
   const int size = n;
-  range<1> gws (((size - 1) / BLOCK_SIZE + 1) * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (((size - 1) / BLOCK_SIZE + 1) * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
-  q.submit([&] (handler &cgh) {
-    auto real_part_dst = real_part.get_access<sycl_discard_write>(cgh);
-    auto imag_part_dst = imag_part.get_access<sycl_discard_write>(cgh);
-    auto real_part_src = other.real_part.get_access<sycl_read>(cgh);
-    auto imag_part_src = other.imag_part.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class apply_sz>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      gpu_apply_sz(item, size, real_part_src.get_pointer(), imag_part_src.get_pointer(), 
-                     real_part_dst.get_pointer(), imag_part_dst.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    auto real_part_dst = real_part;
+    auto imag_part_dst = imag_part;
+    auto real_part_src = other.real_part;
+    auto imag_part_src = other.imag_part;
+    cgh.parallel_for<class apply_sz>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      gpu_apply_sz(item, size, real_part_src, imag_part_src,
+                     real_part_dst, imag_part_dst);
     });
   });
 #else
@@ -276,17 +283,8 @@ void Vector::apply_sz(Vector& other)
 void Vector::copy_from_host(real* other_real, real* other_imag)
 {
 #ifndef CPU_ONLY
-  q.submit([&] (handler &cgh) {
-    auto real_part_dst = real_part.get_access<sycl_discard_write>(cgh);
-    cgh.copy(other_real, real_part_dst);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto imag_part_dst = imag_part.get_access<sycl_discard_write>(cgh);
-    cgh.copy(other_imag, imag_part_dst);
-  });
-
-  q.wait();
+  q.memcpy(real_part, other_real, array_size);
+  q.memcpy(imag_part, other_imag, array_size);
 #else
   memcpy(real_part, other_real, array_size);
   memcpy(imag_part, other_imag, array_size);
@@ -296,16 +294,8 @@ void Vector::copy_from_host(real* other_real, real* other_imag)
 void Vector::copy_to_host(real* target_real, real* target_imag)
 {
 #ifndef CPU_ONLY
-  q.submit([&] (handler &cgh) {
-    auto real_part_src = real_part.get_access<sycl_read>(cgh);
-    cgh.copy(real_part_src, target_real);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto imag_part_src = imag_part.get_access<sycl_read>(cgh);
-    cgh.copy(imag_part_src, target_imag);
-  });
-
+  q.memcpy(target_real, real_part, array_size);
+  q.memcpy(target_imag, imag_part, array_size);
   q.wait();
 #else
   memcpy(target_real, real_part, array_size);
@@ -315,13 +305,11 @@ void Vector::copy_to_host(real* target_real, real* target_imag)
 
 void Vector::swap(Vector& other)
 {
-  auto tmp_real = std::move(real_part);
-  real_part = std::move(other.real_part);
-  other.real_part = std::move(tmp_real);
-
-  auto tmp_imag = std::move(imag_part);
-  imag_part = std::move(other.imag_part);
-  other.imag_part = std::move(tmp_imag);
+  real* tmp_real = real_part;
+  real* tmp_imag = imag_part;
+  real_part = other.real_part, imag_part = other.imag_part;
+  other.real_part = tmp_real;
+  other.imag_part = tmp_imag;
 }
 
 #ifndef CPU_ONLY
@@ -338,7 +326,7 @@ void warp_reduce(volatile real* s, int t)
 
 #ifndef CPU_ONLY
 void gpu_find_inner_product_1(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int number_of_atoms,
   const real* __restrict g_final_state_real,
   const real* __restrict g_final_state_imag,
@@ -366,7 +354,7 @@ void gpu_find_inner_product_1(
     s_data_real[tid] = (a * c + b * d);
     s_data_imag[tid] = (b * c - a * d);
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
 /*
   if (tid < 256) {
@@ -374,20 +362,20 @@ void gpu_find_inner_product_1(
     s_data_real[tid] += s_data_real[m];
     s_data_imag[tid] += s_data_imag[m];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 */
   if (tid < 128) {
     m = tid + 128;
     s_data_real[tid] += s_data_real[m];
     s_data_imag[tid] += s_data_imag[m];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   if (tid < 64) {
     m = tid + 64;
     s_data_real[tid] += s_data_real[m];
     s_data_imag[tid] += s_data_imag[m];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   if (tid < 32) {
     warp_reduce(s_data_real, tid);
     warp_reduce(s_data_imag, tid);
@@ -433,28 +421,28 @@ void Vector::inner_product_1(int number_of_atoms, Vector& other, Vector& target,
 {
   int grid_size = (number_of_atoms - 1) / BLOCK_SIZE + 1;
 #ifndef CPU_ONLY
-  range<1> gws (grid_size * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
-  q.submit([&] (handler &cgh) {
-    auto real_part_acc = real_part.get_access<sycl_discard_write>(cgh);
-    auto imag_part_acc = imag_part.get_access<sycl_discard_write>(cgh);
-    auto other_real_part_acc = other.real_part.get_access<sycl_read>(cgh);
-    auto other_imag_part_acc = other.imag_part.get_access<sycl_read>(cgh);
-    auto target_real_part_acc = target.real_part.get_access<sycl_read>(cgh);
-    auto target_imag_part_acc = target.imag_part.get_access<sycl_read>(cgh);
-    accessor<real, 1, sycl_read_write, access::target::local> s_data_real(BLOCK_SIZE, cgh);
-    accessor<real, 1, sycl_read_write, access::target::local> s_data_imag(BLOCK_SIZE, cgh);
-    cgh.parallel_for<class dot1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-
+  sycl::range<1> gws (grid_size * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
+  q.submit([&] (sycl::handler &cgh) {
+    auto real_part_t = real_part;
+    auto imag_part_t = imag_part;
+    auto other_real_part = other.real_part;
+    auto other_imag_part = other.imag_part;
+    auto target_real_part = target.real_part;
+    auto target_imag_part = target.imag_part;
+    sycl::local_accessor<real, 1> s_data_real(sycl::range<1>(BLOCK_SIZE), cgh);
+    sycl::local_accessor<real, 1> s_data_imag(sycl::range<1>(BLOCK_SIZE), cgh);
+    cgh.parallel_for<class dot1>(
+     sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
      gpu_find_inner_product_1(
        item,
-       number_of_atoms, 
-       real_part_acc.get_pointer(), 
-       imag_part_acc.get_pointer(), 
-       other_real_part_acc.get_pointer(), 
-       other_imag_part_acc.get_pointer(), 
-       target_real_part_acc.get_pointer(),
-       target_imag_part_acc.get_pointer(), 
+       number_of_atoms,
+       real_part_t,
+       imag_part_t,
+       other_real_part,
+       other_imag_part,
+       target_real_part,
+       target_imag_part,
        s_data_real.get_pointer(),
        s_data_imag.get_pointer(),
        offset);
@@ -469,7 +457,7 @@ void Vector::inner_product_1(int number_of_atoms, Vector& other, Vector& target,
 
 #ifndef CPU_ONLY
 void gpu_find_inner_product_2(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int number_of_atoms,
   const real* __restrict g_inner_product_1_real,
   const real* __restrict g_inner_product_1_imag,
@@ -495,7 +483,7 @@ void gpu_find_inner_product_2(
       s_data_imag[tid] += g_inner_product_1_imag[m];
     }
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
 /*
   if (tid < 256) {
@@ -503,20 +491,20 @@ void gpu_find_inner_product_2(
     s_data_real[tid] += s_data_real[m];
     s_data_imag[tid] += s_data_imag[m];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 */
   if (tid < 128) {
     m = tid + 128;
     s_data_real[tid] += s_data_real[m];
     s_data_imag[tid] += s_data_imag[m];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   if (tid < 64) {
     m = tid + 64;
     s_data_real[tid] += s_data_real[m];
     s_data_imag[tid] += s_data_imag[m];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
   if (tid < 32) {
     warp_reduce(s_data_real, tid);
     warp_reduce(s_data_imag, tid);
@@ -552,24 +540,25 @@ void cpu_find_inner_product_2(
 void Vector::inner_product_2(int number_of_atoms, int number_of_moments, Vector& target)
 {
 #ifndef CPU_ONLY
-  range<1> gws (number_of_moments * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (number_of_moments * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
-  q.submit([&] (handler &cgh) {
-    auto real_part_dst = target.real_part.get_access<sycl_discard_write>(cgh);
-    auto imag_part_dst = target.imag_part.get_access<sycl_discard_write>(cgh);
-    auto real_part_src = real_part.get_access<sycl_read>(cgh);
-    auto imag_part_src = imag_part.get_access<sycl_read>(cgh);
-    accessor<real, 1, sycl_read_write, access::target::local> s_data_real(BLOCK_SIZE, cgh);
-    accessor<real, 1, sycl_read_write, access::target::local> s_data_imag(BLOCK_SIZE, cgh);
-    cgh.parallel_for<class dot2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    auto real_part_dst = target.real_part;
+    auto imag_part_dst = target.imag_part;
+    auto real_part_src = real_part;
+    auto imag_part_src = imag_part;
+    sycl::local_accessor<real, 1> s_data_real(sycl::range<1>(BLOCK_SIZE), cgh);
+    sycl::local_accessor<real, 1> s_data_imag(sycl::range<1>(BLOCK_SIZE), cgh);
+    cgh.parallel_for<class dot2>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gpu_find_inner_product_2(
         item,
-        number_of_atoms, 
-        real_part_src.get_pointer(), 
-        imag_part_src.get_pointer(), 
-        real_part_dst.get_pointer(),
-        imag_part_dst.get_pointer(),
+        number_of_atoms,
+        real_part_src,
+        imag_part_src,
+        real_part_dst,
+        imag_part_dst,
         s_data_real.get_pointer(),
         s_data_imag.get_pointer());
     });

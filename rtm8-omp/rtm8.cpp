@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
   float* image_cpu = (float*)malloc(ArraySize * sizeof(float));
 
   float a[5];
-  double pts, t0, t1, k0, k1, dt, flops, pt_rate, flop_rate, speedup, memory;
+  double pts, t0, t1, dt, flops, pt_rate, flop_rate, speedup, memory;
 
   memory = ArraySize*sizeof(float)*6; 
   pts = (double)repeat*(nx-8)*(ny-8)*(nz-8);
@@ -109,7 +109,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  t0 = mysecond();
   #pragma omp target data map(to: current_s[0:ArraySize]) \
                           map(to: current_r[0:ArraySize]) \
                           map(to: a[0:5]) \
@@ -118,7 +117,7 @@ int main(int argc, char *argv[]) {
                           map(alloc: next_s[0:ArraySize]) \
                           map(tofrom: image_gpu[0:ArraySize]) 
   {
-    k0 = mysecond();
+    t0 = mysecond();
   
     for (int t = 0; t < repeat; t++) {
       #pragma omp target teams distribute parallel for collapse(3) thread_limit(256)
@@ -166,11 +165,9 @@ int main(int argc, char *argv[]) {
       }
     }
   
-    k1 = mysecond();
+    t1 = mysecond();
+    dt = t1 - t0;
   }
-
-  t1 = mysecond();
-  dt = t1 - t0;
 
   // CPU execution
   t0 = mysecond();
@@ -197,7 +194,7 @@ int main(int argc, char *argv[]) {
   printf("pt_rate (millions/sec) = %lf\n", pt_rate/1e6);
   printf("flop_rate (Gflops) = %lf\n", flop_rate/1e9);
   printf("speedup over cpu = %lf\n", speedup);
-  printf("average kernel execution time = %lf (s)\n", (k1 - k0) / repeat);
+  printf("average kernel execution time = %lf (s)\n", dt / repeat);
 
   //release arrays
   free(vsq);

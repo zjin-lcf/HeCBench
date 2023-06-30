@@ -11,7 +11,9 @@
 #include <vector>
 #include <memory>  // std::align
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
+
+using float4 = sycl::float4;
 
 #define NPTS (2048*8)
 #define NDIM 128
@@ -51,16 +53,16 @@ void CheckMatches(int *h_index, int *h_index2, float *h_score, float *h_score2)
     ndiff += (h_index[i] != h_index2[i]);
 #ifdef DEBUG
     if (h_index[i] != h_index2[i])
-      std::cout << "  " << i << " " << h_index[i] << " " << h_index2[i] << " " 
+      std::cout << "  " << i << " " << h_index[i] << " " << h_index2[i] << " "
                 << h_score[i] << " " << h_score2[i] << std::endl;
 #endif
   }
   std::cout << "Number of incorrect matches: " << ndiff << std::endl;
 }
-      
 
-void Match1(nd_item<1> &item,
-            const float *__restrict d_pts1, 
+
+void Match1(sycl::nd_item<1> &item,
+            const float *__restrict d_pts1,
             const float *__restrict d_pts2,
                   float *__restrict d_score,
                     int *__restrict d_index)
@@ -68,7 +70,7 @@ void Match1(nd_item<1> &item,
   int p1 = item.get_global_id(0);
   float max_score = 0.0f;
   int index = -1;
-  
+
   for (int p2=0;p2<NPTS;p2++) {
     float score = 0.0f;
     for (int d=0;d<NDIM;d++)
@@ -78,16 +80,16 @@ void Match1(nd_item<1> &item,
       index = p2;
     }
   }
-  
+
   d_score[p1] = max_score;
   d_index[p1] = index;
 }
 
-void Match2(nd_item<2> &item,
+void Match2(sycl::nd_item<2> &item,
                   float *__restrict buffer1,
                   float *__restrict buffer2,
                   float *__restrict scores,
-            const float *__restrict d_pts1, 
+            const float *__restrict d_pts1,
             const float *__restrict d_pts2,
                   float *__restrict d_score,
                     int *__restrict d_index)
@@ -99,72 +101,22 @@ void Match2(nd_item<2> &item,
   if (ty<M2W)
     for (int d=tx;d<NDIM;d+=M2W)
       for (int j=ty;j<M2W;j+=M2H)
-	buffer1[j*NDIM + d] = d_pts1[(bp1 + j)*NDIM + d];   
-  item.barrier(access::fence_space::local_space);
-  
-  float max_score = 0.0f;
-  int index = -1;
-  for (int bp2=0;bp2<NPTS;bp2+=M2H) {
-    for (int d=tx;d<NDIM;d+=M2W)
-      buffer2[ty*NDIM + d] = d_pts2[(bp2 + ty)*NDIM + d]; 
-    item.barrier(access::fence_space::local_space);
+	buffer1[j*NDIM + d] = d_pts1[(bp1 + j)*NDIM + d];
+  item.barrier(sycl::access::fence_space::local_space);
 
-    float score = 0.0f;
-    for (int d=0;d<NDIM;d++) 
-      score += buffer1[tx*NDIM + d]*buffer2[ty*NDIM + d];   
-    scores[idx] = score;
-    item.barrier(access::fence_space::local_space);
-    
-    if (ty==0) {
-      for (int i=0;i<M2H;i++) {
-	if (scores[i*M2W + tx]>max_score) {
-	  max_score = scores[i*M2W + tx];
-	  index = bp2 + i;
-	}
-      }
-    }
-    item.barrier(access::fence_space::local_space);
-  }
-  
-  if (ty==0) {
-    d_score[bp1 + tx] = max_score;
-    d_index[bp1 + tx] = index;
-  }
-}
-
-
-void Match3(nd_item<2> &item,
-                  float *__restrict buffer1,
-                  float *__restrict buffer2,
-                  float *__restrict scores,
-            const float *__restrict d_pts1, 
-            const float *__restrict d_pts2,
-                  float *__restrict d_score,
-                    int *__restrict d_index)
-{
-  int tx = item.get_local_id(1);
-  int ty = item.get_local_id(0);
-  int idx = tx + M2W*ty;
-  int bp1 = M2W*item.get_group(1);
-  if (ty<M2W)
-    for (int d=tx;d<NDIM;d+=M2W)
-      for (int j=ty;j<M2W;j+=M2H)
-	buffer1[j*(NDIM + 1) + d] = d_pts1[(bp1 + j)*NDIM + d]; 
-  item.barrier(access::fence_space::local_space);
-  
   float max_score = 0.0f;
   int index = -1;
   for (int bp2=0;bp2<NPTS;bp2+=M2H) {
     for (int d=tx;d<NDIM;d+=M2W)
       buffer2[ty*NDIM + d] = d_pts2[(bp2 + ty)*NDIM + d];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     float score = 0.0f;
-    for (int d=0;d<NDIM;d++) 
-      score += buffer1[tx*(NDIM + 1) + d]*buffer2[ty*NDIM + d]; 
+    for (int d=0;d<NDIM;d++)
+      score += buffer1[tx*NDIM + d]*buffer2[ty*NDIM + d];
     scores[idx] = score;
-    item.barrier(access::fence_space::local_space);
-    
+    item.barrier(sycl::access::fence_space::local_space);
+
     if (ty==0) {
       for (int i=0;i<M2H;i++) {
 	if (scores[i*M2W + tx]>max_score) {
@@ -173,9 +125,9 @@ void Match3(nd_item<2> &item,
 	}
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
-  
+
   if (ty==0) {
     d_score[bp1 + tx] = max_score;
     d_index[bp1 + tx] = index;
@@ -183,11 +135,61 @@ void Match3(nd_item<2> &item,
 }
 
 
-void Match4(nd_item<2> &item,
+void Match3(sycl::nd_item<2> &item,
+                  float *__restrict buffer1,
+                  float *__restrict buffer2,
+                  float *__restrict scores,
+            const float *__restrict d_pts1,
+            const float *__restrict d_pts2,
+                  float *__restrict d_score,
+                    int *__restrict d_index)
+{
+  int tx = item.get_local_id(1);
+  int ty = item.get_local_id(0);
+  int idx = tx + M2W*ty;
+  int bp1 = M2W*item.get_group(1);
+  if (ty<M2W)
+    for (int d=tx;d<NDIM;d+=M2W)
+      for (int j=ty;j<M2W;j+=M2H)
+	buffer1[j*(NDIM + 1) + d] = d_pts1[(bp1 + j)*NDIM + d];
+  item.barrier(sycl::access::fence_space::local_space);
+
+  float max_score = 0.0f;
+  int index = -1;
+  for (int bp2=0;bp2<NPTS;bp2+=M2H) {
+    for (int d=tx;d<NDIM;d+=M2W)
+      buffer2[ty*NDIM + d] = d_pts2[(bp2 + ty)*NDIM + d];
+    item.barrier(sycl::access::fence_space::local_space);
+
+    float score = 0.0f;
+    for (int d=0;d<NDIM;d++)
+      score += buffer1[tx*(NDIM + 1) + d]*buffer2[ty*NDIM + d];
+    scores[idx] = score;
+    item.barrier(sycl::access::fence_space::local_space);
+
+    if (ty==0) {
+      for (int i=0;i<M2H;i++) {
+	if (scores[i*M2W + tx]>max_score) {
+	  max_score = scores[i*M2W + tx];
+	  index = bp2 + i;
+	}
+      }
+    }
+    item.barrier(sycl::access::fence_space::local_space);
+  }
+
+  if (ty==0) {
+    d_score[bp1 + tx] = max_score;
+    d_index[bp1 + tx] = index;
+  }
+}
+
+
+void Match4(sycl::nd_item<2> &item,
                  float4 *__restrict buffer1,
                  float4 *__restrict buffer2,
                   float *__restrict scores,
-            const float *__restrict d_pts1, 
+            const float *__restrict d_pts1,
             const float *__restrict d_pts2,
                   float *__restrict d_score,
                     int *__restrict d_index)
@@ -199,26 +201,26 @@ void Match4(nd_item<2> &item,
   if (ty<M2W)
     for (int d=tx;d<NDIM/4;d+=M2W)
       for (int j=ty;j<M2W;j+=M2H)
-	buffer1[j*(NDIM/4 + 1) + d] = ((float4*)d_pts1)[(bp1 + j)*(NDIM/4) + d]; 
-  item.barrier(access::fence_space::local_space);
-  
+	buffer1[j*(NDIM/4 + 1) + d] = ((float4*)d_pts1)[(bp1 + j)*(NDIM/4) + d];
+  item.barrier(sycl::access::fence_space::local_space);
+
   float max_score = 0.0f;
   int index = -1;
   for (int bp2=0;bp2<NPTS;bp2+=M2H) {
     for (int d=tx;d<NDIM/4;d+=M2W)
-      buffer2[ty*NDIM/4 + d] = ((float4*)d_pts2)[(bp2 + ty)*(NDIM/4) + d]; 
-    item.barrier(access::fence_space::local_space);
+      buffer2[ty*NDIM/4 + d] = ((float4*)d_pts2)[(bp2 + ty)*(NDIM/4) + d];
+    item.barrier(sycl::access::fence_space::local_space);
 
     float score = 0.0f;
     for (int d=0;d<NDIM/4;d++) {
-      float4 v1 = buffer1[tx*(NDIM/4 + 1) + d]; 
-      float4 v2 = buffer2[ty*(NDIM/4) + d];     
+      float4 v1 = buffer1[tx*(NDIM/4 + 1) + d];
+      float4 v2 = buffer2[ty*(NDIM/4) + d];
       score += v1.x()*v2.x(); score += v1.y()*v2.y();
       score += v1.z()*v2.z(); score += v1.w()*v2.w();
     }
     scores[idx] = score;
-    item.barrier(access::fence_space::local_space);
-    
+    item.barrier(sycl::access::fence_space::local_space);
+
     if (ty==0) {
       for (int i=0;i<M2H;i++) {
 	if (scores[i*M2W + tx]>max_score) {
@@ -227,20 +229,20 @@ void Match4(nd_item<2> &item,
 	}
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
-  
+
   if (ty==0) {
     d_score[bp1 + tx] = max_score;
     d_index[bp1 + tx] = index;
   }
 }
 
-void Match5(nd_item<2> &item,
+void Match5(sycl::nd_item<2> &item,
                  float4 *__restrict buffer1,
                  float4 *__restrict buffer2,
                   float *__restrict scores,
-            const float *__restrict d_pts1, 
+            const float *__restrict d_pts1,
             const float *__restrict d_pts2,
                   float *__restrict d_score,
                     int *__restrict d_index)
@@ -252,23 +254,23 @@ void Match5(nd_item<2> &item,
     for (int d=tx;d<NDIM/4;d+=M5W)
       for (int j=ty;j<M5W;j+=M5H)
 	buffer1[j*(NDIM/4 + 1) + d] = ((float4*)d_pts1)[(bp1 + j)*(NDIM/4) + d];
-  item.barrier(access::fence_space::local_space);
-  
+  item.barrier(sycl::access::fence_space::local_space);
+
   float max_score = 0.0f;
   int index = -1;
   for (int bp2=0;bp2<NPTS;bp2+=M5H) {
     for (int d=tx;d<NDIM/4;d+=M5W)
       buffer2[ty*NDIM/4 + d] = ((float4*)d_pts2)[(bp2 + ty)*(NDIM/4) + d];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
-    if (ty<M5H/M5R) {  
-      float score[M5R];                                    
+    if (ty<M5H/M5R) {
+      float score[M5R];
       for (int dy=0;dy<M5R;dy++)
 	score[dy] = 0.0f;
       for (int d=0;d<NDIM/4;d++) {
 	float4 v1 = buffer1[tx*(NDIM/4 + 1) + d];
 	for (int dy=0;dy<M5R;dy++) {
-	  float4 v2 = buffer2[(M5R*ty + dy)*(NDIM/4) + d];    
+	  float4 v2 = buffer2[(M5R*ty + dy)*(NDIM/4) + d];
 	  score[dy] += v1.x()*v2.x(); score[dy] += v1.y()*v2.y();
 	  score[dy] += v1.z()*v2.z(); score[dy] += v1.w()*v2.w();
 	}
@@ -276,8 +278,8 @@ void Match5(nd_item<2> &item,
       for (int dy=0;dy<M5R;dy++)
 	scores[tx + M5W*(M5R*ty + dy)] = score[dy];
     }
-    item.barrier(access::fence_space::local_space);
-    
+    item.barrier(sycl::access::fence_space::local_space);
+
     if (ty==0) {
       for (int i=0;i<M5H;i++) {
 	if (scores[i*M2W + tx]>max_score) {
@@ -286,7 +288,7 @@ void Match5(nd_item<2> &item,
 	}
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   if (ty==0) {
@@ -296,10 +298,10 @@ void Match5(nd_item<2> &item,
 }
 
 
-void Match6(nd_item<2> &item,
+void Match6(sycl::nd_item<2> &item,
                  float4 *__restrict buffer1,
                  float4 *__restrict buffer2,
-            const float *__restrict d_pts1, 
+            const float *__restrict d_pts1,
             const float *__restrict d_pts2,
                   float *__restrict d_score,
                     int *__restrict d_index)
@@ -311,61 +313,61 @@ void Match6(nd_item<2> &item,
     for (int d=tx;d<NDIM/4;d+=M5W)
       for (int j=ty;j<M5W;j+=M5H)
 	buffer1[j*(NDIM/4 + 1) + d] = ((float4*)d_pts1)[(bp1 + j)*(NDIM/4) + d];
-  
+
   float max_score = 0.0f;
-  int index = -1;    
+  int index = -1;
   for (int bp2=0;bp2<NPTS;bp2+=M5H) {
     for (int d=tx;d<NDIM/4;d+=M5W)
       buffer2[ty*NDIM/4 + d] = ((float4*)d_pts2)[(bp2 + ty)*(NDIM/4) + d];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
-    if (ty<M5H/M5R) {  
-      float score[M5R];                                    
+    if (ty<M5H/M5R) {
+      float score[M5R];
       for (int dy=0;dy<M5R;dy++)
 	score[dy] = 0.0f;
       for (int d=0;d<NDIM/4;d++) {
 	float4 v1 = buffer1[tx*(NDIM/4 + 1) + d];
 	for (int dy=0;dy<M5R;dy++) {
-	  float4 v2 = buffer2[(M5R*ty + dy)*(NDIM/4) + d];    
+	  float4 v2 = buffer2[(M5R*ty + dy)*(NDIM/4) + d];
 	  score[dy] += v1.x()*v2.x(); score[dy] += v1.y()*v2.y();
 	  score[dy] += v1.z()*v2.z(); score[dy] += v1.w()*v2.w();
 	}
       }
       for (int dy=0;dy<M5R;dy++) {
-	if (score[dy]>max_score) {   
-	  max_score = score[dy];     
-	  index = bp2 + M5R*ty + dy;               
+	if (score[dy]>max_score) {
+	  max_score = score[dy];
+	  index = bp2 + M5R*ty + dy;
 	}
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   float *scores = (float*)buffer1;
   int *indices = (int*)&scores[M5W*M5H/M5R];
   if (ty<M5H/M5R) {
-    scores[ty*M5W + tx] = max_score;  
-    indices[ty*M5W + tx] = index;     
+    scores[ty*M5W + tx] = max_score;
+    indices[ty*M5W + tx] = index;
   }
-  item.barrier(access::fence_space::local_space);
-  
+  item.barrier(sycl::access::fence_space::local_space);
+
   if (ty==0) {
     max_score = scores[tx];
     index = indices[tx];
     for (int y=0;y<M5H/M5R;y++)
       if (scores[y*M5W + tx]>max_score) {
-	max_score = scores[y*M5W + tx]; 
-	index = indices[y*M5W + tx];    
+	max_score = scores[y*M5W + tx];
+	index = indices[y*M5W + tx];
       }
     d_score[bp1 + tx] = max_score;
     d_index[bp1 + tx] = index;
   }
 }
 
-void Match7(nd_item<2> &item,
+void Match7(sycl::nd_item<2> &item,
                  float4 *__restrict buffer1,
                  float4 *__restrict buffer2,
-            const float *__restrict d_pts1, 
+            const float *__restrict d_pts1,
             const float *__restrict d_pts2,
                   float *__restrict d_score,
                     int *__restrict d_index)
@@ -374,24 +376,24 @@ void Match7(nd_item<2> &item,
   int ty = item.get_local_id(0);
   int bp1 = M7W*item.get_group(1);
   for (int d=tx;d<NDIM/4;d+=M7W)
-    for (int j=ty;j<M7W;j+=M7H/M7R)      
+    for (int j=ty;j<M7W;j+=M7H/M7R)
       buffer1[j*NDIM/4 + (d + j)%(NDIM/4)] = ((float4*)d_pts1)[(bp1 + j)*(NDIM/4) + d];
-  
+
   float max_score = 0.0f;
-  int index = -1;    
+  int index = -1;
   for (int bp2=0;bp2<NPTS;bp2+=M7H) {
     for (int d=tx;d<NDIM/4;d+=M7W)
-      for (int j=ty;j<M7H;j+=M7H/M7R)       
+      for (int j=ty;j<M7H;j+=M7H/M7R)
 	buffer2[j*NDIM/4 + d] = ((float4*)d_pts2)[(bp2 + j)*(NDIM/4) + d];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
-    float score[M7R];                                    
+    float score[M7R];
     for (int dy=0;dy<M7R;dy++)
       score[dy] = 0.0f;
     for (int d=0;d<NDIM/4;d++) {
       float4 v1 = buffer1[tx*NDIM/4 + (d + tx)%(NDIM/4)];
       for (int dy=0;dy<M7R;dy++) {
-	float4 v2 = buffer2[(M7R*ty + dy)*(NDIM/4) + d];    
+	float4 v2 = buffer2[(M7R*ty + dy)*(NDIM/4) + d];
 	score[dy] += v1.x()*v2.x();
         score[dy] += v1.y()*v2.y();
 	score[dy] += v1.z()*v2.z();
@@ -399,37 +401,37 @@ void Match7(nd_item<2> &item,
       }
     }
     for (int dy=0;dy<M7R;dy++) {
-      if (score[dy]>max_score) {   
-	max_score = score[dy];     
-	index = bp2 + M7R*ty + dy;               
+      if (score[dy]>max_score) {
+	max_score = score[dy];
+	index = bp2 + M7R*ty + dy;
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   float *scores = (float*)buffer1;
   int *indices = (int*)&scores[M7W*M7H/M7R];
-  scores[ty*M7W + tx] = max_score;  
-  indices[ty*M7W + tx] = index;     
-  item.barrier(access::fence_space::local_space);
-  
+  scores[ty*M7W + tx] = max_score;
+  indices[ty*M7W + tx] = index;
+  item.barrier(sycl::access::fence_space::local_space);
+
   if (ty==0) {
     max_score = scores[tx];
     index = indices[tx];
     for (int y=0;y<M7H/M7R;y++)
       if (scores[y*M7W + tx]>max_score) {
-	max_score = scores[y*M7W + tx]; 
-	index = indices[y*M7W + tx];    
+	max_score = scores[y*M7W + tx];
+	index = indices[y*M7W + tx];
       }
     d_score[bp1 + tx] = max_score;
     d_index[bp1 + tx] = index;
   }
 }
 
-void Match8(nd_item<2> &item,
+void Match8(sycl::nd_item<2> &item,
                  float4 *__restrict buffer1,
                  float4 *__restrict buffer2,
-            const float *__restrict d_pts1, 
+            const float *__restrict d_pts1,
             const float *__restrict d_pts2,
                   float *__restrict d_score,
                     int *__restrict d_index)
@@ -438,7 +440,7 @@ void Match8(nd_item<2> &item,
   int ty = item.get_local_id(0);
   int bp1 = M7W*item.get_group(1);
   for (int d=tx;d<NDIM/4;d+=M7W)
-    for (int j=ty;j<M7W;j+=M7H/M7R)     
+    for (int j=ty;j<M7W;j+=M7H/M7R)
       buffer1[j*NDIM/4 + (d + j)%(NDIM/4)] = ((float4*)d_pts1)[(bp1 + j)*(NDIM/4) + d];
 
 #define NRX 2
@@ -453,21 +455,21 @@ void Match8(nd_item<2> &item,
   int iy = idx/(M7W/NRX);
   for (int bp2=0;bp2<NPTS;bp2+=M7H) {
     for (int d=tx;d<NDIM/4;d+=M7W)
-      for (int j=ty;j<M7H;j+=M7H/M7R)       
+      for (int j=ty;j<M7H;j+=M7H/M7R)
 	buffer2[j*NDIM/4 + d] = ((float4*)d_pts2)[(bp2 + j)*(NDIM/4) + d];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     if (idx<M7W*M7H/M7R/NRX) {
-      float score[M7R][NRX];                                    
+      float score[M7R][NRX];
       for (int dy=0;dy<M7R;dy++)
 	for (int i=0;i<NRX;i++)
 	  score[dy][i] = 0.0f;
       for (int d=0;d<NDIM/4;d++) {
 	float4 v1[NRX];
-	for (int i=0;i<NRX;i++) 
+	for (int i=0;i<NRX;i++)
 	  v1[i] = buffer1[((M7W/NRX)*i + ix)*NDIM/4 + (d + (M7W/NRX)*i + ix)%(NDIM/4)];
 	for (int dy=0;dy<M7R;dy++) {
-	  float4 v2 = buffer2[(M7R*iy + dy)*(NDIM/4) + d];    
+	  float4 v2 = buffer2[(M7R*iy + dy)*(NDIM/4) + d];
 	  for (int i=0;i<NRX;i++) {
 	    score[dy][i] += v1[i].x()*v2.x();
 	    score[dy][i] += v1[i].y()*v2.y();
@@ -479,42 +481,42 @@ void Match8(nd_item<2> &item,
       for (int dy=0;dy<M7R;dy++) {
 	for (int i=0;i<NRX;i++) {
 	  if (score[dy][i]>max_score[i]) {
-	    max_score[i] = score[dy][i];     
+	    max_score[i] = score[dy][i];
 	    index[i] = bp2 + M7R*iy + dy;
 	  }
 	}
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   float *scores = (float*)buffer1;
   int *indices = (int*)&scores[M7W*M7H/M7R];
   if (idx<M7W*M7H/M7R/NRX) {
     for (int i=0;i<NRX;i++) {
-      scores[iy*M7W + (M7W/NRX)*i + ix] = max_score[i];  
+      scores[iy*M7W + (M7W/NRX)*i + ix] = max_score[i];
       indices[iy*M7W + (M7W/NRX)*i + ix] = index[i];
     }
   }
-  item.barrier(access::fence_space::local_space);
-  
+  item.barrier(sycl::access::fence_space::local_space);
+
   if (ty==0) {
     float max_score = scores[tx];
     int index = indices[tx];
     for (int y=0;y<M7H/M7R;y++)
       if (scores[y*M7W + tx]>max_score) {
-	max_score = scores[y*M7W + tx]; 
-	index = indices[y*M7W + tx];    
+	max_score = scores[y*M7W + tx];
+	index = indices[y*M7W + tx];
       }
     d_score[bp1 + tx] = max_score;
     d_index[bp1 + tx] = index;
   }
 }
 
-void Match9(nd_item<2> &item,
+void Match9(sycl::nd_item<2> &item,
                  float4 *__restrict buffer1,
                  float4 *__restrict buffer2,
-            const float *__restrict d_pts1, 
+            const float *__restrict d_pts1,
             const float *__restrict d_pts2,
                   float *__restrict d_score,
                     int *__restrict d_index)
@@ -523,7 +525,7 @@ void Match9(nd_item<2> &item,
   int ty = item.get_local_id(0);
   int bp1 = M7W*item.get_group(1);
   for (int d=tx;d<NDIM/4;d+=M7W)
-    for (int j=ty;j<M7W;j+=M7H/M7R/NRX)     
+    for (int j=ty;j<M7W;j+=M7H/M7R/NRX)
       buffer1[j*NDIM/4 + (d + j)%(NDIM/4)] = ((float4*)d_pts1)[(bp1 + j)*(NDIM/4) + d];
 
   float max_score[NRX];
@@ -537,20 +539,20 @@ void Match9(nd_item<2> &item,
   int iy = idx/(M7W/NRX);
   for (int bp2=0;bp2<NPTS;bp2+=M7H) {
     for (int d=tx;d<NDIM/4;d+=M7W)
-      for (int j=ty;j<M7H;j+=M7H/M7R/NRX)       
+      for (int j=ty;j<M7H;j+=M7H/M7R/NRX)
 	buffer2[j*NDIM/4 + d] = ((float4*)d_pts2)[(bp2 + j)*(NDIM/4) + d];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
-    float score[M7R][NRX];                                    
+    float score[M7R][NRX];
     for (int dy=0;dy<M7R;dy++)
       for (int i=0;i<NRX;i++)
 	score[dy][i] = 0.0f;
     for (int d=0;d<NDIM/4;d++) {
       float4 v1[NRX];
-      for (int i=0;i<NRX;i++) 
+      for (int i=0;i<NRX;i++)
 	v1[i] = buffer1[((M7W/NRX)*i + ix)*NDIM/4 + (d + (M7W/NRX)*i + ix)%(NDIM/4)];
       for (int dy=0;dy<M7R;dy++) {
-	float4 v2 = buffer2[(M7R*iy + dy)*(NDIM/4) + d];    
+	float4 v2 = buffer2[(M7R*iy + dy)*(NDIM/4) + d];
 	for (int i=0;i<NRX;i++) {
 	  score[dy][i] += v1[i].x()*v2.x();
 	  score[dy][i] += v1[i].y()*v2.y();
@@ -562,41 +564,41 @@ void Match9(nd_item<2> &item,
     for (int dy=0;dy<M7R;dy++) {
       for (int i=0;i<NRX;i++) {
 	if (score[dy][i]>max_score[i]) {
-	  max_score[i] = score[dy][i];     
+	  max_score[i] = score[dy][i];
 	  index[i] = bp2 + M7R*iy + dy;
 	}
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   float *scores = (float*)buffer1;
   int *indices = (int*)&scores[M7W*M7H/M7R];
   if (idx<M7W*M7H/M7R/NRX) {
     for (int i=0;i<NRX;i++) {
-      scores[iy*M7W + (M7W/NRX)*i + ix] = max_score[i];  
+      scores[iy*M7W + (M7W/NRX)*i + ix] = max_score[i];
       indices[iy*M7W + (M7W/NRX)*i + ix] = index[i];
     }
   }
-  item.barrier(access::fence_space::local_space);
-  
+  item.barrier(sycl::access::fence_space::local_space);
+
   if (ty==0) {
     float max_score = scores[tx];
     int index = indices[tx];
     for (int y=0;y<M7H/M7R;y++)
       if (scores[y*M7W + tx]>max_score) {
-	max_score = scores[y*M7W + tx]; 
-	index = indices[y*M7W + tx];    
+	max_score = scores[y*M7W + tx];
+	index = indices[y*M7W + tx];
       }
     d_score[bp1 + tx] = max_score;
     d_index[bp1 + tx] = index;
   }
 }
 
-void Match10(nd_item<2> &item,
+void Match10(sycl::nd_item<2> &item,
                  float4 *__restrict buffer1,
                  float4 *__restrict buffer2,
-            const float *__restrict d_pts1, 
+            const float *__restrict d_pts1,
             const float *__restrict d_pts2,
                   float *__restrict d_score,
                     int *__restrict d_index)
@@ -607,7 +609,7 @@ void Match10(nd_item<2> &item,
   int ty = item.get_local_id(0);
   int bp1 = M7W*item.get_group(1);
   for (int d=tx;d<NDIM/4;d+=M7W)
-    for (int j=ty;j<M7W;j+=M7H/M7R)     
+    for (int j=ty;j<M7W;j+=M7H/M7R)
       buffer1[j*NDIM/4 + (d + j)%(NDIM/4)] = ((float4*)d_pts1)[(bp1 + j)*(NDIM/4) + d];
 
   float max_score[NRX];
@@ -620,7 +622,7 @@ void Match10(nd_item<2> &item,
   int ix = idx%(M7W/NRX);
   int iy = idx/(M7W/NRX);
   for (int bp2=0;bp2<NPTS;bp2+=M7H) {
-    float score[M7R][NRX];                                    
+    float score[M7R][NRX];
     for (int dy=0;dy<M7R;dy++)
       for (int i=0;i<NRX;i++)
 	score[dy][i] = 0.0f;
@@ -628,7 +630,7 @@ void Match10(nd_item<2> &item,
     int d = (idx%NUM);
     int j = (idx/NUM);
     buffer2[j*NUM + d] = ((float4*)d_pts2)[(bp2 + j)*(NDIM/4) + d];
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     for (int dp=0;dp<NDIM/4;dp+=NUM) {
       float4 temp;
       if (dp<(NDIM/4-NUM))
@@ -638,12 +640,12 @@ void Match10(nd_item<2> &item,
 	for (int d=0;d<NUM;d++) {
 	  float4 v1[NRX];
 #pragma unroll
-	  for (int i=0;i<NRX;i++) 
+	  for (int i=0;i<NRX;i++)
 	    v1[i] = buffer1[(((M7W/NRX)*i + ix)<<5) + ((dp + d + (M7W/NRX)*i + ix)&31)];
 	  //v1[i] = buffer1[((M7W/NRX)*i + ix)*NDIM/4 + (dp + d + (M7W/NRX)*i + ix)%(NDIM/4)];
 #pragma unroll
 	  for (int dy=0;dy<M7R;dy++) {
-	    float4 v2 = buffer2[(M7R*iy + dy)*NUM + d];    
+	    float4 v2 = buffer2[(M7R*iy + dy)*NUM + d];
 #pragma unroll
 	    for (int i=0;i<NRX;i++) {
 	      score[dy][i] += v1[i].x()*v2.x();
@@ -654,41 +656,41 @@ void Match10(nd_item<2> &item,
 	  }
 	}
       }
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       if (dp<(NDIM/4-NUM)) {
 	buffer2[j*NUM + d] = temp;
-	item.barrier(access::fence_space::local_space);
+	item.barrier(sycl::access::fence_space::local_space);
       }
     }
     for (int dy=0;dy<M7R;dy++) {
       for (int i=0;i<NRX;i++) {
 	if (score[dy][i]>max_score[i]) {
-	  max_score[i] = score[dy][i];     
+	  max_score[i] = score[dy][i];
 	  index[i] = bp2 + M7R*iy + dy;
 	}
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   float *scores = (float*)buffer1;
   int *indices = (int*)&scores[M7W*M7H/M7R];
   if (idx<M7W*M7H/M7R/NRX) {
     for (int i=0;i<NRX;i++) {
-      scores[iy*M7W + (M7W/NRX)*i + ix] = max_score[i];  
+      scores[iy*M7W + (M7W/NRX)*i + ix] = max_score[i];
       indices[iy*M7W + (M7W/NRX)*i + ix] = index[i];
     }
   }
-  item.barrier(access::fence_space::local_space);
-  
+  item.barrier(sycl::access::fence_space::local_space);
+
   if (ty==0) {
     float max_score = scores[tx];
     int index = indices[tx];
     for (int y=0;y<M7H/M7R;y++)
       if (scores[y*M7W + tx]>max_score) {
-	max_score = scores[y*M7W + tx]; 
-	index = indices[y*M7W + tx];    
+	max_score = scores[y*M7W + tx];
+	index = indices[y*M7W + tx];
       }
     d_score[bp1 + tx] = max_score;
     d_index[bp1 + tx] = index;
@@ -713,22 +715,21 @@ int main(int argc, char *argv[])
   std::vector<float> h_score(NPTS);
   std::vector<int> h_index2(NPTS);
   std::vector<float> h_score2(NPTS);
-  
+
   std::cout << std::endl;
   int psize = sizeof(float)*NPTS;
   std::cout << "Data size:   " << 2.0*psize*NDIM/1024/1024 << " MB" << std::endl;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> d_pts1 (NPTS*NDIM);
-  buffer<float, 1> d_pts2 (NPTS*NDIM);
-  buffer<  int, 1> d_index(NPTS);
-  buffer<float, 1> d_score(NPTS);
+  float *d_pts1  = sycl::malloc_device<float>(NPTS*NDIM, q);
+  float *d_pts2  = sycl::malloc_device<float>(NPTS*NDIM, q);
+    int *d_index = sycl::malloc_device<  int>(NPTS, q);
+  float *d_score = sycl::malloc_device<float>(NPTS, q);
 
   for (int i=0;i<NPTS;i++) {
     float sum1 = 0.0f, sum2 = 0.0f;
@@ -752,28 +753,18 @@ int main(int argc, char *argv[])
   std::cout << "MatchCPU1:   " << delay << " ms  "
             << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_pts1.get_access<sycl_discard_write>(cgh);
-    cgh.copy(h_pts1, acc);
-  });
-  q.submit([&] (handler &cgh) {
-    auto acc = d_pts2.get_access<sycl_discard_write>(cgh);
-    cgh.copy(h_pts2, acc);
-  });
+  q.memcpy(d_pts1, h_pts1, psize*NDIM);
+  q.memcpy(d_pts2, h_pts2, psize*NDIM);
   q.wait();
 
-  range<1> gws1 (NPTS);
-  range<1> lws1 (M1W);
+  sycl::range<1> gws1 (NPTS);
+  sycl::range<1> lws1 (M1W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < repeat; i++) 
-    q.submit([&] (handler &cgh) {
-      auto pts1  = d_pts1.get_access<sycl_read>(cgh);
-      auto pts2  = d_pts2.get_access<sycl_read>(cgh);
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto index = d_index.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class k1>(nd_range<1>(gws1, lws1), [=] (nd_item<1> item) {
-        Match1(item, pts1.get_pointer(), pts2.get_pointer(), 
-               score.get_pointer(), index.get_pointer());
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class k1>(
+        sycl::nd_range<1>(gws1, lws1), [=] (sycl::nd_item<1> item) {
+        Match1(item, d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -781,33 +772,23 @@ int main(int argc, char *argv[])
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU1:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  q.submit([&] (handler &cgh) {
-    auto score = d_score.get_access<sycl_read>(cgh);
-    cgh.copy(score, h_score2.data());
-  });
-  q.submit([&] (handler &cgh) {
-    auto index = d_index.get_access<sycl_read>(cgh);
-    cgh.copy(index, h_index2.data());
-  });
+  q.memcpy(h_index2.data(), d_index, psize);
+  q.memcpy(h_score2.data(), d_score, psize);
   q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
 
-  range<2> gws2 (M2H, NPTS/M2W);
-  range<2> lws2 (M2H, M2W);
+  sycl::range<2> gws2 (M2H, NPTS/M2W);
+  sycl::range<2> lws2 (M2H, M2W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < repeat; i++) 
-    q.submit([&] (handler &cgh) {
-      auto pts1  = d_pts1.get_access<sycl_read>(cgh);
-      auto pts2  = d_pts2.get_access<sycl_read>(cgh);
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto index = d_index.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> buffer1(M2W*NDIM, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> buffer2(M2H*NDIM, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> scores(M2H*M2W, cgh);
-      cgh.parallel_for<class k2>(nd_range<2>(gws2, lws2), [=] (nd_item<2> item) {
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> buffer1(sycl::range<1>(M2W*NDIM), cgh);
+      sycl::local_accessor<float, 1> buffer2(sycl::range<1>(M2H*NDIM), cgh);
+      sycl::local_accessor<float, 1> scores(sycl::range<1>(M2H*M2W), cgh);
+      cgh.parallel_for<class k2>(
+        sycl::nd_range<2>(gws2, lws2), [=] (sycl::nd_item<2> item) {
         Match2(item, buffer1.get_pointer(), buffer2.get_pointer(), scores.get_pointer(),
-               pts1.get_pointer(), pts2.get_pointer(), 
-               score.get_pointer(), index.get_pointer());
+               d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -815,33 +796,23 @@ int main(int argc, char *argv[])
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU2:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  q.submit([&] (handler &cgh) {
-    auto score = d_score.get_access<sycl_read>(cgh);
-    cgh.copy(score, h_score2.data());
-  });
-  q.submit([&] (handler &cgh) {
-    auto index = d_index.get_access<sycl_read>(cgh);
-    cgh.copy(index, h_index2.data());
-  });
+  q.memcpy(h_index2.data(), d_index, psize);
+  q.memcpy(h_score2.data(), d_score, psize);
   q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
 
-  range<2> gws3 (M2H, NPTS/M2W);
-  range<2> lws3 (M2H, M2W);
+  sycl::range<2> gws3 (M2H, NPTS/M2W);
+  sycl::range<2> lws3 (M2H, M2W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < repeat; i++) 
-    q.submit([&] (handler &cgh) {
-      auto pts1  = d_pts1.get_access<sycl_read>(cgh);
-      auto pts2  = d_pts2.get_access<sycl_read>(cgh);
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto index = d_index.get_access<sycl_discard_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> buffer1(M2W*(NDIM+1), cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> buffer2(M2H*NDIM, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> scores(M2H*M2W, cgh);
-      cgh.parallel_for<class k3>(nd_range<2>(gws3, lws3), [=] (nd_item<2> item) {
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> buffer1(sycl::range<1>(M2W*(NDIM+1)), cgh);
+      sycl::local_accessor<float, 1> buffer2(sycl::range<1>(M2H*NDIM), cgh);
+      sycl::local_accessor<float, 1> scores(sycl::range<1>(M2H*M2W), cgh);
+      cgh.parallel_for<class k3>(
+        sycl::nd_range<2>(gws3, lws3), [=] (sycl::nd_item<2> item) {
         Match3(item, buffer1.get_pointer(), buffer2.get_pointer(), scores.get_pointer(),
-               pts1.get_pointer(), pts2.get_pointer(), 
-               score.get_pointer(), index.get_pointer());
+               d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -849,32 +820,23 @@ int main(int argc, char *argv[])
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU3:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  q.submit([&] (handler &cgh) {
-    auto score = d_score.get_access<sycl_read>(cgh);
-    cgh.copy(score, h_score2.data());
-  });
-  q.submit([&] (handler &cgh) {
-    auto index = d_index.get_access<sycl_read>(cgh);
-    cgh.copy(index, h_index2.data());
-  });
+  q.memcpy(h_index2.data(), d_index, psize);
+  q.memcpy(h_score2.data(), d_score, psize);
+  q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
-  
-  range<2> gws4 (M2H, NPTS);
-  range<2> lws4 (M2H, M2W);
+
+  sycl::range<2> gws4 (M2H, NPTS);
+  sycl::range<2> lws4 (M2H, M2W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < repeat; i++) 
-    q.submit([&] (handler &cgh) {
-      auto pts1  = d_pts1.get_access<sycl_read>(cgh);
-      auto pts2  = d_pts2.get_access<sycl_read>(cgh);
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto index = d_index.get_access<sycl_discard_write>(cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer1(M2W*(NDIM/4+1), cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer2(M2H*NDIM/4, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> scores(M2H*M2W, cgh);
-      cgh.parallel_for<class k4>(nd_range<2>(gws4, lws4), [=] (nd_item<2> item) {
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float4, 1> buffer1(sycl::range<1>(M2W*(NDIM/4+1)), cgh);
+      sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M2H*NDIM/4), cgh);
+      sycl::local_accessor<float, 1> scores(sycl::range<1>(M2H*M2W), cgh);
+      cgh.parallel_for<class k4>(
+        sycl::nd_range<2>(gws4, lws4), [=] (sycl::nd_item<2> item) {
         Match4(item, buffer1.get_pointer(), buffer2.get_pointer(), scores.get_pointer(),
-               pts1.get_pointer(), pts2.get_pointer(), 
-               score.get_pointer(), index.get_pointer());
+               d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -882,33 +844,23 @@ int main(int argc, char *argv[])
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU4:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  q.submit([&] (handler &cgh) {
-    auto score = d_score.get_access<sycl_read>(cgh);
-    cgh.copy(score, h_score2.data());
-  });
-  q.submit([&] (handler &cgh) {
-    auto index = d_index.get_access<sycl_read>(cgh);
-    cgh.copy(index, h_index2.data());
-  });
+  q.memcpy(h_index2.data(), d_index, psize);
+  q.memcpy(h_score2.data(), d_score, psize);
   q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
-  
-  range<2> gws5 (M5H, NPTS);
-  range<2> lws5 (M5H, M5W);
+
+  sycl::range<2> gws5 (M5H, NPTS);
+  sycl::range<2> lws5 (M5H, M5W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < repeat; i++) 
-    q.submit([&] (handler &cgh) {
-      auto pts1  = d_pts1.get_access<sycl_read>(cgh);
-      auto pts2  = d_pts2.get_access<sycl_read>(cgh);
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto index = d_index.get_access<sycl_discard_write>(cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer1(M5W*(NDIM/4+1), cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer2(M5H*NDIM/4, cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> scores(M5H*M5W, cgh);
-      cgh.parallel_for<class k5>(nd_range<2>(gws5, lws5), [=] (nd_item<2> item) {
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float4, 1> buffer1(sycl::range<1>(M5W*(NDIM/4+1)), cgh);
+      sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M5H*NDIM/4), cgh);
+      sycl::local_accessor<float, 1> scores(sycl::range<1>(M5H*M5W), cgh);
+      cgh.parallel_for<class k5>(
+        sycl::nd_range<2>(gws5, lws5), [=] (sycl::nd_item<2> item) {
         Match5(item, buffer1.get_pointer(), buffer2.get_pointer(), scores.get_pointer(),
-               pts1.get_pointer(), pts2.get_pointer(), 
-               score.get_pointer(), index.get_pointer());
+               d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -916,32 +868,22 @@ int main(int argc, char *argv[])
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU5:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  q.submit([&] (handler &cgh) {
-    auto score = d_score.get_access<sycl_read>(cgh);
-    cgh.copy(score, h_score2.data());
-  });
-  q.submit([&] (handler &cgh) {
-    auto index = d_index.get_access<sycl_read>(cgh);
-    cgh.copy(index, h_index2.data());
-  });
+  q.memcpy(h_index2.data(), d_index, psize);
+  q.memcpy(h_score2.data(), d_score, psize);
   q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
-  
-  range<2> gws6 (M5H, NPTS);
-  range<2> lws6 (M5H, M5W);
+
+  sycl::range<2> gws6 (M5H, NPTS);
+  sycl::range<2> lws6 (M5H, M5W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < repeat; i++) 
-    q.submit([&] (handler &cgh) {
-      auto pts1  = d_pts1.get_access<sycl_read>(cgh);
-      auto pts2  = d_pts2.get_access<sycl_read>(cgh);
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto index = d_index.get_access<sycl_discard_write>(cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer1(M5W*(NDIM/4+1), cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer2(M5H*NDIM/4, cgh);
-      cgh.parallel_for<class k6>(nd_range<2>(gws6, lws6), [=] (nd_item<2> item) {
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float4, 1> buffer1(sycl::range<1>(M5W*(NDIM/4+1)), cgh);
+      sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M5H*NDIM/4), cgh);
+      cgh.parallel_for<class k6>(
+        sycl::nd_range<2>(gws6, lws6), [=] (sycl::nd_item<2> item) {
         Match6(item, buffer1.get_pointer(), buffer2.get_pointer(),
-               pts1.get_pointer(), pts2.get_pointer(), 
-               score.get_pointer(), index.get_pointer());
+               d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -949,32 +891,22 @@ int main(int argc, char *argv[])
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU6:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  q.submit([&] (handler &cgh) {
-    auto score = d_score.get_access<sycl_read>(cgh);
-    cgh.copy(score, h_score2.data());
-  });
-  q.submit([&] (handler &cgh) {
-    auto index = d_index.get_access<sycl_read>(cgh);
-    cgh.copy(index, h_index2.data());
-  });
+  q.memcpy(h_index2.data(), d_index, psize);
+  q.memcpy(h_score2.data(), d_score, psize);
   q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
 
-  range<2> gws7 (M7H/M7R, NPTS);
-  range<2> lws7 (M7H/M7R, M7W);
+  sycl::range<2> gws7 (M7H/M7R, NPTS);
+  sycl::range<2> lws7 (M7H/M7R, M7W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < repeat; i++) 
-    q.submit([&] (handler &cgh) {
-      auto pts1  = d_pts1.get_access<sycl_read>(cgh);
-      auto pts2  = d_pts2.get_access<sycl_read>(cgh);
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto index = d_index.get_access<sycl_discard_write>(cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer1(M7W*NDIM/4, cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer2(M7H*NDIM/4, cgh);
-      cgh.parallel_for<class k7>(nd_range<2>(gws7, lws7), [=] (nd_item<2> item) {
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float4, 1> buffer1(sycl::range<1>(M7W*NDIM/4), cgh);
+      sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M7H*NDIM/4), cgh);
+      cgh.parallel_for<class k7>(
+        sycl::nd_range<2>(gws7, lws7), [=] (sycl::nd_item<2> item) {
         Match7(item, buffer1.get_pointer(), buffer2.get_pointer(),
-               pts1.get_pointer(), pts2.get_pointer(), 
-               score.get_pointer(), index.get_pointer());
+               d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -982,32 +914,22 @@ int main(int argc, char *argv[])
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU7:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  q.submit([&] (handler &cgh) {
-    auto score = d_score.get_access<sycl_read>(cgh);
-    cgh.copy(score, h_score2.data());
-  });
-  q.submit([&] (handler &cgh) {
-    auto index = d_index.get_access<sycl_read>(cgh);
-    cgh.copy(index, h_index2.data());
-  });
+  q.memcpy(h_index2.data(), d_index, psize);
+  q.memcpy(h_score2.data(), d_score, psize);
   q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
 
-  range<2> gws8 (M7H/M7R, NPTS);
-  range<2> lws8 (M7H/M7R, M7W);
+  sycl::range<2> gws8 (M7H/M7R, NPTS);
+  sycl::range<2> lws8 (M7H/M7R, M7W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < repeat; i++) 
-    q.submit([&] (handler &cgh) {
-      auto pts1  = d_pts1.get_access<sycl_read>(cgh);
-      auto pts2  = d_pts2.get_access<sycl_read>(cgh);
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto index = d_index.get_access<sycl_discard_write>(cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer1(M7W*NDIM/4, cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer2(M7H*NDIM/4, cgh);
-      cgh.parallel_for<class k8>(nd_range<2>(gws8, lws8), [=] (nd_item<2> item) {
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float4, 1> buffer1(sycl::range<1>(M7W*NDIM/4), cgh);
+      sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M7H*NDIM/4), cgh);
+      cgh.parallel_for<class k8>(
+        sycl::nd_range<2>(gws8, lws8), [=] (sycl::nd_item<2> item) {
         Match8(item, buffer1.get_pointer(), buffer2.get_pointer(),
-               pts1.get_pointer(), pts2.get_pointer(), 
-               score.get_pointer(), index.get_pointer());
+               d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -1015,32 +937,22 @@ int main(int argc, char *argv[])
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU8:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  q.submit([&] (handler &cgh) {
-    auto score = d_score.get_access<sycl_read>(cgh);
-    cgh.copy(score, h_score2.data());
-  });
-  q.submit([&] (handler &cgh) {
-    auto index = d_index.get_access<sycl_read>(cgh);
-    cgh.copy(index, h_index2.data());
-  });
+  q.memcpy(h_index2.data(), d_index, psize);
+  q.memcpy(h_score2.data(), d_score, psize);
   q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
 
-  range<2> gws9 (M7H/M7R/2, NPTS);
-  range<2> lws9 (M7H/M7R/2, M7W);
+  sycl::range<2> gws9 (M7H/M7R/2, NPTS);
+  sycl::range<2> lws9 (M7H/M7R/2, M7W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < repeat; i++) 
-    q.submit([&] (handler &cgh) {
-      auto pts1  = d_pts1.get_access<sycl_read>(cgh);
-      auto pts2  = d_pts2.get_access<sycl_read>(cgh);
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto index = d_index.get_access<sycl_discard_write>(cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer1(M7W*NDIM/4, cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer2(M7H*NDIM/4, cgh);
-      cgh.parallel_for<class k9>(nd_range<2>(gws9, lws9), [=] (nd_item<2> item) {
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float4, 1> buffer1(sycl::range<1>(M7W*NDIM/4), cgh);
+      sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M7H*NDIM/4), cgh);
+      cgh.parallel_for<class k9>(
+        sycl::nd_range<2>(gws9, lws9), [=] (sycl::nd_item<2> item) {
         Match9(item, buffer1.get_pointer(), buffer2.get_pointer(),
-               pts1.get_pointer(), pts2.get_pointer(), 
-               score.get_pointer(), index.get_pointer());
+               d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -1048,32 +960,21 @@ int main(int argc, char *argv[])
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU9:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  q.submit([&] (handler &cgh) {
-    auto score = d_score.get_access<sycl_read>(cgh);
-    cgh.copy(score, h_score2.data());
-  });
-  q.submit([&] (handler &cgh) {
-    auto index = d_index.get_access<sycl_read>(cgh);
-    cgh.copy(index, h_index2.data());
-  });
+  q.memcpy(h_index2.data(), d_index, psize);
+  q.memcpy(h_score2.data(), d_score, psize);
   q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
 
-  range<2> gws10 (M7H/M7R, NPTS);
-  range<2> lws10 (M7H/M7R, M7W);
+  sycl::range<2> gws10 (M7H/M7R, NPTS);
+  sycl::range<2> lws10 (M7H/M7R, M7W);
   start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < repeat; i++) 
-    q.submit([&] (handler &cgh) {
-      auto pts1  = d_pts1.get_access<sycl_read>(cgh);
-      auto pts2  = d_pts2.get_access<sycl_read>(cgh);
-      auto score = d_score.get_access<sycl_discard_write>(cgh);
-      auto index = d_index.get_access<sycl_discard_write>(cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer1(M7W*NDIM/4, cgh);
-      accessor<float4, 1, sycl_read_write, access::target::local> buffer2(M7H*NUM, cgh);
-      cgh.parallel_for<class k10>(nd_range<2>(gws10, lws10), [=] (nd_item<2> item) {
+  for (int i = 0; i < repeat; i++)
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float4, 1> buffer1(sycl::range<1>(M7W*NDIM/4), cgh);
+      sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M7H*NUM), cgh);
+      cgh.parallel_for<class k10>(sycl::nd_range<2>(gws10, lws10), [=] (sycl::nd_item<2> item) {
         Match10(item, buffer1.get_pointer(), buffer2.get_pointer(),
-                pts1.get_pointer(), pts2.get_pointer(), 
-                score.get_pointer(), index.get_pointer());
+                d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -1081,16 +982,14 @@ int main(int argc, char *argv[])
   elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   delay = elapsed_seconds.count() * 1000 / repeat;
   std::cout << "MatchGPU10:   " << delay << " ms  " << 2.0*NPTS*NPTS*NDIM/delay/1024/1024 << " Gflops" << std::endl;
-  q.submit([&] (handler &cgh) {
-    auto score = d_score.get_access<sycl_read>(cgh);
-    cgh.copy(score, h_score2.data());
-  });
-  q.submit([&] (handler &cgh) {
-    auto index = d_index.get_access<sycl_read>(cgh);
-    cgh.copy(index, h_index2.data());
-  });
+  q.memcpy(h_index2.data(), d_index, psize);
+  q.memcpy(h_score2.data(), d_score, psize);
   q.wait();
   CheckMatches(h_index.data(), h_index2.data(), h_score.data(), h_score2.data());
 
+  sycl::free(d_pts1, q);
+  sycl::free(d_pts2, q);
+  sycl::free(d_index, q);
+  sycl::free(d_score, q);
   return 0;
 }

@@ -13,7 +13,7 @@ void LCG_random_init(unsigned int * seed) {
   *seed = (a * (*seed) + c) % m;
 }
 
-void setupKernel(nd_item<1> &item, unsigned int* state) {
+void setupKernel(sycl::nd_item<1> &item, unsigned int* state) {
   int idx = item.get_global_id(0);
   state[idx] = idx;
   for (int i = 0; i < idx; i++) {
@@ -62,7 +62,7 @@ void swapBlock(int *key, int posLeft, int posRight, int length) {
 }
 
 void decodeKernel(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const float *__restrict d_scores, 
     const int *__restrict d_encrypted,
   const unsigned int*__restrict globalState, 
@@ -91,7 +91,7 @@ void decodeKernel(
         shared_scores[j*ALPHABET + jj] = d_scores[j*ALPHABET + jj];
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   for (j=0; j<KEY_LENGTH; ++j) 
     key[j]=j;
@@ -125,7 +125,8 @@ void decodeKernel(
       {
         blockStart = LCG_random_float(&localState)*KEY_LENGTH;
         blockEnd = LCG_random_float(&localState)*KEY_LENGTH;
-        swapBlock(key, blockStart, blockEnd, 1+LCG_random_float(&localState)*(sycl::abs((blockStart-blockEnd))-1));
+        swapBlock(key, blockStart, blockEnd, 
+                  1+LCG_random_float(&localState)*(sycl::abs((blockStart-blockEnd))-1));
       }
     }
 
@@ -173,4 +174,3 @@ void decodeKernel(
   for (j=0; j<ENCRYPTEDLEN; ++j)
     d_decrypted[idx*ENCRYPTEDLEN+j] = bestLocalDecrypted[j];
 }
-

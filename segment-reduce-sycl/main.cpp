@@ -14,14 +14,13 @@ void segreduce (const size_t num_elements, const int repeat ) {
   for (size_t i = 0; i < num_elements; i++) h_in[i] = VALUE;
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  sycl::queue q(dev_sel);
   int *d_in = sycl::malloc_device<int>(num_elements, q);
-  int *d_keys = sycl::malloc_device<int>(num_elements, q); 
+  int *d_keys = sycl::malloc_device<int>(num_elements, q);
   q.memcpy(d_in, h_in, num_elements * sizeof(int));
 
   auto policy = oneapi::dpl::execution::make_device_policy(q);
@@ -38,14 +37,14 @@ void segreduce (const size_t num_elements, const int repeat ) {
     const size_t num_segments = num_elements / segment_size;
     int *h_out = new int[num_segments];
     int *d_keys_out = sycl::malloc_device<int>(num_segments, q);
-    int *d_out = sycl::malloc_device<int>(num_segments, q); 
+    int *d_out = sycl::malloc_device<int>(num_segments, q);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++)
       oneapi::dpl::reduce_by_segment(policy, d_keys, d_keys + num_elements, d_in,
-                            d_keys_out, d_out);
+                                     d_keys_out, d_out);
 
     q.wait();
     auto end = std::chrono::steady_clock::now();
@@ -94,8 +93,8 @@ int main(int argc, char* argv[]) {
     printf("The total number of elements is 16384 x multiplier\n");
     return 1;
   }
-  const int multiplier = atoi(argv[1]);  
-  const int repeat = atoi(argv[2]);  
+  const int multiplier = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
 
   size_t num_elements = 16384 * size_t(multiplier);
   segreduce(num_elements, repeat);

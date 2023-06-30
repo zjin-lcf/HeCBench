@@ -35,7 +35,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include "hwt.h"
 
-void dwtHaar1D( nd_item<1> &item,
+void dwtHaar1D(sycl::nd_item<1> &item,
                 const float *__restrict inSignal,
                       float *__restrict coefsSignal,
                       float *__restrict AverageSignal,
@@ -66,7 +66,7 @@ void dwtHaar1D( nd_item<1> &item,
     sharedArray[localId] = t0;
     sharedArray[localSize + localId] = t1;
      
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
     
     unsigned int levels = tLevels > mLevels ? mLevels: tLevels;
     unsigned int activeThreads = (1 << levels) / 2;
@@ -84,7 +84,7 @@ void dwtHaar1D( nd_item<1> &item,
         }
 
         /* make sure all work items have read from sharedArray before modifying it */
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         if(localId < activeThreads)
         {
@@ -95,7 +95,7 @@ void dwtHaar1D( nd_item<1> &item,
             midOutPos >>= 1;
         }
         activeThreads >>= 1;
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
     }
     
     /**
@@ -108,15 +108,15 @@ void dwtHaar1D( nd_item<1> &item,
 }
 
 int runKernel(
-    queue &q,
+    sycl::queue &q,
     float *inData, 
     float *dOutData, 
     float *hOutData, 
     float *dPartialOutData,
     const unsigned int signalLength,
-    buffer<float, 1> &inDataBuf,
-    buffer<float, 1> &partialOutDataBuf,
-    buffer<float, 1> &outDataBuf)
+    float *inDataBuf,
+    float *partialOutDataBuf,
+    float *outDataBuf)
 {
   unsigned int levels = 0;
 
@@ -133,9 +133,10 @@ int runKernel(
   //int maxLevelsOnDevice = tempVar + 1;
   // Assume work group size is 256
   const int maxLevelsOnDevice = 9;
+  const int signalLengthByte = signalLength * sizeof(float);
 
-  float* temp = (float*)malloc(signalLength * sizeof(float));
-  memcpy(temp, inData, signalLength * sizeof(float));
+  float* temp = (float*)malloc(signalLengthByte);
+  memcpy(temp, inData, signalLengthByte);
 
   int levelsDone = 0;
   int one = 1;
@@ -160,23 +161,18 @@ int runKernel(
 
     unsigned int totalLevels = levels;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = inDataBuf.get_access<sycl_discard_write>(cgh);  
-      cgh.copy(inData, acc);
-    });
+    q.memcpy(inDataBuf, inData, signalLengthByte);
 
-    range<1> gws (curSignalLength >> 1);
-    range<1> lws (groupSize);
-    q.submit([&] (handler &cgh) {
-      auto inData = inDataBuf.get_access<sycl_read>(cgh);  
-      auto outData = outDataBuf.get_access<sycl_write>(cgh);
-      auto partialOutData = partialOutDataBuf.get_access<sycl_write>(cgh);
-      accessor<float, 1, sycl_read_write, access::target::local> lmem (groupSize*2, cgh);
-      cgh.parallel_for<class dwt>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    sycl::range<1> gws (curSignalLength >> 1);
+    sycl::range<1> lws (groupSize);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> lmem (sycl::range<1>(groupSize*2), cgh);
+      cgh.parallel_for<class dwt>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         dwtHaar1D(item,
-                  inData.get_pointer(),
-                  outData.get_pointer(),
-                  partialOutData.get_pointer(), 
+                  inDataBuf,
+                  outDataBuf,
+                  partialOutDataBuf,
                   lmem.get_pointer(),
                   totalLevels,
                   curSignalLength,
@@ -185,15 +181,9 @@ int runKernel(
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto acc = outDataBuf.get_access<sycl_read>(cgh);  
-      cgh.copy(acc, dOutData);
-    });
+    q.memcpy(dOutData, outDataBuf, signalLengthByte);
 
-    q.submit([&] (handler &cgh) {
-      auto acc = partialOutDataBuf.get_access<sycl_read>(cgh);  
-      cgh.copy(acc, dPartialOutData);
-    });
+    q.memcpy(dPartialOutData, partialOutDataBuf, signalLengthByte);
 
     q.wait();
 

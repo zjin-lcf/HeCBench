@@ -1,5 +1,5 @@
 void fk (
-    nd_item<2> &item,
+    sycl::nd_item<2> &item,
     const int ni,
     const int nj,
           int seed,
@@ -34,7 +34,6 @@ void fk (
     double w_exact;
     double we;
     double wt;
-    int steps;
     double chk = sycl::pow ( x / a, 2.0 ) + sycl::pow ( y / b, 2.0 );
 
     if ( 1.0 < chk )
@@ -43,14 +42,13 @@ void fk (
       wt = 1.0;
     }
     else {
-      auto ao_n = ext::oneapi::atomic_ref<int, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::device,
-                  access::address_space::global_space> (n_inside[0]);
+      auto ao_n = sycl::atomic_ref<int, 
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::device,
+                  sycl::access::address_space::global_space> (n_inside[0]);
       ao_n.fetch_add(1);
       w_exact = sycl::exp ( sycl::pow ( x / a, 2.0 ) + sycl::pow ( y / b, 2.0 ) - 1.0 );
       wt = 0.0;
-      steps = 0;
       for ( int k = 0; k < N; k++ )
       {
         x1 = x;
@@ -90,8 +88,6 @@ void fk (
           x1 = x1 + dx;
           x2 = x2 + dy;
 
-          steps++;
-
           vh = potential ( a, b, x1, x2 );
 
           we = ( 1.0 - h * vs ) * w;
@@ -102,12 +98,11 @@ void fk (
         wt += w;
       }
       wt /= ( double ) ( N ); 
-      auto ao_e = ext::oneapi::atomic_ref<double, 
-                  ext::oneapi::memory_order::relaxed,
-                  ext::oneapi::memory_scope::device,
-                  access::address_space::global_space> (err[0]);
+      auto ao_e = sycl::atomic_ref<double, 
+                  sycl::memory_order::relaxed,
+                  sycl::memory_scope::device,
+                  sycl::access::address_space::global_space> (err[0]);
       ao_e.fetch_add(sycl::pow ( w_exact - wt, 2.0 ));
     }
   }
 }
-

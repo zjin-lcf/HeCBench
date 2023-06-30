@@ -18,39 +18,35 @@
 #include <fstream>
 #include <cstdlib>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernels.cpp"
 
 double runKernels(
-    queue &q,
-    buffer<float, 1> &inputImageBuffer,
-    buffer<float, 1> &outputImageBuffer,
+    sycl::queue &q,
+    float *inputImageBuffer,
+    float *outputImageBuffer,
     const float *input,
     float *output,
-    const float averageLuminance, 
-    const float gamma, 
-    const float c, 
+    const float averageLuminance,
+    const float gamma,
+    const float c,
     const float delta,
     const uint width,
     const uint numChannels,
     const uint height)
 {
-  q.submit([&] (handler &cgh) {
-    auto acc = inputImageBuffer.get_access<sycl_discard_write>(cgh);
-    cgh.copy(input, acc);
-  });
+  q.memcpy(inputImageBuffer, input, sizeof(float) * width * height * numChannels);
 
-  range<2> gws (height, width);
-  range<2> lws (16, 16);
+  sycl::range<2> gws (height, width);
+  sycl::range<2> lws (16, 16);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&] (handler &cgh) {
-    auto input = inputImageBuffer.get_access<sycl_read>(cgh);
-    auto output = outputImageBuffer.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class pattannaik>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-      toneMapping(input.get_pointer(), output.get_pointer(),
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class pattannaik>(
+      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+      toneMapping(inputImageBuffer, outputImageBuffer,
                   averageLuminance, gamma, c, delta, width, numChannels, height, item);
     });
   }).wait();
@@ -58,10 +54,7 @@ double runKernels(
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  q.submit([&] (handler &cgh) {
-    auto acc = outputImageBuffer.get_access<sycl_read>(cgh);
-    cgh.copy(acc, output);
-  }).wait();
+  q.memcpy(output, outputImageBuffer, sizeof(float) * width * height * numChannels).wait();
 
   return time;
 }
@@ -76,7 +69,7 @@ int main(int argc, char *argv[])
   const char* inputImageName = argv[1]; //"input.hdr";
   const int iterations = atoi(argv[2]);
 
-  // Read a simple image 
+  // Read a simple image
   std::ifstream inputFile;
   std::cout << "Input file name " << inputImageName << std::endl;
   inputFile.open(inputImageName, std::ifstream::binary);
@@ -129,34 +122,33 @@ int main(int argc, char *argv[])
   }
 
   averageLuminance = averageLuminance / (width * height);
-  std::cout << "Average luminance value in the image " 
+  std::cout << "Average luminance value in the image "
     << averageLuminance << std::endl;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<float, 1> inputImageBuffer(width * height * numChannels);
-  buffer<float, 1> outputImageBuffer(width * height * numChannels);
+  float *inputImageBuffer = sycl::malloc_device<float>(width * height * numChannels, q);
+  float *outputImageBuffer = sycl::malloc_device<float>(width * height * numChannels, q);
 
   // Warm up
   for(int i = 0; i < 2 && iterations != 1; i++)
   {
     runKernels(
-      q, 
+      q,
       inputImageBuffer,
       outputImageBuffer,
       input,
       output,
-      averageLuminance, 
-      gammaPattanaik, 
-      cPattanaik, 
-      deltaPattanaik, 
-      width, 
-      numChannels, 
+      averageLuminance,
+      gammaPattanaik,
+      cPattanaik,
+      deltaPattanaik,
+      width,
+      numChannels,
       height);
   }
   std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
@@ -167,17 +159,17 @@ int main(int argc, char *argv[])
   for(int i = 0; i < iterations; i++)
   {
     time += runKernels(
-      q, 
+      q,
       inputImageBuffer,
       outputImageBuffer,
       input,
       output,
-      averageLuminance, 
-      gammaPattanaik, 
-      cPattanaik, 
-      deltaPattanaik, 
-      width, 
-      numChannels, 
+      averageLuminance,
+      gammaPattanaik,
+      cPattanaik,
+      deltaPattanaik,
+      width,
+      numChannels,
       height);
   }
 
@@ -322,5 +314,7 @@ int main(int argc, char *argv[])
   free(input);
   free(output);
   free(referenceOutput);
+  sycl::free(inputImageBuffer, q);
+  sycl::free(outputImageBuffer, q);
   return 0;
 }

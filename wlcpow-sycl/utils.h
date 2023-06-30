@@ -1,3 +1,6 @@
+typedef sycl::float4 float4;
+typedef sycl::float3 float3;
+typedef sycl::int2 int2;
 typedef float r32;
 typedef double r64;
 typedef int i32;

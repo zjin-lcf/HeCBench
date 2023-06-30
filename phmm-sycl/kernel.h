@@ -1,5 +1,5 @@
 void pair_HMM_forward(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const int cur_i,
     const int cur_j,
     const fArray *__restrict forward_matrix_in,
@@ -11,41 +11,24 @@ void pair_HMM_forward(
 {
   auto g = item.get_group();
 
-  multi_ptr<double[batch][states-1], access::address_space::local_space>
-  p1 = ext::oneapi::group_local_memory_for_overwrite<double[batch][states-1]>(g);
+  sycl::multi_ptr<double[batch][states-1], sycl::access::address_space::local_space>
+  p1 = sycl::ext::oneapi::group_local_memory_for_overwrite<double[batch][states-1]>(g);
   double(*e)[states-1] = *p1;
 
-  multi_ptr<double[1][batch][2], access::address_space::local_space>
-  p2 = ext::oneapi::group_local_memory_for_overwrite<double[1][batch][2]>(g);
+  sycl::multi_ptr<double[1][batch][2], sycl::access::address_space::local_space>
+  p2 = sycl::ext::oneapi::group_local_memory_for_overwrite<double[1][batch][2]>(g);
   double(*f01)[batch][2] = *p2;
 
-  multi_ptr<double[1][batch][2], access::address_space::local_space>
-  p3 = ext::oneapi::group_local_memory_for_overwrite<double[1][batch][2]>(g);
+  sycl::multi_ptr<double[1][batch][2], sycl::access::address_space::local_space>
+  p3 = sycl::ext::oneapi::group_local_memory_for_overwrite<double[1][batch][2]>(g);
   double(*mul_3d)[batch][2] = *p3;
 
-  multi_ptr<double[4][batch][1][2], access::address_space::local_space>
-  p4 = ext::oneapi::group_local_memory_for_overwrite<double[4][batch][1][2]>(g);
+  sycl::multi_ptr<double[4][batch][1][2], sycl::access::address_space::local_space>
+  p4 = sycl::ext::oneapi::group_local_memory_for_overwrite<double[4][batch][1][2]>(g);
   double(*mul_4d)[batch][1][2] = *p4;
 
   int batch_id = item.get_group(0);
   int states_id = item.get_local_id(0);
-
-  if (batch_id == 0 && states_id == 0) {
-    for (int i = 0; i < batch; i++)
-      for (int j = 0; j < states-1; j++)
-        e[i][j] = 0;
-
-    for (int i = 0; i < batch; i++) 
-      for (int j = 0; j < 2; j++)
-        f01[0][i][j] = mul_3d[0][i][j] = 0;
-
-    for (int i = 0; i < 4; i++) {
-      for (int j = 0; j < batch; j++)
-        for (int k = 0; k < 2; k++)
-          mul_4d[i][j][0][k] = 0;
-    }
-  }
-  item.barrier(access::fence_space::local_space);
 
   e[batch_id][states_id] = emissions[cur_i][cur_j][batch_id][states_id];
 
@@ -58,7 +41,7 @@ void pair_HMM_forward(
       t[1][1][batch_id][k][l] = transitions[cur_i][batch_id][k][l];
     }
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if (cur_i > 0 && cur_j == 0) {
     if (cur_i == 1) {
@@ -76,7 +59,7 @@ void pair_HMM_forward(
       f01[0][batch_id][states_id] = 
         forward_matrix_in[cur_i - 1][cur_j][batch_id][states_id];
 
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       double s = 0.0;
       for (int k = 0; k < 2; k++)
@@ -84,7 +67,7 @@ void pair_HMM_forward(
       s *= (e[batch_id][states_id] * likelihood[0][1][batch_id][states_id]);
       mul_3d[0][batch_id][states_id] = s;
 
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
 
       forward_matrix_out[cur_i][0][batch_id][states_id] = mul_3d[0][batch_id][states_id];
     }
@@ -98,7 +81,7 @@ void pair_HMM_forward(
       f[1][0][batch_id][0][i] = forward_matrix_in[cur_i][cur_j-1][batch_id][i];
       f[1][1][batch_id][0][i] = forward_matrix_in[cur_i][cur_j][batch_id][i];
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     double s0 = 0.0;
     double s1 = 0.0;
@@ -120,7 +103,7 @@ void pair_HMM_forward(
     mul_4d[2][batch_id][0][states_id] = s2;
     mul_4d[3][batch_id][0][states_id] = s3;
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     for (int j = 0; j < 2; j++) {
       double summation = mul_4d[0][batch_id][0][j] + 

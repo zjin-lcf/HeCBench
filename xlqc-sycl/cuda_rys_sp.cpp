@@ -1526,7 +1526,7 @@ float cuda_rys_pbf(const double *ptr_i, const double *ptr_j,
 
 // calculate J matrix using 1-thread-1-primitive-integral scheme
 void cuda_mat_J_PI(
-  nd_item<2> &item, 
+  sycl::nd_item<2> &item, 
   double *__restrict elem_J_PI, 
   const double *__restrict pbf_xlec,
   const int *__restrict pbf_to_cbf,
@@ -1583,7 +1583,7 @@ void cuda_mat_J_PI(
     }
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // only update mat_J_PI on one thread of the block
   if (0 == threadIdx_x && 0 == threadIdx_y)
@@ -1600,7 +1600,7 @@ void cuda_mat_J_PI(
 
 // calculate K matrix using 1-thread-1-primitive-integral scheme
 void cuda_mat_K_PI(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   double *__restrict elem_K_PI, 
   const double *__restrict pbf_xlec,
   const int *__restrict pbf_to_cbf,
@@ -1657,7 +1657,7 @@ void cuda_mat_K_PI(
     }
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // only update mat_K_PI on one thread of the block
   if (0 == threadIdx_x && 0 == threadIdx_y)

@@ -136,7 +136,7 @@ int parity_check (float app[])
 //===================================
 // parity check
 //===================================
-error_result cuda_error_check (int info[], int hard_decision[])
+error_result error_check (int info[], int hard_decision[])
 {
   error_result this_error;
   this_error.bit_error = 0;

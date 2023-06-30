@@ -1,7 +1,7 @@
 #ifndef __BUCKETSORT
 #define __BUCKETSORT
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define LOG_DIVISIONS	10
 #define DIVISIONS		(1 << LOG_DIVISIONS)
@@ -19,10 +19,10 @@
 
 #define HISTOGRAM_BIN_COUNT  1024
 #define HISTOGRAM_BLOCK_MEMORY  (3 * HISTOGRAM_BIN_COUNT)
-#define IMUL(a, b) cl::sycl::mul24(a, b)
+#define IMUL(a, b) sycl::mul24(a, b)
 
 
-void bucketSort(queue &q, float *d_input, float *d_output, int listsize,
+void bucketSort(sycl::queue &q, float *d_input, float *d_output, int listsize,
 				int *sizes, int *nullElements, float minimum, float maximum,
 				unsigned int *origOffsets);
 double getBucketTime();

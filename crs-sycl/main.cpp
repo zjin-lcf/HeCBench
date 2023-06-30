@@ -3,16 +3,16 @@
 //
 
 #include <sys/time.h>
+#include <sycl/sycl.hpp>
 #include "GCRSMatrix.h"
 #include "utils.h"
-#include "common.h"
 
 typedef void (*coding_func)(
-    queue &q,
+    sycl::queue &q,
     int k, int index,
-    buffer<char,1> &dataPtr,
-    buffer<char,1> &codeDevPtr,
-    buffer<unsigned int,1> &bitMatrixPtr,
+    char *dataPtr,
+    char *codeDevPtr,
+    const unsigned int *bitMatrixPtr,
     int threadDimX,int blockDimX,
     int workSizePerGridInLong);
 
@@ -29,11 +29,10 @@ int main(int argc, const char * argv[]) {
   int taskNum = atoi(argv[2]);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   double encode_time = 0.0;
 
@@ -75,8 +74,18 @@ int main(int argc, const char * argv[]) {
     // initialize host buffer
     generateRandomValue(data, bufSize * k);
 
+    char *d_data = sycl::malloc_device<char>(bufSize * k, q);
+    char *d_code = sycl::malloc_device<char>(bufSize * m, q);
+
     int dataSizePerAssign = bufSizePerTask * k;
     int codeSizePerAssign = bufSizePerTask * m;
+
+    char** d_data_ptr = (char**) malloc (sizeof(char*) * taskNum);
+    char** d_code_ptr = (char**) malloc (sizeof(char*) * taskNum);
+    for (int i = 0; i < taskNum; ++i) {
+      d_data_ptr[i] = d_data + dataSizePerAssign * i;
+      d_code_ptr[i] = d_code + codeSizePerAssign * i;
+    }
 
     // taskSize will determine the number of kernels to run on a device
     int taskSize = 1;
@@ -128,15 +137,9 @@ int main(int argc, const char * argv[]) {
       mValueSum += mValue[i];
     }
 
-    // allocate device buffers
-    buffer<char, 1> d_data (bufSize * k);
-    buffer<char, 1> d_code (bufSize * m);
-    buffer<unsigned int, 1> d_bitmatrix (k * w * taskSize);
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_bitmatrix.get_access<sycl_discard_write>(cgh);
-      cgh.copy(all_columns_bitmatrix, acc);
-    }).wait();
+    unsigned int *d_bitmatrix = sycl::malloc_device<unsigned int>(k * w * taskSize, q);
+    q.memcpy(d_bitmatrix, all_columns_bitmatrix,
+            sizeof(unsigned int) * k * w * taskSize);
 
     int warpThreadNum = 32;
     int threadNum = MAX_THREAD_NUM;
@@ -159,35 +162,22 @@ int main(int argc, const char * argv[]) {
 
       int count = (i == taskNum-1) ? bufSizeForLastTask : bufSizePerTask;
 
-      q.submit([&] (handler &cgh) {
-        auto acc = d_data.get_access<sycl_write>(cgh, range<1>(k*count), id<1>(i*k*bufSizePerTask));
-        cgh.copy(data + i * k * bufSizePerTask , acc);
-      });
+      q.memcpy(d_data + i * k * bufSizePerTask, data + i * k * bufSizePerTask, (k * count));
 
       int workSizePerGrid = count / sizeof(long);
       int size = workSizePerGrid * sizeof(long);
       mValueSum = 0;
-      buffer<char, 1> d_data_sub (d_data, id<1>(dataSizePerAssign*i), range<1>(bufSize*k-dataSizePerAssign*i));
       for (int j = 0; j < taskSize; ++j) {
-        buffer<char, 1> d_code_sub (d_code, 
-		   id<1>(codeSizePerAssign*i+mValueSum*size), 
-		   range<1>(bufSize*m - codeSizePerAssign*i+mValueSum*size));
-
         coding_function_ptrs[j](
-          q, 
-          k, index[j], 
-          d_data_sub, 
-          d_code_sub, 
-          d_bitmatrix, 
-          threadNum, blockNum, workSizePerGrid);
+          q, k, index[j], d_data_ptr[i], d_code_ptr[i] + mValueSum*size, 
+          d_bitmatrix, threadNum, blockNum, workSizePerGrid);
 
         mValueSum += mValue[j];
       }
 
-      q.submit([&] (handler &cgh) {
-        auto acc = d_code.get_access<sycl_read>(cgh, range<1>(m*count), id<1>(i*m*bufSizePerTask));
-        cgh.copy(acc, code + i * m * bufSizePerTask);
-      });
+      q.memcpy(code + i * m * bufSizePerTask, 
+               d_code + i * m * bufSizePerTask, 
+               (m * count));
     }
     q.wait();
     gettimeofday(&endEncodeTime, NULL);
@@ -202,6 +192,9 @@ int main(int argc, const char * argv[]) {
     printf("\n");
 #endif
 
+    sycl::free(d_data, q);
+    sycl::free(d_code, q);
+    sycl::free(d_bitmatrix, q);
     free(mValue);
     free(index);
     free(coding_function_ptrs);

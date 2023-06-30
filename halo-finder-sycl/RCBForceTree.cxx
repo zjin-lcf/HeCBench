@@ -70,7 +70,6 @@ POSSIBILITY OF SUCH DAMAGE.
 
 =========================================================================*/
 
-#include <CL/sycl.hpp>
 #include "Timings.h"
 #include "RCBForceTree.h"
 #include "Partition.h"

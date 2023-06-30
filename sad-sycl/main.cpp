@@ -103,7 +103,7 @@ void find_min_in_sad_array(
 void get_num_of_occurrences(
     sycl::nd_item<1> &item,
     const int sad_array_size,
-          int*__restrict s,
+          int &s,
     const int*__restrict sad_array,
     const int*__restrict min_sad,
           int*__restrict num_occurrences)
@@ -113,7 +113,7 @@ void get_num_of_occurrences(
   if (gid < sad_array_size) {
     unsigned int lid = item.get_local_id(0);
 
-    if (lid == 0) s[0] = 0;
+    if (lid == 0) s = 0;
 
     syncthreads();
 
@@ -122,7 +122,7 @@ void get_num_of_occurrences(
       auto ao = sycl::atomic_ref<int,
               sycl::memory_order::relaxed,
               sycl::memory_scope::work_group,
-              sycl::access::address_space::local_space> (s[0]);
+              sycl::access::address_space::local_space> (s);
       ao.fetch_add(1);
     }
 
@@ -135,7 +135,7 @@ void get_num_of_occurrences(
               sycl::memory_order::relaxed,
               sycl::memory_scope::device,
               sycl::access::address_space::global_space> (num_occurrences[0]);
-      ao.fetch_add(s[0]);
+      ao.fetch_add(s);
     }
   }
 }
@@ -192,17 +192,21 @@ int main(int argc, char* argv[]) {
   int h_min_mse;
 
 #ifdef USE_GPU
-  sycl::queue q(sycl::gpu_selector_v);
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::queue q(sycl::cpu_selector_v);
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
   // Device allocation
-  sycl::buffer<unsigned char, 1> d_main_image ( h_main_image, 3 * main_size );
-  sycl::buffer<unsigned char, 1> d_template_image ( h_template_image, 3 * template_size );
-  sycl::buffer<int, 1> d_sad_array ( sad_array_size );
-  sycl::buffer<int, 1> d_min_mse (1);
-  sycl::buffer<int, 1> d_num_occurances (1);
+  unsigned char *d_main_image = sycl::malloc_device<unsigned char>(3 * main_size, q);
+  q.memcpy(d_main_image, h_main_image, 3 * main_size * sizeof(unsigned char));
+
+  unsigned char *d_template_image = sycl::malloc_device<unsigned char>(3 * template_size, q);
+  q.memcpy(d_template_image, h_template_image, 3 * template_size * sizeof(unsigned char));
+
+  int *d_sad_array = sycl::malloc_device<int>(sad_array_size, q);
+  int *d_min_mse = sycl::malloc_device<int>(1, q);
+  int *d_num_occurances = sycl::malloc_device<int>(1, q);
 
   sycl::range<2> gws ((unsigned int)ceilf((float)main_height / BLOCK_SIZE_Y) * BLOCK_SIZE_Y,
                       (unsigned int)ceilf((float)main_width / BLOCK_SIZE_X) * BLOCK_SIZE_X );
@@ -218,31 +222,22 @@ int main(int argc, char* argv[]) {
 
   for (int i = 0; i < repeat; i++) {
 
-    q.submit([&] (sycl::handler &cgh) {
-      auto acc = d_num_occurances.get_access<sycl::access::mode::discard_write>(cgh);
-      cgh.fill(acc, 0);
-    });
-
     h_min_mse = THRESHOLD;
 
-    q.submit([&] (sycl::handler &cgh) {
-      auto acc = d_min_mse.get_access<sycl::access::mode::discard_write>(cgh);
-      cgh.copy(&h_min_mse, acc);
-    });
+    q.memset(d_num_occurances, 0, sizeof(int));
+    q.memcpy(d_min_mse, &h_min_mse, sizeof(int));
 
     q.wait();
     auto kbegin = std::chrono::steady_clock::now();
 
     q.submit([&] (sycl::handler &cgh) {
-      auto sad_array = d_sad_array.get_access<sycl::access::mode::discard_write>(cgh);
-      auto m_image = d_main_image.get_access<sycl::access::mode::read>(cgh);
-      auto t_image = d_template_image.get_access<sycl::access::mode::read>(cgh);
-      cgh.parallel_for<class sad>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+      cgh.parallel_for<class sad>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         compute_sad_array (
           item,
-          sad_array.get_pointer(),
-          m_image.get_pointer(),
-          t_image.get_pointer(),
+          d_sad_array,
+          d_main_image,
+          d_template_image,
           sad_array_size,
           main_width, main_height,
           template_width, template_height,
@@ -251,32 +246,29 @@ int main(int argc, char* argv[]) {
     });
 
     q.submit([&] (sycl::handler &cgh) {
-      auto sad_array = d_sad_array.get_access<sycl::access::mode::read>(cgh);
-      auto min_mse = d_min_mse.get_access<sycl::access::mode::read_write>(cgh);
-      sycl::local_accessor<int> cache (BLOCK_SIZE, cgh);
-      cgh.parallel_for<class find_min>(sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
+      sycl::local_accessor<int> cache (lws2, cgh);
+      cgh.parallel_for<class find_min>(
+        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         find_min_in_sad_array (
           item,
           sad_array_size,
           cache.get_pointer(),
-          sad_array.get_pointer(),
-          min_mse.get_pointer());
+          d_sad_array,
+          d_min_mse);
       });
     });
 
     q.submit([&] (sycl::handler &cgh) {
-      auto sad_array = d_sad_array.get_access<sycl::access::mode::read>(cgh);
-      auto min_mse = d_min_mse.get_access<sycl::access::mode::read>(cgh);
-      auto occurances = d_num_occurances.get_access<sycl::access::mode::read_write>(cgh);
-      sycl::local_accessor<int> sum (1, cgh);
-      cgh.parallel_for<class count>(sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
+      sycl::local_accessor<int, 0> sum (cgh);
+      cgh.parallel_for<class count>(
+        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         get_num_of_occurrences (
           item,
           sad_array_size,
-          sum.get_pointer(),
-          sad_array.get_pointer(),
-          min_mse.get_pointer(),
-          occurances.get_pointer());
+          sum,
+          d_sad_array,
+          d_min_mse,
+          d_num_occurances);
       });
     });
 
@@ -284,15 +276,8 @@ int main(int argc, char* argv[]) {
     auto kend = std::chrono::steady_clock::now();
     kernel_time += std::chrono::duration_cast<std::chrono::milliseconds> (kend - kbegin).count();
 
-    q.submit([&] (sycl::handler &cgh) {
-      auto acc = d_min_mse.get_access<sycl::access::mode::read>(cgh);
-      cgh.copy(acc, &h_min_mse);
-    });
-
-    q.submit([&] (sycl::handler &cgh) {
-      auto acc = d_num_occurances.get_access<sycl::access::mode::read>(cgh);
-      cgh.copy(acc, &h_num_occurances);
-    });
+    q.memcpy(&h_min_mse, d_min_mse, sizeof(int));
+    q.memcpy(&h_num_occurances, d_num_occurances, sizeof(int));
   }
   q.wait();
 
@@ -307,6 +292,11 @@ int main(int argc, char* argv[]) {
   std::cout << "Found Minimum:  " << h_min_mse << std::endl;
   std::cout << "Number of Occurances: " << h_num_occurances << std::endl;
 
+  sycl::free(d_main_image, q);
+  sycl::free(d_template_image, q);
+  sycl::free(d_sad_array, q);
+  sycl::free(d_min_mse, q);
+  sycl::free(d_num_occurances, q);
   delete[] h_main_image;
   delete[] h_template_image;
   delete[] h_sad_array;

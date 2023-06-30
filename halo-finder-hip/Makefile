@@ -3,7 +3,7 @@ HIPCC_BIN=/opt/rocm/bin
 # the path may be adjusted for each platform
 MPI_INCLUDE=/usr/lib/x86_64-linux-gnu/openmpi/include
 
-OPT=-O3 -g -DRCB_UNTHREADED_BUILD -DUSE_SERIAL_COSMO
+OPT=-O3 -DRCB_UNTHREADED_BUILD -DUSE_SERIAL_COSMO
 
 #HIPCC_FLAGS=-ffast_math -DINLINE_FORCE -I${MPI_INCLUDE}
 HIPCC_FLAGS=-I${MPI_INCLUDE} -I/opt/rocm/hip/include

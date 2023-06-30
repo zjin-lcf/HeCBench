@@ -7,7 +7,7 @@
 #define benchmark_h
 
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 class benchmark {
 public:
@@ -16,7 +16,7 @@ public:
   virtual void init() = 0;
   
   // executes the testcase, in blocks of p at a time
-  virtual void run(queue &q, int p = 1) = 0;
+  virtual void run(sycl::queue &q, int p = 1) = 0;
   
   // compares the computed output with the golden reference output
   // output can be read from a file or in a static array
@@ -36,7 +36,7 @@ public:
 protected:
   void (*unpause_func)();
   void (*pause_func)();
-  virtual int read_next_testcases(queue &q, int count) = 0;
+  virtual int read_next_testcases(sycl::queue &q, int count) = 0;
 };
 
 #endif

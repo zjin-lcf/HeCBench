@@ -1,6 +1,9 @@
 #ifndef __DEGRID_H
 #define __DEGRID_H
 
+#include <sycl/sycl.hpp>
+using namespace sycl;
+
 // NPOINTS is a multiple of 32
 #define NPOINTS  40000
 #define GCF_DIM  256 

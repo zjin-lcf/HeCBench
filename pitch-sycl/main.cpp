@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 float sigmoid (float x) {
   return (1.f / (1.f + sycl::exp(-x)));
 }
 
-void parallelPitched2DAccess (nd_item<2> &item, char* devPtr,
+void parallelPitched2DAccess (sycl::nd_item<2> &item, char* devPtr,
                               size_t pitch,int width, int height)
 {
   int r = item.get_global_id(0);
@@ -18,7 +18,7 @@ void parallelPitched2DAccess (nd_item<2> &item, char* devPtr,
   }
 }
 
-void parallelSimple2DAccess (nd_item<2> &item, float* elem, int width, int height)
+void parallelSimple2DAccess (sycl::nd_item<2> &item, float* elem, int width, int height)
 {
   int r = item.get_global_id(0);
   int c = item.get_global_id(1);
@@ -27,7 +27,7 @@ void parallelSimple2DAccess (nd_item<2> &item, float* elem, int width, int heigh
   }
 }
 
-void parallelPitched3DAccess (nd_item<3> &item, char* devPtr, int pitch,
+void parallelPitched3DAccess (sycl::nd_item<3> &item, char* devPtr, int pitch,
                               int width, int height, int depth)
 {
   int z = item.get_global_id(0);
@@ -41,7 +41,7 @@ void parallelPitched3DAccess (nd_item<3> &item, char* devPtr, int pitch,
   }
 }
 
-void parallelSimple3DAccess (nd_item<3> &item, float* elem,
+void parallelSimple3DAccess (sycl::nd_item<3> &item, float* elem,
                              int width, int height, int depth)
 {
   int z = item.get_global_id(0);
@@ -54,19 +54,19 @@ void parallelSimple3DAccess (nd_item<3> &item, float* elem,
 }
 
 // Host code
-void malloc2D (queue &q, int repeat, int width, int height) {
+void malloc2D (sycl::queue &q, int repeat, int width, int height) {
   printf("Dimension: (%d %d)\n", width, height);
 
-  range<2> gws ((height + 15)/16*16, (width + 15)/16*16);
-  range<2> lws (16, 16);
+  sycl::range<2> gws ((height + 15)/16*16, (width + 15)/16*16);
+  sycl::range<2> lws (16, 16);
 
   // size of a row in bytes
   size_t pitch = (width * sizeof(float) + 63) & ~(0x3F);
-  
-  char* devPitchedPtr = (char*) malloc_device(pitch * height, q);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+  char* devPitchedPtr = (char*) sycl::malloc_device(pitch * height, q);
+
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       parallelPitched2DAccess(item, devPitchedPtr, pitch, width, height);
     });
   }).wait();
@@ -74,8 +74,8 @@ void malloc2D (queue &q, int repeat, int width, int height) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         parallelPitched2DAccess(item, devPitchedPtr, pitch, width, height);
       });
     });
@@ -85,10 +85,10 @@ void malloc2D (queue &q, int repeat, int width, int height) {
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  float* devPtr = malloc_device<float>(width * height, q);
+  float* devPtr = sycl::malloc_device<float>(width * height, q);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       parallelSimple2DAccess(item, devPtr, width, height);
     });
   }).wait();
@@ -96,8 +96,8 @@ void malloc2D (queue &q, int repeat, int width, int height) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         parallelSimple2DAccess(item, devPtr, width, height);
       });
     });
@@ -109,24 +109,24 @@ void malloc2D (queue &q, int repeat, int width, int height) {
   printf("Average execution time (pitched vs simple): %f %f (us)\n",
           (time * 1e-3f) / repeat, (time2 * 1e-3f) / repeat);
 
-  free(devPitchedPtr, q);
-  free(devPtr, q);
+  sycl::free(devPitchedPtr, q);
+  sycl::free(devPtr, q);
 }
 
 
 // Host code
-void malloc3D (queue &q, int repeat, int width, int height, int depth) {
+void malloc3D (sycl::queue &q, int repeat, int width, int height, int depth) {
   printf("Dimension: (%d %d %d)\n", width, height, depth);
-  range<3> gws ((depth + 3)/4*4, (height + 7)/8*8, (width + 15)/16*16);
-  range<3> lws (4, 8, 16);
+  sycl::range<3> gws ((depth + 3)/4*4, (height + 7)/8*8, (width + 15)/16*16);
+  sycl::range<3> lws (4, 8, 16);
 
   // size of a row in bytes
   size_t pitch = (width * sizeof(float) + 63) & ~(0x3F);
-  
-  char* devPitchedPtr = (char*) malloc_device(pitch * height * depth, q);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  char* devPitchedPtr = (char*) sycl::malloc_device(pitch * height * depth, q);
+
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       parallelPitched3DAccess(item, devPitchedPtr, pitch, width, height, depth);
     });
   }).wait();
@@ -134,8 +134,8 @@ void malloc3D (queue &q, int repeat, int width, int height, int depth) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         parallelPitched3DAccess(item, devPitchedPtr, pitch, width, height, depth);
       });
     });
@@ -145,10 +145,10 @@ void malloc3D (queue &q, int repeat, int width, int height, int depth) {
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  float *devPtr = malloc_device<float>(width * height * depth, q);
+  float *devPtr = sycl::malloc_device<float>(width * height * depth, q);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       parallelSimple3DAccess(item, devPtr, width, height, depth);
     });
   }).wait();
@@ -156,8 +156,8 @@ void malloc3D (queue &q, int repeat, int width, int height, int depth) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         parallelSimple3DAccess(item, devPtr, width, height, depth);
       });
     });
@@ -169,8 +169,8 @@ void malloc3D (queue &q, int repeat, int width, int height, int depth) {
   printf("Average execution time (pitched vs simple): %f %f (us)\n",
           (time * 1e-3f) / repeat, (time2 * 1e-3f) / repeat);
 
-  free(devPitchedPtr, q);
-  free(devPtr, q);
+  sycl::free(devPitchedPtr, q);
+  sycl::free(devPtr, q);
 }
 
 
@@ -184,11 +184,10 @@ int main(int argc, char* argv[])
   const int repeat = atoi(argv[1]);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   // width, height and depth
   const int w[] = {227, 256, 720, 768, 854, 1280, 1440, 1920, 2048, 3840, 4096};

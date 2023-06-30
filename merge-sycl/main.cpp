@@ -7,7 +7,7 @@
 #include <vector>
 #include <algorithm>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernels.h"
 
 #define CSV 0
@@ -21,7 +21,7 @@
 
 /*
  * Produce 64-bits of pseudo-randomness
- * Note: not very "good" or "random" 
+ * Note: not very "good" or "random"
  */
 template<typename vec_t>
 vec_t rand64() {
@@ -42,23 +42,23 @@ template<typename vec_t, uint32_t blocks, uint32_t threads, bool timing>
 class merge;
 
 /*
- * Perform <runs> merges of two sorted pseudorandom <vec_t> arrays of length <size> 
+ * Perform <runs> merges of two sorted pseudorandom <vec_t> arrays of length <size>
  * Checks the output of each merge for correctness
  */
 #define PADDING 1024
 template<typename vec_t, uint32_t blocks, uint32_t threads, bool timing>
-void mergeType(queue &q, const uint64_t size, const uint32_t runs) {
+void mergeType(sycl::queue &q, const uint64_t size, const uint32_t runs) {
   // Prepare host and device vectors
   std::vector<vec_t> hA (size + PADDING);
   std::vector<vec_t> hB (size + PADDING);
   std::vector<vec_t> hC (2*size + PADDING);
 
-  buffer<vec_t, 1> dA (size + PADDING);
-  buffer<vec_t, 1> dB (size + PADDING);
-  buffer<vec_t, 1> dC (2*size + PADDING);
+  vec_t *dA = sycl::malloc_device<vec_t>(size + PADDING, q);
+  vec_t *dB = sycl::malloc_device<vec_t>(size + PADDING, q);
+  vec_t *dC = sycl::malloc_device<vec_t>(2*size + PADDING, q);
 
   // diagonal_path_intersections;
-  buffer<uint32_t, 1> dpi (2 * (blocks + 1));
+  uint32_t *dpi = sycl::malloc_device<uint32_t>(2 * (blocks + 1), q);
 
   uint32_t errors = 0;
 
@@ -80,60 +80,47 @@ void mergeType(queue &q, const uint64_t size, const uint32_t runs) {
     std::sort(hA.begin(), hA.end());
     std::sort(hB.begin(), hB.end());
 
-    q.submit([&] (handler &cgh) {
-      auto acc = dA.template get_access<sycl_discard_write>(cgh);
-      cgh.copy(hA.data(), acc);
-    });
-     
-    q.submit([&] (handler &cgh) {
-      auto acc = dB.template get_access<sycl_discard_write>(cgh);
-      cgh.copy(hB.data(), acc);
-    });
+    q.memcpy(dA, hA.data(), (size + PADDING) * sizeof(vec_t));
+    q.memcpy(dB, hB.data(), (size + PADDING) * sizeof(vec_t));
 
     // Perform the global diagonal intersection serach to divide work among SMs
-    range<1> gws (blocks * 32);
-    range<1> lws (32);
+    sycl::range<1> gws (blocks * 32);
+    sycl::range<1> lws (32);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto a = dA.template get_access<sycl_read>(cgh);
-      auto b = dB.template get_access<sycl_read>(cgh);
-      auto d = dpi.template get_access<sycl_discard_write>(cgh);
-      accessor<int32_t, 1, sycl_read_write, access::target::local> xt(1, cgh);
-      accessor<int32_t, 1, sycl_read_write, access::target::local> yt(1, cgh);
-      accessor<int32_t, 1, sycl_read_write, access::target::local> xb(1, cgh);
-      accessor<int32_t, 1, sycl_read_write, access::target::local> yb(1, cgh);
-      accessor<int32_t, 1, sycl_read_write, access::target::local> found(1, cgh);
-      accessor<int32_t, 1, sycl_read_write, access::target::local> oneorzero(32, cgh);
-      cgh.parallel_for<class divide<vec_t, blocks, threads, timing>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<int32_t, 0> xt(cgh);
+      sycl::local_accessor<int32_t, 0> yt(cgh);
+      sycl::local_accessor<int32_t, 0> xb(cgh);
+      sycl::local_accessor<int32_t, 0> yb(cgh);
+      sycl::local_accessor<int32_t, 0> found(cgh);
+      sycl::local_accessor<int32_t, 1> oneorzero(sycl::range<1>(32), cgh);
+      cgh.parallel_for<class divide<vec_t, blocks, threads, timing>>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         workloadDiagonals<vec_t>(
-          item, xt.get_pointer(), yt.get_pointer(), xb.get_pointer(), yb.get_pointer(),
-          found.get_pointer(), oneorzero.get_pointer(), 
-          a.get_pointer(), size, b.get_pointer(), size, d.get_pointer());
+          item, xt, yt, xb, yb,
+          found, oneorzero.get_pointer(),
+          dA, size, dB, size, dpi);
       });
     });
 
     // Merge between global diagonals independently on each block
-    range<1> gws2 (blocks * threads);
-    range<1> lws2 (threads);
-    q.submit([&] (handler &cgh) {
-      auto a = dA.template get_access<sycl_read>(cgh);
-      auto b = dB.template get_access<sycl_read>(cgh);
-      auto c = dC.template get_access<sycl_discard_write>(cgh);
-      auto d = dpi.template get_access<sycl_read>(cgh);
-      accessor<vec_t, 1, sycl_read_write, access::target::local> A((K+2)<<1, cgh);
-      accessor<uint32_t, 1, sycl_read_write, access::target::local> xt(1, cgh);
-      accessor<uint32_t, 1, sycl_read_write, access::target::local> yt(1, cgh);
-      accessor<uint32_t, 1, sycl_read_write, access::target::local> xs(1, cgh);
-      accessor<uint32_t, 1, sycl_read_write, access::target::local> ys(1, cgh);
-      cgh.parallel_for<class merge<vec_t, blocks, threads, timing>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+    sycl::range<1> gws2 (blocks * threads);
+    sycl::range<1> lws2 (threads);
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<vec_t, 1> A(sycl::range<1>((K+2)<<1), cgh);
+      sycl::local_accessor<uint32_t, 0> xt(cgh);
+      sycl::local_accessor<uint32_t, 0> yt(cgh);
+      sycl::local_accessor<uint32_t, 0> xs(cgh);
+      sycl::local_accessor<uint32_t, 0> ys(cgh);
+      cgh.parallel_for<class merge<vec_t, blocks, threads, timing>>(
+        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         mergeSinglePath<vec_t,false,false> (
-          item, A.get_pointer(), xt.get_pointer(), yt.get_pointer(),
-          xs.get_pointer(), ys.get_pointer(),
-          a.get_pointer(), size, b.get_pointer(), size, 
-          d.get_pointer(), c.get_pointer(), size * 2);
+          item, A.get_pointer(), xt, yt, xs, ys,
+          dA, size, dB, size,
+          dpi, dC, size * 2);
       });
     });
 
@@ -143,15 +130,17 @@ void mergeType(queue &q, const uint64_t size, const uint32_t runs) {
     total_time += time;
 
     // Test for errors
-    q.submit([&] (handler &cgh) {
-      auto acc = dC.template get_access<sycl_read>(cgh, range<1>(size));
-      cgh.copy(acc, hC.data());
-    }).wait();
+    q.memcpy(hC.data(), dC, size * sizeof(vec_t)).wait();
 
     for(uint32_t i = 1; i < size; i++) {
       errors += hC[i] < hC[i-1];
     }
   }
+
+  sycl::free(dA, q);
+  sycl::free(dB, q);
+  sycl::free(dC, q);
+  sycl::free(dpi, q);
 
   PV(errors); // Print error info
   printf("%s. ", errors ? "FAIL" : "PASS");
@@ -162,11 +151,11 @@ void mergeType(queue &q, const uint64_t size, const uint32_t runs) {
     printf("Warmup run\n");
 }
 
-/* 
+/*
  * Performs <runs> merge tests for each type at a given size
  */
 template<uint32_t blocks, uint32_t threads>
-void mergeAllTypes(queue &q, const uint64_t size, const uint32_t runs) {
+void mergeAllTypes(sycl::queue &q, const uint64_t size, const uint32_t runs) {
   PS("uint32_t", size)  mergeType<uint32_t, blocks, threads, false>(q, size, runs); printf("\n");
   PS("uint32_t", size)  mergeType<uint32_t, blocks, threads, true>(q, size, runs); printf("\n");
 
@@ -185,7 +174,7 @@ int main(int argc, char *argv[]) {
     printf("Usage: %s <length of the arrays> <runs>\n", argv[0]);
     return 1;
   }
-  // length is sufficiently large; 
+  // length is sufficiently large;
   // otherwise there are invalid global reads in the kernel mergeSinglePath
   const uint64_t length = atol(argv[1]);
 
@@ -195,11 +184,10 @@ int main(int argc, char *argv[]) {
   const int threads = 128;  // do not change
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   mergeAllTypes<blocks, threads>(q, length, runs);
 

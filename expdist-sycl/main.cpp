@@ -3,7 +3,7 @@
 #include <math.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp> 
 #include "kernel.h"
 
 template <typename FP, int dim>
@@ -30,7 +30,6 @@ void test(const int size, const int repeat) {
 
   size_t point_size_bytes = sizeof(FP) * size * 2;
   size_t scale_size_bytes = sizeof(FP) * size;
-  size_t cost_size_bytes = sizeof(FP) * nblocks;
 
   FP *A = (FP*) malloc (point_size_bytes);
   FP *B = (FP*) malloc (point_size_bytes);
@@ -48,45 +47,45 @@ void test(const int size, const int repeat) {
   FP output;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  FP *d_A = malloc_device<FP>(size*2, q);
+  FP *d_A = sycl::malloc_device<FP>(size*2, q);
   q.memcpy(d_A, A, point_size_bytes);
 
-  FP *d_B = malloc_device<FP>(size*2, q);
+  FP *d_B = sycl::malloc_device<FP>(size*2, q);
   q.memcpy(d_B, B, point_size_bytes);
 
-  FP *d_scaleA = malloc_device<FP>(size, q);
+  FP *d_scaleA = sycl::malloc_device<FP>(size, q);
   q.memcpy(d_scaleA, scaleA, scale_size_bytes);
 
-  FP *d_scaleB = malloc_device<FP>(size, q);
+  FP *d_scaleB = sycl::malloc_device<FP>(size, q);
   q.memcpy(d_scaleB, scaleB, scale_size_bytes);
 
-  FP *d_cost = malloc_device<FP>(nblocks, q);
-  FP *d_output = malloc_device<FP>(1, q);
+  FP *d_cost = sycl::malloc_device<FP>(nblocks, q);
+  FP *d_output = sycl::malloc_device<FP>(1, q);
 
-  range<2> gws (size / (block_size_y * tile_size_y) * block_size_y,
-                size / (block_size_x * tile_size_x) * block_size_x);
-  range<2> lws (block_size_y, block_size_x);
+  sycl::range<2> gws (size / (block_size_y * tile_size_y) * block_size_y,
+                      size / (block_size_x * tile_size_x) * block_size_x);
+  sycl::range<2> lws (block_size_y, block_size_x);
 
-  range<1> gws2 (reduce_block_size);
-  range<1> lws2 (reduce_block_size);
+  sycl::range<1> gws2 (reduce_block_size);
+  sycl::range<1> lws2 (reduce_block_size);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      accessor<FP, 1, sycl_read_write, access::target::local> sh_A (2 * block_size_x * tile_size_x, cgh);
-      accessor<FP, 1, sycl_read_write, access::target::local> sh_B (2 * block_size_y * tile_size_y, cgh);
-      accessor<FP, 1, sycl_read_write, access::target::local> sh_scaleA (block_size_x * tile_size_x, cgh);
-      accessor<FP, 1, sycl_read_write, access::target::local> sh_scaleB (block_size_y * tile_size_y, cgh);
-      accessor<FP, 1, sycl_read_write, access::target::local> sum (1, cgh);
-      cgh.parallel_for<class computeCost<FP>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<FP, 1> sh_A (sycl::range<1>(2 * block_size_x * tile_size_x), cgh);
+      sycl::local_accessor<FP, 1> sh_B (sycl::range<1>(2 * block_size_y * tile_size_y), cgh);
+      sycl::local_accessor<FP, 1> sh_scaleA (sycl::range<1>(block_size_x * tile_size_x), cgh);
+      sycl::local_accessor<FP, 1> sh_scaleB (sycl::range<1>(block_size_y * tile_size_y), cgh);
+      sycl::local_accessor<FP, 1> sum (sycl::range<1>(1), cgh);
+      cgh.parallel_for<class computeCost<FP>>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         distance_tiled<FP>(
           item, d_A, d_B, size, size, d_scaleA, d_scaleB, d_cost,
           sh_A.get_pointer(), sh_B.get_pointer(), 
@@ -94,9 +93,10 @@ void test(const int size, const int repeat) {
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      accessor<FP, 1, sycl_read_write, access::target::local> sum (1, cgh);
-      cgh.parallel_for<class reduceBlock<FP>>(nd_range<1>(gws2, lws2), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      sycl::local_accessor<FP, 1> sum (sycl::range<1>(1), cgh);
+      cgh.parallel_for<class reduceBlock<FP>>(
+         sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
          reduce_cross_term<FP>(
            item, d_output, d_cost, sum.get_pointer(), size, size, nblocks);
       });
@@ -116,12 +116,12 @@ void test(const int size, const int repeat) {
 
   printf("analytical result: %lf\n\n", size * size * exp(-1.0));
 
-  free(d_A, q);
-  free(d_B, q);
-  free(d_scaleA, q);
-  free(d_scaleB, q);
-  free(d_output, q);
-  free(d_cost, q);
+  sycl::free(d_A, q);
+  sycl::free(d_B, q);
+  sycl::free(d_scaleA, q);
+  sycl::free(d_scaleB, q);
+  sycl::free(d_output, q);
+  sycl::free(d_cost, q);
   free(A);
   free(B);
   free(scaleA);

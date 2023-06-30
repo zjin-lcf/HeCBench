@@ -71,14 +71,13 @@ float extend2(struct extend2_dat *d)
 
   auto start = std::chrono::steady_clock::now();
 
-#pragma omp target map(to: query[0:qlen], \
-                           target[0:tlen], \
-                           mat[0:m*m], \
-                           eh[0:qlen+1], \
-                           qp[0:qlen*m])\
+  #pragma omp target map(to: query[0:qlen], \
+                             target[0:tlen], \
+                             mat[0:m*m], \
+                             eh[0:qlen+1], \
+                             qp[0:qlen*m])\
   map(from: d_qle, d_tle, d_gtle, d_gscore, d_score, d_max_off) 
   {
-
     int oe_del = o_del + e_del;
     int oe_ins = o_ins + e_ins; 
     int i, j, k;
@@ -229,6 +228,6 @@ int main(int argc, char *argv[])
     read_data(files[f%17], &d);
     time += extend2(&d);
   }
-  printf("Average offload time %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average offload time %f (us)\n", (time * 1e-3f) / repeat);
   return 0;
 }

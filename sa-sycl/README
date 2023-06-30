@@ -1,0 +1,7 @@
+Please clone the oneDPL and oneTBB GitHub repositories in the current directory before building the SYCL program
+
+https://github.com/oneapi-src/oneDPL
+https://github.com/oneapi-src/oneTBB
+
+
+The dataset is available at https://github.com/gmzang/Parallel-Suffix-Array-on-GPU/tree/master/dc3_gpu

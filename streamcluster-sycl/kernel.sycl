@@ -22,7 +22,7 @@ if(thread_id<num){
     for(int i=0; i<dim; i++){ 
       coord_s_acc[i] = coord_d_acc[i*num + x];
     }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // cost between this point and point[x]: euclidean distance multiplied by weight
   float x_cost = 0.0;

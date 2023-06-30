@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define TREE_NUM 4096
 #define TREE_SIZE 4096
@@ -35,9 +35,9 @@ struct ApplesOnTrees
   int trees[TREE_NUM];
 };
 
-void AoSKernel(const AppleTree *__restrict trees, 
+void AoSKernel(const AppleTree *__restrict trees,
                int *__restrict outBuf,
-               int treeSize, nd_item<1> &item)
+               int treeSize, sycl::nd_item<1> &item)
 {
   uint gid = item.get_global_id(0);
   uint res = 0;
@@ -51,7 +51,7 @@ void AoSKernel(const AppleTree *__restrict trees,
 
 void SoAKernel(const ApplesOnTrees *__restrict applesOnTrees,
                int *__restrict outBuf,
-               int treeSize, nd_item<1> &item)
+               int treeSize, sycl::nd_item<1> &item)
 {
   uint gid = item.get_global_id(0);
   uint res = 0;
@@ -68,7 +68,7 @@ int main(int argc, char * argv[])
     printf("Usage: %s <repeat>\n", argv[0]);
     return 1;
   }
-  
+
   const int iterations = atoi(argv[1]); // Number of iterations for kernel execution
   const int treeSize = TREE_SIZE;
   const int treeNumber = TREE_NUM;
@@ -109,38 +109,31 @@ int main(int argc, char * argv[])
       reference[i] += i * treeSize + j;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  range<1> gws(treeNumber);
-  range<1> lws(GROUP_SIZE);
+  sycl::range<1> gws(treeNumber);
+  sycl::range<1> lws(GROUP_SIZE);
 
-  buffer<int, 1> inputBuffer (elements);
-  buffer<int, 1> outputBuffer (treeNumber);
+  int *inputBuffer = sycl::malloc_device<int>(elements, q);
+  int *outputBuffer = sycl::malloc_device<int>(treeNumber, q);
 
   //initialize aos data
   for (int i = 0; i < treeNumber; i++)
     for(int j = 0; j < treeSize; j++)
       data[j + i* treeSize] = j + i* treeSize;
 
-  q.submit([&] (handler &cgh) {
-    auto in = inputBuffer.get_access<sycl_discard_write>(cgh);
-    cgh.copy(data, in);
-  });
+  q.memcpy(inputBuffer, data, inputSize).wait();
 
-  q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  auto trees = inputBuffer.reinterpret<AppleTree>(range<1>(treeNumber));
   for (int i = 0; i < iterations; i++) {
-    q.submit([&] (handler &cgh) {
-      auto out = outputBuffer.get_access<sycl_discard_write>(cgh);
-      auto in = trees.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class AoS>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        AoSKernel(in.get_pointer(), out.get_pointer(), treeSize, item);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class AoS>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        AoSKernel((AppleTree*)inputBuffer, outputBuffer, treeSize, item);
       });
     });
   }
@@ -151,10 +144,7 @@ int main(int argc, char * argv[])
   std::cout << "Average kernel execution time (AoS): "
             << (time * 1e-3f) / iterations << " (us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out = outputBuffer.get_access<sycl_read>(cgh);
-    cgh.copy(out, deviceResult);
-  }).wait();
+  q.memcpy(deviceResult, outputBuffer, outputSize).wait();
 
   for(int i = 0; i< treeNumber; i++)
   {
@@ -175,22 +165,15 @@ int main(int argc, char * argv[])
     for(int j = 0; j < treeSize; j++)
       data[i + j* treeNumber] = j + i* treeSize;
 
-  q.submit([&] (handler &cgh) {
-    auto in = inputBuffer.get_access<sycl_discard_write>(cgh);
-    cgh.copy(data, in);
-  });
+  q.memcpy(inputBuffer, data, inputSize).wait();
 
-  auto apples = inputBuffer.reinterpret<ApplesOnTrees>(range<1>(treeNumber));
-
-  q.wait();
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iterations; i++) {
-    q.submit([&] (handler &cgh) {
-      auto out = outputBuffer.get_access<sycl_discard_write>(cgh);
-      auto in = apples.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class SoA>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        SoAKernel(in.get_pointer(), out.get_pointer(), treeSize, item);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class SoA>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        SoAKernel((ApplesOnTrees*)inputBuffer, outputBuffer, treeSize, item);
       });
     });
   }
@@ -201,10 +184,7 @@ int main(int argc, char * argv[])
   std::cout << "Average kernel execution time (SoA): "
             << (time * 1e-3f) / iterations << " (us)\n";
 
-  q.submit([&] (handler &cgh) {
-    auto out = outputBuffer.get_access<sycl_read>(cgh);
-    cgh.copy(out, deviceResult);
-  }).wait();
+  q.memcpy(deviceResult, outputBuffer, outputSize).wait();
 
   for(int i = 0; i< treeNumber; i++)
   {
@@ -219,7 +199,9 @@ int main(int argc, char * argv[])
     std::cout << "FAIL\n";
   else
     std::cout << "PASS\n";
-  
+
+  sycl::free(inputBuffer, q);
+  sycl::free(outputBuffer, q);
   free(deviceResult);
   free(reference);
   free(data);

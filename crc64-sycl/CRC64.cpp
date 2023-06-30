@@ -47,7 +47,7 @@
 
 #include <stdbool.h>
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "CRC64.h"
 
 // The polynomial here is the bit-reversed encoding of 0x42f0e1eba9ea3693.
@@ -258,6 +258,7 @@ uint64_t crc64(const void *input, size_t nbytes) {
   return cs[0] ^ UINT64_C(0xffffffffffffffff);
 }
 
+inline
 uint64_t crc64_device(const unsigned char *input, size_t nbytes, 
 		const uint64_t *d_crc64_table, 
 		const uint64_t *d_crc64_interleaved_table) {
@@ -537,7 +538,7 @@ uint64_t crc64_combine(uint64_t cs1, uint64_t cs2, size_t nbytes2) {
 
 static const size_t crc64_min_thread_bytes = 1024;
 
-uint64_t crc64_parallel(queue &q, const void *input, size_t nbytes) {
+uint64_t crc64_parallel(sycl::queue &q, const void *input, size_t nbytes) {
 
   if (nbytes > 2*crc64_min_thread_bytes) {
     int nthreads = 96*8*32;
@@ -550,46 +551,42 @@ uint64_t crc64_parallel(queue &q, const void *input, size_t nbytes) {
 
     const unsigned char *data = (const unsigned char*) input;
 
-    buffer<size_t, 1> d_thread_sz(nthreads);
-    buffer<uint64_t, 1> d_thread_cs(nthreads);
-    buffer<unsigned char, 1> d_data(data, nbytes);
-    buffer<uint64_t, 1> d_crc64_table(crc64_table_1D, 4*256);
-    buffer<uint64_t, 1> d_crc64_interleaved_table(crc64_interleaved_table_1D, 4*256);
+    uint64_t *d_thread_sz = sycl::malloc_device<size_t>(nthreads, q);
+    size_t *d_thread_cs = sycl::malloc_device<uint64_t>(nthreads, q);
 
-    range<1> local_size(64);
-    range<1> global_size(nthreads);
+    unsigned char *d_data = sycl::malloc_device<unsigned char>(nbytes, q);
+    q.memcpy(d_data, data, nbytes);
 
-    q.submit([&](handler &h) {
-      auto d_thread_sz_acc = d_thread_sz.get_access<sycl_discard_write>(h);
-      auto d_thread_cs_acc = d_thread_cs.get_access<sycl_discard_write>(h);
-      auto d_data_acc = d_data.get_access<sycl_read>(h);
-      auto d_crc64_table_acc = d_crc64_table.get_access<sycl_read>(h);
-      auto d_crc64_interleaved_table_acc = d_crc64_interleaved_table.get_access<sycl_read>(h);
-      h.parallel_for<class crc64_block>(nd_range<1>(global_size, local_size), [=](nd_item<1> item) {
+    uint64_t *d_crc64_table = sycl::malloc_device<uint64_t>(4*256, q);
+    q.memcpy(d_crc64_table, crc64_table_1D, sizeof(uint64_t) * 4 * 256);
+
+    uint64_t *d_crc64_interleaved_table = sycl::malloc_device<uint64_t>(4*256, q);
+    q.memcpy(d_crc64_interleaved_table, crc64_interleaved_table_1D, sizeof(uint64_t) * 4 * 256);
+
+    sycl::range<1> local_size(64);
+    sycl::range<1> global_size(nthreads);
+
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class crc64_block>(
+        sycl::nd_range<1>(global_size, local_size), [=](sycl::nd_item<1> item) {
         int tid = item.get_global_id(0);
           size_t bpt = nbytes/nthreads;
-          const unsigned char *start = d_data_acc.get_pointer() + bpt*tid;
+          const unsigned char *start = d_data + bpt*tid;
           const unsigned char *end;
           if (tid != nthreads - 1)
             end = start + bpt;
           else
-            end = d_data_acc.get_pointer() + nbytes;
+            end = d_data + nbytes;
     
           size_t sz = end - start;
-          d_thread_sz_acc[tid] = sz;
-          d_thread_cs_acc[tid] = crc64_device(start, sz, 
-			  d_crc64_table_acc.get_pointer(), 
-			  d_crc64_interleaved_table_acc.get_pointer());
+          d_thread_sz[tid] = sz;
+          d_thread_cs[tid] = crc64_device(start, sz, d_crc64_table, d_crc64_interleaved_table);
       });
     });
-    q.submit([&] (handler &h) {
-      auto d_thread_sz_acc = d_thread_sz.get_access<sycl_read>(h);
-      h.copy(d_thread_sz_acc, thread_sz);
-    });
-    q.submit([&] (handler &h) {
-      auto d_thread_cs_acc = d_thread_cs.get_access<sycl_read>(h);
-      h.copy(d_thread_cs_acc, thread_cs);
-    });
+
+    q.memcpy(thread_sz, d_thread_sz, sizeof(size_t) * nthreads);
+    q.memcpy(thread_cs, d_thread_cs, sizeof(uint64_t) * nthreads);
+
     q.wait();
 
     uint64_t cs = thread_cs[0];
@@ -597,6 +594,11 @@ uint64_t crc64_parallel(queue &q, const void *input, size_t nbytes) {
       cs = crc64_combine(cs, thread_cs[i], thread_sz[i]);
     }
 
+    sycl::free(d_thread_sz, q);
+    sycl::free(d_thread_cs, q);
+    sycl::free(d_data, q);
+    sycl::free(d_crc64_table, q);
+    sycl::free(d_crc64_interleaved_table, q);
     return cs;
   }
 

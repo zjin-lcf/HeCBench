@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 // Add two vectors on the GPU
 void vectorAddGPU(float *__restrict a,
@@ -77,9 +77,9 @@ void eval(sycl::queue &q, bool warmup, bool bGenericSharedMemory, const int repe
     if (bGenericSharedMemory) {
       auto start = std::chrono::steady_clock::now();
 
-      a_UA = (float *)malloc_shared(bytes + MEMORY_ALIGNMENT, q);
-      b_UA = (float *)malloc_shared(bytes + MEMORY_ALIGNMENT, q);
-      c_UA = (float *)malloc_shared(bytes + MEMORY_ALIGNMENT, q);
+      a_UA = (float *)sycl::malloc_shared(bytes + MEMORY_ALIGNMENT, q);
+      b_UA = (float *)sycl::malloc_shared(bytes + MEMORY_ALIGNMENT, q);
+      c_UA = (float *)sycl::malloc_shared(bytes + MEMORY_ALIGNMENT, q);
 
       // We need to ensure memory is aligned to 4K,
       // so we will need to pad memory accordingly
@@ -161,7 +161,7 @@ void eval(sycl::queue &q, bool warmup, bool bGenericSharedMemory, const int repe
       auto end = std::chrono::steady_clock::now();
       auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       if (!warmup)
-        printf("Memory deallocation (cudaFreeHost): %lf ms\n", time * 1e-6);
+        printf("Memory deallocation (free): %lf ms\n", time * 1e-6);
     }
   }
   if (warmup) printf("Done.\n");
@@ -175,11 +175,10 @@ int main(int argc, char **argv) {
   const int repeat = atoi(argv[1]);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   bool bGenericSharedMemory;
 

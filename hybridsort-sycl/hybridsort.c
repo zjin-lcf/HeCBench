@@ -32,8 +32,8 @@ int compare(const void *a, const void *b) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-cl::sycl::float4* runMergeSort(int listsize, int divisions,
-    cl::sycl::float4 *d_origList, cl::sycl::float4 *d_resultList,
+sycl::float4* runMergeSort(int listsize, int divisions,
+    sycl::float4 *d_origList, sycl::float4 *d_resultList,
     int *sizes, int *nullElements,
     unsigned int *origOffsets);
 
@@ -110,19 +110,18 @@ int main(int argc, char** argv)
   unsigned int *origOffsets = (unsigned int *) malloc((DIVISIONS + 1) * sizeof(int));
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v);
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v);
 #endif
-  queue q(dev_sel);
 
   // time bucketsort
   clock_t bucketsort_start = clock();
   bucketSort(q, cpu_idata,d_output,numElements,sizes,nullElements,datamin,datamax, origOffsets);
   clock_t bucketsort_diff = clock() - bucketsort_start;
  
-  cl::sycl::float4 *d_origList = (cl::sycl::float4*) d_output;
-  cl::sycl::float4 *d_resultList = (cl::sycl::float4*) cpu_idata;
+  sycl::float4 *d_origList = (sycl::float4*) d_output;
+  sycl::float4 *d_resultList = (sycl::float4*) cpu_idata;
 
   int newlistsize = 0;
   for(int i = 0; i < DIVISIONS; i++){
@@ -131,7 +130,7 @@ int main(int argc, char** argv)
 
   // time mergesort
   clock_t mergesort_start = clock();
-  cl::sycl::float4* mergeresult = runMergeSort(q, newlistsize,DIVISIONS,d_origList,d_resultList,sizes,nullElements,origOffsets);
+  sycl::float4 *mergeresult = runMergeSort(q, newlistsize,DIVISIONS,d_origList,d_resultList,sizes,nullElements,origOffsets);
   clock_t mergesort_diff = clock() - mergesort_start;
   gpu_odata = (float*)mergeresult;
 
@@ -189,6 +188,3 @@ int main(int argc, char** argv)
 
   return 0;
 }
-
-
-

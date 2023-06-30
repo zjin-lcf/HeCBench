@@ -1,5 +1,5 @@
 
-#define CLAMP_TO_EDGE 
+#define CLAMP_TO_EDGE
 #define MAC
 
 #include <stdio.h>
@@ -8,11 +8,13 @@
 #include <iostream>
 #include <cassert>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "main.h"
 #include "shrUtils.h"
 
-// Inline device function to convert 32-bit unsigned integer to floating point rgba color 
+using float4 = sycl::float4;
+
+// Inline device function to convert 32-bit unsigned integer to floating point rgba color
 //*****************************************************************
 float4 rgbaUintToFloat4(const unsigned int uiPackedRGBA)
 {
@@ -38,11 +40,11 @@ unsigned int rgbaFloat4ToUint(const float4 rgba)
 
 // Transpose kernel (see transpose SDK sample for details)
 //*****************************************************************
-void Transpose(nd_item<2> &item,
-               global_ptr<const unsigned int> uiDataIn, 
-               global_ptr<unsigned int> uiDataOut, 
-               const int iWidth, const int iHeight, 
-               local_ptr<unsigned int> uiLocalBuff)
+void Transpose(sycl::nd_item<2> &item,
+               const unsigned int *uiDataIn,
+               unsigned int *uiDataOut,
+               const int iWidth, const int iHeight,
+               unsigned int *uiLocalBuff)
 {
     // read the matrix tile into LMEM
     unsigned int xIndex = item.get_global_id(1);
@@ -51,56 +53,56 @@ void Transpose(nd_item<2> &item,
     if((xIndex < iWidth) && (yIndex < iHeight))
     {
         //uiLocalBuff[get_local_id(1) * (get_local_size(0) + 1) + get_local_id(0)] = uiDataIn[(yIndex * iWidth) + xIndex];
-        uiLocalBuff[item.get_local_id(0) * (item.get_local_range(1) + 1) + 
+        uiLocalBuff[item.get_local_id(0) * (item.get_local_range(1) + 1) +
                     item.get_local_id(1)] = uiDataIn[(yIndex * iWidth) + xIndex];
     }
 
     // Synchronize the read into LMEM
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     // write the transposed matrix tile to global memory
     // mul24(get_group_id(1), get_local_size(1)) + get_local_id(0);
-    xIndex = sycl::mul24((unsigned)item.get_group(0), (unsigned)item.get_local_range(0)) + item.get_local_id(1); 
+    xIndex = sycl::mul24((unsigned)item.get_group(0), (unsigned)item.get_local_range(0)) + item.get_local_id(1);
     //mul24(get_group_id(0), get_local_size(0)) + get_local_id(1);
-    yIndex = sycl::mul24((unsigned)item.get_group(1), (unsigned)item.get_local_range(1)) + item.get_local_id(0); 
+    yIndex = sycl::mul24((unsigned)item.get_group(1), (unsigned)item.get_local_range(1)) + item.get_local_id(0);
     if((xIndex < iHeight) && (yIndex < iWidth))
     {
-        uiDataOut[(yIndex * iHeight) + xIndex] = 
+        uiDataOut[(yIndex * iHeight) + xIndex] =
          //uiLocalBuff[get_local_id(0) * (get_local_size(1) + 1) + get_local_id(1)];
          uiLocalBuff[item.get_local_id(1) * (item.get_local_range(0) + 1) + item.get_local_id(0)];
     }
 }
 
-// 	simple 1st order recursive filter kernel 
+// 	simple 1st order recursive filter kernel
 //*****************************************************************
 //    - processes one image column per thread
-//      parameters:	
+//      parameters:
 //      uiDataIn - pointer to input data (RGBA image packed into 32-bit integers)
-//      uiDataOut - pointer to output data 
+//      uiDataOut - pointer to output data
 //      iWidth  - image width
 //      iHeight  - image height
 //      a  - blur parameter
 //*****************************************************************
 void SimpleRecursiveRGBA(
-  nd_item<1> &item,
-  global_ptr<const unsigned int> uiDataIn,
-  global_ptr<unsigned int> uiDataOut,
+  sycl::nd_item<1> &item,
+  const unsigned int *uiDataIn,
+  unsigned int *uiDataOut,
   const int iWidth, const int iHeight, const float a)
 {
     // compute X pixel location and check in-bounds
   unsigned int X = item.get_global_id(0);
   if (X >= iWidth) return;
-    
+
   // advance global pointers to correct column for this work item and x position
-  uiDataIn += X;    
+  uiDataIn += X;
   uiDataOut += X;
 
   // start forward filter pass
   float4 yp = rgbaUintToFloat4(*uiDataIn);  // previous output
-  for (int Y = 0; Y < iHeight; Y++) 
+  for (int Y = 0; Y < iHeight; Y++)
   {
     float4 xc = rgbaUintToFloat4(*uiDataIn);
-    float4 yc = xc + (yp - xc) * (float4)a;   
+    float4 yc = xc + (yp - xc) * (float4)a;
     *uiDataOut = rgbaFloat4ToUint(yc);
     yp = yc;
     uiDataIn += iWidth;     // move to next row
@@ -113,7 +115,7 @@ void SimpleRecursiveRGBA(
 
   // start reverse filter pass: ensures response is symmetrical
   yp = rgbaUintToFloat4(*uiDataIn);
-  for (int Y = iHeight - 1; Y > -1; Y--) 
+  for (int Y = iHeight - 1; Y > -1; Y--)
   {
     float4 xc = rgbaUintToFloat4(*uiDataIn);
     float4 yc = xc + (yp - xc) * (float4)a;
@@ -124,33 +126,33 @@ void SimpleRecursiveRGBA(
   }
 }
 
-// Recursive Gaussian filter 
+// Recursive Gaussian filter
 //*****************************************************************
-//  parameters:	
+//  parameters:
 //      uiDataIn - pointer to input data (RGBA image packed into 32-bit integers)
-//      uiDataOut - pointer to output data 
+//      uiDataOut - pointer to output data
 //      iWidth  - image width
 //      iHeight  - image height
 //      a0-a3, b1, b2, coefp, coefn - filter parameters
 //
 //      If used, CLAMP_TO_EDGE is passed in via OpenCL clBuildProgram call options string at app runtime
 //*****************************************************************
-void RecursiveRGBA(nd_item<1> &item,
-                   global_ptr<const unsigned int> uiDataIn, 
-                   global_ptr<unsigned int> uiDataOut, 
-                   const int iWidth, const int iHeight, 
-                   const float a0, const float a1, 
-                   const float a2, const float a3, 
-                   const float b1, const float b2, 
+void RecursiveRGBA(sycl::nd_item<1> &item,
+                   const unsigned int *uiDataIn,
+                   unsigned int *uiDataOut,
+                   const int iWidth, const int iHeight,
+                   const float a0, const float a1,
+                   const float a2, const float a3,
+                   const float b1, const float b2,
                    const float coefp, const float coefn)
 {
     // compute X pixel location and check in-bounds
     //unsigned int X = mul24(get_group_id(0), get_local_size(0)) + get_local_id(0);
-    unsigned int X = item.get_global_id(0); 
+    unsigned int X = item.get_global_id(0);
 	if (X >= iWidth) return;
 
     // advance global pointers to correct column for this work item and x position
-    uiDataIn += X;    
+    uiDataIn += X;
     uiDataOut += X;
 
     // start forward filter pass
@@ -159,19 +161,19 @@ void RecursiveRGBA(nd_item<1> &item,
     float4 yb = (float4)0.0f;  // previous output by 2
 
 #ifdef CLAMP_TO_EDGE
-    xp = rgbaUintToFloat4(*uiDataIn); 
-    yb = xp * (float4)coefp; 
+    xp = rgbaUintToFloat4(*uiDataIn);
+    yb = xp * (float4)coefp;
     yp = yb;
 #endif
 
-    for (int Y = 0; Y < iHeight; Y++) 
+    for (int Y = 0; Y < iHeight; Y++)
     {
         float4 xc = rgbaUintToFloat4(*uiDataIn);
         float4 yc = (xc * a0) + (xp * a1) - (yp * b1) - (yb * b2);
-		*uiDataOut = rgbaFloat4ToUint(yc);
-        xp = xc; 
-        yb = yp; 
-        yp = yc; 
+        *uiDataOut = rgbaFloat4ToUint(yc);
+        xp = xc;
+        yb = yp;
+        yp = yc;
         uiDataIn += iWidth;     // move to next row
         uiDataOut += iWidth;    // move to next row
     }
@@ -188,18 +190,18 @@ void RecursiveRGBA(nd_item<1> &item,
 
 #ifdef CLAMP_TO_EDGE
     xn = rgbaUintToFloat4(*uiDataIn);
-    xa = xn; 
-    yn = xn * (float4)coefn; 
+    xa = xn;
+    yn = xn * (float4)coefn;
     ya = yn;
 #endif
 
-    for (int Y = iHeight - 1; Y > -1; Y--) 
+    for (int Y = iHeight - 1; Y > -1; Y--)
     {
         float4 xc = rgbaUintToFloat4(*uiDataIn);
         float4 yc = (xn * a2) + (xa * a3) - (yn * b1) - (ya * b2);
-        xa = xn; 
-        xn = xc; 
-        ya = yn; 
+        xa = xn;
+        xn = xc;
+        ya = yn;
         yn = yc;
         *uiDataOut = rgbaFloat4ToUint(rgbaUintToFloat4(*uiDataOut) + yc);
         uiDataIn -= iWidth;   // move to previous row
@@ -207,14 +209,14 @@ void RecursiveRGBA(nd_item<1> &item,
     }
 }
 
-double GPUGaussianFilterRGBA(queue &q,
+double GPUGaussianFilterRGBA(sycl::queue &q,
                              const unsigned int* uiInput,
                              unsigned int* uiOutput,
-                             buffer<unsigned int, 1> &d_BufIn,
-                             buffer<unsigned int, 1> &d_BufTmp,
-                             buffer<unsigned int, 1> &d_BufOut,
+                             unsigned int *d_BufIn,
+                             unsigned int *d_BufTmp,
+                             unsigned int *d_BufOut,
                              const unsigned int uiImageWidth,
-                             const unsigned int uiImageHeight, 
+                             const unsigned int uiImageHeight,
                              const GaussParms* pGP)
 {
 #if USE_SIMPLE_FILTER
@@ -230,29 +232,27 @@ double GPUGaussianFilterRGBA(queue &q,
   float coefn = pGP->coefn;
 #endif
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_BufIn.get_access<sycl_write>(cgh);
-    cgh.copy(uiInput, acc);
-  }).wait();
+  unsigned int szBuffBytes = uiImageWidth * uiImageHeight * sizeof (unsigned int);
+  q.memcpy(d_BufIn, uiInput, szBuffBytes).wait();
 
   auto start = std::chrono::steady_clock::now();
 
-  const int iTransposeBlockDim = 16;        // initial height and width dimension of 2D transpose workgroup 
+  const int iTransposeBlockDim = 16;        // initial height and width dimension of 2D transpose workgroup
   size_t szGaussLocalWork = 256;
-  size_t szGaussGlobalWork = shrRoundUp((int)szGaussLocalWork, uiImageWidth); 
+  size_t szGaussGlobalWork = shrRoundUp((int)szGaussLocalWork, uiImageWidth);
 
-  range<1> gauss_gws (szGaussGlobalWork);
-  range<1> gauss_lws (szGaussLocalWork);
- 
-  q.submit([&] (handler &cgh) {
-    auto in = d_BufIn.get_access<sycl_read>(cgh);
-    auto tmp = d_BufTmp.get_access<sycl_write>(cgh);
+  sycl::range<1> gauss_gws (szGaussGlobalWork);
+  sycl::range<1> gauss_lws (szGaussLocalWork);
+
+  q.submit([&] (sycl::handler &cgh) {
 #if USE_SIMPLE_FILTER
-    cgh.parallel_for<class simpleRecursiveRGBA>(nd_range<1>(gauss_gws, gauss_lws), [=] (nd_item<1> item) {
-      SimpleRecursiveRGBA(item, in.get_pointer(), tmp.get_pointer(), uiImageWidth, uiImageHeight, ema);
+    cgh.parallel_for<class simpleRecursiveRGBA>(
+      sycl::nd_range<1>(gauss_gws, gauss_lws), [=] (sycl::nd_item<1> item) {
+      SimpleRecursiveRGBA(item, d_BufIn, d_BufTmp, uiImageWidth, uiImageHeight, ema);
 #else
-    cgh.parallel_for<class recursiveRGBA>(nd_range<1>(gauss_gws, gauss_lws), [=] (nd_item<1> item) {
-      RecursiveRGBA(item, in.get_pointer(), tmp.get_pointer(), uiImageWidth, uiImageHeight, 
+    cgh.parallel_for<class recursiveRGBA>(
+      sycl::nd_range<1>(gauss_gws, gauss_lws), [=] (sycl::nd_item<1> item) {
+      RecursiveRGBA(item, d_BufIn, d_BufTmp, uiImageWidth, uiImageHeight,
                     a0, a1, a2, a3, b1, b2, coefp, coefn);
 #endif
     });
@@ -261,57 +261,53 @@ double GPUGaussianFilterRGBA(queue &q,
   size_t szTransposeGlobalWork[2];
   size_t szTransposeLocalWork[2] = {16, 16};
   // Launch transpose kernel in 1st direction
-  szTransposeGlobalWork[0] = shrRoundUp((int)szTransposeLocalWork[0], uiImageWidth); 
-  szTransposeGlobalWork[1] = shrRoundUp((int)szTransposeLocalWork[1], uiImageHeight); 
-  range<2> t1_gws (szTransposeGlobalWork[1], szTransposeGlobalWork[0]);
-  range<2> t1_lws (szTransposeLocalWork[1], szTransposeLocalWork[0]);
+  szTransposeGlobalWork[0] = shrRoundUp((int)szTransposeLocalWork[0], uiImageWidth);
+  szTransposeGlobalWork[1] = shrRoundUp((int)szTransposeLocalWork[1], uiImageHeight);
+  sycl::range<2> t1_gws (szTransposeGlobalWork[1], szTransposeGlobalWork[0]);
+  sycl::range<2> t1_lws (szTransposeLocalWork[1], szTransposeLocalWork[0]);
 
-  q.submit([&] (handler &cgh) {
-    auto in = d_BufTmp.get_access<sycl_read>(cgh);
-    auto out = d_BufOut.get_access<sycl_write>(cgh);
-    accessor<unsigned int, 1, sycl_read_write, access::target::local> 
-      uiLocalBuff (iTransposeBlockDim * (iTransposeBlockDim + 1), cgh);
-    cgh.parallel_for<class transpose1>(nd_range<2>(t1_gws, t1_lws), [=] (nd_item<2> item) {
-      Transpose(item, in.get_pointer(), out.get_pointer(), uiImageWidth, uiImageHeight, uiLocalBuff.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<unsigned int, 1>
+      uiLocalBuff (sycl::range<1>(iTransposeBlockDim * (iTransposeBlockDim + 1)), cgh);
+    cgh.parallel_for<class transpose1>(sycl::nd_range<2>(t1_gws, t1_lws), [=] (sycl::nd_item<2> item) {
+      Transpose(item, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight, uiLocalBuff.get_pointer());
     });
   });
 
   // Reset Gaussian global work dimensions and variable args, then process in 2nd dimension
   // note width and height parameters flipped due to transpose
-  szGaussGlobalWork = shrRoundUp((int)szGaussLocalWork, uiImageHeight); 
+  szGaussGlobalWork = shrRoundUp((int)szGaussLocalWork, uiImageHeight);
 
-  range<1> gauss2_gws (szGaussGlobalWork);
+  sycl::range<1> gauss2_gws (szGaussGlobalWork);
 
-  q.submit([&] (handler &cgh) {
-    auto in = d_BufOut.get_access<sycl_read>(cgh);
-    auto out = d_BufTmp.get_access<sycl_write>(cgh);
+  q.submit([&] (sycl::handler &cgh) {
 #if USE_SIMPLE_FILTER
-    cgh.parallel_for<class simpleRecursiveRGBA2>(nd_range<1>(gauss2_gws, gauss_lws), [=] (nd_item<1> item) {
-      SimpleRecursiveRGBA(item, in.get_pointer(), out.get_pointer(), uiImageHeight, uiImageWidth, ema);
+    cgh.parallel_for<class simpleRecursiveRGBA2>(
+      sycl::nd_range<1>(gauss2_gws, gauss_lws), [=] (sycl::nd_item<1> item) {
+      SimpleRecursiveRGBA(item, d_BufOut, d_BufTmp, uiImageHeight, uiImageWidth, ema);
 #else
-    cgh.parallel_for<class recursiveRGBA2>(nd_range<1>(gauss2_gws, gauss_lws), [=] (nd_item<1> item) {
-      RecursiveRGBA(item, in.get_pointer(), out.get_pointer(), uiImageHeight, uiImageWidth, 
+    cgh.parallel_for<class recursiveRGBA2>(
+      sycl::nd_range<1>(gauss2_gws, gauss_lws), [=] (sycl::nd_item<1> item) {
+      RecursiveRGBA(item, d_BufOut, d_BufTmp, uiImageHeight, uiImageWidth,
                     a0, a1, a2, a3, b1, b2, coefp, coefn);
 #endif
     });
   });
 
 
-  // Reset transpose global work dimensions and variable args 
+  // Reset transpose global work dimensions and variable args
   // note width and height parameters flipped due to 1st transpose
-  szTransposeGlobalWork[0] = shrRoundUp((int)szTransposeLocalWork[0], uiImageHeight); 
-  szTransposeGlobalWork[1] = shrRoundUp((int)szTransposeLocalWork[1], uiImageWidth); 
+  szTransposeGlobalWork[0] = shrRoundUp((int)szTransposeLocalWork[0], uiImageHeight);
+  szTransposeGlobalWork[1] = shrRoundUp((int)szTransposeLocalWork[1], uiImageWidth);
 
-  range<2> t2_gws (szTransposeGlobalWork[1], szTransposeGlobalWork[0]);
+  sycl::range<2> t2_gws (szTransposeGlobalWork[1], szTransposeGlobalWork[0]);
   //range<1> t2_lws (szTransposeLocalWork[1], szTransposeLobalWork[0]);
   // Launch transpose kernel in 2nd direction
-  q.submit([&] (handler &cgh) {
-    auto in = d_BufTmp.get_access<sycl_read>(cgh);
-    auto out = d_BufOut.get_access<sycl_write>(cgh);
-    accessor<unsigned int, 1, sycl_read_write, access::target::local> 
-      uiLocalBuff (iTransposeBlockDim * (iTransposeBlockDim + 1), cgh);
-    cgh.parallel_for<class transpose2>(nd_range<2>(t2_gws, t1_lws), [=] (nd_item<2> item) {
-      Transpose(item, in.get_pointer(), out.get_pointer(), uiImageHeight, uiImageWidth, uiLocalBuff.get_pointer());
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<unsigned int, 1>
+      uiLocalBuff (sycl::range<1>(iTransposeBlockDim * (iTransposeBlockDim + 1)), cgh);
+    cgh.parallel_for<class transpose2>(sycl::nd_range<2>(t2_gws, t1_lws), [=] (sycl::nd_item<2> item) {
+      Transpose(item, d_BufTmp, d_BufOut, uiImageHeight, uiImageWidth, uiLocalBuff.get_pointer());
     });
   });
 
@@ -319,11 +315,7 @@ double GPUGaussianFilterRGBA(queue &q,
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_BufOut.get_access<sycl_read>(cgh);
-    cgh.copy(acc, uiOutput);
-  });
-
+  q.memcpy(uiOutput, d_BufOut, szBuffBytes).wait();
   return time;
 }
 
@@ -351,19 +343,18 @@ int main(int argc, char** argv)
   unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
   uiTemp = (unsigned int*)malloc(szBuffBytes);
   uiOutput = (unsigned int*)malloc(szBuffBytes);
-  printf("Allocate Host Image Buffers...\n"); 
+  printf("Allocate Host Image Buffers...\n");
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // Allocate the source, intermediate and result buffer memory objects on the device GMEM
-  buffer<unsigned int, 1> d_BufIn(szBuff);
-  buffer<unsigned int, 1> d_BufTmp(szBuff);
-  buffer<unsigned int, 1> d_BufOut(szBuff);
+  unsigned int *d_BufIn= sycl::malloc_device<unsigned int>(szBuff, q);
+  unsigned int *d_BufTmp= sycl::malloc_device<unsigned int>(szBuff, q);
+  unsigned int *d_BufOut= sycl::malloc_device<unsigned int>(szBuff, q);
 
   // init filter coefficients
   PreProcessGaussParms (fSigma, iOrder, &GP);
@@ -384,17 +375,20 @@ int main(int argc, char** argv)
 
   printf("Average execution time of kernels: %f (s)\n", (time * 1e-9f) / iCycles);
 
-  // Compute on host 
+  // Compute on host
   unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
   HostRecursiveGaussianRGBA(uiInput, uiTemp, uiGolden, uiImageWidth, uiImageHeight, &GP);
 
-  printf("Comparing GPU Result to CPU Result...\n"); 
+  printf("Comparing GPU Result to CPU Result...\n");
   shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
-  printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
+  printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match");
 
   free(uiGolden);
   free(uiInput);
   free(uiTemp);
   free(uiOutput);
+  sycl::free(d_BufIn, q);
+  sycl::free(d_BufTmp, q);
+  sycl::free(d_BufOut, q);
   return 0;
 }

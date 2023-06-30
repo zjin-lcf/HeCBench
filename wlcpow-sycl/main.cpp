@@ -3,7 +3,7 @@
 #include <math.h>
 #include <random>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "utils.h"
 
 void bond_wlcpowallvisc(
@@ -16,7 +16,7 @@ void bond_wlcpowallvisc(
     const r32 *__restrict gamc_global, const r32 *__restrict gamt_global,
     const r32 *__restrict sigc_global, const r32 *__restrict sigt_global,
     const float3 period, const int padding, const int n_type,
-    const int n_local, nd_item<1> &item, r32 *__restrict shared_data)
+    const int n_local, sycl::nd_item<1> &item, r32 *__restrict shared_data)
 {
   r32* temp    = &shared_data[0];
   r32* r0      = &shared_data[1*(n_type+1)];
@@ -42,7 +42,7 @@ void bond_wlcpowallvisc(
     sigc[i]    = sigc_global[i];
     sigt[i]    = sigt_global[i];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   for( int i = blockIdx_x * blockDim_x + threadIdx_x;
            i < n_local ; i += gridDim_x * blockDim_x ) {
@@ -72,9 +72,9 @@ void bond_wlcpowallvisc(
                 (0.25f / sr - 0.25f + rr);
       // mu is described in the papers
       r32 mu = 0.433f * ( // 0.25 * sqrt(3)
-         temp[type] * (-0.25f / sr + 0.25f + 
+         temp[type] * (-0.25f / sr + 0.25f +
          0.5f * rr / (sr * (1.0f - rr))) /
-         (lmax * rr) + kph * (qp[type] + 1.0f) / 
+         (lmax * rr) + kph * (qp[type] + 1.0f) /
          sycl::pow<float>(l0, qp[type] + 1.0f));
       r32 lambda = mu/mu_targ[type];
       kph = kph/lambda;
@@ -129,22 +129,22 @@ T* resize (int n) {
 }
 
 template <typename T>
-T* grow (queue &q, int n) {
+T* grow (sycl::queue &q, int n) {
   return sycl::malloc_device<T>(n, q);
 }
 
 template <typename T>
-void upload(queue &q, T* d, T* h, int n) {
+void upload(sycl::queue &q, T* d, T* h, int n) {
   q.memcpy(d, h, sizeof(T) * n);
 }
 
 template <typename T>
-void reset(queue &q, T* d, int n) {
+void reset(sycl::queue &q, T* d, int n) {
   q.memset(d, (T)0, sizeof(T) * n);
 }
 
 template <typename T>
-void download(queue &q, T* h, T* d, int n) {
+void download(sycl::queue &q, T* h, T* d, int n) {
   q.memcpy(h, d, sizeof(T) * n);
 }
 
@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
   for (i = 0; i < n + n + 1; i++) {
     bond_r0[i] = dist_r64(g) + 0.001;
     // select two distinct atoms in the kernel to evaluate their forces
-    bonds[i] = { (i+1)%(n+1), 
+    bonds[i] = { (i+1)%(n+1),
                  dist_i32(g) };
   }
 
@@ -214,11 +214,10 @@ int main(int argc, char *argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   float4 *dev_coord_merged = grow<float4>(q, n + 1);
   float4 *dev_veloc = grow<float4>(q, n + 1);
@@ -256,8 +255,8 @@ int main(int argc, char *argv[]) {
   upload (q, dev_sigc, sigc, n+1);
   upload (q, dev_sigt, sigt, n+1);
 
-  range<1> gws ((n + 127) / 128 * 128);
-  range<1> lws (128);
+  sycl::range<1> gws ((n + 127) / 128 * 128);
+  sycl::range<1> lws (128);
 
   const int sm_size = (n_type + 1) * 8;
 
@@ -267,8 +266,8 @@ int main(int argc, char *argv[]) {
   // note the outputs are not reset for each run
   for (i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler &cgh) {
-      accessor<r32, 1, sycl_read_write, sycl_lmem> sm (sm_size, cgh);
-      cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+      sycl::local_accessor<r32, 1> sm (sycl::range<1>(sm_size), cgh);
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         bond_wlcpowallvisc(dev_force_x, dev_force_y, dev_force_z,
                            dev_coord_merged, dev_veloc, dev_nbond, dev_bonds,
                            dev_bond_r0, dev_temp, dev_bond_l0, dev_mu_targ,
@@ -292,7 +291,7 @@ int main(int argc, char *argv[]) {
 
   // no NaN values in the outputs
   for (i = 0; i < n+1; i++) {
-    bool r = (isnan(force_x[i]) | isnan(force_y[i]) | isnan(force_z[i]));
+    bool r = (isnan(force_x[i]) || isnan(force_y[i]) || isnan(force_z[i]));
     if (r) printf("There are NaN numbers at index %d\n", i);
   }
 
@@ -305,7 +304,7 @@ int main(int argc, char *argv[]) {
   // values are meaningless, but they should be consistent across devices
   printf("checksum: forceX=%lf forceY=%lf forceZ=%lf\n",
     force_x_sum/(n+1), force_y_sum/(n+1), force_z_sum/(n+1));
-  
+
 #ifdef DEBUG
   for (i = 0; i < 16; i++) {
     printf("%d %lf %lf %lf\n", i, force_x[i], force_y[i], force_z[i]);

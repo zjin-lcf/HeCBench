@@ -65,9 +65,9 @@ void discrete_frechet_distance(const int s, const int n_1, const int n_2, const 
   }
 
 #ifdef USE_GPU
-  sycl::queue q(sycl::gpu_selector_v);
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::queue q(sycl::cpu_selector_v);
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
   double *d_ca, *d_c1, *d_c2;

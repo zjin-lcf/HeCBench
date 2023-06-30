@@ -1,4 +1,4 @@
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "helper.h"
 #include "track_ellipse.h"
 #include "misc_math.h"
@@ -51,7 +51,7 @@ int main(int argc, char ** argv) {
   // Compute the (x,y) pixel offsets of each sample point in each sample circle
   int host_tX[NCIRCLES * NPOINTS], host_tY[NCIRCLES * NPOINTS];
   for (int k = 0; k < NCIRCLES; k++) {
-    double rad = (double) (MIN_RAD + (2 * k)); 
+    double rad = (double) (MIN_RAD + (2 * k));
     for (int n = 0; n < NPOINTS; n++) {
       host_tX[(k * NPOINTS) + n] = (int)(std::cos(theta[n]) * rad);
       host_tY[(k * NPOINTS) + n] = (int)(std::sin(theta[n]) * rad);
@@ -106,16 +106,15 @@ int main(int argc, char ** argv) {
   for (int i = 0; i < grad_m * grad_n; i++) host_gicov[i] = 0;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // Offload the GICOV score computation to the GPU
 
   // Setup execution parameters
-  int local_work_size = grad_m - (2 * MaxR); 
+  int local_work_size = grad_m - (2 * MaxR);
   int num_work_groups = grad_n - (2 * MaxR);
   size_t work_group_size = 256;
   size_t global_work_size = num_work_groups * local_work_size;
@@ -124,15 +123,25 @@ int main(int argc, char ** argv) {
 
   long long GICOV_start_time = get_time();
 
-  const property_list props = property::buffer::use_host_ptr();
-  buffer<float, 1> d_sin_angle(host_sin_angle, NPOINTS, props);
-  buffer<float, 1> d_cos_angle(host_cos_angle, NPOINTS, props);
-  buffer<int, 1> d_tX(host_tX, NCIRCLES*NPOINTS, props);
-  buffer<int, 1> d_tY(host_tY, NCIRCLES*NPOINTS, props);
+  float *d_sin_angle = sycl::malloc_device<float>(NPOINTS, q);
+  q.memcpy(d_sin_angle, host_sin_angle, sizeof(float)*NPOINTS);
 
-  buffer<float,1> d_grad_x(host_grad_x, grad_m * grad_n, props);
-  buffer<float,1> d_grad_y(host_grad_y, grad_m * grad_n, props);
-  buffer<float,1> d_gicov(grad_m * grad_n);
+  float *d_cos_angle = sycl::malloc_device<float>(NPOINTS, q);
+  q.memcpy(d_cos_angle, host_cos_angle, sizeof(float)*NPOINTS);
+
+  int *d_tX = sycl::malloc_device<int>(NCIRCLES*NPOINTS, q);
+  q.memcpy(d_tX, host_tX, sizeof(int)*NCIRCLES*NPOINTS);
+
+  int *d_tY = sycl::malloc_device<int>(NCIRCLES*NPOINTS, q);
+  q.memcpy(d_tY, host_tY, sizeof(int)*NCIRCLES*NPOINTS);
+
+  float *d_grad_x = sycl::malloc_device<float>(grad_m * grad_n, q);
+  q.memcpy(d_grad_x, host_grad_x, sizeof(float)*grad_m*grad_n);
+
+  float *d_grad_y = sycl::malloc_device<float>(grad_m * grad_n, q);
+  q.memcpy(d_grad_y, host_grad_y, sizeof(float)*grad_m*grad_n);
+
+  float *d_gicov = sycl::malloc_device<float>(grad_m * grad_n, q);
 
 #ifdef DEBUG
   printf("Find: local_work_size = %zu, global_work_size = %zu \n" ,work_group_size, global_work_size);
@@ -141,34 +150,22 @@ int main(int argc, char ** argv) {
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&](handler& cgh) {
-    auto grad_x_acc = d_grad_x.get_access<sycl_read>(cgh);
-    auto grad_y_acc = d_grad_y.get_access<sycl_read>(cgh);
-    auto sin_angle_acc = d_sin_angle.get_access<sycl_read>(cgh);
-    auto cos_angle_acc = d_cos_angle.get_access<sycl_read>(cgh);
-    auto tX_acc = d_tX.get_access<sycl_read>(cgh);
-    auto tY_acc = d_tY.get_access<sycl_read>(cgh);
-    auto gicov_acc = d_gicov.get_access<sycl_write>(cgh);
-
+  q.submit([&](sycl::handler& cgh) {
     cgh.parallel_for<class gicov>(
-        nd_range<1>(range<1>(global_work_size), range<1>(work_group_size)), [=] (nd_item<1> item) {
+      sycl::nd_range<1>(sycl::range<1>(global_work_size), sycl::range<1>(work_group_size)),
+      [=] (sycl::nd_item<1> item) {
        #include "kernel_GICOV.sycl"
     });
-  });
+  }).wait();
 
-  q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Kernel execution time (GICOV): %f (s)\n", time * 1e-9f);
 
-  q.submit([&](handler& cgh) {
-    auto gicov_acc = d_gicov.get_access<sycl_read>(cgh);
-    cgh.copy(gicov_acc, host_gicov);
-  });
-  q.wait();
+  q.memcpy(host_gicov, d_gicov, sizeof(float)*grad_m*grad_n).wait();
 
   long long GICOV_end_time = get_time();
-  
+
   // Copy the results into a new host matrix
 #ifdef DEBUG
   printf("grad_m=%d grad_n=%d\n", grad_m, grad_n);
@@ -192,8 +189,11 @@ int main(int argc, char ** argv) {
   int strel_m = 12 * 2 + 1;
   int strel_n = 12 * 2 + 1;
 
-  buffer<float, 1> d_strel(host_strel, strel_m * strel_n, props);
-  buffer<float, 1> d_img_dilated(max_gicov_m * max_gicov_n);
+  float *d_strel = sycl::malloc_device<float>(strel_m * strel_n, q);
+  q.memcpy(d_strel, host_strel, sizeof(float)*strel_m*strel_n);
+
+  float *d_img_dilated = sycl::malloc_device<float>(max_gicov_m * max_gicov_n, q);
+
   float *host_dilated = (float *) malloc(sizeof(float)*max_gicov_m * max_gicov_n);
 
   // Setup execution parameters
@@ -204,18 +204,16 @@ int main(int argc, char ** argv) {
     global_work_size = ((global_work_size / local_work_size) + 1) * local_work_size;
   }
 #ifdef DEBUG
-  printf("image dilate: local_work_size = %zu, global_work_size = %zu \n", local_work_size, global_work_size);
+  printf("image dilate: local work size = %zu, global work size = %zu \n", local_work_size, global_work_size);
 #endif
 
   q.wait();
   start = std::chrono::steady_clock::now();
 
-  q.submit([&](handler& cgh) {
-    auto c_strel_acc = d_strel.get_access<sycl_read>(cgh);
-    auto img_acc = d_gicov.get_access<sycl_read>(cgh);
-    auto dilated_acc = d_img_dilated.get_access<sycl_write>(cgh);
+  q.submit([&](sycl::handler& cgh) {
     cgh.parallel_for<class dilated>(
-      nd_range<1>(range<1>(global_work_size), range<1>(local_work_size)), [=] (nd_item<1> item) {
+      sycl::nd_range<1>(sycl::range<1>(global_work_size), sycl::range<1>(local_work_size)),
+      [=] (sycl::nd_item<1> item) {
       #include "kernel_dilated.sycl"
     });
   });
@@ -225,11 +223,7 @@ int main(int argc, char ** argv) {
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Kernel execution time (dilated): %f (s)\n", time * 1e-9f);
 
-  q.submit([&](handler& cgh) {
-    auto dilated_acc = d_img_dilated.get_access<sycl_read>(cgh);
-    cgh.copy(dilated_acc, host_dilated);
-  });
-  q.wait();
+  q.memcpy(host_dilated, d_img_dilated, sizeof(float)*grad_m*grad_n).wait();
 
   long long dilate_end_time = get_time();
 
@@ -249,8 +243,8 @@ int main(int argc, char ** argv) {
   ccol = (int *) malloc(gicov->m * gicov->n * sizeof(int));
   for(i = 0; i < gicov->m; i++) {
     for(j = 0; j < gicov->n; j++) {
-      if(!double_eq(m_get_val(gicov,i,j), 0.0) && 
-          double_eq(m_get_val(img_dilated,i,j), 
+      if(!double_eq(m_get_val(gicov,i,j), 0.0) &&
+          double_eq(m_get_val(img_dilated,i,j),
             m_get_val(gicov,i,j)))
       {
         crow[pair_counter]=i;
@@ -298,9 +292,9 @@ int main(int argc, char ** argv) {
   V = (double *) malloc(sizeof(double) * pair_counter);
   QAX_CENTERS = (double * )malloc(sizeof(double) * pair_counter);
   QAY_CENTERS = (double *) malloc(sizeof(double) * pair_counter);
-  ::memset(V, 0, sizeof(double) * pair_counter);
-  ::memset(QAX_CENTERS, 0, sizeof(double) * pair_counter);
-  ::memset(QAY_CENTERS, 0, sizeof(double) * pair_counter);
+  memset(V, 0, sizeof(double) * pair_counter);
+  memset(QAX_CENTERS, 0, sizeof(double) * pair_counter);
+  memset(QAY_CENTERS, 0, sizeof(double) * pair_counter);
 
   // For all possible results, find the ones that are feasibly leukocytes and store their centers
   k_count = 0;
@@ -385,7 +379,7 @@ int main(int argc, char ** argv) {
         v_free(X);
         m_free(Cy_temp);
         m_free(Cy);
-        m_free(Cx);        
+        m_free(Cx);
       }
 
       // Free memory
@@ -397,6 +391,16 @@ int main(int argc, char ** argv) {
   }
 
   // Free memory
+  sycl::free(d_sin_angle, q);
+  sycl::free(d_cos_angle, q);
+  sycl::free(d_tX, q);
+  sycl::free(d_tY, q);
+  sycl::free(d_grad_x, q);
+  sycl::free(d_grad_y, q);
+  sycl::free(d_gicov, q);
+  sycl::free(d_strel, q);
+  sycl::free(d_img_dilated, q);
+
   free(host_grad_x);
   free(host_grad_y);
   free(host_gicov);
@@ -437,7 +441,7 @@ int main(int argc, char ** argv) {
   long long tracking_start_time = get_time();
   int num_snaxels = 20;
   ellipsetrack(q, cell_file, QAX_CENTERS, QAY_CENTERS, k_count, radius, num_snaxels, num_frames);
-  printf("           Total: %.5f seconds\n", ((float) (get_time() - tracking_start_time)) / (float) (1000*1000*num_frames));  
+  printf("           Total: %.5f seconds\n", ((float) (get_time() - tracking_start_time)) / (float) (1000*1000*num_frames));
 
   // Report total program execution time
   printf("\nTotal application run time: %.5f seconds\n", ((float) (get_time() - program_start_time)) / (1000*1000));

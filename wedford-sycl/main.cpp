@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define WARP_SIZE 32
 
@@ -22,9 +22,9 @@ void welford_merge_element(C& count,
 
 template<typename T>
 inline
-void warp_reduce_mean_m2n(nd_item<2> &item, T &mean, T &m2n, int &num)
+void warp_reduce_mean_m2n(sycl::nd_item<2> &item, T &mean, T &m2n, int &num)
 {
-  auto sg = item.get_sub_group(); 
+  auto sg = item.get_sub_group();
   #pragma unroll
   for(int i = WARP_SIZE/2; i > 0; i >>= 1) {
     auto num_new = sg.shuffle_down(num, i);
@@ -36,7 +36,7 @@ void warp_reduce_mean_m2n(nd_item<2> &item, T &mean, T &m2n, int &num)
 
 template <typename T>
 void welford_reduce_mean_m2n(
-      nd_item<2> &item,
+      sycl::nd_item<2> &item,
       T* __restrict x,
       int* __restrict count,
       T &mean,
@@ -56,7 +56,7 @@ void welford_reduce_mean_m2n(
       count[wid] = num;
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     if (wid == 0) {
       mean = (thread_id < block_size / WARP_SIZE)? x[lane*2] : T(0);
@@ -70,7 +70,7 @@ void welford_reduce_mean_m2n(
 
 template <typename scalar_t, typename accscalar_t, typename outscalar_t>
 void welford_kernel(
-      nd_item<2> &item,
+      sycl::nd_item<2> &item,
       const scalar_t* __restrict input,
       outscalar_t* __restrict out_mean,
       outscalar_t* __restrict out_var_biased,
@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
     printf("Usage: %s <batch_size> <spatial_size> <feature_size> <repeat>\n", argv[0]);
     return 1;
   }
-    
+
   const int batch_size = atoi(argv[1]);
   const int spatial_size = atoi(argv[2]);
   const int feature_size = atoi(argv[3]);
@@ -132,8 +132,8 @@ int main(int argc, char* argv[])
   const int block_y = 16;
   const int block_x = 32;
 
-  range<2> lws (block_y, block_x);
-  range<2> gws (block_y, feature_size * block_x);
+  sycl::range<2> lws (block_y, block_x);
+  sycl::range<2> gws (block_y, feature_size * block_x);
 
   int fs_bytes = feature_size * sizeof(float);
   size_t input_size = (size_t)batch_size * spatial_size * feature_size;
@@ -148,27 +148,27 @@ int main(int argc, char* argv[])
 
   float *mean = (float*) malloc (fs_bytes);
   float *var = (float*) malloc (fs_bytes);
-  
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
 
-  float *d_input, *d_mean, *d_var;  
-  d_input = (float*) malloc_device(is_bytes, q);
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
+
+  float *d_input, *d_mean, *d_var;
+  d_input = (float*) sycl::malloc_device(is_bytes, q);
   q.memcpy(d_input, input, is_bytes);
 
-  d_mean = (float*) malloc_device(fs_bytes, q);
-  d_var = (float*) malloc_device(fs_bytes, q);
+  d_mean = (float*) sycl::malloc_device(fs_bytes, q);
+  d_var = (float*) sycl::malloc_device(fs_bytes, q);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler& cgh) {
-      cgh.parallel_for<class welford>(nd_range<2>(gws, lws), [=] (nd_item<2> item) 
+      cgh.parallel_for<class welford>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item)
         [[intel::reqd_sub_group_size(WARP_SIZE)]] {
         welford_kernel<float, float, float>(
           item, d_input, d_mean, d_var, batch_size, feature_size, spatial_size);
@@ -195,9 +195,9 @@ int main(int argc, char* argv[])
 
   printf("Checksum: mean = %f and variance = %f\n", avg_var, avg_mean);
 
-  free(d_input, q);
-  free(d_mean, q);
-  free(d_var, q);
+  sycl::free(d_input, q);
+  sycl::free(d_mean, q);
+  sycl::free(d_var, q);
   free(input);
   free(mean);
   free(var);

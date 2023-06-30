@@ -37,7 +37,9 @@ Original author: Rodrigo de Barros Vimieiro
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
+
+using namespace sycl;
 
 // thread block size
 #define BLOCK_SIZE 256
@@ -383,11 +385,10 @@ void backprojectionDDb(
   const int nPixYMap = nPixY + 1;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  queue q(gpu_selector_v, property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  queue q(cpu_selector_v, property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   double *d_pProj = malloc_device<double>(nDetXMap*nDetYMap*nProj, q);
   double *d_sliceI = malloc_device<double>(nPixXMap*nPixYMap, q);

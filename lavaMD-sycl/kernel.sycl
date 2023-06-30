@@ -40,26 +40,26 @@ if(bx<dim_cpu_number_boxes) {
   //  Setup parameters
 
   // home box - box parameters
-  first_i = d_box_gpu_acc[bx].offset;
+  first_i = d_box_gpu[bx].offset;
 
   //  Copy to shared memory
 
   // (enable the section below only if wanting to use shared memory)
   // home box - shared memory
   while(wtx<NUMBER_PAR_PER_BOX){
-    rA_shared[wtx] = d_rv_gpu_acc[first_i+wtx];
+    rA_shared[wtx] = d_rv_gpu[first_i+wtx];
     wtx = wtx + NUMBER_THREADS;
   }
   wtx = tx;
 
   // (enable the section below only if wanting to use shared memory)
   // synchronize threads  - not needed, but just to be safe for now
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   //  nei box loop
 
   // loop over nei boxes of home box
-  for (k=0; k<(1+d_box_gpu_acc[bx].nn); k++){
+  for (k=0; k<(1+d_box_gpu[bx].nn); k++){
 
     //  nei box - get pointer to the right box
 
@@ -67,33 +67,33 @@ if(bx<dim_cpu_number_boxes) {
       pointer = bx;                          // set first box to be processed to home box
     }
     else{
-      pointer = d_box_gpu_acc[bx].nei[k-1].number;              // remaining boxes are nei boxes
+      pointer = d_box_gpu[bx].nei[k-1].number;              // remaining boxes are nei boxes
     }
 
     //  Setup parameters
 
     // nei box - box parameters
-    first_j = d_box_gpu_acc[pointer].offset;
+    first_j = d_box_gpu[pointer].offset;
 
     // (enable the section below only if wanting to use shared memory)
     // nei box - shared memory
     while(wtx<NUMBER_PAR_PER_BOX){
-      rB_shared[wtx] = d_rv_gpu_acc[first_j+wtx];
-      qB_shared[wtx] = d_qv_gpu_acc[first_j+wtx];
+      rB_shared[wtx] = d_rv_gpu[first_j+wtx];
+      qB_shared[wtx] = d_qv_gpu[first_j+wtx];
       wtx = wtx + NUMBER_THREADS;
     }
     wtx = tx;
 
     // (enable the section below only if wanting to use shared memory)
     // synchronize threads because in next section each thread accesses data brought in by different threads here
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     //  Calculation
 
     // loop for the number of particles in the home box
     while(wtx<NUMBER_PAR_PER_BOX){
 
-      auto fv_acc = d_fv_gpu_acc[first_i+wtx];
+      auto fv = d_fv_gpu[first_i+wtx];
       auto rA = rA_shared[wtx];
 
       // loop for the number of particles in the current nei box
@@ -112,13 +112,13 @@ if(bx<dim_cpu_number_boxes) {
         d.z = rA.z  - rB.z;
         fzij=fs*d.z;
 
-        fv_acc.v += qB * vij;
-        fv_acc.x += qB * fxij;
-        fv_acc.y += qB * fyij;
-        fv_acc.z += qB * fzij;
+        fv.v += qB * vij;
+        fv.x += qB * fxij;
+        fv.y += qB * fyij;
+        fv.z += qB * fzij;
       }
 
-      d_fv_gpu_acc[first_i+wtx] = fv_acc;
+      d_fv_gpu[first_i+wtx] = fv;
 
       // increment work thread index
       wtx = wtx + NUMBER_THREADS;
@@ -128,7 +128,7 @@ if(bx<dim_cpu_number_boxes) {
     wtx = tx;
 
     // synchronize after finishing force contributions from current nei box not to cause conflicts when starting next box
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
     //  Calculation END
   }

@@ -6,57 +6,56 @@ int y;
 int indX, indY;
 float u, v;
 
-
 if(i < Nparticles){
-  arrayX_acc[i] = xj_acc[i]; 
-  arrayY_acc[i] = yj_acc[i]; 
+  arrayX_d[i] = xj_d[i]; 
+  arrayY_d[i] = yj_d[i]; 
 
-  weights_acc[i] = 1.0f / ((float) (Nparticles)); 
-  seed_acc[i] = (A*seed_acc[i] + C) % M;
-  u = cl::sycl::fabs(seed_acc[i]/((float)M));
-  seed_acc[i] = (A*seed_acc[i] + C) % M;
-  v = cl::sycl::fabs(seed_acc[i]/((float)M));
-  arrayX_acc[i] += 1.0f + 5.0f*(cl::sycl::sqrt(-2.0f*cl::sycl::log(u))*cl::sycl::cos(2.0f*PI*v));
+  weights_d[i] = 1.0f / ((float) (Nparticles)); 
+  seed_d[i] = (A*seed_d[i] + C) % M;
+  u = sycl::fabs(seed_d[i]/((float)M));
+  seed_d[i] = (A*seed_d[i] + C) % M;
+  v = sycl::fabs(seed_d[i]/((float)M));
+  arrayX_d[i] += 1.0f + 5.0f*(sycl::sqrt(-2.0f*sycl::log(u))*sycl::cos(2.0f*PI*v));
 
-  seed_acc[i] = (A*seed_acc[i] + C) % M;
-  u = cl::sycl::fabs(seed_acc[i]/((float)M));
-  seed_acc[i] = (A*seed_acc[i] + C) % M;
-  v = cl::sycl::fabs(seed_acc[i]/((float)M));
-  arrayY_acc[i] += -2.0f + 2.0f*(cl::sycl::sqrt(-2.0f*cl::sycl::log(u))*cl::sycl::cos(2.0f*PI*v));
+  seed_d[i] = (A*seed_d[i] + C) % M;
+  u = sycl::fabs(seed_d[i]/((float)M));
+  seed_d[i] = (A*seed_d[i] + C) % M;
+  v = sycl::fabs(seed_d[i]/((float)M));
+  arrayY_d[i] += -2.0f + 2.0f*(sycl::sqrt(-2.0f*sycl::log(u))*sycl::cos(2.0f*PI*v));
 }
 
-item.barrier(access::fence_space::local_space);
+item.barrier(sycl::access::fence_space::local_space);
 
 
 if(i < Nparticles)
 {
   for(y = 0; y < countOnes; y++){
 
-    int iX = arrayX_acc[i];
-    int iY = arrayY_acc[i];
-    int rnd_iX = (arrayX_acc[i] - iX) < .5f ? iX : iX++;
-    int rnd_iY = (arrayY_acc[i] - iY) < .5f ? iY : iY++;
-    indX = rnd_iX + objxy_acc[y*2 + 1];
-    indY = rnd_iY + objxy_acc[y*2];
+    int iX = arrayX_d[i];
+    int iY = arrayY_d[i];
+    int rnd_iX = (arrayX_d[i] - iX) < .5f ? iX : iX++;
+    int rnd_iY = (arrayY_d[i] - iY) < .5f ? iY : iY++;
+    indX = rnd_iX + objxy_d[y*2 + 1];
+    indY = rnd_iY + objxy_d[y*2];
 
-    ind_acc[i*countOnes + y] = (indX*IszY*Nfr + indY*Nfr + k) >= 0 ? 
+    ind_d[i*countOnes + y] = (indX*IszY*Nfr + indY*Nfr + k) >= 0 ? 
       (indX*IszY*Nfr + indY*Nfr + k) : -(indX*IszY*Nfr + indY*Nfr + k);
-    if(ind_acc[i*countOnes + y] >= max_size)
-      ind_acc[i*countOnes + y] = 0;
+    if(ind_d[i*countOnes + y] >= max_size)
+      ind_d[i*countOnes + y] = 0;
   }
   float likelihoodSum = 0.0f;
   for(int x = 0; x < countOnes; x++)
-    likelihoodSum += ((I_acc[ind_acc[i*countOnes + x]] - 100) * (I_acc[ind_acc[i*countOnes + x]] - 100) -
-        (I_acc[ind_acc[i*countOnes + x]] - 228) * (I_acc[ind_acc[i*countOnes + x]] - 228)) / 50.0f;
-  likelihood_acc[i] = likelihoodSum/countOnes-SCALE_FACTOR;
+    likelihoodSum += ((I_d[ind_d[i*countOnes + x]] - 100) * (I_d[ind_d[i*countOnes + x]] - 100) -
+        (I_d[ind_d[i*countOnes + x]] - 228) * (I_d[ind_d[i*countOnes + x]] - 228)) / 50.0f;
+  likelihood_d[i] = likelihoodSum/countOnes-SCALE_FACTOR;
 
-  weights_acc[i] = weights_acc[i] * cl::sycl::exp(likelihood_acc[i]); //Donnie Newell - added the missing exponential function call
+  weights_d[i] = weights_d[i] * sycl::exp(likelihood_d[i]); //Donnie Newell - added the missing exponential function call
 
 }
 
-weights_local[thread_id] = (i < Nparticles) ?  weights_acc[i] : 0.f;
+weights_local[thread_id] = (i < Nparticles) ?  weights_d[i] : 0.f;
 
-item.barrier(access::fence_space::local_space);
+item.barrier(sycl::access::fence_space::local_space);
 
 for(unsigned int s=BLOCK_SIZE/2; s>0; s>>=1)
 {
@@ -64,9 +63,10 @@ for(unsigned int s=BLOCK_SIZE/2; s>0; s>>=1)
   {
     weights_local[thread_id] += weights_local[thread_id + s];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 }
+
 if(thread_id == 0)
 {
-  partial_sums_acc[block_id] = weights_local[0];
+  partial_sums_d[block_id] = weights_local[0];
 }

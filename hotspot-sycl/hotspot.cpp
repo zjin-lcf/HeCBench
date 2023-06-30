@@ -1,5 +1,5 @@
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "hotspot.h"
 
 // Returns the current system time in microseconds
@@ -66,9 +66,9 @@ void readinput(float *vect, int grid_rows, int grid_cols, char *file) {
 
 /* compute N time steps */
 int compute_tran_temp(
-    queue &q, 
-    buffer<float,1> &MatrixPower, 
-    std::vector<buffer<float,1>> &MatrixTemp, 
+    sycl::queue &q,
+    float *MatrixPower, 
+    float *MatrixTemp[2], 
     int col, int row,
     int total_iterations, int num_iterations, 
     int blockCols, int blockRows, int borderCols, int borderRows)
@@ -99,8 +99,8 @@ int compute_tran_temp(
   local_work_size[0] = BLOCK_SIZE;
   local_work_size[1] = BLOCK_SIZE;
 
-  range<2> gws (global_work_size[1], global_work_size[0]);
-  range<2> lws (local_work_size[1], local_work_size[0]);
+  sycl::range<2> gws (global_work_size[1], global_work_size[0]);
+  sycl::range<2> lws (local_work_size[1], local_work_size[0]);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
@@ -110,14 +110,15 @@ int compute_tran_temp(
     // Specify kernel arguments
     int iter = MIN(num_iterations, total_iterations - t);
 
-    q.submit([&](handler& cgh) {
-      auto power_acc = MatrixPower.get_access<sycl_read>(cgh);
-      auto temp_src_acc = MatrixTemp[src].get_access<sycl_read>(cgh);
-      auto temp_dst_acc = MatrixTemp[dst].get_access<sycl_write>(cgh);
-      accessor <float, 2, sycl_read_write, access::target::local> temp_on_device ({BLOCK_SIZE,BLOCK_SIZE}, cgh);
-      accessor <float, 2, sycl_read_write, access::target::local> power_on_device ({BLOCK_SIZE,BLOCK_SIZE}, cgh);
-      accessor <float, 2, sycl_read_write, access::target::local> temp_t ({BLOCK_SIZE,BLOCK_SIZE}, cgh);
-      cgh.parallel_for<class calc_temp>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&](sycl::handler& cgh) {
+      auto power_acc = MatrixPower;
+      auto temp_src_acc = MatrixTemp[src];
+      auto temp_dst_acc = MatrixTemp[dst];
+      sycl::local_accessor <float, 2> temp_on_device (sycl::range<2>{BLOCK_SIZE,BLOCK_SIZE}, cgh);
+      sycl::local_accessor <float, 2> power_on_device (sycl::range<2>{BLOCK_SIZE,BLOCK_SIZE}, cgh);
+      sycl::local_accessor <float, 2> temp_t (sycl::range<2>{BLOCK_SIZE,BLOCK_SIZE}, cgh);
+      cgh.parallel_for<class calc_temp>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
          #include "kernel_hotspot.sycl"
       });
     });
@@ -132,14 +133,6 @@ int compute_tran_temp(
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time %f (s)\n", time * 1e-9f);
 
-#ifdef DEBUG
-  auto vect_acc = MatrixTemp[src].get_access<sycl_read>();
-  for (int i=0; i < 1; i++) 
-    for (int j=0; j < 16; j++)
-    {
-      printf("%g\n", vect_acc[i*col+j]);
-    }
-#endif
   return src;
 }
 
@@ -158,7 +151,7 @@ int main(int argc, char** argv) {
 
   printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
 
-  int size;
+  int size, size_bytes;
   int grid_rows,grid_cols = 0;
   float *FilesavingTemp,*FilesavingPower;
   char *tfile, *pfile, *ofile;
@@ -178,7 +171,8 @@ int main(int argc, char** argv) {
   pfile=argv[5];
   ofile=argv[6];
 
-  size=grid_rows*grid_cols;
+  size = grid_rows*grid_cols;
+  size_bytes = size * sizeof(float);
 
   // --------------- pyramid parameters --------------- 
   int borderCols = (pyramid_height)*EXPAND_RATE/2;
@@ -188,8 +182,8 @@ int main(int argc, char** argv) {
   int blockCols = grid_cols/smallBlockCol+((grid_cols%smallBlockCol==0)?0:1);
   int blockRows = grid_rows/smallBlockRow+((grid_rows%smallBlockRow==0)?0:1);
 
-  FilesavingTemp = (float *) malloc(size*sizeof(float));
-  FilesavingPower = (float *) malloc(size*sizeof(float));
+  FilesavingTemp = (float *) malloc(size_bytes);
+  FilesavingPower = (float *) malloc(size_bytes);
 
   if( !FilesavingPower || !FilesavingTemp) {
     printf("unable to allocate memory");
@@ -201,32 +195,26 @@ int main(int argc, char** argv) {
   readinput(FilesavingPower, grid_rows, grid_cols, pfile);
 
   long long start_time = get_time();
-  { 
+
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<float, 1> MatrixPower(FilesavingPower, size, props);
+  float *MatrixPower = sycl::malloc_device<float>(size, q);
+  q.memcpy(MatrixPower, FilesavingPower, size_bytes);
 
-    std::vector<buffer<float>> MatrixTemp;
-    MatrixTemp.emplace_back(FilesavingTemp, size, props);
-    MatrixTemp.emplace_back(size);
-    MatrixTemp[0].set_final_data(nullptr);
-    MatrixTemp[1].set_final_data(nullptr);
+  float *MatrixTemp[2];
+  MatrixTemp[0] = sycl::malloc_device<float>(size, q);
+  MatrixTemp[1] = sycl::malloc_device<float>(size, q);
+  q.memcpy(MatrixTemp[0], FilesavingTemp, size_bytes);
 
-    // Perform the computation
-    int ret = compute_tran_temp(q, MatrixPower, MatrixTemp, grid_cols, grid_rows, 
-        total_iterations, pyramid_height, blockCols, blockRows, borderCols, borderRows);
+  // Perform the computation
+  int ret = compute_tran_temp(q, MatrixPower, MatrixTemp, grid_cols, grid_rows, 
+      total_iterations, pyramid_height, blockCols, blockRows, borderCols, borderRows);
 
-    q.submit([&](handler& cgh) {
-        auto acc = MatrixTemp[ret].get_access<sycl_read>(cgh);
-        cgh.copy(acc, FilesavingPower);
-    });
-  } // SYCL scope
+  q.memcpy(FilesavingPower, MatrixTemp[ret], size_bytes).wait();
 
   long long end_time = get_time();
   printf("Device offloading time: %.3f seconds\n", ((float) (end_time - start_time)) / (1000*1000));
@@ -234,6 +222,9 @@ int main(int argc, char** argv) {
   // Write final output to output file
   writeoutput(FilesavingPower, grid_rows, grid_cols, ofile);
 
+  sycl::free(MatrixPower, q);
+  sycl::free(MatrixTemp[0], q);
+  sycl::free(MatrixTemp[1], q);
   free(FilesavingTemp);
   free(FilesavingPower);
 

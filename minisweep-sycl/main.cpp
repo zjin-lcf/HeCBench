@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <string.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "utils.h"
 #include "utils.cpp"
 #include "kernels.cpp"
@@ -30,11 +30,10 @@ int main( int argc, char** argv )
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   Dimensions dims_g;       /*---dims for entire problem---*/
   Dimensions dims;         /*---dims for the part on this MPI proc---*/
@@ -161,8 +160,11 @@ int main( int argc, char** argv )
   for (int i = 0; i < n/sizeof(P); i++) printf("m_from_a %d %f\n", i, m_from_a[i]);
 #endif
 
-  buffer<P, 1> d_a_from_m (a_from_m,  n / sizeof(P));
-  buffer<P, 1> d_m_from_a (m_from_a,  n / sizeof(P));
+  P *d_a_from_m = (P*) sycl::malloc_device(n, q);
+  q.memcpy(d_a_from_m, a_from_m,  n);
+
+  P *d_m_from_a = (P*) sycl::malloc_device(n, q);
+  q.memcpy(d_m_from_a, m_from_a,  n);
 
   /*---Initialize input state array ---*/
   n = Dimensions_size_state( dims, NU ) * sizeof(P);
@@ -173,12 +175,11 @@ int main( int argc, char** argv )
   for (int i = 0; i < n/sizeof(P); i++) printf("vi %d %f\n", i, vi[i]);
 #endif
 
-  buffer<P, 1> d_vi (vi, n / sizeof(P));
-
+  P *d_vi = (P*) sycl::malloc_device(n, q);
+  q.memcpy(d_vi, vi, n);
 
   P* vo = (P*) malloc( n );
-  buffer<P, 1> d_vo (n / sizeof(P));
-
+  P *d_vo = (P*) sycl::malloc_device(n, q);
 
   /*---This is not strictly required for the output state array, but might
     have a performance effect from pre-touching pages */
@@ -205,22 +206,22 @@ int main( int argc, char** argv )
 
   n = Dimensions_size_facexy( sweeper.dims_b, NU, noctant_per_block ) * sizeof(P);
   P* facexy = (P*) malloc ( n );
-  buffer<P, 1> d_facexy(n / sizeof(P));
+  P *d_facexy = (P*) sycl::malloc_device(n, q);
 
   n = Dimensions_size_facexz( sweeper.dims_b, NU, noctant_per_block) * sizeof(P);
 
   P* facexz = (P*) malloc ( n );
-  buffer<P, 1> d_facexz(n / sizeof(P));
+  P *d_facexz = (P*) sycl::malloc_device(n, q);
 
   n = Dimensions_size_faceyz( sweeper.dims_b, NU, noctant_per_block) * sizeof(P);
 
   P* faceyz = (P*) malloc ( n );
-  buffer<P, 1> d_faceyz(n / sizeof(P));
+  P *d_faceyz = (P*) sycl::malloc_device(n, q);
 
   n = dims.na * NU * dims.ne * NOCTANT * dims.ncell_x * dims.ncell_y * sizeof(P);
   P* vslocal = (P*) malloc ( n ); 
 
-  buffer<P, 1> d_vslocal(n / sizeof(P));
+  P *d_vslocal = (P*) sycl::malloc_device(n, q);
 
   // measure host and device execution time
   double ktime = 0.0;
@@ -251,8 +252,8 @@ int main( int argc, char** argv )
       int facexy_size = dims_b.ncell_x * dims_b.ncell_y * dims_b.ne * dims_b.na * NU * NOCTANT;
       int facexz_size = dims_b.ncell_x * dims_b.ncell_z * dims_b.ne * dims_b.na * NU * NOCTANT;
       int faceyz_size = dims_b.ncell_y * dims_b.ncell_z * dims_b.ne * dims_b.na * NU * NOCTANT;
-      int v_size = dims.ncell_x * dims.ncell_y * dims.ncell_z * dims.ne * dims.nm * NU;
 #endif
+      int v_size = sizeof(P) * dims.ncell_x * dims.ncell_y * dims.ncell_z * dims.ne * dims.nm * NU;
 
       //int a_from_m_size = sizeof(P) * dims_b.nm * dims_b.na * NOCTANT;
       //int m_from_a_size = sizeof(P) * dims_b.nm * dims_b.na * NOCTANT;
@@ -279,109 +280,88 @@ int main( int argc, char** argv )
       const int is_first_step = 0 == step;
       const int is_last_step = nstep - 1 == step;
 
-      range<3> xy_gws((NOCTANT+3)/4*4, (dims_b_ncell_y+7)/8*8, (dims_b_ncell_x+7)/8*8);
-      range<3> xy_lws(4, 8, 8);
+      sycl::range<3> xy_gws((NOCTANT+3)/4*4, (dims_b_ncell_y+7)/8*8, (dims_b_ncell_x+7)/8*8);
+      sycl::range<3> xy_lws(4, 8, 8);
 
-      range<3> xz_gws((NOCTANT+3)/4*4, (dims_b_ncell_z+7)/8*8, (dims_b_ncell_x+7)/8*8);
-      range<3> xz_lws(4, 8, 8);
+      sycl::range<3> xz_gws((NOCTANT+3)/4*4, (dims_b_ncell_z+7)/8*8, (dims_b_ncell_x+7)/8*8);
+      sycl::range<3> xz_lws(4, 8, 8);
 
-      range<3> yz_gws((NOCTANT+3)/4*4, (dims_b_ncell_z+7)/8*8, (dims_b_ncell_y+7)/8*8);
-      range<3> yz_lws(4, 8, 8);
+      sycl::range<3> yz_gws((NOCTANT+3)/4*4, (dims_b_ncell_z+7)/8*8, (dims_b_ncell_y+7)/8*8);
+      sycl::range<3> yz_lws(4, 8, 8);
 
-      range<2> wave_grid((dims_b_ne+63)/64*64, (NOCTANT+3)/4*4);
-      range<2> wave_block(64, 4);
+      sycl::range<2> wave_grid((dims_b_ne+63)/64*64, (NOCTANT+3)/4*4);
+      sycl::range<2> wave_block(64, 4);
 
       if (is_first_step) {
 
         k_start = get_time();
 
-        q.submit([&] (handler &cgh) {
-          auto acc = d_vo.get_access<sycl_discard_write>(cgh);
-          cgh.fill(acc, (P)0);
-        });
+        q.memset(d_vo, 0, v_size);
 
-        q.submit([&] (handler &cgh) {
-          auto facexy = d_facexy.get_access<sycl_discard_write>(cgh);
-          cgh.parallel_for<class set_facexy>(nd_range<3>(xy_gws, xy_lws), [=] (nd_item<3> item) {
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class set_facexy>(
+            sycl::nd_range<3>(xy_gws, xy_lws), [=] (sycl::nd_item<3> item) {
             init_facexy(ix_base, iy_base, dims_b_ne, dims_b_na, dims_b_ncell_x, 
-              dims_b_ncell_y, dims_b_ncell_z, dims_ncell_z, facexy.get_pointer(), item);
+                        dims_b_ncell_y, dims_b_ncell_z, dims_ncell_z, d_facexy, item);
           });
         });
 
 #ifdef DEBUG
-        q.submit([&] (handler &cgh) {
-          auto acc = d_facexy.get_access<sycl_read>(cgh);
-          cgh.copy(acc, facexy);
-        }).wait();
+        q.memcpy(facexy, d_facexy, facexy_size * sizeof(P)).wait();
         for (int i = 0; i < facexy_size; i++)
           printf("facexy: %d %f\n", i, facexy[i]);
 #endif
       }
 
-      q.submit([&] (handler &cgh) {
-        auto facexz = d_facexz.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class set_facexz>(nd_range<3>(xz_gws, xz_lws), [=] (nd_item<3> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class set_facexz>(sycl::nd_range<3>(xz_gws, xz_lws), [=] (sycl::nd_item<3> item) {
           init_facexz(ix_base, iy_base, dims_b_ne, dims_b_na, 
                       dims_b_ncell_x, dims_b_ncell_y, dims_ncell_z, 
                       1, //proc_x_min, 
                       1, //proc_x_max, 
-                      stepinfoall, facexz.get_pointer(), item);
+                      stepinfoall, d_facexz, item);
         });
       });
 #ifdef DEBUG
-      q.submit([&] (handler &cgh) {
-        auto acc = d_facexz.get_access<sycl_read>(cgh);
-        cgh.copy(acc, facexz);
-      }).wait();
+      q.memcpy(facexz, d_facexz, facexz_size * sizeof(P)).wait();
       for (int i = 0; i < facexz_size; i++)
         printf("facexz: %d %f\n", i, facexz[i]);
 #endif
 
-      q.submit([&] (handler &cgh) {
-        auto faceyz = d_faceyz.get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class set_faceyz>(nd_range<3>(yz_gws, yz_lws), [=] (nd_item<3> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class set_faceyz>(
+          sycl::nd_range<3>(yz_gws, yz_lws), [=] (sycl::nd_item<3> item) {
           init_faceyz(ix_base, iy_base, dims_b_ne, dims_b_na, 
                       dims_b_ncell_x, dims_b_ncell_y, dims_ncell_z, 
                       1, //proc_y_min, 
                       1, //proc_y_max, 
-                      stepinfoall, faceyz.get_pointer(), item);
+                      stepinfoall, d_faceyz, item);
         });
       });
 
 #ifdef DEBUG
-      q.submit([&] (handler &cgh) {
-        auto acc = d_faceyz.get_access<sycl_read>(cgh);
-        cgh.copy(acc, faceyz);
-      }).wait();
+      q.memcpy(faceyz, d_faceyz, faceyz_size * sizeof(P)).wait();
       for (int i = 0; i < faceyz_size; i++)
         printf("faceyz: %d %f\n", i, faceyz[i]);
 #endif
 
-      q.submit([&] (handler &cgh) {
-        auto facexy = d_facexy.get_access<sycl_read>(cgh);
-        auto facexz = d_facexz.get_access<sycl_read>(cgh);
-        auto faceyz = d_faceyz.get_access<sycl_read>(cgh);
-        auto a_from_m = d_a_from_m.get_access<sycl_read>(cgh);
-        auto m_from_a = d_m_from_a.get_access<sycl_read>(cgh);
-        auto vi = d_vi.get_access<sycl_read>(cgh);
-        auto vo = d_vo.get_access<sycl_read_write>(cgh);
-        auto vslocal = d_vslocal.get_access<sycl_read_write>(cgh);
-
-        cgh.parallel_for<class wavefront_processing>(nd_range<2>(wave_grid, wave_block), [=] (nd_item<2> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class wavefront_processing>(
+          sycl::nd_range<2>(wave_grid, wave_block), [=] (sycl::nd_item<2> item) {
           wavefronts(num_wavefronts,  
                      ix_base, iy_base, 
                      v_b_size,
                      noctant_per_block,
                      dims_b,
                      stepinfoall,
-                     facexy.get_pointer(), 
-                     facexz.get_pointer(), 
-                     faceyz.get_pointer(), 
-                     a_from_m.get_pointer(),
-                     m_from_a.get_pointer(),
-                     vi.get_pointer(),
-                     vo.get_pointer(),
-                     vslocal.get_pointer(),
+                     d_facexy, 
+                     d_facexz, 
+                     d_faceyz, 
+                     d_a_from_m,
+                     d_m_from_a,
+                     d_vi,
+                     d_vo,
+                     d_vslocal,
                      item);
         });
       });
@@ -392,13 +372,11 @@ int main( int argc, char** argv )
         k_end = get_time();
         ktime += k_end - k_start;
 
-        q.submit([&] (handler &cgh) {
-          auto acc = d_vo.get_access<sycl_read>(cgh);
-          cgh.copy(acc, vo);
-        }).wait();
+        q.memcpy(vo, d_vo, v_size);
 
 #ifdef DEBUG
-        for (int i = 0; i < v_size; i++) printf("vo %d %f\n", i, vo[i]);
+        q.wait();
+        for (int i = 0; i < v_size/sizeof(P); i++) printf("vo %d %f\n", i, vo[i]);
 #endif
       }
     } // step
@@ -437,6 +415,15 @@ int main( int argc, char** argv )
   /*---Deallocations---*/
 
   Arguments_destroy( &args );
+
+  sycl::free(d_vo, q);
+  sycl::free(d_vi, q);
+  sycl::free(d_a_from_m, q);
+  sycl::free(d_m_from_a, q);
+  sycl::free(d_facexy, q);
+  sycl::free(d_facexz, q);
+  sycl::free(d_faceyz, q);
+  sycl::free(d_vslocal, q);
 
   free(vi);
   free(vo);

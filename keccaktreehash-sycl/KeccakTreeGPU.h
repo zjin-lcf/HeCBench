@@ -8,10 +8,10 @@ It is given as is, without any guarantee.
 #ifndef KECCAKTREEGPU_H_INCLUDED
 #define KECCAKTREEGPU_H_INCLUDED
 
+#include <sycl/sycl.hpp>
 #include "KeccakTree.h"
 #include "KeccakTypes.h"
 #include "KeccakF.h"
-#include "common.h"
 
 //************************
 //First Tree mode
@@ -19,9 +19,12 @@ It is given as is, without any guarantee.
 //output chaining values hashes are copied to h_outBuffer
 //************************
 
-void KeccakTreeGPU(queue &q, tKeccakLane * h_inBuffer, buffer<tKeccakLane,1> &d_inBuffer,
-                   tKeccakLane * h_outBuffer, buffer<tKeccakLane,1> &d_outBuffer,
-		   buffer<tKeccakLane,1> &d_KeccakF_RoundConstant);
+void KeccakTreeGPU(sycl::queue &q,
+                   tKeccakLane *h_inBuffer,
+                   tKeccakLane *d_inBuffer,
+                   tKeccakLane *h_outBuffer,
+                   tKeccakLane *d_outBuffer,
+                   tKeccakLane *d_KeccakF_RoundConstants);
 
 
 

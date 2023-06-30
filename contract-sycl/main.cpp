@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 const int nContractions = 18;  // the device kernel contains 18 cases
 
@@ -11,7 +11,7 @@ class tensor_aggregate;
 
 template <typename T>
 void contraction (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const T *__restrict tensor,
   const T *__restrict adj,
         T *__restrict value,
@@ -348,7 +348,7 @@ int rounded_division(int number1, int number2) {
 }
 
 template <typename T>
-void contract (queue &q, const int max_N, const int max_C, const int repeat) {
+void contract (sycl::queue &q, const int max_N, const int max_C, const int repeat) {
   // tensor
   const size_t tensor_size = max_N * max_N * max_N * max_C * sizeof(T);
   const size_t tensor_size_byte = tensor_size * sizeof(T);
@@ -357,7 +357,8 @@ void contract (queue &q, const int max_N, const int max_C, const int repeat) {
   for (size_t i = 0; i < max_N * max_N * max_N * max_C; i++)
     tensor_value[i] = 1;
 
-  buffer<T, 1> device_tensor_value (tensor_value, tensor_size);
+  T* d_tensor_value = (T*) sycl::malloc_device (tensor_size_byte, q);
+  q.memcpy(d_tensor_value, tensor_value, tensor_size_byte);
 
   // adjacency matrix
   const size_t adj_size = max_N * max_N;
@@ -367,44 +368,40 @@ void contract (queue &q, const int max_N, const int max_C, const int repeat) {
   T* adj_value = (T*) malloc (adj_size_byte);
   for (int i = 0; i < adj_size; i++) adj_value[i] = 1;
 
-  buffer<T, 1> device_adj_value (adj_value, adj_size);
+  T* d_adj_value = (T*) sycl::malloc_device (adj_size_byte, q);
+  q.memcpy(d_adj_value, adj_value, adj_size_byte);
 
   // output value 
   const size_t output_size = max_N * max_N * max_C * nContractions;
   const size_t output_size_byte = max_N * max_N * max_C * nContractions * sizeof(T);
 
   T* value = (T*) malloc (output_size_byte);
-
-  buffer<T, 1> device_value (output_size);
+  T* d_value = (T*) sycl::malloc_device (output_size_byte, q);
 
   // launch kernel
   const int nThreads = 256;
-  range<1> gws (rounded_division(output_size, nThreads) * nThreads);
-  range<1> lws (nThreads);
+  sycl::range<1> gws (rounded_division(output_size, nThreads) * nThreads);
+  sycl::range<1> lws (nThreads);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
-    q.submit([&] (handler &cgh) {
-      auto t = device_tensor_value.template get_access<sycl_read>(cgh);
-      auto a = device_adj_value.template get_access<sycl_read>(cgh);
-      auto o = device_value.template get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class tensor_aggregate<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        contraction<T>(item, t.get_pointer(), a.get_pointer(), o.get_pointer(),
-                    output_size, max_N, max_C);
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class tensor_aggregate<T>>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        contraction<T>(item, d_tensor_value, d_adj_value, d_value,
+                       output_size, max_N, max_C);
       });
     });
+  }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = device_value.template get_access<sycl_read>(cgh);
-    cgh.copy(acc, value);
-  }).wait();
+  q.memcpy(value, d_value, output_size_byte).wait();
 
   double checksum = 0;
   for (size_t i = 0; i < output_size; i++) checksum += value[i];
@@ -415,6 +412,9 @@ void contract (queue &q, const int max_N, const int max_C, const int repeat) {
   free(value);
   free(tensor_value);
   free(adj_value);
+  sycl::free(d_value, q);
+  sycl::free(d_tensor_value, q);
+  sycl::free(d_adj_value, q);
 }
 
 int main(int argc, char* argv[]) {
@@ -428,11 +428,10 @@ int main(int argc, char* argv[]) {
   int repeat = atoi(argv[2]);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   contract<float>(q, max_N, max_C, repeat);
   contract<double>(q, max_N, max_C, repeat);

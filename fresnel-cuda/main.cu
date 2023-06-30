@@ -33,21 +33,22 @@ int main(int argc, char *argv[])
   // range [0, 8], interval 1e-7
   const double interval = 1e-7;
   const int points = (int)(8.0 / interval);
-  double *x = (double*) malloc (sizeof(double) * points);
-  double *output = (double*) malloc (sizeof(double) * points);
-  double *h_output = (double*) malloc (sizeof(double) * points);
+  const size_t points_size = points * sizeof(double);
+  double *x = (double*) malloc (points_size);
+  double *output = (double*) malloc (points_size);
+  double *h_output = (double*) malloc (points_size);
   for (int i = 0; i < points; i++)
     x[i] = (double)i * interval;
 	   
   double *d_x;
-  cudaMalloc((void**)&d_x, sizeof(double) * points);
+  cudaMalloc((void**)&d_x, points_size);
   double *d_output;
-  cudaMalloc((void**)&d_output, sizeof(double) * points);
+  cudaMalloc((void**)&d_output, points_size);
 
   dim3 grids = (points + 255)/256;
   dim3 blocks = 256;
 
-  cudaMemcpy(d_x, x, sizeof(double) * points, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_x, x, points_size, cudaMemcpyHostToDevice);
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
@@ -60,7 +61,7 @@ int main(int argc, char *argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
-  cudaMemcpy(output, d_output, sizeof(double) * points, cudaMemcpyDeviceToHost);
+  cudaMemcpy(output, d_output, points_size, cudaMemcpyDeviceToHost);
 
   // verify
   reference(x, h_output, points);

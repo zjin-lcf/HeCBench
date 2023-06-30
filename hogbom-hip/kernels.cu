@@ -3,8 +3,9 @@
 #include <cmath>
 #include <cassert>
 #include <cstddef>
-#include "hip/hip_runtime.h"
+#include <hip/hip_runtime.h>
 #include "kernels.h"
+#include "timer.h"
 
 // grids and blocks are constant for the findPeak kernel
 #define findPeakNBlocks 128
@@ -76,7 +77,7 @@ static Peak findPeak(const float* d_image, Peak* d_peak, size_t size)
   Peak peaks[nBlocks];
 
   // Find peak
-  hipLaunchKernelGGL(k_findPeak, dim3(nBlocks), dim3(findPeakWidth), 0, 0, d_image, size, d_peak);
+  k_findPeak<<<nBlocks, findPeakWidth>>>(d_image, size, d_peak);
 
   // Get the peaks array back from the device
   hipMemcpy(&peaks, d_peak, nBlocks * sizeof(Peak), hipMemcpyDeviceToHost);
@@ -144,9 +145,8 @@ static void subtractPSF(const float* d_psf, const int psfWidth,
 
   dim3 numBlocks(blocksx, blocksy);
   dim3 threadsPerBlock(blockDim, blockDim);
-  hipLaunchKernelGGL(k_subtractPSF, dim3(numBlocks), dim3(threadsPerBlock), 0, 0, 
-    d_psf, psfWidth, d_residual, residualWidth,
-    startx, starty, stopx, stopy, diffx, diffy, absPeakVal, gain);
+  k_subtractPSF<<<numBlocks,threadsPerBlock>>>(d_psf, psfWidth, d_residual, residualWidth,
+      startx, starty, stopx, stopy, diffx, diffy, absPeakVal, gain);
 }
 
 HogbomTest::HogbomTest()
@@ -190,6 +190,10 @@ void HogbomTest::deconvolve(const std::vector<float>& dirty,
     << idxToPos(psfPeak.pos, psfWidth).y << std::endl;
   assert(psfPeak.pos <= psf_size);
 
+  hipDeviceSynchronize();
+  Stopwatch sw;
+  sw.start();
+
   for (unsigned int i = 0; i < niters; ++i) {
     // Find peak in the residual image
     Peak peak = findPeak(d_residual, d_peaks, residual_size);
@@ -208,6 +212,15 @@ void HogbomTest::deconvolve(const std::vector<float>& dirty,
     // Add to model
     model[peak.pos] += peak.val * gain;
   }
+
+  hipDeviceSynchronize();
+  const double time = sw.stop();
+
+  // Report on timings
+  std::cout << "    Time " << time << " (s) " << std::endl;
+  std::cout << "    Time per cycle " << time / niters * 1000 << " (ms)" << std::endl;
+  std::cout << "    Cleaning rate  " << niters / time << " (iterations per second)" << std::endl;
+  std::cout << "Done" << std::endl;
 
   // Copy device arrays back into the host 
   hipMemcpy(&residual[0], d_residual, residual.size() * sizeof(float), hipMemcpyDeviceToHost);

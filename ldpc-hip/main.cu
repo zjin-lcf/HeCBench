@@ -124,7 +124,7 @@ int main()
   float rate = (float)0.5f;
 
   //////////////////////////////////////////////////////////////////////////////////
-  // all the variables Starting with _gpu is used in host code and for cuda computation
+  // all the variables Starting with _gpu is used in host code and for gpu computation
   int memorySize_infobits_gpu = MCW * CW * memorySize_infobits ;
   int memorySize_llr_gpu = MCW *  CW * CODEWORD_LEN * sizeof(float);
   int memorySize_dt_gpu = MCW *  CW * ROW * BLK_COL * sizeof(float);
@@ -276,7 +276,7 @@ int main()
               memorySize_hard_decision_gpu, 
               hipMemcpyDeviceToHost);
 
-        this_error = cuda_error_check(info_bin_gpu, hard_decision_gpu);
+        this_error = error_check(info_bin_gpu, hard_decision_gpu);
         total_bit_error += this_error.bit_error;
         total_frame_error += this_error.frame_error;
       } // end of MAX-SIM

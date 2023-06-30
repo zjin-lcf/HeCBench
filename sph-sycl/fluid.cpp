@@ -8,9 +8,9 @@
 // B spline smoothing kernel
 ////////////////////////////////////////////////////////////////////////////
 
-double W(cl::sycl::double3 p_pos, cl::sycl::double3 q_pos, double h)
+double W(double3 p_pos, double3 q_pos, double h)
 {
-  double r = cl::sycl::sqrt((p_pos.x()-q_pos.x())*(p_pos.x()-q_pos.x())
+  double r = sycl::sqrt((p_pos.x()-q_pos.x())*(p_pos.x()-q_pos.x())
       + (p_pos.y()-q_pos.y())*(p_pos.y()-q_pos.y())
       + (p_pos.z()-q_pos.z())*(p_pos.z()-q_pos.z()));
   double C = 1.0/(M_PI*h*h*h);
@@ -21,7 +21,7 @@ double W(cl::sycl::double3 p_pos, cl::sycl::double3 q_pos, double h)
   else if(u < 1.0 )
     val = 1.0 - (3.0/2.0)*u*u + (3.0/4.0)*u*u*u;
   else if(u >= 1.0 && u < 2.0)
-    val = (1.0/4.0) * cl::sycl::pow(2.0-u,3.0);
+    val = (1.0/4.0) * sycl::pow(2.0-u,3.0);
 
   val *= C;
   return val;
@@ -29,9 +29,9 @@ double W(cl::sycl::double3 p_pos, cl::sycl::double3 q_pos, double h)
 
 // Gradient of B spline kernel
 
-double del_W(cl::sycl::double3 p_pos, cl::sycl::double3 q_pos, double h)
+double del_W(double3 p_pos, double3 q_pos, double h)
 {
-  double r = cl::sycl::sqrt((p_pos.x()-q_pos.x())*(p_pos.x()-q_pos.x())
+  double r = sycl::sqrt((p_pos.x()-q_pos.x())*(p_pos.x()-q_pos.x())
       + (p_pos.y()-q_pos.y())*(p_pos.y()-q_pos.y())
       + (p_pos.z()-q_pos.z())*(p_pos.z()-q_pos.z()));
   double C = 1.0/(M_PI * h*h*h);
@@ -42,7 +42,7 @@ double del_W(cl::sycl::double3 p_pos, cl::sycl::double3 q_pos, double h)
   else if(u < 1.0 )
     val = -1.0/(h*h) * (3.0 - 9.0/4.0*u);
   else if(u >= 1.0 && u < 2.0)
-    val = -3.0/(4.0*h*r) * cl::sycl::pow(2.0-u,2.0);
+    val = -3.0/(4.0*h*r) * sycl::pow(2.0-u,2.0);
 
   val *= C;
   return val;
@@ -54,14 +54,14 @@ double del_W(cl::sycl::double3 p_pos, cl::sycl::double3 q_pos, double h)
 ////////////////////////////////////////////////////////////////////////////
 
 
-double boundaryGamma(cl::sycl::double3 p_pos, cl::sycl::double3 k_pos, cl::sycl::double3 k_n, double h, double speed_sound)
+double boundaryGamma(double3 p_pos, double3 k_pos, double3 k_n, double h, double speed_sound)
 {
   // Radial distance between p,q
-  double r = cl::sycl::sqrt((p_pos.x()-k_pos.x())*(p_pos.x()-k_pos.x())
+  double r = sycl::sqrt((p_pos.x()-k_pos.x())*(p_pos.x()-k_pos.x())
       + (p_pos.y()-k_pos.y())*(p_pos.y()-k_pos.y())
       + (p_pos.z()-k_pos.z())*(p_pos.z()-k_pos.z()));
   // Distance to p normal to surface particle
-  double y = cl::sycl::sqrt((p_pos.x()-k_pos.x())*(p_pos.x()-k_pos.x())*(k_n.x()*k_n.x())
+  double y = sycl::sqrt((p_pos.x()-k_pos.x())*(p_pos.x()-k_pos.x())*(k_n.x()*k_n.x())
       + (p_pos.y()-k_pos.y())*(p_pos.y()-k_pos.y())*(k_n.y()*k_n.y())
       + (p_pos.z()-k_pos.z())*(p_pos.z()-k_pos.z())*(k_n.z()*k_n.z()));
   // Tangential distance
@@ -91,8 +91,8 @@ double boundaryGamma(cl::sycl::double3 p_pos, cl::sycl::double3 k_pos, cl::sycl:
 ////////////////////////////////////////////////////////////////////////////
 
 
-double computeDensity(cl::sycl::double3 p_pos, cl::sycl::double3 p_v, cl::sycl::double3 q_pos, cl::sycl::double3 q_v,
-    global_ptr<param> params)
+double computeDensity(double3 p_pos, double3 p_v, double3 q_pos, double3 q_v,
+    param *params)
 {
   double v_x = (p_v.x() - q_v.x());
   double v_y = (p_v.y() - q_v.y());
@@ -110,20 +110,20 @@ double computeDensity(cl::sycl::double3 p_pos, cl::sycl::double3 p_v, cl::sycl::
 }
 
 
-double computePressure(double p_density, global_ptr<param> params)
+double computePressure(double p_density, param *params)
 {
   double gam = 7.0;
   double B = params->rest_density * params->speed_sound*params->speed_sound / gam;
-  double pressure =  B * (cl::sycl::pow((p_density/params->rest_density),gam) - 1.0);
+  double pressure =  B * (sycl::pow((p_density/params->rest_density),gam) - 1.0);
 
   return pressure;
 }
 
 
-cl::sycl::double3 computeBoundaryAcceleration(cl::sycl::double3 p_pos, cl::sycl::double3 k_pos, cl::sycl::double3 k_n,
+double3 computeBoundaryAcceleration(double3 p_pos, double3 k_pos, double3 k_n,
     double h, double speed_sound)
 {
-  cl::sycl::double3 p_a;
+  double3 p_a;
   double bGamma = boundaryGamma(p_pos,k_pos,k_n,h,speed_sound);
   p_a.x() = bGamma * k_n.x();
   p_a.y() = bGamma * k_n.y();
@@ -133,17 +133,17 @@ cl::sycl::double3 computeBoundaryAcceleration(cl::sycl::double3 p_pos, cl::sycl:
 }
 
 
-cl::sycl::double3 computeAcceleration(cl::sycl::double3 p_pos, 
-    cl::sycl::double3 p_v, 
+double3 computeAcceleration(double3 p_pos,
+    double3 p_v,
     double p_density,
-    double p_pressure, 
-    cl::sycl::double3 q_pos, 
-    cl::sycl::double3 q_v,
-    double q_density, 
-    double q_pressure, 
-    global_ptr<param> params)
+    double p_pressure,
+    double3 q_pos,
+    double3 q_v,
+    double q_density,
+    double q_pressure,
+    param *params)
 {
-  cl::sycl::double3 a;
+  double3 a;
   double accel;
   double h = params->smoothing_radius;
   double alpha = params->alpha;
@@ -199,8 +199,8 @@ void eulerStart(fluid_particle* fluid_particles,
   for(int i=0; i<params->number_fluid_particles; i++)
   {
     // Velocity at t + dt/2
-    cl::sycl::double3 v      = fluid_particles[i].v;
-    cl::sycl::double3 v_half;
+    double3 v      = fluid_particles[i].v;
+    double3 v_half;
 
     v_half.x() = v.x();
     v_half.y() = v.y();
@@ -339,171 +339,171 @@ int main(int argc, char *argv[])
   int num_fluid_particles = params.number_fluid_particles;
   int num_boundary_particles = params.number_boundary_particles;
 
-  {
-
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<fluid_particle, 1> d_fluid_particles(fluid_particles, num_fluid_particles, props);
-    buffer<boundary_particle, 1> d_boundary_particles(boundary_particles, num_boundary_particles, props);
-    buffer<param, 1> d_params(&params, 1, props);
+  fluid_particle *d_fluid_particles =
+    sycl::malloc_device<fluid_particle>(num_fluid_particles, q);
 
-    size_t global_work_size_FP = (num_fluid_particles + 255)/256*256;
-    size_t global_work_size_BP = (num_boundary_particles + 255)/256*256;
+  boundary_particle *d_boundary_particles =
+    sycl::malloc_device<boundary_particle>(num_boundary_particles, q);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+  param *d_params = sycl::malloc_device<param>(1, q);
 
-    // Main simulation loop
-    for(int n=0; n<params.number_steps; n++) {
-      //updatePressures <<< dim3(grid1D_FP), dim3(block1D) >>> (d_fluid_particles, d_params);
-      q.submit([&](handler& cgh) {
-          auto fluid_particles = d_fluid_particles.get_access<sycl_read_write>(cgh);
-          auto params = d_params.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class updatePressure>(nd_range<1>(
-                range<1>(global_work_size_FP), range<1>(256)), [=] (nd_item<1> item) {
-              int num_fluid_particles = params[0].number_fluid_particles;
-              int i = item.get_global_id(0);
-              if (i >= num_fluid_particles) return;
-              cl::sycl::double3 p_pos = fluid_particles[i].pos;
-              cl::sycl::double3 p_v   = fluid_particles[i].v;
-              double density = fluid_particles[i].density;
+  q.memcpy(d_fluid_particles, fluid_particles,
+    num_fluid_particles * sizeof(fluid_particle));
+  q.memcpy(d_boundary_particles, boundary_particles,
+    num_boundary_particles * sizeof(boundary_particle));
+  q.memcpy(d_params, &params, sizeof(param));
 
-              for(int j=0; j< num_fluid_particles; j++) {
-                cl::sycl::double3 q_pos = fluid_particles[j].pos;
-                cl::sycl::double3 q_v   = fluid_particles[j].v;
-                density += computeDensity(p_pos,p_v,q_pos,q_v, params.get_pointer());
-              }
-              fluid_particles[i].density = density;
-              fluid_particles[i].pressure = computePressure(density, params.get_pointer());
-          });
+  sycl::range<1> gws_FP ((num_fluid_particles + 255)/256*256);
+  sycl::range<1> gws_BP ((num_boundary_particles + 255)/256*256);
+  sycl::range<1> lws (256);
+
+  q.wait();
+  auto start = std::chrono::steady_clock::now();
+
+  // Main simulation loop
+  for(int n=0; n<params.number_steps; n++) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class updatePressure>(
+        sycl::nd_range<1>(gws_FP, lws), [=] (sycl::nd_item<1> item) {
+          int num_d_fluid_particles = d_params[0].number_fluid_particles;
+          int i = item.get_global_id(0);
+          if (i >= num_d_fluid_particles) return;
+          double3 p_pos = d_fluid_particles[i].pos;
+          double3 p_v   = d_fluid_particles[i].v;
+          double density = d_fluid_particles[i].density;
+
+          for(int j=0; j< num_d_fluid_particles; j++) {
+            double3 q_pos = d_fluid_particles[j].pos;
+            double3 q_v   = d_fluid_particles[j].v;
+            density += computeDensity(p_pos,p_v,q_pos,q_v, d_params);
+          }
+          d_fluid_particles[i].density = density;
+          d_fluid_particles[i].pressure = computePressure(density, d_params);
       });
+    });
 
-      //updateAccelerationsFP <<< dim3(grid1D_FP), dim3(block1D) >>> (d_fluid_particles, d_params);
-      q.submit([&](handler& cgh) {
-          auto fluid_particles = d_fluid_particles.get_access<sycl_read_write>(cgh);
-          auto params = d_params.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class updateAccelerationFP>(
-              nd_range<1>(range<1>(global_work_size_FP), range<1>(256)), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class updateAccelerationFP>(
+        sycl::nd_range<1>(gws_FP, lws), [=] (sycl::nd_item<1> item) {
 
-              int num_fluid_particles = params[0].number_fluid_particles;
-              int i = item.get_global_id(0);
-              if (i >= num_fluid_particles) return;
+        int num_d_fluid_particles = d_params[0].number_fluid_particles;
+        int i = item.get_global_id(0);
+        if (i >= num_d_fluid_particles) return;
 
-              double ax = 0.0;
-              double ay = 0.0;
-              double az = -9.8;
+        double ax = 0.0;
+        double ay = 0.0;
+        double az = -9.8;
 
-              cl::sycl::double3 p_pos = fluid_particles[i].pos;
-              cl::sycl::double3 p_v   = fluid_particles[i].v;
-              double p_density = fluid_particles[i].density;
-              double p_pressure = fluid_particles[i].pressure;
+        double3 p_pos = d_fluid_particles[i].pos;
+        double3 p_v   = d_fluid_particles[i].v;
+        double p_density = d_fluid_particles[i].density;
+        double p_pressure = d_fluid_particles[i].pressure;
 
-              for(int j=0; j<num_fluid_particles; j++) {
-              if (i!=j) {
-              cl::sycl::double3 q_pos = fluid_particles[j].pos;
-              cl::sycl::double3 q_v   = fluid_particles[j].v;
-              double q_density = fluid_particles[j].density;
-              double q_pressure = fluid_particles[j].pressure;
-              cl::sycl::double3 tmp_a = computeAcceleration(p_pos, p_v, p_density,
-                  p_pressure, q_pos, q_v,
-                  q_density, q_pressure, params.get_pointer());
+        for(int j=0; j<num_d_fluid_particles; j++) {
+          if (i!=j) {
+            double3 q_pos = d_fluid_particles[j].pos;
+            double3 q_v   = d_fluid_particles[j].v;
+            double q_density = d_fluid_particles[j].density;
+            double q_pressure = d_fluid_particles[j].pressure;
+            double3 tmp_a = computeAcceleration(p_pos, p_v, p_density,
+                            p_pressure, q_pos, q_v,
+                            q_density, q_pressure, d_params);
 
-              ax += tmp_a.x();
-              ay += tmp_a.y();
-              az += tmp_a.z();
-              }
-              }
+            ax += tmp_a.x();
+            ay += tmp_a.y();
+            az += tmp_a.z();
+          }
+        }
 
-              fluid_particles[i].a.x() = ax;
-              fluid_particles[i].a.y() = ay;
-              fluid_particles[i].a.z() = az;
-          });
+        d_fluid_particles[i].a.x() = ax;
+        d_fluid_particles[i].a.y() = ay;
+        d_fluid_particles[i].a.z() = az;
       });
-      //updateAccelerationsBP ()<<< dim3(grid1D_BP), dim3(block1D) >>> (d_fluid_particles, d_boundary_particles, d_params);
-      q.submit([&](handler& cgh) {
-          auto fluid_particles = d_fluid_particles.get_access<sycl_read_write>(cgh);
-          auto boundary_particles = d_boundary_particles.get_access<sycl_read_write>(cgh);
-          auto params = d_params.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class updateAccelerationBP>(
-              nd_range<1>(range<1>(global_work_size_BP), range<1>(256)), [=] (nd_item<1> item) {
-              int num_fluid_particles = params[0].number_fluid_particles;
-              int i = item.get_global_id(0);
-              if (i >= num_fluid_particles) return;
+    });
 
-              double ax = fluid_particles[i].a.x();
-              double ay = fluid_particles[i].a.y();
-              double az = fluid_particles[i].a.z();
-              cl::sycl::double3 p_pos = fluid_particles[i].pos;
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class updateAccelerationBP>(
+        sycl::nd_range<1>(gws_BP, lws), [=] (sycl::nd_item<1> item) {
+        int num_d_fluid_particles = d_params[0].number_fluid_particles;
+        int i = item.get_global_id(0);
+        if (i >= num_d_fluid_particles) return;
 
-              for (int j=0; j<num_boundary_particles; j++) {
-              cl::sycl::double3 k_pos = boundary_particles[j].pos;
-              cl::sycl::double3 k_n   = boundary_particles[j].n;
-              cl::sycl::double3 tmp_a = computeBoundaryAcceleration(p_pos,k_pos,k_n,
-                  params[0].smoothing_radius,
-                  params[0].speed_sound);
-              ax += tmp_a.x();
-              ay += tmp_a.y();
-              az += tmp_a.z();
-              }
+        double ax = d_fluid_particles[i].a.x();
+        double ay = d_fluid_particles[i].a.y();
+        double az = d_fluid_particles[i].a.z();
+        double3 p_pos = d_fluid_particles[i].pos;
 
-              fluid_particles[i].a.x() = ax;
-              fluid_particles[i].a.y() = ay;
-              fluid_particles[i].a.z() = az;
-          });
+        for (int j=0; j<num_boundary_particles; j++) {
+          double3 k_pos = d_boundary_particles[j].pos;
+          double3 k_n   = d_boundary_particles[j].n;
+          double3 tmp_a = computeBoundaryAcceleration(p_pos,k_pos,k_n,
+                          d_params[0].smoothing_radius,
+                          d_params[0].speed_sound);
+          ax += tmp_a.x();
+          ay += tmp_a.y();
+          az += tmp_a.z();
+        }
+
+        d_fluid_particles[i].a.x() = ax;
+        d_fluid_particles[i].a.y() = ay;
+        d_fluid_particles[i].a.z() = az;
       });
-      //updatePositions <<< dim3(grid1D_FP), dim3(block1D) >>> (d_fluid_particles, d_params);
-      q.submit([&](handler& cgh) {
-          auto fluid_particles = d_fluid_particles.get_access<sycl_read_write>(cgh);
-          auto params = d_params.get_access<sycl_read>(cgh);
-          cgh.parallel_for<class updatePositions>(
-              nd_range<1>(range<1>(global_work_size_FP), range<1>(256)), [=] (nd_item<1> item) {
-              int num_fluid_particles = params[0].number_fluid_particles;
-              int i = item.get_global_id(0);
-              if (i >= num_fluid_particles) return;
-              double dt = params[0].time_step;
+    });
 
-              // Velocity at t + dt/2
-              cl::sycl::double3 v_half = fluid_particles[i].v_half;
-              cl::sycl::double3 v      = fluid_particles[i].v;
-              cl::sycl::double3 pos    = fluid_particles[i].pos;
-              cl::sycl::double3 a      = fluid_particles[i].a;
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class updatePositions>(
+        sycl::nd_range<1>(gws_FP, lws), [=] (sycl::nd_item<1> item) {
+        int num_d_fluid_particles = d_params[0].number_fluid_particles;
+        int i = item.get_global_id(0);
+        if (i >= num_d_fluid_particles) return;
+        double dt = d_params[0].time_step;
 
-              v_half.x() = v_half.x() + dt * a.x();
-              v_half.y() = v_half.y() + dt * a.y();
-              v_half.z() = v_half.z() + dt * a.z();
+        // Velocity at t + dt/2
+        double3 v_half = d_fluid_particles[i].v_half;
+        double3 v      = d_fluid_particles[i].v;
+        double3 pos    = d_fluid_particles[i].pos;
+        double3 a      = d_fluid_particles[i].a;
 
-              // Velocity at t + dt, must estimate for foce calc
-              v.x() = v_half.x() + a.x() * (dt / 2.0);
-              v.y() = v_half.y() + a.y() * (dt / 2.0);
-              v.z() = v_half.z() + a.z() * (dt / 2.0);
+        v_half.x() = v_half.x() + dt * a.x();
+        v_half.y() = v_half.y() + dt * a.y();
+        v_half.z() = v_half.z() + dt * a.z();
 
-              // Position at time t + dt
-              pos.x() = pos.x() + dt * v_half.x();
-              pos.y() = pos.y() + dt * v_half.y();
-              pos.z() = pos.z() + dt * v_half.z();
+        // Velocity at t + dt, must estimate for foce calc
+        v.x() = v_half.x() + a.x() * (dt / 2.0);
+        v.y() = v_half.y() + a.y() * (dt / 2.0);
+        v.z() = v_half.z() + a.z() * (dt / 2.0);
 
-              fluid_particles[i].v_half = v_half;
-              fluid_particles[i].v      = v;
-              fluid_particles[i].pos    = pos;
-          });
+        // Position at time t + dt
+        pos.x() = pos.x() + dt * v_half.x();
+        pos.y() = pos.y() + dt * v_half.y();
+        pos.z() = pos.z() + dt * v_half.z();
+
+        d_fluid_particles[i].v_half = v_half;
+        d_fluid_particles[i].v      = v;
+        d_fluid_particles[i].pos    = pos;
       });
-    }
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average execution time of sph kernels: %f (ms)\n", (time * 1e-6f) / params.number_steps);
-
+    });
   }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of sph kernels: %f (ms)\n", (time * 1e-6f) / params.number_steps);
+
+  q.memcpy(fluid_particles, d_fluid_particles,
+           num_fluid_particles * sizeof(fluid_particle));
 
   writeFile(fluid_particles, &params);
 
   finalizeParticles(fluid_particles, boundary_particles);
+  sycl::free(d_fluid_particles, q);
+  sycl::free(d_boundary_particles, q);
+  sycl::free(d_params, q);
   return 0;
 }

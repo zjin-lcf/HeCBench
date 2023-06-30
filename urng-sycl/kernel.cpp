@@ -35,8 +35,8 @@ inline uchar4 convert_uchar4_sat(float4 v) {
 /* Generate uniform random deviation */
 /* Park-Miller with Bays-Durham shuffle and added safeguards
    Returns a uniform random deviate between (-FACTOR/2, FACTOR/2)
-   input seed should be negative */ 
-float ran1(int idum, int *iv, nd_item<1> &item)
+   input seed should be negative */
+float ran1(int idum, int *iv, sycl::nd_item<1> &item)
 {
   int j;
   int k;
@@ -69,11 +69,11 @@ float ran1(int idum, int *iv, nd_item<1> &item)
 
 
 void kernel_noise_uniform(
-  const uchar4* inputImage, 
-  uchar4* outputImage, 
-  const int factor, 
-  int* iv, 
-  nd_item<1> &item)
+  const uchar4* inputImage,
+  uchar4* outputImage,
+  const int factor,
+  int* iv,
+  sycl::nd_item<1> &item)
 {
   int pos = item.get_global_id(0);
 

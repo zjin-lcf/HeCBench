@@ -3,24 +3,27 @@
 #include <stdlib.h>
 #include <time.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "benchmark.h"
 #include "kernels.h"
 
-void run_benchmark(queue &q)
+void run_benchmark(sycl::queue &q)
 {
   int i, j, cnt, val_ref, val_eff;
   uint64_t time_vals[SIZES_CNT_MAX][BASES_CNT_MAX][2];
 
-  buffer<uint32_t, 1> d_bases32 (bases32, sizeof(bases32) / sizeof(bases32[0]));
+  uint32_t bases32_size = sizeof(bases32);
+  uint32_t *d_bases32 = (uint32_t*) sycl::malloc_device(bases32_size, q);
+  q.memcpy(d_bases32, bases32, bases32_size);
 
-  buffer<uint32_t, 1> d_n32 (BENCHMARK_ITERATIONS);
+  uint32_t n32_size = BENCHMARK_ITERATIONS * sizeof(uint32_t);
+  uint32_t *d_n32 = sycl::malloc_device<uint32_t>(BENCHMARK_ITERATIONS, q);
 
   int val_dev;
-  buffer<int, 1> d_val(1);
+  int *d_val = sycl::malloc_device<int>(1, q);
 
-  range<1> gws ((BENCHMARK_ITERATIONS + 255) / 256 * 256);
-  range<1> lws (256);
+  sycl::range<1> gws ((BENCHMARK_ITERATIONS + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   printf("Starting benchmark...\n");
 
@@ -30,15 +33,8 @@ void run_benchmark(queue &q)
   for (i = 0; i < SIZES_CNT32; i++) {
     val_ref = val_eff = 0;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_n32.get_access<sycl_discard_write>(cgh);
-      cgh.copy(n32[i], acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_val.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0);
-    });
+    q.memcpy(d_n32, n32[i], n32_size);
+    q.memset(d_val, 0, sizeof(int));
 
     for (cnt = 1; cnt <= BASES_CNT32; cnt++) {
       time_point start = get_time();
@@ -65,13 +61,10 @@ void run_benchmark(queue &q)
     auto start = std::chrono::steady_clock::now();
 
     // the efficient version is faster than the simple version on a device
-    q.submit([&] (handler &cgh) {
-      auto b = d_bases32.get_access<sycl_read>(cgh);
-      auto n = d_n32.get_access<sycl_read>(cgh);
-      auto v = d_val.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class simple>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-       mr32_sf(item, b.get_pointer(), n.get_pointer(), 
-               v.get_pointer(), BENCHMARK_ITERATIONS);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class simple>(
+       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+       mr32_sf(item, d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
       });
     });
 
@@ -80,10 +73,7 @@ void run_benchmark(queue &q)
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     mr32_sf_time += time;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_val.get_access<sycl_read>(cgh);
-      cgh.copy(acc, &val_dev);
-    }).wait();
+    q.memcpy(&val_dev, d_val, sizeof(int)).wait();
 
     if (val_ref != val_dev) {
       ok = false;
@@ -91,21 +81,15 @@ void run_benchmark(queue &q)
       break;
     }
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_val.get_access<sycl_discard_write>(cgh);
-      cgh.fill(acc, 0);
-    });
+    q.memset(d_val, 0, sizeof(int));
 
     q.wait();
     start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto b = d_bases32.get_access<sycl_read>(cgh);
-      auto n = d_n32.get_access<sycl_read>(cgh);
-      auto v = d_val.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class efficient>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-       mr32_eff(item, b.get_pointer(), n.get_pointer(), 
-                v.get_pointer(), BENCHMARK_ITERATIONS);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class efficient>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        mr32_eff(item, d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
       });
     });
 
@@ -114,10 +98,7 @@ void run_benchmark(queue &q)
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     mr32_eff_time += time;
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_val.get_access<sycl_read>(cgh);
-      cgh.copy(acc, &val_dev);
-    }).wait();
+    q.memcpy(&val_dev, d_val, sizeof(int)).wait();
 
     if (val_ref != val_dev) {
       ok = false;
@@ -132,6 +113,10 @@ void run_benchmark(queue &q)
 
   // device results are not included
   print_results(bits32, SIZES_CNT32, BASES_CNT32, time_vals);
+
+  sycl::free(d_bases32, q);
+  sycl::free(d_n32, q);
+  sycl::free(d_val, q);
 }
 
 int main()
@@ -141,11 +126,10 @@ int main()
 #endif
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   printf("Setting random primes...\n");
   set_nprimes();

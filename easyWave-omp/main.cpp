@@ -289,8 +289,11 @@ int main( int argc, char **argv )
   Dx = Re * g2r( DLon );     // in m along the equator
   Dy = Re * g2r( DLat );
 
+  const size_t grid_size = (size_t)NLat*NLon*MAX_VARS_PER_NODE;
+  const size_t grid_size_bytes = grid_size * sizeof(float);
+
   // allocate memory for GRIDNODE structure and for caching arrays
-  float* node = (float*) malloc(sizeof(float)*NLon*NLat*MAX_VARS_PER_NODE);
+  float* node = (float*) malloc(grid_size_bytes);
   if (node == NULL) return Err.post( Err.msgAllocateMem() );
   float* R6 = (float*) malloc( sizeof(float) * (NLat+1) );
   if (R6 == NULL) return Err.post( Err.msgAllocateMem() );
@@ -831,8 +834,8 @@ int main( int argc, char **argv )
   timespec start, inter, end;
   clock_gettime(CLOCK_MONOTONIC, &start);
 
-#pragma omp target data map(tofrom: node[0:NLat*NLon*MAX_VARS_PER_NODE]) \
-                        map(to: R6[0:NLat+1], C1[0:NLon+1], C3[0:NLon+1], C2[0:NLat+1], C4[0:NLat+1])
+  #pragma omp target data map(tofrom: node[0:grid_size]) \
+                          map(to: R6[0:NLat+1], C1[0:NLon+1], C3[0:NLon+1], C2[0:NLat+1], C4[0:NLat+1])
   {
     for( Par.time=0,loop=1,lastProgress=Par.outProgress,lastPropagation=Par.outPropagation,lastDump=0;
         Par.time<=Par.timeMax; loop++,Par.time+=Par.dt,lastProgress+=Par.dt,lastPropagation+=Par.dt ) {
@@ -840,7 +843,7 @@ int main( int argc, char **argv )
       /* FIXME: check if Par.poiDt can be used for those purposes */
       if( Par.filePOIs && Par.poiDt && ((Par.time/Par.poiDt)*Par.poiDt == Par.time) ) {
         // SavePOIs
-#pragma omp target update from (node[0:NLat*NLon*MAX_VARS_PER_NODE])
+        #pragma omp target update from (node[0:grid_size])
         it = Par.time / Par.poiDt;
         timePOI[it] = Par.time;
         for( n=0; n<NPOIs; n++ ) {
@@ -875,8 +878,8 @@ int main( int argc, char **argv )
         }
       }
 
-#pragma omp target teams num_teams(1) thread_limit(1) map(tofrom: node[0:NLat*NLon*MAX_VARS_PER_NODE]) \
-      map(to: C1[0:NLon+1], C3[0:NLon+1], C2[0:NLat+1], C4[0:NLat+1])
+      #pragma omp target teams num_teams(1) thread_limit(1) map(tofrom: node[0:grid_size]) \
+       map(to: C1[0:NLon+1], C3[0:NLon+1], C2[0:NLat+1], C4[0:NLat+1])
       {
         // open bondary conditions
         if( Jmin <= 2 ) {
@@ -940,8 +943,9 @@ int main( int argc, char **argv )
 
         }
       }
-#pragma omp target teams num_teams(1) thread_limit(1) \
-      map(tofrom: node[0:NLat*NLon*MAX_VARS_PER_NODE], Imin, Imax, Jmin, Jmax)
+
+      #pragma omp target teams num_teams(1) thread_limit(1) \
+      map(tofrom: node[0:grid_size], Imin, Imax, Jmin, Jmax)
       {
         // open boundaries
         if( Jmin <= 2 ) {

@@ -60,7 +60,7 @@ double *chebyshev3 ( int n )
 
   for ( i = 0; i < n; i++ )
   {
-    angle = r8_pi * ( double ) ( 2 * n - 2 * i - 1 ) 
+    angle = r8_pi * ( double ) ( 2 * n - 2 * i - 1 )
       / ( double ) ( 2 * n         + 1 );
     x[i] = cos ( angle );
   }
@@ -155,7 +155,7 @@ double *fejer1 ( int n )
 
   for ( i = 0; i < n; i++ )
   {
-    theta = r8_pi * ( double ) ( 2 * n - 1 - 2 * i ) 
+    theta = r8_pi * ( double ) ( 2 * n - 1 - 2 * i )
       / ( double ) ( 2 * n );
     x[i] = cos ( theta );
   }
@@ -174,7 +174,7 @@ double *fejer2 ( int n )
 
   for ( i = 0; i < n; i++ )
   {
-    theta = r8_pi * ( double ) ( n - i ) 
+    theta = r8_pi * ( double ) ( n - i )
       / ( double ) ( n + 1 );
     x[i] = cos ( theta );
   }
@@ -191,7 +191,7 @@ double *fejer2 ( int n )
   Input, evaluation points.
   Output, an estimate of the Lebesgue constant for the points.
 */
-double lebesgue_constant ( queue &q, int n, double x[], int nfun, double xfun[] )
+double lebesgue_constant ( sycl::queue &q, int n, double x[], int nfun, double xfun[] )
 
 {
   double lmax = 0.0;
@@ -204,14 +204,14 @@ double lebesgue_constant ( queue &q, int n, double x[], int nfun, double xfun[] 
 
   return lmax;
 }
-   
+
 
 /* create a vector of linearly spaced values.
 
     An R8VEC is a vector of R8's.
 
     4 points evenly spaced between 0 and 12 will yield 0, 4, 8, 12.
- 
+
     In other words, the interval is divided into N-1 even subintervals,
     and the endpoints of intervals are used as the points.
 
@@ -239,8 +239,8 @@ double *r8vec_linspace_new ( int n, double a, double b )
   {
     for ( i = 0; i < n; i++ )
     {
-      x[i] = ( ( double ) ( n - 1 - i ) * a 
-             + ( double ) (         i ) * b ) 
+      x[i] = ( ( double ) ( n - 1 - i ) * a
+             + ( double ) (         i ) * b )
              / ( double ) ( n - 1     );
     }
   }

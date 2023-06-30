@@ -589,4 +589,5 @@ void LUonDevice(Symbolic_Matrix &A_sym, ostream &out, ostream &err, bool PERTURB
   hipFree(csr_r_ptr_dev);
   hipFree(csr_diag_ptr_dev);
   hipFree(level_idx_dev);
+  hipFree(tmpMem);
 }

@@ -32,7 +32,6 @@
 *
 */
 
-#include "common.h"
 #include "sobol.h"
 #include "sobol_gpu.h"
 
@@ -44,10 +43,10 @@ int _ffs(const int x) {
   return sycl::ctz(x) + 1;
 }
 
-void sobelGPU_kernel(nd_item<2> item, 
-                     global_ptr<unsigned int> dir,
-                     global_ptr<float> out,
-                     local_ptr<unsigned int> v,
+void sobelGPU_kernel(sycl::nd_item<2> item,
+                     const unsigned int *__restrict dir,
+                     float *__restrict out,
+                     unsigned int *__restrict v,
                      unsigned int n_vectors,
                      unsigned int n_dimesnions)
 {
@@ -62,7 +61,7 @@ void sobelGPU_kernel(nd_item<2> item,
     v[item.get_local_id(1)] = dir[item.get_local_id(1)];
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   // Set initial index (i.e. which vector this thread is
   // computing first) and stride (i.e. step to the next vector
@@ -138,8 +137,8 @@ void sobelGPU_kernel(nd_item<2> item,
   }
 }
 
-double sobolGPU(queue &q, int repeat, int n_vectors, int n_dimensions, 
-                buffer<unsigned int> &d_directions, buffer<float> &d_output)
+double sobolGPU(sycl::queue &q, int repeat, int n_vectors, int n_dimensions,
+                unsigned int *d_directions, float *d_output)
 {
     const int threadsperblock = 64;
 
@@ -182,24 +181,24 @@ double sobolGPU(queue &q, int repeat, int n_vectors, int n_dimensions,
     size_t dimBlock_x = threadsperblock;
     size_t dimBlock_y = 1;
 
-    range<2> gws (dimGrid_y * dimBlock_y, dimGrid_x * dimBlock_x); 
-    range<2> lws (dimBlock_y, dimBlock_x);
+    sycl::range<2> gws (dimGrid_y * dimBlock_y, dimGrid_x * dimBlock_x);
+    sycl::range<2> lws (dimBlock_y, dimBlock_x);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     // Execute GPU kernel
-    for (int i = 0; i < repeat; i++) 
-      q.submit([&] (handler &cgh) {
-        auto dir = d_directions.get_access<sycl_read>(cgh);
-        auto out = d_output.get_access<sycl_discard_write>(cgh);
-        accessor<unsigned int, 1, sycl_read_write, access::target::local> v(n_directions, cgh);
-        cgh.parallel_for<class sobol>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    for (int i = 0; i < repeat; i++) {
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<unsigned int, 1> v(sycl::range<1>(n_directions), cgh);
+        cgh.parallel_for<class sobol>(
+          sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
           // Offset into the correct dimension as specified by the block y coordinate
-          sobelGPU_kernel(item, dir.get_pointer(), out.get_pointer(), 
+          sobelGPU_kernel(item, d_directions, d_output,
                           v.get_pointer(), n_vectors, n_dimensions);
         });
       });
+    }
 
     q.wait();
     auto end = std::chrono::steady_clock::now();

@@ -136,7 +136,9 @@ int main(int argc, char *argv[])
   }
   const int repeat = atoi(argv[1]);
 
-  size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
+  const size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
+  const size_t size_bytes = size * sizeof(half2);
+  const size_t result_bytes = NUM_OF_BLOCKS*sizeof(float);
 
   half2 *a, *b;
   half2 *d_a, *d_b;
@@ -144,20 +146,20 @@ int main(int argc, char *argv[])
   float *r;  // result
   float *d_r;
 
-  a = (half2*) malloc (size*sizeof(half2));
-  b = (half2*) malloc (size*sizeof(half2));
-  cudaMalloc((void**)&d_a, size*sizeof(half2));
-  cudaMalloc((void**)&d_b, size*sizeof(half2));
+  a = (half2*) malloc (size_bytes);
+  b = (half2*) malloc (size_bytes);
+  cudaMalloc((void**)&d_a, size_bytes);
+  cudaMalloc((void**)&d_b, size_bytes);
 
-  r = (float*) malloc (NUM_OF_BLOCKS*sizeof(float));
-  cudaMalloc((void**)&d_r, NUM_OF_BLOCKS*sizeof(float));
+  r = (float*) malloc (result_bytes);
+  cudaMalloc((void**)&d_r, result_bytes);
 
   srand(123); 
   generateInput(a, size);
-  cudaMemcpy(d_a, a, size*sizeof(half2), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_a, a, size_bytes, cudaMemcpyHostToDevice);
 
   generateInput(b, size);
-  cudaMemcpy(d_b, b, size*sizeof(half2), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_b, b, size_bytes, cudaMemcpyHostToDevice);
 
   // warmup
   for (int i = 0; i < repeat; i++)
@@ -174,7 +176,7 @@ int main(int argc, char *argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-  cudaMemcpy(r, d_r, NUM_OF_BLOCKS*sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(r, d_r, result_bytes, cudaMemcpyDeviceToHost);
 
   float result_intrinsics = 0;
   for (int i = 0; i < NUM_OF_BLOCKS; ++i)
@@ -198,7 +200,7 @@ int main(int argc, char *argv[])
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-  cudaMemcpy(r, d_r, NUM_OF_BLOCKS*sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(r, d_r, result_bytes, cudaMemcpyDeviceToHost);
 
   float result_native = 0;
   for (int i = 0; i < NUM_OF_BLOCKS; ++i)

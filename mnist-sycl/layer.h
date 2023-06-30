@@ -9,19 +9,23 @@ class Layer {
   public:
     int M, N, O;
 
-    buffer<float, 1> output;
-    buffer<float, 1> preact;
+    sycl::queue q;
 
-    buffer<float, 1> bias;
-    buffer<float, 1> weight;
+    float *output;
+    float *preact;
 
-    buffer<float, 1> d_output;
-    buffer<float, 1> d_preact;
-    buffer<float, 1> d_weight;
+    float *bias;
+    float *weight;
 
-    Layer(queue &q, int M, int N, int O);
+    float *d_output;
+    float *d_preact;
+    float *d_weight;
 
-    void setOutput(queue &q, float *data);
-    void clear(queue &q);
-    void bp_clear(queue &q);
+    Layer(sycl::queue &Q, int M, int N, int O);
+
+    ~Layer();
+
+    void setOutput(float *data);
+    void clear();
+    void bp_clear();
 };

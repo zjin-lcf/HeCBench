@@ -17,10 +17,10 @@
     along with GPUQT.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <string.h>    // memcpy
 #include "hamiltonian.h"
 #include "model.h"
 #include "vector.h"
-#include <string.h>    // memcpy
 #define BLOCK_SIZE 256 // optimized
 
 #ifndef CPU_ONLY
@@ -31,10 +31,15 @@ void Hamiltonian::initialize_gpu(Model& model)
   energy_max = model.energy_max;
   grid_size = (model.number_of_atoms - 1) / BLOCK_SIZE + 1;
 
-  q.submit([&] (handler &cgh) {
-    auto acc = neighbor_number.get_access<sycl_discard_write>(cgh);
-    cgh.copy(model.neighbor_number, acc);
-  });
+  neighbor_number = sycl::malloc_device<int>(n, q);
+  neighbor_list = sycl::malloc_device<int>(model.number_of_pairs, q);
+  potential = sycl::malloc_device<real>(n, q);
+  hopping_real = sycl::malloc_device<real>(model.number_of_pairs, q);
+  hopping_imag = sycl::malloc_device<real>(model.number_of_pairs, q);
+  xx = sycl::malloc_device<real>(model.number_of_pairs, q);
+
+  q.memcpy(neighbor_number, model.neighbor_number, sizeof(int) * n);
+  q.memcpy(potential, model.potential, sizeof(real) * n);
 
   int* neighbor_list_new = new int[model.number_of_pairs];
   for (int m = 0; m < max_neighbor; ++m) {
@@ -42,16 +47,7 @@ void Hamiltonian::initialize_gpu(Model& model)
       neighbor_list_new[m * n + i] = model.neighbor_list[i * max_neighbor + m];
     }
   }
-
-  q.submit([&] (handler &cgh) {
-    auto acc = neighbor_list.get_access<sycl_discard_write>(cgh);
-    cgh.copy(neighbor_list_new, acc);
-  });
-
-  q.submit([&] (handler &cgh) {
-    auto acc = potential.get_access<sycl_discard_write>(cgh);
-    cgh.copy(model.potential, acc);
-  });
+  q.memcpy(neighbor_list, neighbor_list_new, sizeof(int) * model.number_of_pairs);
 
   real* hopping_real_new = new real[model.number_of_pairs];
   for (int m = 0; m < max_neighbor; ++m) {
@@ -59,11 +55,7 @@ void Hamiltonian::initialize_gpu(Model& model)
       hopping_real_new[m * n + i] = model.hopping_real[i * max_neighbor + m];
     }
   }
-
-  q.submit([&] (handler &cgh) {
-    auto acc = hopping_real.get_access<sycl_discard_write>(cgh);
-    cgh.copy(hopping_real_new, acc);
-  });
+  q.memcpy(hopping_real, hopping_real_new, sizeof(real) * model.number_of_pairs);
 
   real* hopping_imag_new = new real[model.number_of_pairs];
   for (int m = 0; m < max_neighbor; ++m) {
@@ -71,11 +63,7 @@ void Hamiltonian::initialize_gpu(Model& model)
       hopping_imag_new[m * n + i] = model.hopping_imag[i * max_neighbor + m];
     }
   }
-
-  q.submit([&] (handler &cgh) {
-    auto acc = hopping_imag.get_access<sycl_discard_write>(cgh);
-    cgh.copy(hopping_imag_new, acc);
-  });
+  q.memcpy(hopping_imag, hopping_imag_new, sizeof(real) * model.number_of_pairs);
 
   real* xx_new = new real[model.number_of_pairs];
   for (int m = 0; m < max_neighbor; ++m) {
@@ -83,11 +71,7 @@ void Hamiltonian::initialize_gpu(Model& model)
       xx_new[m * n + i] = model.xx[i * max_neighbor + m];
     }
   }
-
-  q.submit([&] (handler &cgh) {
-    auto acc = xx.get_access<sycl_discard_write>(cgh);
-    cgh.copy(xx_new, acc);
-  });
+  q.memcpy(xx, xx_new, sizeof(real) * model.number_of_pairs);
 
   q.wait();
 
@@ -101,7 +85,6 @@ void Hamiltonian::initialize_gpu(Model& model)
   delete[] hopping_real_new;
   delete[] hopping_imag_new;
   delete[] xx_new;
-
 }
 #else
 void Hamiltonian::initialize_cpu(Model& model)
@@ -138,15 +121,6 @@ void Hamiltonian::initialize_cpu(Model& model)
 #endif
 
 Hamiltonian::Hamiltonian(Model& model)
-#ifndef CPU_ONLY
-: neighbor_number{model.number_of_atoms},
-  neighbor_list {model.number_of_pairs},
-  potential{model.number_of_atoms},
-  hopping_real{model.number_of_pairs},
-  hopping_imag{model.number_of_pairs},
-  xx (model.number_of_pairs)
-#endif
-
 {
 #ifndef CPU_ONLY
   initialize_gpu(model);
@@ -158,6 +132,12 @@ Hamiltonian::Hamiltonian(Model& model)
 Hamiltonian::~Hamiltonian()
 {
 #ifndef CPU_ONLY
+  sycl::free(neighbor_number, q);
+  sycl::free(neighbor_list, q);
+  sycl::free(potential, q);
+  sycl::free(hopping_real, q);
+  sycl::free(hopping_imag, q);
+  sycl::free(xx, q);
 #else
   delete[] neighbor_number;
   delete[] neighbor_list;
@@ -170,7 +150,7 @@ Hamiltonian::~Hamiltonian()
 
 #ifndef CPU_ONLY
 void gpu_apply_hamiltonian(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int number_of_atoms,
   const real energy_max,
   const  int* __restrict g_neighbor_number,
@@ -245,36 +225,36 @@ void cpu_apply_hamiltonian(
 void Hamiltonian::apply(Vector& input, Vector& output)
 {
 #ifndef CPU_ONLY
-  range<1> gws (grid_size * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (grid_size * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
   const int size = n;
   const real emax = energy_max;
 
-  q.submit([&] (handler &cgh) {
-    auto neighbor_number_acc = neighbor_number.get_access<sycl_read>(cgh);
-    auto neighbor_list_acc = neighbor_list.get_access<sycl_read>(cgh);
-    auto potential_acc = potential.get_access<sycl_read>(cgh);
-    auto hopping_real_acc = hopping_real.get_access<sycl_read>(cgh);
-    auto hopping_imag_acc = hopping_imag.get_access<sycl_read>(cgh);
-    auto input_real_part_acc = input.real_part.get_access<sycl_read>(cgh);
-    auto input_imag_part_acc = input.imag_part.get_access<sycl_read>(cgh); 
-    auto output_real_part_acc = output.real_part.get_access<sycl_discard_write>(cgh);
-    auto output_imag_part_acc = output.imag_part.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class apply_hamiltonian>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-
+  q.submit([&] (sycl::handler &cgh) {
+    auto neighbor_number_t = neighbor_number;
+    auto neighbor_list_t = neighbor_list;
+    auto potential_t = potential;
+    auto hopping_real_t = hopping_real;
+    auto hopping_imag_t = hopping_imag;
+    auto input_real_part = input.real_part;
+    auto input_imag_part = input.imag_part;
+    auto output_real_part = output.real_part;
+    auto output_imag_part = output.imag_part;
+    cgh.parallel_for<class apply_hamiltonian>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gpu_apply_hamiltonian(
         item,
-        size, 
-        emax, 
-        neighbor_number_acc.get_pointer(), 
-        neighbor_list_acc.get_pointer(),
-        potential_acc.get_pointer(),
-        hopping_real_acc.get_pointer(),
-        hopping_imag_acc.get_pointer(),
-        input_real_part_acc.get_pointer(), 
-        input_imag_part_acc.get_pointer(), 
-        output_real_part_acc.get_pointer(), 
-        output_imag_part_acc.get_pointer());
+        size,
+        emax,
+        neighbor_number_t,
+        neighbor_list_t,
+        potential_t,
+        hopping_real_t,
+        hopping_imag_t,
+        input_real_part,
+        input_imag_part,
+        output_real_part,
+        output_imag_part);
     });
   });
 #else
@@ -286,7 +266,7 @@ void Hamiltonian::apply(Vector& input, Vector& output)
 
 #ifndef CPU_ONLY
 void gpu_apply_commutator(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int number_of_atoms,
   const real energy_max,
   const  int* __restrict g_neighbor_number,
@@ -359,33 +339,34 @@ void Hamiltonian::apply_commutator(Vector& input, Vector& output)
 #ifndef CPU_ONLY
   const int size = n;
   const real emax = energy_max;
-  range<1> gws (grid_size * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (grid_size * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
-  q.submit([&] (handler &cgh) {
-    auto neighbor_number_acc = neighbor_number.get_access<sycl_read>(cgh);
-    auto neighbor_list_acc = neighbor_list.get_access<sycl_read>(cgh);
-    auto hopping_real_acc = hopping_real.get_access<sycl_read>(cgh);
-    auto hopping_imag_acc = hopping_imag.get_access<sycl_read>(cgh);
-    auto xx_acc = xx.get_access<sycl_read>(cgh);
-    auto input_real_part_acc = input.real_part.get_access<sycl_read>(cgh);
-    auto input_imag_part_acc = input.imag_part.get_access<sycl_read>(cgh);
-    auto output_real_part_acc = output.real_part.get_access<sycl_discard_write>(cgh);
-    auto output_imag_part_acc = output.imag_part.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class apply_comm>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    auto neighbor_number_t = neighbor_number;
+    auto neighbor_list_t = neighbor_list;
+    auto hopping_real_t = hopping_real;
+    auto hopping_imag_t = hopping_imag;
+    auto xx_t = xx;
+    auto input_real_part = input.real_part;
+    auto input_imag_part = input.imag_part;
+    auto output_real_part = output.real_part;
+    auto output_imag_part = output.imag_part;
+    cgh.parallel_for<class apply_comm>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gpu_apply_commutator(
         item,
         size,
-        emax, 
-        neighbor_number_acc.get_pointer(),
-        neighbor_list_acc.get_pointer(),
-        hopping_real_acc.get_pointer(),
-        hopping_imag_acc.get_pointer(),
-        xx_acc.get_pointer(),
-        input_real_part_acc.get_pointer(),
-        input_imag_part_acc.get_pointer(), 
-        output_real_part_acc.get_pointer(), 
-        output_imag_part_acc.get_pointer());
+        emax,
+        neighbor_number_t,
+        neighbor_list_t,
+        hopping_real_t,
+        hopping_imag_t,
+        xx_t,
+        input_real_part,
+        input_imag_part,
+        output_real_part,
+        output_imag_part);
     });
   });
 #else
@@ -397,7 +378,7 @@ void Hamiltonian::apply_commutator(Vector& input, Vector& output)
 
 #ifndef CPU_ONLY
 void gpu_apply_current(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int number_of_atoms,
   const int*__restrict g_neighbor_number,
   const int*__restrict g_neighbor_list,
@@ -464,33 +445,34 @@ void cpu_apply_current(
 void Hamiltonian::apply_current(Vector& input, Vector& output)
 {
 #ifndef CPU_ONLY
-  range<1> gws (grid_size * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (grid_size * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
   const int size = n;
 
-  q.submit([&] (handler &cgh) {
-    auto neighbor_number_acc = neighbor_number.get_access<sycl_read>(cgh);
-    auto neighbor_list_acc = neighbor_list.get_access<sycl_read>(cgh);
-    auto hopping_real_acc = hopping_real.get_access<sycl_read>(cgh);
-    auto hopping_imag_acc = hopping_imag.get_access<sycl_read>(cgh);
-    auto xx_acc = xx.get_access<sycl_read>(cgh);
-    auto input_real_part_acc = input.real_part.get_access<sycl_read>(cgh);
-    auto input_imag_part_acc = input.imag_part.get_access<sycl_read>(cgh);
-    auto output_real_part_acc = output.real_part.get_access<sycl_discard_write>(cgh);
-    auto output_imag_part_acc = output.imag_part.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class apply_current>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    auto neighbor_number_t = neighbor_number;
+    auto neighbor_list_t = neighbor_list;
+    auto hopping_real_t = hopping_real;
+    auto hopping_imag_t = hopping_imag;
+    auto xx_t = xx;
+    auto input_real_part = input.real_part;
+    auto input_imag_part = input.imag_part;
+    auto output_real_part = output.real_part;
+    auto output_imag_part = output.imag_part;
+    cgh.parallel_for<class apply_current>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gpu_apply_current(
         item,
         size,
-        neighbor_number_acc.get_pointer(),
-        neighbor_list_acc.get_pointer(),
-        hopping_real_acc.get_pointer(),
-        hopping_imag_acc.get_pointer(),
-        xx_acc.get_pointer(),
-        input_real_part_acc.get_pointer(),
-        input_imag_part_acc.get_pointer(), 
-        output_real_part_acc.get_pointer(), 
-        output_imag_part_acc.get_pointer());
+        neighbor_number_t,
+        neighbor_list_t,
+        hopping_real_t,
+        hopping_imag_t,
+        xx_t,
+        input_real_part,
+        input_imag_part,
+        output_real_part,
+        output_imag_part);
     });
   });
 #else
@@ -504,7 +486,7 @@ void Hamiltonian::apply_current(Vector& input, Vector& output)
 // Eq. (36) in [Comput. Phys. Commun.185, 28 (2014)].
 #ifndef CPU_ONLY
 void gpu_chebyshev_01(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int number_of_atoms,
   const real*__restrict g_state_0_real,
   const real*__restrict g_state_0_imag,
@@ -551,27 +533,28 @@ void Hamiltonian::chebyshev_01(
   Vector& state_0, Vector& state_1, Vector& state, real bessel_0, real bessel_1, int direction)
 {
 #ifndef CPU_ONLY
-  range<1> gws (grid_size * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (grid_size * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
   const int size = n;
 
-  q.submit([&] (handler &cgh) {
-    auto input0_real_part_acc = state_0.real_part.get_access<sycl_read>(cgh);
-    auto input0_imag_part_acc = state_0.imag_part.get_access<sycl_read>(cgh);
-    auto input1_real_part_acc = state_1.real_part.get_access<sycl_read>(cgh);
-    auto input1_imag_part_acc = state_1.imag_part.get_access<sycl_read>(cgh);
-    auto output_real_part_acc = state.real_part.get_access<sycl_discard_write>(cgh);
-    auto output_imag_part_acc = state.imag_part.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class chebyshev01>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    auto input0_real_part = state_0.real_part;
+    auto input0_imag_part = state_0.imag_part;
+    auto input1_real_part = state_1.real_part;
+    auto input1_imag_part = state_1.imag_part;
+    auto output_real_part = state.real_part;
+    auto output_imag_part = state.imag_part;
+    cgh.parallel_for<class chebyshev01>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gpu_chebyshev_01(
         item,
         size,
-        input0_real_part_acc.get_pointer(),
-        input0_imag_part_acc.get_pointer(), 
-        input1_real_part_acc.get_pointer(),
-        input1_imag_part_acc.get_pointer(), 
-        output_real_part_acc.get_pointer(), 
-        output_imag_part_acc.get_pointer(),
+        input0_real_part,
+        input0_imag_part,
+        input1_real_part,
+        input1_imag_part,
+        output_real_part,
+        output_imag_part,
         bessel_0, bessel_1, direction);
     });
   });
@@ -586,7 +569,7 @@ void Hamiltonian::chebyshev_01(
 // in [Comput. Phys. Commun.185, 28 (2014)].
 #ifndef CPU_ONLY
 void gpu_chebyshev_2(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int number_of_atoms,
   const real energy_max,
   const  int* __restrict g_neighbor_number,
@@ -729,43 +712,44 @@ void Hamiltonian::chebyshev_2(
     //state_0.real_part, state_0.imag_part, state_1.real_part, state_1.imag_part, state_2.real_part,
     //state_2.imag_part, state.real_part, state.imag_part, bessel_m, label);
 
-  range<1> gws (grid_size * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (grid_size * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
   const int size = n;
   const real emax = energy_max;
 
-  q.submit([&] (handler &cgh) {
-    auto neighbor_number_acc = neighbor_number.get_access<sycl_read>(cgh);
-    auto neighbor_list_acc = neighbor_list.get_access<sycl_read>(cgh);
-    auto potential_acc = potential.get_access<sycl_read>(cgh);
-    auto hopping_real_acc = hopping_real.get_access<sycl_read>(cgh);
-    auto hopping_imag_acc = hopping_imag.get_access<sycl_read>(cgh);
-    auto state0_real_part_acc = state_0.real_part.get_access<sycl_read>(cgh);
-    auto state0_imag_part_acc = state_0.imag_part.get_access<sycl_read>(cgh);
-    auto state1_real_part_acc = state_1.real_part.get_access<sycl_read>(cgh);
-    auto state1_imag_part_acc = state_1.imag_part.get_access<sycl_read>(cgh);
-    auto state2_real_part_acc = state_2.real_part.get_access<sycl_discard_write>(cgh);
-    auto state2_imag_part_acc = state_2.imag_part.get_access<sycl_discard_write>(cgh);
-    auto state_real_part_acc = state.real_part.get_access<sycl_read_write>(cgh);
-    auto state_imag_part_acc = state.imag_part.get_access<sycl_read_write>(cgh);
-    cgh.parallel_for<class chebyshev02>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    auto neighbor_number_t = neighbor_number;
+    auto neighbor_list_t = neighbor_list;
+    auto potential_t = potential;
+    auto hopping_real_t = hopping_real;
+    auto hopping_imag_t = hopping_imag;
+    auto state0_real_part = state_0.real_part;
+    auto state0_imag_part = state_0.imag_part;
+    auto state1_real_part = state_1.real_part;
+    auto state1_imag_part = state_1.imag_part;
+    auto state2_real_part = state_2.real_part;
+    auto state2_imag_part = state_2.imag_part;
+    auto state_real_part = state.real_part;
+    auto state_imag_part = state.imag_part;
+    cgh.parallel_for<class chebyshev02>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gpu_chebyshev_2(
         item,
         size,
-        emax, 
-        neighbor_number_acc.get_pointer(),
-        neighbor_list_acc.get_pointer(),
-        potential_acc.get_pointer(),
-        hopping_real_acc.get_pointer(),
-        hopping_imag_acc.get_pointer(),
-        state0_real_part_acc.get_pointer(),
-        state0_imag_part_acc.get_pointer(), 
-        state1_real_part_acc.get_pointer(),
-        state1_imag_part_acc.get_pointer(), 
-        state2_real_part_acc.get_pointer(),
-        state2_imag_part_acc.get_pointer(), 
-        state_real_part_acc.get_pointer(), 
-        state_imag_part_acc.get_pointer(),
+        emax,
+        neighbor_number_t,
+        neighbor_list_t,
+        potential_t,
+        hopping_real_t,
+        hopping_imag_t,
+        state0_real_part,
+        state0_imag_part,
+        state1_real_part,
+        state1_imag_part,
+        state2_real_part,
+        state2_imag_part,
+        state_real_part,
+        state_imag_part,
         bessel_m, label);
     });
   });
@@ -781,7 +765,7 @@ void Hamiltonian::chebyshev_2(
 // Corresponds to Eq. (37) in [Comput. Phys. Commun.185, 28 (2014)].
 #ifndef CPU_ONLY
 void gpu_chebyshev_1x(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int number_of_atoms,
   const real*__restrict g_state_1x_real,
   const real*__restrict g_state_1x_imag,
@@ -821,23 +805,24 @@ void Hamiltonian::chebyshev_1x(Vector& input, Vector& output, real bessel_1)
   //  n, input.real_part, input.imag_part, output.real_part, output.imag_part, bessel_1);
   //CHECK(cudaGetLastError());
 
-  range<1> gws (grid_size * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (grid_size * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
   const int size = n;
 
-  q.submit([&] (handler &cgh) {
-    auto input_real_part_acc = input.real_part.get_access<sycl_read>(cgh);
-    auto input_imag_part_acc = input.imag_part.get_access<sycl_read>(cgh);
-    auto output_real_part_acc = output.real_part.get_access<sycl_discard_write>(cgh);
-    auto output_imag_part_acc = output.imag_part.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class chebyshev_1x>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    auto input_real_part = input.real_part;
+    auto input_imag_part = input.imag_part;
+    auto output_real_part = output.real_part;
+    auto output_imag_part = output.imag_part;
+    cgh.parallel_for<class chebyshev_1x>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gpu_chebyshev_1x(
         item,
         size,
-        input_real_part_acc.get_pointer(),
-        input_imag_part_acc.get_pointer(),
-        output_real_part_acc.get_pointer(),
-        output_imag_part_acc.get_pointer(),
+        input_real_part,
+        input_imag_part,
+        output_real_part,
+        output_imag_part,
         bessel_1);
     });
   });
@@ -849,7 +834,7 @@ void Hamiltonian::chebyshev_1x(Vector& input, Vector& output, real bessel_1)
 // Kernel which calculates the further terms of [X, U(dt)]
 #ifndef CPU_ONLY
 void gpu_chebyshev_2x(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int number_of_atoms,
   const real energy_max,
   const  int* __restrict g_neighbor_number,
@@ -1057,58 +1042,59 @@ void Hamiltonian::chebyshev_2x(
     //state_1.imag_part, state_1x.real_part, state_1x.imag_part, state_2.real_part, state_2.imag_part,
     //state_2x.real_part, state_2x.imag_part, state.real_part, state.imag_part, bessel_m, label);
 
-  range<1> gws (grid_size * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (grid_size * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
   const int size = n;
   const real emax = energy_max;
 
-  q.submit([&] (handler &cgh) {
-    auto neighbor_number_acc = neighbor_number.get_access<sycl_read>(cgh);
-    auto neighbor_list_acc = neighbor_list.get_access<sycl_read>(cgh);
-    auto potential_acc = potential.get_access<sycl_read>(cgh);
-    auto hopping_real_acc = hopping_real.get_access<sycl_read>(cgh);
-    auto hopping_imag_acc = hopping_imag.get_access<sycl_read>(cgh);
-    auto xx_acc = xx.get_access<sycl_read>(cgh);
-    auto state0_real_part_acc = state_0.real_part.get_access<sycl_read>(cgh);
-    auto state0_imag_part_acc = state_0.imag_part.get_access<sycl_read>(cgh);
-    auto state0x_real_part_acc = state_0x.real_part.get_access<sycl_read>(cgh);
-    auto state0x_imag_part_acc = state_0x.imag_part.get_access<sycl_read>(cgh);
-    auto state1_real_part_acc = state_1.real_part.get_access<sycl_read>(cgh);
-    auto state1_imag_part_acc = state_1.imag_part.get_access<sycl_read>(cgh);
-    auto state1x_real_part_acc = state_1x.real_part.get_access<sycl_read>(cgh);
-    auto state1x_imag_part_acc = state_1x.imag_part.get_access<sycl_read>(cgh);
-    auto state2_real_part_acc = state_2.real_part.get_access<sycl_discard_write>(cgh);
-    auto state2_imag_part_acc = state_2.imag_part.get_access<sycl_discard_write>(cgh);
-    auto state2x_real_part_acc = state_2x.real_part.get_access<sycl_discard_write>(cgh);
-    auto state2x_imag_part_acc = state_2x.imag_part.get_access<sycl_discard_write>(cgh);
-    auto state_real_part_acc = state.real_part.get_access<sycl_read_write>(cgh);
-    auto state_imag_part_acc = state.imag_part.get_access<sycl_read_write>(cgh);
+  q.submit([&] (sycl::handler &cgh) {
+    auto neighbor_number_t = neighbor_number;
+    auto neighbor_list_t = neighbor_list;
+    auto potential_t = potential;
+    auto hopping_real_t = hopping_real;
+    auto hopping_imag_t = hopping_imag;
+    auto xx_t = xx;
+    auto state0_real_part = state_0.real_part;
+    auto state0_imag_part = state_0.imag_part;
+    auto state0x_real_part = state_0x.real_part;
+    auto state0x_imag_part = state_0x.imag_part;
+    auto state1_real_part = state_1.real_part;
+    auto state1_imag_part = state_1.imag_part;
+    auto state1x_real_part = state_1x.real_part;
+    auto state1x_imag_part = state_1x.imag_part;
+    auto state2_real_part = state_2.real_part;
+    auto state2_imag_part = state_2.imag_part;
+    auto state2x_real_part = state_2x.real_part;
+    auto state2x_imag_part = state_2x.imag_part;
+    auto state_real_part = state.real_part;
+    auto state_imag_part = state.imag_part;
 
-    cgh.parallel_for<class chebyshev2x>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    cgh.parallel_for<class chebyshev2x>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gpu_chebyshev_2x(
         item,
-        size, 
-        emax, 
-        neighbor_number_acc.get_pointer(),
-        neighbor_list_acc.get_pointer(),
-        potential_acc.get_pointer(),
-        hopping_real_acc.get_pointer(),
-        hopping_imag_acc.get_pointer(),
-        xx_acc.get_pointer(),
-        state0_real_part_acc.get_pointer(),
-        state0_imag_part_acc.get_pointer(), 
-        state0x_real_part_acc.get_pointer(),
-        state0x_imag_part_acc.get_pointer(), 
-        state1_real_part_acc.get_pointer(),
-        state1_imag_part_acc.get_pointer(), 
-        state1x_real_part_acc.get_pointer(),
-        state1x_imag_part_acc.get_pointer(), 
-        state2_real_part_acc.get_pointer(),
-        state2_imag_part_acc.get_pointer(), 
-        state2x_real_part_acc.get_pointer(),
-        state2x_imag_part_acc.get_pointer(), 
-        state_real_part_acc.get_pointer(), 
-        state_imag_part_acc.get_pointer(),
+        size,
+        emax,
+        neighbor_number_t,
+        neighbor_list_t,
+        potential_t,
+        hopping_real_t,
+        hopping_imag_t,
+        xx_t,
+        state0_real_part,
+        state0_imag_part,
+        state0x_real_part,
+        state0x_imag_part,
+        state1_real_part,
+        state1_imag_part,
+        state1x_real_part,
+        state1x_imag_part,
+        state2_real_part,
+        state2_imag_part,
+        state2x_real_part,
+        state2x_imag_part,
+        state_real_part,
+        state_imag_part,
         bessel_m, label);
     });
   });
@@ -1126,7 +1112,7 @@ void Hamiltonian::chebyshev_2x(
 // Kernel for doing the Chebyshev iteration phi_2 = 2 * H * phi_1 - phi_0.
 #ifndef CPU_ONLY
 void gpu_kernel_polynomial(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int number_of_atoms,
   const real energy_max,
   const  int* __restrict g_neighbor_number,
@@ -1218,39 +1204,40 @@ void Hamiltonian::kernel_polynomial(Vector& state_0, Vector& state_1, Vector& st
   //  state_0.real_part, state_0.imag_part, state_1.real_part, state_1.imag_part, state_2.real_part,
   //  state_2.imag_part);
 
-  range<1> gws (grid_size * BLOCK_SIZE);
-  range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (grid_size * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
   const int size = n;
   const real emax = energy_max;
 
-  q.submit([&] (handler &cgh) {
-    auto neighbor_number_acc = neighbor_number.get_access<sycl_read>(cgh);
-    auto neighbor_list_acc = neighbor_list.get_access<sycl_read>(cgh);
-    auto potential_acc = potential.get_access<sycl_read>(cgh);
-    auto hopping_real_acc = hopping_real.get_access<sycl_read>(cgh);
-    auto hopping_imag_acc = hopping_imag.get_access<sycl_read>(cgh);
-    auto state0_real_part_acc = state_0.real_part.get_access<sycl_read>(cgh);
-    auto state0_imag_part_acc = state_0.imag_part.get_access<sycl_read>(cgh);
-    auto state1_real_part_acc = state_1.real_part.get_access<sycl_read>(cgh);
-    auto state1_imag_part_acc = state_1.imag_part.get_access<sycl_read>(cgh);
-    auto state2_real_part_acc = state_2.real_part.get_access<sycl_discard_write>(cgh);
-    auto state2_imag_part_acc = state_2.imag_part.get_access<sycl_discard_write>(cgh);
-    cgh.parallel_for<class polynomial>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    auto neighbor_number_t = neighbor_number;
+    auto neighbor_list_t = neighbor_list;
+    auto potential_t = potential;
+    auto hopping_real_t = hopping_real;
+    auto hopping_imag_t = hopping_imag;
+    auto state0_real_part = state_0.real_part;
+    auto state0_imag_part = state_0.imag_part;
+    auto state1_real_part = state_1.real_part;
+    auto state1_imag_part = state_1.imag_part;
+    auto state2_real_part = state_2.real_part;
+    auto state2_imag_part = state_2.imag_part;
+    cgh.parallel_for<class polynomial>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gpu_kernel_polynomial(
         item,
         size,
-        emax, 
-        neighbor_number_acc.get_pointer(),
-        neighbor_list_acc.get_pointer(),
-        potential_acc.get_pointer(),
-        hopping_real_acc.get_pointer(),
-        hopping_imag_acc.get_pointer(),
-        state0_real_part_acc.get_pointer(),
-        state0_imag_part_acc.get_pointer(), 
-        state1_real_part_acc.get_pointer(),
-        state1_imag_part_acc.get_pointer(), 
-        state2_real_part_acc.get_pointer(),
-        state2_imag_part_acc.get_pointer());
+        emax,
+        neighbor_number_t,
+        neighbor_list_t,
+        potential_t,
+        hopping_real_t,
+        hopping_imag_t,
+        state0_real_part,
+        state0_imag_part,
+        state1_real_part,
+        state1_imag_part,
+        state2_real_part,
+        state2_imag_part);
     });
   });
 #else

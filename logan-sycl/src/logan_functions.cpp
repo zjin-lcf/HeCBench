@@ -2,19 +2,19 @@
 // Title:  x-drop seed-and-extend alignment algorithm
 // Author: A. Zeni, G. Guidi
 //==================================================================
+#include <chrono>
 #include <sycl/sycl.hpp>
 #include "logan_functions.hpp"
 #include "seed.hpp"
-#include <chrono>
 
 using namespace std;
 using namespace chrono;
 
 inline void warpReduce(volatile short *input, int myTId)
 {
-  input[myTId] = (input[myTId] > input[myTId + 32]) ? input[myTId] : input[myTId + 32]; 
+  input[myTId] = (input[myTId] > input[myTId + 32]) ? input[myTId] : input[myTId + 32];
   input[myTId] = (input[myTId] > input[myTId + 16]) ? input[myTId] : input[myTId + 16];
-  input[myTId] = (input[myTId] > input[myTId + 8]) ? input[myTId] : input[myTId + 8]; 
+  input[myTId] = (input[myTId] > input[myTId + 8]) ? input[myTId] : input[myTId + 8];
   input[myTId] = (input[myTId] > input[myTId + 4]) ? input[myTId] : input[myTId + 4];
   input[myTId] = (input[myTId] > input[myTId + 2]) ? input[myTId] : input[myTId + 2];
   input[myTId] = (input[myTId] > input[myTId + 1]) ? input[myTId] : input[myTId + 1];
@@ -210,11 +210,11 @@ void extendSeedLGappedXDropOneDirectionGlobal(
     databaseSeg = databaseSegArray + offsetTarget[myId-1];
   }
 
-  short *antiDiag1 = &antidiag[myId*offAntidiag*3]; 
+  short *antiDiag1 = &antidiag[myId*offAntidiag*3];
   short* antiDiag2 = &antiDiag1[offAntidiag];
   short* antiDiag3 = &antiDiag2[offAntidiag];
 
-  SeedL mySeed(seed[myId]);  
+  SeedL mySeed(seed[myId]);
   //dimension of the antidiagonals
   int a1size = 0, a2size = 0, a3size = 0;
   int cols, rows;
@@ -246,7 +246,7 @@ void extendSeedLGappedXDropOneDirectionGlobal(
   int upperDiag = 0;
 
   while (minCol < maxCol)
-  {  
+  {
     ++antiDiagNo;
 
     //antidiagswap
@@ -273,12 +273,12 @@ void extendSeedLGappedXDropOneDirectionGlobal(
     //roofline analysis
     item.barrier(sycl::access::fence_space::local_space);
 
-    int tmp, antiDiagBest = UNDEF;  
+    int tmp, antiDiagBest = UNDEF;
     for(int i=0; i<a3size; i+=n_threads){
       int size = a3size-i;
 
       if(myTId<n_threads){
-        temp[myTId] = (myTId<size) ? antiDiag3[myTId+i]:UNDEF;        
+        temp[myTId] = (myTId<size) ? antiDiag3[myTId+i]:UNDEF;
       }
 
       item.barrier(sycl::access::fence_space::local_space);
@@ -316,7 +316,7 @@ void extendSeedLGappedXDropOneDirectionGlobal(
   int longestExtensionCol = a3size + offset3 - 2;
   int longestExtensionRow = antiDiagNo - longestExtensionCol;
   int longestExtensionScore = antiDiag3[longestExtensionCol - offset3];
-  
+
   if (longestExtensionScore == UNDEF)
   {
     if (antiDiag2[a2size -2] != UNDEF)
@@ -334,22 +334,22 @@ void extendSeedLGappedXDropOneDirectionGlobal(
       longestExtensionScore = antiDiag2[longestExtensionCol - offset2];
     }
   }
-  
+
   if (longestExtensionScore == UNDEF){
-  
+
     // general case
     for (int i = 0; i < a1size; ++i){
-  
+
       if (antiDiag1[i] > longestExtensionScore){
-  
+
         longestExtensionScore = antiDiag1[i];
         longestExtensionCol = i + offset1;
         longestExtensionRow = antiDiagNo - 2 - longestExtensionCol;
-  
+
       }
     }
   }
-  
+
   if (longestExtensionScore != UNDEF)
     updateExtendedSeedL(mySeed, direction, longestExtensionCol, longestExtensionRow, lowerDiag, upperDiag);
 
@@ -428,13 +428,13 @@ void extendSeedL(std::vector<SeedL> &seeds,
   seeds_r.reserve(numAlignments);
 
   for (size_t i=0; i<seeds.size(); i++){
-    seeds_r.push_back(seeds[i]);  
+    seeds_r.push_back(seeds[i]);
   }
 
-  //sequences offsets       
+  //sequences offsets
   vector<int> offsetLeftQ[MAX_GPUS];
-  vector<int> offsetLeftT[MAX_GPUS];  
-  vector<int> offsetRightQ[MAX_GPUS];  
+  vector<int> offsetLeftT[MAX_GPUS];
+  vector<int> offsetRightQ[MAX_GPUS];
   vector<int> offsetRightT[MAX_GPUS];
 
   //shared_mem_size per block per GPU
@@ -464,7 +464,7 @@ void extendSeedL(std::vector<SeedL> &seeds,
   //declare GPU seeds
   SeedL *seed_d_l[MAX_GPUS], *seed_d_r[MAX_GPUS];
 
-  //declare prefixes and suffixes on the GPU  
+  //declare prefixes and suffixes on the GPU
   char *prefQ_d[MAX_GPUS], *prefT_d[MAX_GPUS];
   char *suffQ_d[MAX_GPUS], *suffT_d[MAX_GPUS];
 
@@ -492,7 +492,7 @@ void extendSeedL(std::vector<SeedL> &seeds,
     }
 
     //compute antidiagonal offsets
-    partial_sum(offsetLeftQ[i].begin(),offsetLeftQ[i].end(),offsetLeftQ[i].begin());  
+    partial_sum(offsetLeftQ[i].begin(),offsetLeftQ[i].end(),offsetLeftQ[i].begin());
     partial_sum(offsetLeftT[i].begin(),offsetLeftT[i].end(),offsetLeftT[i].begin());
     partial_sum(offsetRightQ[i].begin(),offsetRightQ[i].end(),offsetRightQ[i].begin());
     partial_sum(offsetRightT[i].begin(),offsetRightT[i].end(),offsetRightT[i].begin());
@@ -679,8 +679,8 @@ void extendSeedL(std::vector<SeedL> &seeds,
 
   for(int i = 0; i < numAlignments; i++){
     res[i] = scoreLeft[i]+scoreRight[i]+kmer_length;
-    setEndPositionH(seeds[i], getEndPositionH(seeds_r[i]));    
-    setEndPositionV(seeds[i], getEndPositionV(seeds_r[i])); 
+    setEndPositionH(seeds[i], getEndPositionH(seeds_r[i]));
+    setEndPositionV(seeds[i], getEndPositionV(seeds_r[i]));
     std::cout << res[i] << std::endl;
   }
 

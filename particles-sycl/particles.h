@@ -1,7 +1,15 @@
 #ifndef PARTICLES_H
 #define PARTICLES_H
 
+#include <sycl/sycl.hpp>
+
+using  uint3 = sycl::uint3;
+using   int4 = sycl::int4;
+using float3 = sycl::float3;
+using float4 = sycl::float4;
+
 #define UMAD(a, b, c)  ( (a) * (b) + (c) )
+
 
 //Simulation parameters
 typedef struct{
@@ -28,7 +36,7 @@ typedef struct{
 } simParams_t;
 
 void integrateSystem(
-    queue &q,
+    sycl::queue &q,
     float4 *__restrict d_Pos,
     float4 *__restrict d_Vel,
     const simParams_t &params,
@@ -36,7 +44,7 @@ void integrateSystem(
     const unsigned int numParticles);
 
 void calcHash(
-    queue &q,
+    sycl::queue &q,
     unsigned int *__restrict d_Hash,
     unsigned int *__restrict d_Index,
     float4 *__restrict d_Pos,
@@ -44,13 +52,13 @@ void calcHash(
     const int numParticles);
 
 void memSet(
-    queue &q,
+    sycl::queue &q,
     unsigned int *d_Data,
     unsigned int val,
     unsigned int N);
 
 void findCellBoundsAndReorder(
-    queue &q,
+    sycl::queue &q,
     unsigned int *__restrict d_CellStart,
     unsigned int *__restrict d_CellEnd,
     float4 *__restrict d_ReorderedPos,
@@ -63,7 +71,7 @@ void findCellBoundsAndReorder(
     const unsigned int numCells);
 
 void collide(
-    queue &q,
+    sycl::queue &q,
     float4 *__restrict d_Vel,
     float4 *__restrict d_ReorderedPos,
     float4 *__restrict d_ReorderedVel,
@@ -75,7 +83,7 @@ void collide(
     const unsigned int numCells);
 
 void bitonicSort(
-    queue &q,
+    sycl::queue &q,
     unsigned int *__restrict d_DstKey,
     unsigned int *__restrict d_DstVal,
     unsigned int *__restrict d_SrcKey,

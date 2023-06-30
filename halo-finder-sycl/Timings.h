@@ -77,8 +77,6 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "Timer.h"
 
-using namespace std;
-
 //////////////////////////////////////////////////////////////////////
 /*
   A simple compliant implementation of auto_ptr.

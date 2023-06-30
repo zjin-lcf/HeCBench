@@ -18,7 +18,7 @@ extern "C" {
 #ifdef MNIST_STATIC
 #define _STATIC static
 #else
-#define _STATIC 
+#define _STATIC
 #endif
 
   /*

@@ -3,23 +3,30 @@
 #include <algorithm>
 #include "distance.h"
 
-void distance_device(queue &q, const double4* loc, double* dist,
+void distance_device(const sycl::double4* loc, double* dist,
                      const int n, const int iteration) {
 
-  range<1> gws ((n+255)/256*256);
-  range<1> lws (256);
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
 
-  double4 *in = malloc_device<double4>(n, q);
-  q.memcpy(in, loc, sizeof(double4) * n);
+  sycl::range<1> gws ((n+255)/256*256);
+  sycl::range<1> lws (256);
 
-  double *out = malloc_device<double>(n, q);
+  sycl::double4 *in = sycl::malloc_device<sycl::double4>(n, q);
+  q.memcpy(in, loc, sizeof(sycl::double4) * n);
+
+  double *out = sycl::malloc_device<double>(n, q);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iteration; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class haversine>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class haversine>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int i = item.get_global_id(0);
         if (i < n) {
           auto ay = in[i].x() * DEGREE_TO_RADIAN;  // a_lat
@@ -45,8 +52,8 @@ void distance_device(queue &q, const double4* loc, double* dist,
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
 
   q.memcpy(dist, out, sizeof(double) * n).wait();
-  free(in, q);
-  free(out, q);
+  sycl::free(in, q);
+  sycl::free(out, q);
 }
 
 void verify(int size, const double *output, const double *expected_output) {
@@ -81,7 +88,7 @@ int main(int argc, char* argv[]) {
   int city = 0;
   double lat, lon;
 
-  double4* input  = (double4*) aligned_alloc(4096, N*sizeof(double4));
+  sycl::double4* input  = (sycl::double4*) aligned_alloc(4096, N*sizeof(sycl::double4));
   double*  output = (double*) aligned_alloc(4096, N*sizeof(double));
   double*  expected_output = (double*) malloc(N*sizeof(double));
 
@@ -128,14 +135,7 @@ int main(int argc, char* argv[]) {
     expected_output[i] = 2.0 * EARTH_RADIUS_KM * asin(sqrt(sinysqrd + sinxsqrd * scale));
   }
 
-#ifdef USE_GPU
-  gpu_selector dev_sel;
-#else
-  cpu_selector dev_sel;
-#endif
-  queue q(dev_sel);
-
-  distance_device(q, input, output, N, repeat);
+  distance_device(input, output, N, repeat);
 
   verify(N, output, expected_output);
 

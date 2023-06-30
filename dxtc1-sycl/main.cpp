@@ -18,11 +18,11 @@
 #include <stdlib.h>
 #include <float.h>
 #include <chrono>
+#include <sycl/sycl.hpp>
 #include "dds.h"
 #include "permutations.h"
 #include "block.h"
 #include "shrUtils.h"
-#include "common.h"
 
 #define ERROR_THRESHOLD 0.02f
 #define NUM_THREADS     64      // Number of threads per work group.
@@ -79,28 +79,35 @@ int main(int argc, char** argv)
   const unsigned int compressedSize = (width / 4) * (height / 4) * 8;
   unsigned int * h_result = (unsigned int*)malloc(compressedSize);
 
-  {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // Tables
-  buffer<float, 1> d_alphaTable4 (alphaTable4, 4);
-  buffer<float, 1> d_alphaTable3 (alphaTable3, 4);
-  buffer<int, 1> d_prods4 (prods4, 4);
-  buffer<int, 1> d_prods3 (prods3, 4);
+  float *d_alphaTable4 = sycl::malloc_device<float>(4, q);
+  q.memcpy(d_alphaTable4, alphaTable4, sizeof(float) * 4);
+
+  float *d_alphaTable3 = sycl::malloc_device<float>(4, q);
+  q.memcpy(d_alphaTable3, alphaTable3, sizeof(float) * 4);
+
+  int *d_prods4 = sycl::malloc_device<int>(4, q);
+  q.memcpy(d_prods4, prods4, sizeof(int) * 4);
+
+  int *d_prods3 = sycl::malloc_device<int>(4, q);
+  q.memcpy(d_prods3, prods3, sizeof(int) * 4);
 
   // Upload permutations.
-  buffer<unsigned int, 1> d_permutations(permutations, 1024);
+  unsigned int *d_permutations = sycl::malloc_device<unsigned int>(1024, q);
+  q.memcpy(d_permutations, permutations, sizeof(unsigned int) * 1024);
 
   // Image
-  buffer<unsigned int, 1> d_image(block_image, memSize);
+  unsigned int *d_image = sycl::malloc_device<unsigned int>(memSize, q);
+  q.memcpy(d_image, block_image, sizeof(unsigned int) * memSize);
 
   // Result 
-  buffer<uint2, 1> d_result((uint2*)h_result, compressedSize/8); 
+  sycl::uint2 *d_result = sycl::malloc_device<sycl::uint2>(compressedSize/8, q); 
 
   // Determine launch configuration and run timed computation numIterations times
   int blocks = ((width + 3) / 4) * ((height + 3) / 4); // rounds up by 1 block in each dim if %4 != 0
@@ -112,7 +119,7 @@ int main(int argc, char** argv)
   // set work-item dimensions
   size_t szGlobalWorkSize = blocksPerLaunch * NUM_THREADS;
 
-  range<1> lws (NUM_THREADS);
+  sycl::range<1> lws (NUM_THREADS);
 
   printf("\nRunning DXT Compression on %u x %u image...\n", width, height);
   printf("\n%u Workgroups, %u Work Items per Workgroup, %u Work Items in NDRange...\n\n", 
@@ -125,46 +132,48 @@ int main(int argc, char** argv)
     for( int j=0; j<blocks; j+= blocksPerLaunch ) {
 
       szGlobalWorkSize = MIN( blocksPerLaunch, blocks-j ) * NUM_THREADS;
-      range<1> gws (szGlobalWorkSize);
+      sycl::range<1> gws (szGlobalWorkSize);
 
-      q.submit([&] (handler &cgh) {
-        auto permutations = d_permutations.get_access<sycl_read>(cgh);
-        auto image = d_image.get_access<sycl_read>(cgh);
-        auto result = d_result.get_access<sycl_discard_write>(cgh);
-        auto alphaTable4 = d_alphaTable4.get_access<sycl_read>(cgh);
-        auto alphaTable3 = d_alphaTable3.get_access<sycl_read>(cgh);
-        auto prods4 = d_prods4.get_access<sycl_read>(cgh);
-        auto prods3 = d_prods3.get_access<sycl_read>(cgh);
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<sycl::float4, 1> s_colors(sycl::range<1>(16), cgh);
+        sycl::local_accessor<sycl::float4, 1> s_sums(sycl::range<1>(16), cgh);
+        sycl::local_accessor<int, 1> s_int(sycl::range<1>(64), cgh);
+        sycl::local_accessor<float, 1> s_float(sycl::range<1>(96), cgh);
+        sycl::local_accessor<unsigned int, 1> s_permutations(sycl::range<1>(160), cgh);
+        sycl::local_accessor<int, 1> s_xrefs(sycl::range<1>(16), cgh);
 
-        accessor<float4, 1, sycl_read_write, access::target::local> colors(16, cgh);
-        accessor<float4, 1, sycl_read_write, access::target::local> sums(16, cgh);
-        accessor<int, 1, sycl_read_write, access::target::local> s_int(64, cgh);
-        accessor<float, 1, sycl_read_write, access::target::local> s_float(96, cgh);
-        accessor<unsigned int, 1, sycl_read_write, access::target::local> s_permutations(160, cgh);
-        accessor<int, 1, sycl_read_write, access::target::local> xrefs(16, cgh);
-
-        cgh.parallel_for<class dxtc>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+        cgh.parallel_for<class dxtc>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
 	  const int idx = item.get_local_id(0);
     
-          loadColorBlock(item, image.get_pointer(), colors.get_pointer(), 
-                         sums.get_pointer(), xrefs.get_pointer(), s_float.get_pointer(), j);
+          loadColorBlock(item,
+                         d_image,
+                         s_colors.get_pointer(), 
+                         s_sums.get_pointer(),
+                         s_xrefs.get_pointer(),
+                         s_float.get_pointer(),
+                         j);
           
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
           
-          uint4 best = evalAllPermutations(item, colors.get_pointer(), permutations.get_pointer(),
-                                           s_float.get_pointer(), sums[0], s_permutations.get_pointer(), 
-                                           alphaTable4.get_pointer(), prods4.get_pointer(), 
-                                           alphaTable3.get_pointer(), prods3.get_pointer());
+          sycl::uint4 best = evalAllPermutations(item,
+                                                 s_colors.get_pointer(),
+                                                 d_permutations,
+                                                 s_float.get_pointer(),
+                                                 s_sums[0],
+                                                 s_permutations.get_pointer(), 
+                                                 d_alphaTable4, d_prods4, 
+                                                 d_alphaTable3, d_prods3);
 
           // Use a parallel reduction to find minimum error.
           const int minIdx = findMinError(item, s_float.get_pointer(), s_int.get_pointer());    
 
-          item.barrier(access::fence_space::local_space);
+          item.barrier(sycl::access::fence_space::local_space);
           
           // Only write the result of the winner thread.
           if (idx == minIdx)
           {
-            saveBlockDXT1(item, best.x(), best.y(), best.z(), xrefs.get_pointer(), result.get_pointer(), j);
+            saveBlockDXT1(item, best.x(), best.y(), best.z(), s_xrefs.get_pointer(), d_result, j);
           }
         });
       });
@@ -175,7 +184,16 @@ int main(int argc, char** argv)
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
-}
+
+  q.memcpy(h_result, (uint*)d_result, compressedSize).wait();
+
+  sycl::free(d_permutations, q);  
+  sycl::free(d_image, q);  
+  sycl::free(d_result, q);  
+  sycl::free(d_alphaTable4, q);
+  sycl::free(d_alphaTable3, q);
+  sycl::free(d_prods4, q);
+  sycl::free(d_prods3, q);
   
   // Write DDS file.
   FILE* fp = NULL;

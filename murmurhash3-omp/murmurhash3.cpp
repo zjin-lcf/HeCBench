@@ -179,14 +179,6 @@ int main(int argc, char** argv)
                                   length[0:numKeys]) \
                           map(from: d_out[0:2*numKeys])
   {
-    // warmup
-    for (uint32_t n = 0; n < repeat; n++) {
-      #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
-      for (uint32_t i = 0; i < numKeys; i++) {
-        MurmurHash3_x64_128 (d_keys+d_length[i], length[i], i, d_out+i*2);
-      }
-    }
-
     auto start = std::chrono::steady_clock::now();
 
     for (uint32_t n = 0; n < repeat; n++) {

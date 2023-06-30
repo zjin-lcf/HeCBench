@@ -43,10 +43,10 @@ Using GPUs, pp. 7:1-7:7. March 2011.
 #include <assert.h>
 #include <cmath>
 #include <algorithm>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernels.h"
 
-static void Compress(queue &q, int blocks, int warpsperblock, int repeat, int dimensionality) {
+static void Compress(sycl::queue &q, int blocks, int warpsperblock, int repeat, int dimensionality) {
 
   // generate a test file with fixed values
   FILE *fp = fopen("input.bin", "wb");
@@ -73,20 +73,23 @@ static void Compress(queue &q, int blocks, int warpsperblock, int repeat, int di
   int doubles = fread(cbuf, 8, MAX, fp);
   if (doubles != MAX) {
     fprintf(stderr, "Error in reading input.bin. Exit\n");
+    if (cbuf != NULL) free(cbuf);
     fclose(fp);
     return ;
   }
   fclose(fp);
 
+  const int num_warps = blocks * warpsperblock;
+
   char *dbuf = (char *)malloc(sizeof(char) * ((MAX+1)/2*17)); // compressed data
   if (dbuf == NULL) {
     fprintf(stderr, "cannot allocate dbuf\n");
   }
-  int *cut = (int *)malloc(sizeof(int) * blocks * warpsperblock); // chunk boundaries
+  int *cut = (int *)malloc(sizeof(int) * num_warps); // chunk boundaries
   if (cut == NULL) {
     fprintf(stderr, "cannot allocate cut\n");
   }
-  int *off = (int *)malloc(sizeof(int) * blocks * warpsperblock); // offset table
+  int *off = (int *)malloc(sizeof(int) * num_warps); // offset table
   if (off == NULL) {
     fprintf(stderr, "cannot allocate off\n");
   }
@@ -96,11 +99,11 @@ static void Compress(queue &q, int blocks, int warpsperblock, int repeat, int di
   doubles += padding;
 
   // determine chunk assignments per warp
-  int per = (doubles + blocks * warpsperblock - 1) / (blocks * warpsperblock);
+  int per = (doubles + num_warps - 1) / (num_warps);
   if (per < WARPSIZE) per = WARPSIZE;
   per = (per + WARPSIZE - 1) & -WARPSIZE;
   int curr = 0, before = 0, d = 0;
-  for (int i = 0; i < blocks * warpsperblock; i++) {
+  for (int i = 0; i < num_warps; i++) {
     curr += per;
     cut[i] = std::min(curr, doubles);
     if (cut[i] - before > 0) {
@@ -121,30 +124,32 @@ static void Compress(queue &q, int blocks, int warpsperblock, int repeat, int di
   }
 
   // allocate GPU buffers
-  buffer<ull, 1> cbufd (cbuf, doubles); // uncompressed data
-  buffer<char, 1> dbufd ((doubles + 1) / 2 * 17); // compressed data
-  buffer<int, 1> cutd (cut, blocks * warpsperblock); // chunk boundaries
-  buffer<int, 1> offd (blocks * warpsperblock); // offset table
+  ull *cbufd = sycl::malloc_device<ull>(doubles, q);
+  q.memcpy(cbufd, cbuf, doubles * sizeof(ull)); // uncompressed data
+
+  char *dbufd = sycl::malloc_device<char>((doubles + 1) / 2 * 17, q); // compressed data
+
+  int *cutd = sycl::malloc_device<int>(num_warps, q); // chunk boundaries
+  q.memcpy(cutd, cut, num_warps * sizeof(int));
+
+  int *offd = sycl::malloc_device<int>(num_warps, q); // offset table
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  range<1> gws (blocks * WARPSIZE * warpsperblock);
-  range<1> lws (WARPSIZE * warpsperblock);
+  sycl::range<1> gws (WARPSIZE * num_warps);
+  sycl::range<1> lws (WARPSIZE * warpsperblock);
 
-  for (int i = 0; i < repeat; i++)
-    q.submit([&](handler &cgh) {
-      auto cbuf = cbufd.get_access<sycl_read>(cgh);
-      auto dbuf = dbufd.get_access<sycl_write>(cgh);
-      auto cut = cutd.get_access<sycl_read>(cgh);
-      auto off = offd.get_access<sycl_write>(cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> ibufs (32 * (3 * WARPSIZE / 2), cgh);
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) [[sycl::reqd_sub_group_size(WARPSIZE)]] {
-        CompressionKernel(item, dimensionality,
-                          cbuf.get_pointer(), dbuf.get_pointer(), cut.get_pointer(),
-                          off.get_pointer(), ibufs.get_pointer());
+  for (int i = 0; i < repeat; i++) {
+    q.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<int, 1> ibufs (sycl::range<1>(32 * (3 * WARPSIZE / 2)), cgh);
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
+        [[sycl::reqd_sub_group_size(WARPSIZE)]] {
+        CompressionKernel(item, dimensionality, cbufd, dbufd, cutd, offd,
+                          ibufs.get_pointer());
       });
     });
+  }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
@@ -152,10 +157,7 @@ static void Compress(queue &q, int blocks, int warpsperblock, int repeat, int di
   fprintf(stderr, "Average compression kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   // transfer offsets back to CPU
-  q.submit([&] (handler &cgh) {
-    auto acc = offd.get_access<sycl_read>(cgh);
-    cgh.copy(acc, off);
-  }).wait();
+  q.memcpy(off, offd, sizeof(int) * num_warps).wait();
 
   // output header
   fp = fopen("output.bin", "wb");
@@ -174,7 +176,7 @@ static void Compress(queue &q, int blocks, int warpsperblock, int repeat, int di
   num = fwrite(&doublecnt, 4, 1, fp);
   assert(1 == num);
   // output offset table
-  for(int i = 0; i < blocks * warpsperblock; i++) {
+  for(int i = 0; i < num_warps; i++) {
     int start = 0;
     if(i > 0) start = cut[i-1];
     off[i] -= ((start+1)/2*17);
@@ -182,16 +184,12 @@ static void Compress(queue &q, int blocks, int warpsperblock, int repeat, int di
     assert(1 == num);
   }
   // output compressed data by chunk
-  for(int i = 0; i < blocks * warpsperblock; i++) {
+  for(int i = 0; i < num_warps; i++) {
     int offset, start = 0;
     if(i > 0) start = cut[i-1];
     offset = ((start+1)/2*17);
     // transfer compressed data back to CPU by chunk
-
-    q.submit([&] (handler &cgh) {
-      auto acc = dbufd.get_access<sycl_read>(cgh, off[i], offset);
-      cgh.copy(acc, dbuf+offset);
-    }).wait();
+    q.memcpy(dbuf + offset, dbufd + offset, sizeof(char) * off[i]).wait();
 
     num = fwrite(&dbuf[offset], 1, off[i], fp);
     assert(off[i] == num);
@@ -209,6 +207,10 @@ static void Compress(queue &q, int blocks, int warpsperblock, int repeat, int di
 
   fprintf(stderr, "Compression ratio = %lf\n", 1.0 * input_size / output_size);
 
+  sycl::free(cbufd, q);
+  sycl::free(dbufd, q);
+  sycl::free(cutd, q);
+  sycl::free(offd, q);
   free(cbuf);
   free(dbuf);
   free(cut);
@@ -245,11 +247,10 @@ int main(int argc, char *argv[])
   int repeat;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   if((4 == argc) || (5 == argc)) { /* compress */
     blocks = atoi(argv[1]);

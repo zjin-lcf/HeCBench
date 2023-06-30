@@ -92,7 +92,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "util.h"
 #include "kernel.h"
 
@@ -154,56 +154,43 @@ int main ( int argc, char **argv )
   n_inside = 0;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  range<2> gws ((nj+15)/16*16, (ni+15)/16);
-  range<2> lws (16, 16);
+  sycl::range<2> gws ((nj+15)/16*16, (ni+15)/16);
+  sycl::range<2> lws (16, 16);
 
-  buffer<double, 1> d_err (1);
-  buffer<int, 1> d_n_inside (1);
-
+  double *d_err = sycl::malloc_device<double>(1, q);
+  int *d_n_inside = sycl::malloc_device<int>(1, q);
+  
   long time = 0;
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto acc = d_err.get_access<sycl_discard_write>(cgh);
-      cgh.copy(&err, acc);
-    });
-
-    q.submit([&] (handler &cgh) {
-      auto acc = d_n_inside.get_access<sycl_discard_write>(cgh);
-      cgh.copy(&n_inside, acc);
-    });
-
+    q.memcpy(d_err, &err, sizeof(double));
+    q.memcpy(d_n_inside, &n_inside, sizeof(int));
     q.wait();
+
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      auto err = d_err.get_access<sycl_read_write>(cgh);
-      auto n = d_n_inside.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class solution>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-        fk (item, ni, nj, seed, N, a, b, h, rth, n.get_pointer(), err.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class solution>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+        fk (item, ni, nj, seed, N, a, b, h, rth, d_n_inside, d_err);
       });
     }).wait();
+
     auto end = std::chrono::steady_clock::now();
     time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
   printf("Average kernel time: %lf (s)\n", time * 1e-9 / repeat);
   
-  q.submit([&] (handler &cgh) {
-    auto acc = d_err.get_access<sycl_read>(cgh);
-    cgh.copy(acc, &err);
-  });
+  q.memcpy(&err, d_err, sizeof(double));
+  q.memcpy(&n_inside, d_n_inside, sizeof(int));
+  q.wait();
 
-  q.submit([&] (handler &cgh) {
-    auto acc = d_n_inside.get_access<sycl_read>(cgh);
-    cgh.copy(acc, &n_inside);
-  });
-
-  q.wait(); 
+  sycl::free(d_err, q);
+  sycl::free(d_n_inside, q);
 
   err = sqrt ( err / ( double ) ( n_inside ) );
   printf ( "\n" );

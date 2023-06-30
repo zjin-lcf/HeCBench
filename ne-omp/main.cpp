@@ -120,11 +120,6 @@ int main(int argc, char* argv[]) {
   #pragma omp target data map (to: points[0:numPts]) \
                           map (from: normal_points[0:numPts])
   {
-    // warmup
-    #pragma omp target teams distribute parallel for thread_limit(256)
-    for (int idx = 0; idx < numPts; idx++)
-      normal_points[idx] = normalEstimate(points, idx, width, height);
-
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {

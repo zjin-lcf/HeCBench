@@ -17,12 +17,16 @@
 
 #include <chrono>
 #include <cmath>
-#include "common.h"
+#include <sycl/sycl.hpp>
+
+using uchar4 = sycl::uchar4;
+using float4 = sycl::float4;
+ 
 #include "SDKBitMap.h"
 #include "kernels.cpp"
 
 void reference (uchar4 *verificationOutput,
-                const uchar4 *inputImageData, 
+                const uchar4 *inputImageData,
                 const uint width,
                 const uint height,
                 const int pixelSize);
@@ -84,7 +88,7 @@ int main(int argc, char * argv[])
 
   // allocate memory for output image data
   uchar4 *outputImageData = (uchar4*) malloc (imageSize);
-  if (outputImageData == nullptr) 
+  if (outputImageData == nullptr)
     printf("Failed to allocate memory! (outputImageData)");
 
   // initialize the output
@@ -100,31 +104,30 @@ int main(int argc, char * argv[])
 
   // allocate memory for verification output
   uchar4* verificationOutput = (uchar4*)malloc(imageSize);
-  if (verificationOutput == nullptr) 
+  if (verificationOutput == nullptr)
     printf("verificationOutput heap allocation failed!");
 
   // initialize the output
   memset(verificationOutput, 0, imageSize);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // Create memory object for input Image
-  uchar4 *inputImageBuffer = malloc_device<uchar4>(width * height, q);
+  uchar4 *inputImageBuffer = sycl::malloc_device<uchar4>(width * height, q);
   q.memcpy(inputImageBuffer, inputImageData, imageSize);
 
-  uchar4 *outputImageBuffer = malloc_device<uchar4>(width * height, q);
+  uchar4 *outputImageBuffer = sycl::malloc_device<uchar4>(width * height, q);
   q.memset(outputImageBuffer, 0, imageSize);
 
   // Enqueue a kernel run call.
   const int blockSizeX = 16;
   const int blockSizeY = 16;
-  range<2> gws (height, width);
-  range<2> lws (blockSizeY, blockSizeX);
+  sycl::range<2> gws (height, width);
+  sycl::range<2> lws (blockSizeY, blockSizeX);
 
   printf("Executing kernel for %d iterations", iterations);
   printf("-------------------------------------------\n");
@@ -134,8 +137,9 @@ int main(int argc, char * argv[])
 
   for(int i = 0; i < iterations; i++)
   {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class sobel>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class sobel>(
+        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         sobel_filter(inputImageBuffer, outputImageBuffer, width, height, item);
       });
     });
@@ -147,8 +151,8 @@ int main(int argc, char * argv[])
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
 
   q.memcpy(outputImageData, outputImageBuffer, imageSize).wait();
-  free(outputImageBuffer, q);
-  free(inputImageBuffer, q);
+  sycl::free(outputImageBuffer, q);
+  sycl::free(inputImageBuffer, q);
 
   // reference implementation
   reference (verificationOutput, inputImageData, width, height, pixelSize);
@@ -162,7 +166,7 @@ int main(int argc, char * argv[])
   if (outputReference == nullptr)
     printf("Failed to allocate host memory!" "(outputReference)");
 
-  // copy uchar data to float array
+  // copy unsigned char data to float array
   for(int i = 0; i < (int)(width * height); i++)
   {
     outputDevice[i * 4 + 0] = outputImageData[i].x();

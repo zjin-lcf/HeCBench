@@ -279,7 +279,7 @@ void print_input_summary(Input input)
 	printf("Est. Memory Usage (MB):      %.1lf\n", mem / 1024.0 / 1024.0);
 }
 
-int validate_and_print_results(Input input, double runtime, unsigned long vhash, double kernel_init_time)
+int validate_and_print_results(Input input, double runtime, unsigned long vhash, double kernel_time)
 {
 	int lookups = 0;
 	if( input.simulation_method == HISTORY_BASED )
@@ -288,17 +288,14 @@ int validate_and_print_results(Input input, double runtime, unsigned long vhash,
 		lookups = input.lookups;
 	
 	int lookups_per_sec = (int) ((double) lookups / runtime);
-	int sim_only_lookups_per_sec = (int) ((double) lookups/ (runtime-kernel_init_time));
+	int sim_only_lookups_per_sec = (int) ((double) lookups/ kernel_time);
 
 	printf("Total Time Statistics (HIP Init / JIT Compilation + Simulation Kernel)\n");
 	printf("Runtime:               %.3lf seconds\n", runtime);
 	printf("Lookups:               "); fancy_int(lookups);
-	printf("Lookups/s:             ");
-	fancy_int(lookups_per_sec);
+	printf("Lookups/s:             "); fancy_int(lookups_per_sec);
 	printf("Simulation Kernel Only Statistics\n");
-	printf("Runtime:               %.3lf seconds\n", runtime-kernel_init_time);
-	printf("Lookups/s:             ");
-	fancy_int(sim_only_lookups_per_sec);
+	printf("Lookups/s:             "); fancy_int(sim_only_lookups_per_sec);
 
 	int is_invalid = 1;
 

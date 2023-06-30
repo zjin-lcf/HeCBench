@@ -301,7 +301,7 @@ void SaveVocab() {
 }
 
 void ReadVocab() {
-  int a, i = 0;
+  int a;
   char c;
   char word[MAX_STRING];
   FILE *fin = fopen(read_vocab_file, "rb");
@@ -316,7 +316,6 @@ void ReadVocab() {
     if (feof(fin)) break;
     a = AddWordToVocab(word);
     fscanf(fin, "%d%c", &vocab[a].cn, &c);
-    i++;
   }
   SortVocab();
   if (debug_mode > 0) {

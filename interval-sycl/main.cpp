@@ -37,7 +37,7 @@
 #include <math.h>
 #include <iostream>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "interval.h"
 #include "gpu_interval.h"
 #include "cpu_interval.h"
@@ -67,27 +67,26 @@ int main(int argc, char *argv[]) {
   int *h_nresults = new int[THREADS];
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
-  interval_gpu<T> *d_result = malloc_device<interval_gpu<T>>(THREADS * DEPTH_RESULT, q);
-  int *d_nresults = malloc_device<int>(THREADS, q);
+  interval_gpu<T> *d_result = sycl::malloc_device<interval_gpu<T>>(THREADS * DEPTH_RESULT, q);
+  int *d_nresults = sycl::malloc_device<int>(THREADS, q);
 
   interval_gpu<T> i(0.01f, 4.0f);
   std::cout << "Searching for roots in [" << i.lower() << ", " << i.upper()
             << "]...\n";
 
-  range<1> lws (BLOCK_SIZE);
-  range<1> gws (GRID_SIZE * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
+  sycl::range<1> gws (GRID_SIZE * BLOCK_SIZE);
 
   auto start = std::chrono::steady_clock::now();
 
   for (int it = 0; it < repeat; ++it) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         test_interval_newton<T>(d_result, d_nresults,
                                 i, implementation_choice, item);
       });
@@ -117,8 +116,8 @@ int main(int argc, char *argv[]) {
   std::cout << "Average execution time of test_interval_newton: "
             << (time * 1e-3f) / repeat << " us\n";
 
-  free(d_result, q);
-  free(d_nresults, q);
+  sycl::free(d_result, q);
+  sycl::free(d_nresults, q);
 
   // Compute the results using a CPU implementation based on the Boost library
   I_CPU i_cpu(0.01f, 4.0f);

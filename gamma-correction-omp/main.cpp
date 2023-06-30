@@ -25,8 +25,8 @@ int main(int argc, char* argv[]) {
 
   // Lambda to process image with gamma = 2
   auto gamma_f = [](ImgPixel& pixel) {
-    float v = (0.3f * pixel.r + 0.59f * pixel.g + 0.11f * pixel.b) / 255.0;
-    std::uint8_t gamma_pixel = static_cast<std::uint8_t>(255 * v * v);
+    float v = (0.3f * pixel.r + 0.59f * pixel.g + 0.11f * pixel.b) / 255.f;
+    std::uint8_t gamma_pixel = static_cast<std::uint8_t>(255.f * v * v);
     if (gamma_pixel > 255) gamma_pixel = 255;
     pixel.set(gamma_pixel, gamma_pixel, gamma_pixel, gamma_pixel);
   };
@@ -70,8 +70,8 @@ int main(int argc, char* argv[]) {
       #pragma omp target teams distribute parallel for thread_limit(block_size)
       for (int i = 0; i < image_size; i++) {
         // Lambda to process image with gamma = 2
-        const float v = (0.3f * pixel[i].r + 0.59f * pixel[i].g + 0.11f * pixel[i].b) / 255.0;
-        std::uint8_t gamma_pixel = static_cast<std::uint8_t>(255 * v * v);
+        const float v = (0.3f * pixel[i].r + 0.59f * pixel[i].g + 0.11f * pixel[i].b) / 255.f;
+        std::uint8_t gamma_pixel = static_cast<std::uint8_t>(255.f * v * v);
         if (gamma_pixel > 255) gamma_pixel = 255;
         pixel[i].set(gamma_pixel, gamma_pixel, gamma_pixel, gamma_pixel);
       }

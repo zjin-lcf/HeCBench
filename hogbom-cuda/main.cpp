@@ -77,17 +77,7 @@ int main(int argc, char* argv[])
     // Time for the implementation targeting a device
     std::cout << "+++++ Offload processing on a device +++++" << std::endl;
     HogbomTest device;
-
-    Stopwatch sw;
-    sw.start();
     device.deconvolve(dirty, dim, psf, psfDim, deviceModel, deviceResidual);
-    const double time = sw.stop();
-
-    // Report on timings
-    std::cout << "    Time " << time << " (s) " << std::endl;
-    std::cout << "    Time per cycle " << time / niters * 1000 << " (ms)" << std::endl;
-    std::cout << "    Cleaning rate  " << niters / time << " (iterations per second)" << std::endl;
-    std::cout << "Done" << std::endl;
   }
 
 #ifdef VERIFY

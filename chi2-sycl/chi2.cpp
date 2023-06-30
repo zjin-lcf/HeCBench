@@ -4,7 +4,7 @@
 #include <math.h>
 #include <iostream>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "reference.h"
 
 int main(int argc, char* argv[]) {
@@ -51,29 +51,29 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   // allocate SNP device data
 
-  unsigned char *snpdata = malloc_device<unsigned char>(size, q);
+  unsigned char *snpdata = sycl::malloc_device<unsigned char>(size, q);
   q.memcpy(dataT, snpdata, snpdata_size);
 
-  float *chi_result = malloc_device<float>(cols, q);
+  float *chi_result = sycl::malloc_device<float>(cols, q);
 
   unsigned jobs = cols;
-  range<1> gws ((jobs + nthreads - 1)/nthreads * nthreads);
-  range<1> lws (nthreads);
+  sycl::range<1> gws ((jobs + nthreads - 1)/nthreads * nthreads);
+  sycl::range<1> lws (nthreads);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](handler& cgh) {
-      cgh.parallel_for<class chi2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class chi2>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         unsigned char y;
         int m, n;
         unsigned int p = 0;
@@ -135,8 +135,8 @@ int main(int argc, char* argv[]) {
 
   q.memcpy(chi_result, h_results, result_size).wait();
 
-  free(snpdata, q);
-  free(chi_result, q);
+  sycl::free(snpdata, q);
+  sycl::free(chi_result, q);
 
   start = std::chrono::steady_clock::now();
 

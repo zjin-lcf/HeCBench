@@ -1,6 +1,6 @@
 // Compute a forward step using the rush larsen algorithm to the
 // tentusscher_panfilov_2006_M_cell ODE
-void k_forward_rush_larsen(nd_item<1> &item, 
+void k_forward_rush_larsen(sycl::nd_item<1> &item, 
                            double*__restrict states, const double t, const double dt,
                            const double*__restrict parameters, const int n)
 {

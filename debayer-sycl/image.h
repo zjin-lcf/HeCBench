@@ -65,7 +65,7 @@ INLINE uchar* image_pixel_at_(uchar *im_p, const uint im_rows, const uint im_col
 #define image_pixel_at(PixelT, im_p, im_rows, im_cols, image_pitch, r, c) (*((PixelT *) image_pixel_at_((uchar *)(im_p), (im_rows), (im_cols), (image_pitch), (r), (c), sizeof(PixelT))))
 
 INLINE uchar* image_tex2D_(uchar *im_p, const uint im_rows, const uint im_cols, const uint image_pitch,
-                           const int r, const int c, const uint sizeof_pixel, const uint sample_method) {
+                                 const int r, const int c, const uint sizeof_pixel, const uint sample_method) {
   const uint2 p2 = tex2D((int) im_rows, (int) im_cols, c, r, sample_method);
   return image_pixel_at_(im_p, im_rows, im_cols, image_pitch, p2.s0(), p2.s1(), sizeof_pixel);
 }

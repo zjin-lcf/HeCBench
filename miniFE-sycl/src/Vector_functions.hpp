@@ -31,8 +31,7 @@
 #include <vector>
 #include <sstream>
 #include <fstream>
-#include <CL/sycl.hpp>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #ifdef HAVE_MPI
 #include <mpi.h>
@@ -73,7 +72,7 @@ void write_vector(const std::string& filename,
       if (p == 0) {
         ofs << vec.local_size << std::endl;
       }
-  
+
       typename VectorType::GlobalOrdinalType first = vec.startIndex;
       for(size_t i=0; i<vec.local_size; ++i) {
         ofs << first+i << " " << coefs[i] << std::endl;
@@ -135,10 +134,10 @@ void
   waxpby(typename VectorType::ScalarType alpha, const VectorType& x,
          typename VectorType::ScalarType beta, const VectorType& y,
          VectorType& w,
-         queue &q,
-         buffer<typename VectorType::ScalarType, 1> &d_xcoefs,
-         buffer<typename VectorType::ScalarType, 1> &d_ycoefs,
-         buffer<typename VectorType::ScalarType, 1> &d_wcoefs)
+         sycl::queue &q,
+         typename VectorType::ScalarType *d_xcoefs,
+         typename VectorType::ScalarType *d_ycoefs,
+         typename VectorType::ScalarType *d_wcoefs)
 {
 #ifdef MINIFE_DEBUG
   std::cout << "Starting WAXPBY..." << std::endl;
@@ -152,48 +151,42 @@ void
 #endif
 
   const int n = x.coefs.size();
-  range<1> gws ((n+255)/256*256);
-  range<1> lws (256);
+  sycl::range<1> gws ((n+255)/256*256);
+  sycl::range<1> lws (256);
 
   if(beta == 0.0) {
     if(alpha == 1.0) {
-      q.submit([&] (handler &h) {
-        auto wcoefs = d_wcoefs.template get_access<sycl_write>(h);
-        auto xcoefs = d_xcoefs.template get_access<sycl_read>(h);
-        h.parallel_for<class wx_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &h) {
+        h.parallel_for<class wx_kernel>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int i = item.get_global_id(0);
-          if (i < n) wcoefs[i] = xcoefs[i];
+          if (i < n) d_wcoefs[i] = d_xcoefs[i];
         });
       });
     } else {
-      q.submit([&] (handler &h) {
-        auto wcoefs = d_wcoefs.template get_access<sycl_write>(h);
-        auto xcoefs = d_xcoefs.template get_access<sycl_read>(h);
-        h.parallel_for<class wax_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &h) {
+        h.parallel_for<class wax_kernel>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int i = item.get_global_id(0);
-          if (i < n) wcoefs[i] = alpha*xcoefs[i];
+          if (i < n) d_wcoefs[i] = alpha * d_xcoefs[i];
         });
       });
     }
   } else {
     if(alpha == 1.0) {
-      q.submit([&] (handler &h) {
-        auto wcoefs = d_wcoefs.template get_access<sycl_write>(h);
-        auto xcoefs = d_xcoefs.template get_access<sycl_read>(h);
-        auto ycoefs = d_ycoefs.template get_access<sycl_read>(h);
-        h.parallel_for<class wxby_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &h) {
+        h.parallel_for<class wxby_kernel>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int i = item.get_global_id(0);
-          if (i < n) wcoefs[i] = xcoefs[i]+beta*ycoefs[i];
+          if (i < n) d_wcoefs[i] = d_xcoefs[i] + beta * d_ycoefs[i];
         });
       });
     } else {
-      q.submit([&] (handler &h) {
-        auto wcoefs = d_wcoefs.template get_access<sycl_write>(h);
-        auto xcoefs = d_xcoefs.template get_access<sycl_read>(h);
-        auto ycoefs = d_ycoefs.template get_access<sycl_read>(h);
-        h.parallel_for<class waxby_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+      q.submit([&] (sycl::handler &h) {
+        h.parallel_for<class waxby_kernel>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           int i = item.get_global_id(0);
-          if (i < n) wcoefs[i] = alpha*xcoefs[i]+beta*ycoefs[i];
+          if (i < n) d_wcoefs[i] = alpha * d_xcoefs[i] + beta * d_ycoefs[i];
         });
       });
     }
@@ -205,69 +198,62 @@ void
 }
 
 template<typename VectorType>
-	void
-daxpby(const MINIFE_SCALAR alpha, 
-    const VectorType& x,
-    const MINIFE_SCALAR beta, 
-    VectorType& y,
-    queue &q,
-    buffer<MINIFE_SCALAR, 1> &d_xcoefs,
-    buffer<MINIFE_SCALAR, 1> &d_ycoefs)
+void
+daxpby(const MINIFE_SCALAR alpha,
+       const VectorType& x,
+       const MINIFE_SCALAR beta,
+       VectorType& y,
+       sycl::queue &q,
+       MINIFE_SCALAR *d_xcoefs,
+       MINIFE_SCALAR *d_ycoefs)
 {
 
   const MINIFE_LOCAL_ORDINAL n = MINIFE_MIN(x.coefs.size(), y.coefs.size());
 
-  range<1> gws ((n+255)/256*256);
-  range<1> lws (256);
-
+  sycl::range<1> gws ((n+255)/256*256);
+  sycl::range<1> lws (256);
 
   if(alpha == 1.0 && beta == 1.0) {
-    q.submit([&] (handler &h) {
-        auto ycoefs = d_ycoefs.get_access<sycl_write>(h);
-        auto xcoefs = d_xcoefs.get_access<sycl_read>(h);
-        h.parallel_for<class dyx_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            int i = item.get_global_id(0);
-            if (i < n) ycoefs[i] += xcoefs[i];
-            });
-        });
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class dyx_kernel>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        int i = item.get_global_id(0);
+        if (i < n) d_ycoefs[i] += d_xcoefs[i];
+      });
+    });
   } else if (beta == 1.0) {
-    q.submit([&] (handler &h) {
-        auto ycoefs = d_ycoefs.get_access<sycl_write>(h);
-        auto xcoefs = d_xcoefs.get_access<sycl_read>(h);
-        h.parallel_for<class dyax_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            int i = item.get_global_id(0);
-            if (i < n) ycoefs[i] += alpha*xcoefs[i];
-            });
-        });
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class dyax_kernel>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        int i = item.get_global_id(0);
+        if (i < n) d_ycoefs[i] += alpha * d_xcoefs[i];
+      });
+    });
   } else if (alpha == 1.0) {
-    q.submit([&] (handler &h) {
-        auto ycoefs = d_ycoefs.get_access<sycl_read_write>(h);
-        auto xcoefs = d_xcoefs.get_access<sycl_read>(h);
-        h.parallel_for<class yxby_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            int i = item.get_global_id(0);
-            if (i < n) ycoefs[i] = xcoefs[i] + beta * ycoefs[i];
-            });
-        });
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class yxby_kernel>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        int i = item.get_global_id(0);
+        if (i < n) d_ycoefs[i] = d_xcoefs[i] + beta * d_ycoefs[i];
+      });
+    });
   } else if (beta == 0.0) {
-    q.submit([&] (handler &h) {
-        auto ycoefs = d_ycoefs.get_access<sycl_write>(h);
-        auto xcoefs = d_xcoefs.get_access<sycl_read>(h);
-        h.parallel_for<class yax_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            int i = item.get_global_id(0);
-            if (i < n) ycoefs[i] = alpha*xcoefs[i];
-            });
-        });
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class yax_kernel>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        int i = item.get_global_id(0);
+        if (i < n) d_ycoefs[i] = alpha * d_xcoefs[i];
+      });
+    });
   } else {
-    q.submit([&] (handler &h) {
-        auto ycoefs = d_ycoefs.get_access<sycl_read_write>(h);
-        auto xcoefs = d_xcoefs.get_access<sycl_read>(h);
-        h.parallel_for<class yaxby_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-            int i = item.get_global_id(0);
-            if (i < n) ycoefs[i] = alpha*xcoefs[i]+beta*ycoefs[i];
-            });
-        });
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class yaxby_kernel>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        int i = item.get_global_id(0);
+        if (i < n) d_ycoefs[i] = alpha * d_xcoefs[i] + beta * d_ycoefs[i];
+      });
+    });
   }
-
 }
 
 //-----------------------------------------------------------
@@ -278,12 +264,12 @@ daxpby(const MINIFE_SCALAR alpha,
 // result - return-value
 //
 template<typename Vector>
-  typename TypeTraits<typename Vector::ScalarType>::magnitude_type
+typename TypeTraits<typename Vector::ScalarType>::magnitude_type
 dot(const Vector& x,
     const Vector& y,
-    queue &q,
-    buffer<typename Vector::ScalarType,1> &d_xcoefs,
-    buffer<typename Vector::ScalarType,1> &d_ycoefs)
+    sycl::queue &q,
+    typename Vector::ScalarType *d_xcoefs,
+    typename Vector::ScalarType *d_ycoefs)
 {
   const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
 
@@ -293,97 +279,85 @@ dot(const Vector& x,
 
   MINIFE_SCALAR result = 0;
 
-
 #ifdef ONEAPI_REDUCTION
-  buffer<MINIFE_SCALAR, 1> d_result(&result, 1);
-  d_result.set_final_data(nullptr);
+  MINIFE_SCALAR *d_result = sycl::malloc_device<MINIFE_SCALAR>(1, q);
+  q.memcpy(d_result, &result, sizeof(MINIFE_SCALAR));
 
-  range<1> gws((n+255)/256*256);
-  range<1> lws(256);
+  sycl::range<1> gws((n+255)/256*256);
+  sycl::range<1> lws(256);
 
-  // use Intel-specific reduction
-  q.submit([&] (handler &h) {
-    auto xcoefs_acc = d_xcoefs.template get_access<sycl_read>(h);
-    auto ycoefs_acc = d_ycoefs.template get_access<sycl_read>(h);
-    auto result_acc = d_result.template get_access<sycl_read_write>(h);
-    h.parallel_for(nd_range<1>(gws, lws), 
-      ext::oneapi::reduction(result_acc, result, std::plus<MINIFE_SCALAR>()),
-      [=] (nd_item<1> item, auto& result_acc) {
+  // use SYCL Reduction
+  q.submit([&] (sycl::handler &h) {
+    h.parallel_for(sycl::nd_range<1>(gws, lws),
+      sycl::reduction(d_result, result, std::plus<MINIFE_SCALAR>()),
+      [=] (sycl::nd_item<1> item, auto& res) {
       int i = item.get_global_id(0);
-      if (i < n) result_acc += xcoefs_acc[i] * ycoefs_acc[i];
+      if (i < n) res += d_xcoefs[i] * d_ycoefs[i];
     });
   });
 
-  q.submit([&] (handler &h) {
-    auto result_acc = d_result.template get_access<sycl_read>(h);
-    h.copy(result_acc, &result);
-  });
+  q.memcpy(&result, d_result, sizeof(MINIFE_SCALAR)).wait();
+
 #else
-  // consistent with the reduction in the miniFE-cuda 
+
+  // consistent with the reduction in the miniFE-cuda
   int NWI = std::min(1024, (n+255)/256) * 256;
-  range<1> gws (NWI);
-  range<1> lws (256);
-  buffer<MINIFE_SCALAR, 1> d_sop (1024); // sum-of-product
+  sycl::range<1> gws (NWI);
+  sycl::range<1> lws (256);
 
-  q.submit([&] (handler &h) {
-    auto d = d_sop.template get_access<sycl_discard_write>(h);
-    h.fill(d, (MINIFE_SCALAR)0);
-  });
+  // sum-of-product
+  MINIFE_SCALAR *d_sop = sycl::malloc_device<MINIFE_SCALAR>(1024, q);
+  q.memset(d_sop, 0, sizeof(MINIFE_SCALAR)*1024);
 
-  q.submit([&] (handler &h) {
-    auto x = d_xcoefs.template get_access<sycl_read>(h);
-    auto y = d_ycoefs.template get_access<sycl_read>(h);
-    auto d = d_sop.template get_access<sycl_write>(h);
-    accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
-    h.parallel_for<class xy_dot_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &h) {
+    sycl::local_accessor<MINIFE_SCALAR, 1> red(lws, h);
+    h.parallel_for<class xy_dot_kernel>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       MINIFE_SCALAR sum = 0;
       int lid = item.get_local_id(0);
-      for(int idx=item.get_global_id(0);idx<n;idx+=item.get_group_range(0) * item.get_local_range(0)) {
-        sum+=x[idx]*y[idx];
+      for(int idx=item.get_global_id(0);idx<n;
+          idx+=item.get_group_range(0) * item.get_local_range(0)) {
+        sum+=d_xcoefs[idx] * d_ycoefs[idx];
       }
 
       //Do a shared memory reduction on the dot product
       red[lid]=sum;
 #pragma unroll
       for (int n = 128; n > 0; n = n/2) {
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
       }
 
       //save partial dot products
-      if(lid==0) d[item.get_group(0)]=sum;
+      if(lid==0) d_sop[item.get_group(0)]=sum;
     });
   });
 
-  q.submit([&] (handler &h) {
-    auto d = d_sop.template get_access<sycl_read_write>(h);
-    accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
-    h.parallel_for<class final_reduce>(nd_range<1>(lws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &h) {
+    sycl::local_accessor<MINIFE_SCALAR, 1> red(lws, h);
+    h.parallel_for<class final_reduce>(
+      sycl::nd_range<1>(lws, lws), [=] (sycl::nd_item<1> item) {
       int lid = item.get_local_id(0);
-      MINIFE_SCALAR sum = d[lid];
+      MINIFE_SCALAR sum = d_sop[lid];
       red[lid]=sum;
 #pragma unroll
       for (int n = 128; n > 0; n = n/2) {
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
       }
       //save final dot product at the front
-      if(lid==0) d[0]=sum;
+      if(lid==0) d_sop[0]=sum;
     });
   });
 
-  q.submit([&] (handler &h) {
-    auto d = d_sop.template get_access<sycl_read>(h, range<1>(1));
-    h.copy(d, &result);
-  });
+  q.memcpy(&result, d_sop, sizeof(MINIFE_SCALAR)).wait();
+  sycl::free(d_sop, q);
 #endif
-
-  q.wait();
 
 #ifdef HAVE_MPI
   typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
   magnitude local_dot = result, global_dot = 0;
-  MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
+  MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();
   MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
   return global_dot;
 #else
@@ -392,8 +366,8 @@ dot(const Vector& x,
 }
 
 template<typename Vector>
-  typename TypeTraits<typename Vector::ScalarType>::magnitude_type
-dot_r2(const Vector& x, queue &q, buffer<typename Vector::ScalarType,1> &d_xcoefs)
+typename TypeTraits<typename Vector::ScalarType>::magnitude_type
+dot_r2(const Vector& x, sycl::queue &q, const typename Vector::ScalarType *d_xcoefs)
 {
 #ifdef HAVE_MPI
 #ifdef MINIFE_DEBUG
@@ -414,93 +388,81 @@ dot_r2(const Vector& x, queue &q, buffer<typename Vector::ScalarType,1> &d_xcoef
   //}
 
 #ifdef ONEAPI_REDUCTION
-  range<1> gws ((n+255)/256*256);
-  range<1> lws (256);
+  sycl::range<1> gws ((n+255)/256*256);
+  sycl::range<1> lws (256);
 
-  buffer<MINIFE_SCALAR, 1> d_result(&result, 1);
-  d_result.set_final_data(nullptr);
+  MINIFE_SCALAR *d_result = sycl::malloc_device<MINIFE_SCALAR>(1, q);
+  q.memcpy(d_result, &result, sizeof(MINIFE_SCALAR));
 
-  // use Intel-specific reduction
-  q.submit([&] (handler &h) {
-    auto xcoefs_acc = d_xcoefs.template get_access<sycl_read>(h);
-    auto result_acc = d_result.template get_access<sycl_read_write>(h);
-    h.parallel_for<class reduction_kernel>(nd_range<1>(gws, lws), 
-      ext::oneapi::reduction(result_acc, result, std::plus<MINIFE_SCALAR>()),
-      [=] (nd_item<1> item, auto& result_acc) {
+  // use SYCL Reduction
+  q.submit([&] (sycl::handler &h) {
+    h.parallel_for<class reduction_kernel>(sycl::nd_range<1>(gws, lws),
+      sycl::reduction(d_result, result, std::plus<MINIFE_SCALAR>()),
+      [=] (sycl::nd_item<1> item, auto& res) {
       int i = item.get_global_id(0);
-      if (i < n) result_acc += xcoefs_acc[i] * xcoefs_acc[i];
+      if (i < n) res += d_xcoefs[i] * d_xcoefs[i];
     });
   });
-  q.submit([&] (handler &h) {
-    auto result_acc = d_result.template get_access<sycl_read>(h);
-    h.copy(result_acc, &result);
-  });
+  q.memcpy(&result, d_result, sizeof(MINIFE_SCALAR)).wait();
+
 #else
-  // consistent with the reduction in the miniFE-cuda 
+
+  // consistent with the reduction in the miniFE-cuda
   int NWI = std::min(1024, (n+255)/256) * 256;
-  range<1> gws (NWI);
-  range<1> lws (256);
-  buffer<MINIFE_SCALAR, 1> d_sop (1024); // sum-of-product
+  sycl::range<1> gws (NWI);
+  sycl::range<1> lws (256);
+  MINIFE_SCALAR *d_sop = sycl::malloc_device<MINIFE_SCALAR>(1024, q);
+  q.memset(d_sop, 0, sizeof(MINIFE_SCALAR)*1024);
 
-  q.submit([&] (handler &h) {
-    auto d = d_sop.template get_access<sycl_discard_write>(h);
-    h.fill(d, (MINIFE_SCALAR)0);
-  });
-
-  q.submit([&] (handler &h) {
-    auto x = d_xcoefs.template get_access<sycl_read>(h);
-    auto d = d_sop.template get_access<sycl_write>(h);
-    accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
-    h.parallel_for<class xx_dot_kernel>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &h) {
+    sycl::local_accessor<MINIFE_SCALAR, 1> red(lws, h);
+    h.parallel_for<class xx_dot_kernel>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       MINIFE_SCALAR sum = 0;
       int lid = item.get_local_id(0);
       for(int idx=item.get_global_id(0);idx<n;idx+=item.get_group_range(0) * item.get_local_range(0)) {
-        sum+=x[idx]*x[idx];
+        sum+=d_xcoefs[idx] * d_xcoefs[idx];
       }
 
       //Do a shared memory reduction on the dot product
       red[lid]=sum;
 #pragma unroll
       for (int n = 128; n > 0; n = n/2) {
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
       }
 
       //save partial dot products
-      if(lid==0) d[item.get_group(0)]=sum;
+      if(lid==0) d_sop[item.get_group(0)]=sum;
     });
   });
 
-  q.submit([&] (handler &h) {
-    auto d = d_sop.template get_access<sycl_read_write>(h);
-    accessor<MINIFE_SCALAR, 1, sycl_read_write, access::target::local> red(256, h);
-    h.parallel_for<class final_reduce2>(nd_range<1>(lws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &h) {
+    sycl::local_accessor<MINIFE_SCALAR, 1> red(lws, h);
+    h.parallel_for<class final_reduce2>(
+      sycl::nd_range<1>(lws, lws), [=] (sycl::nd_item<1> item) {
       int lid = item.get_local_id(0);
-      MINIFE_SCALAR sum = d[lid];
+      MINIFE_SCALAR sum = d_sop[lid];
       red[lid]=sum;
 #pragma unroll
       for (int n = 128; n > 0; n = n/2) {
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
         if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
       }
         //save final dot product at the front
-      if(lid==0) d[0]=sum;
+      if(lid==0) d_sop[0]=sum;
     });
   });
 
-  q.submit([&] (handler &h) {
-    auto d = d_sop.template get_access<sycl_read>(h, range<1>(1));
-    h.copy(d, &result);
-  });
+  q.memcpy(&result, d_sop, sizeof(MINIFE_SCALAR)).wait();
+  sycl::free(d_sop, q);
 
 #endif
-
-  q.wait();
 
 #ifdef HAVE_MPI
   typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
   magnitude local_dot = result, global_dot = 0;
-  MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
+  MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();
   MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
 
 #ifdef MINIFE_DEBUG

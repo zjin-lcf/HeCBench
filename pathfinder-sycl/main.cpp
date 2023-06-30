@@ -16,7 +16,7 @@
 #include <assert.h>
 #include <iostream>
 #include <sys/time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 // halo width along one direction when advancing to the next iteration
@@ -97,86 +97,78 @@ int main(int argc, char** argv)
   /* printf("pyramidHeight: %d\ngridSize: [%d]\nborder:[%d]\nblockSize: %d\nblockGrid:[%d]\ntargetBlock:[%d]\n",
      pyramid_height, cols, borderCols, NUMBER_THREADS, blockCols, smallBlockCol); */
 
-  int size = rows * cols; // the size (global work size) is a multiple of lws 
+  int size = rows * cols; // the size (global work size) is a multiple of lws
 
-  // running the opencl application shows lws=4000 (cpu) and lws=250 (gpu)
+  // running the opencl application shows block_size=4000 (cpu) and block_size=250 (gpu)
 #ifdef USE_GPU
-  int lws = 250;
+  int block_size = 250;
 #else
-  int lws = 4000;
+  int block_size = 4000;
 #endif
-  cl_int* h_outputBuffer = (cl_int*)calloc(16384, sizeof(cl_int));
+  int* outputBuffer = (int*)calloc(16384, sizeof(int));
   int theHalo = HALO;
 
   double offload_start = get_time();
-  { // SYCL scope
 
 #ifdef USE_GPU
-    gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    const property_list props = property::buffer::use_host_ptr();
-    buffer<int,1> d_gpuWall (data + cols, size-cols, props);
-    buffer<int,1> d_gpuSrc (data, cols, props);
-    buffer<int,1> d_gpuResult (cols);
-    buffer<int,1> d_outputBuffer (h_outputBuffer, 16384, props);
+  int *d_gpuWall = sycl::malloc_device<int>(size-cols, q);
+  q.memcpy(d_gpuWall, data+cols, sizeof(int)*(size-cols));
 
-    d_gpuSrc.set_final_data(nullptr);
-    d_gpuResult.set_final_data(nullptr);
+  int *d_gpuSrc = sycl::malloc_device<int>(cols, q);
+  q.memcpy(d_gpuSrc, data, sizeof(int)*cols);
 
-    double kstart = 0.0;
+  int *d_gpuResult = sycl::malloc_device<int>(cols, q);
+  int *d_outputBuffer = sycl::malloc_device<int>(16384, q);
 
-    for (int t = 0; t < rows - 1; t += pyramid_height)
-    {
-      // exclude host-to-device data transfer in the first iteration
-      if (t == pyramid_height) {
-        q.wait();
-        kstart = get_time();
-      }
+  sycl::range<1> gws(size);
+  sycl::range<1> lws(block_size);
 
-      // Calculate this for the kernel argument...
-      int iteration = MIN(pyramid_height, rows-t-1);
+  q.wait();
+  double kstart = get_time();
 
-      q.submit([&](handler& cgh) {
-        auto gpuWall_acc = d_gpuWall.get_access<sycl_read>(cgh);
-        auto gpuSrc_acc = d_gpuSrc.get_access<sycl_read>(cgh);
-        auto gpuResult_acc = d_gpuResult.get_access<sycl_write>(cgh);
-        auto outputBuffer_acc = d_outputBuffer.get_access<sycl_discard_write>(cgh);
-        accessor <int, 1, sycl_read_write, access::target::local> prev (lws, cgh);
-        accessor <int, 1, sycl_read_write, access::target::local> result (lws, cgh);
+  for (int t = 0; t < rows - 1; t += pyramid_height)
+  {
+    // Calculate this for the kernel argument...
+    int iteration = MIN(pyramid_height, rows-t-1);
 
-        // Set the kernel arguments.
-        cgh.parallel_for<class dynproc_kernel>(
-            nd_range<1>(range<1>(size), range<1>(lws)), [=] (nd_item<1> item) {
-            #include "kernel.sycl"
-        });
+    q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor <int, 1> prev (lws, cgh);
+      sycl::local_accessor <int, 1> result (lws, cgh);
+      // Set the kernel arguments.
+      cgh.parallel_for<class dynproc_kernel>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          #include "kernel.sycl"
       });
+    });
 
-      auto temp = std::move(d_gpuResult) ;
-      d_gpuResult = std::move(d_gpuSrc);
-      d_gpuSrc = std::move(temp);
-    } // for
+    int* temp = d_gpuResult;
+    d_gpuResult = d_gpuSrc;
+    d_gpuSrc = temp;
+  } // for
 
-    q.wait();
-    double kend = get_time();
-    printf("Total kernel execution time: %lf (s)\n", kend - kstart);
+  q.wait();
+  double kend = get_time();
+  printf("Total kernel execution time: %lf (s)\n", kend - kstart);
 
-    // Copy results back to host.
-    q.submit([&](handler& cgh) {
-      auto d_gpuSrc_acc = d_gpuSrc.get_access<sycl_read>(cgh);
-      cgh.copy(d_gpuSrc_acc, result);
-    }).wait();
+  q.memcpy(result, d_gpuSrc, sizeof(int)*cols);
+  q.memcpy(outputBuffer, d_outputBuffer, sizeof(int)*16348);
+  q.wait();
 
-  } // SYCL scope
+  sycl::free(d_gpuResult, q);
+  sycl::free(d_gpuSrc, q);
+  sycl::free(d_gpuWall, q);
+  sycl::free(d_outputBuffer, q);
 
   double offload_end = get_time();
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
 
   // add a null terminator at the end of the string.
-  h_outputBuffer[16383] = '\0';
+  outputBuffer[16383] = '\0';
 
 #ifdef BENCH_PRINT
   for (int i = 0; i < cols; i++)
@@ -191,7 +183,7 @@ int main(int argc, char** argv)
   delete[] data;
   delete[] wall;
   delete[] result;
-  free(h_outputBuffer);
+  free(outputBuffer);
 
   return EXIT_SUCCESS;
 }

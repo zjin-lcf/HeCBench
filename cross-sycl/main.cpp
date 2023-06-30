@@ -3,7 +3,7 @@
 #include <math.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Reference
 // https://pytorch.org/docs/stable/generated/torch.linalg.cross.html#torch.linalg.cross
@@ -19,7 +19,7 @@ class cross3;
 
 template <typename T, typename StrideType>
 void cross_kernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int numel,
           T* out,
     const T* x1,
@@ -52,7 +52,7 @@ void cross_kernel(
 
 template <typename T, typename StrideType>
 void cross2_kernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int numel,
           T* out,
     const T* x1,
@@ -89,7 +89,7 @@ void cross2_kernel(
 
 template <typename T>
 void cross3_kernel(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     int numel,
           T* out,
     const T* x1,
@@ -142,29 +142,28 @@ void eval(const int nrows, const int repeat) {
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   T *d_a, *d_b, *d_o;
-  d_o = malloc_device<T>(num_elems, q);
-  d_a = malloc_device<T>(num_elems, q);
-  d_b = malloc_device<T>(num_elems, q);
+  d_o = sycl::malloc_device<T>(num_elems, q);
+  d_a = sycl::malloc_device<T>(num_elems, q);
+  d_b = sycl::malloc_device<T>(num_elems, q);
 
   q.memcpy(d_a, a, size_bytes);
   q.memcpy(d_b, b, size_bytes);
 
-  range<1> gws ((nrows + 255) / 256 * 256);
-  range<1> lws (256);
+  sycl::range<1> gws ((nrows + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class cross1<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class cross1<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         cross_kernel(item, nrows, d_o, d_a, d_b, 1, 1, 1);
       });
     });
@@ -180,8 +179,8 @@ void eval(const int nrows, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class cross2<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class cross2<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         cross2_kernel(item, nrows, d_o, d_a, d_b, 1, 1, 1);
       });
     });
@@ -197,8 +196,8 @@ void eval(const int nrows, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class cross3<T>>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class cross3<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         cross3_kernel(item, nrows, d_o, d_a, d_b);
       });
     });
@@ -220,9 +219,9 @@ void eval(const int nrows, const int repeat) {
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  free(d_a, q);
-  free(d_b, q);
-  free(d_o, q);
+  sycl::free(d_a, q);
+  sycl::free(d_b, q);
+  sycl::free(d_o, q);
 
   free(a);
   free(b);

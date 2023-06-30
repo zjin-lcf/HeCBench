@@ -4,7 +4,7 @@ void gcrs_m_1_w_4_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 4;
@@ -36,7 +36,7 @@ void gcrs_m_1_w_4_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -44,7 +44,7 @@ void gcrs_m_1_w_4_coding_dotprod(
       result = result ^ ( (((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -57,7 +57,7 @@ void gcrs_m_1_w_5_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 5;
@@ -89,7 +89,7 @@ void gcrs_m_1_w_5_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -97,7 +97,7 @@ void gcrs_m_1_w_5_coding_dotprod(
       result = result ^ ( (((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -110,7 +110,7 @@ void gcrs_m_1_w_6_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 6;
@@ -142,7 +142,7 @@ void gcrs_m_1_w_6_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -150,7 +150,7 @@ void gcrs_m_1_w_6_coding_dotprod(
       result = result ^ ( (((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -163,7 +163,7 @@ void gcrs_m_1_w_7_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 7;
@@ -195,7 +195,7 @@ void gcrs_m_1_w_7_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -203,7 +203,7 @@ void gcrs_m_1_w_7_coding_dotprod(
       result = result ^ ( (((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -216,7 +216,7 @@ void gcrs_m_1_w_8_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 8;
@@ -248,7 +248,7 @@ void gcrs_m_1_w_8_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -256,7 +256,7 @@ void gcrs_m_1_w_8_coding_dotprod(
       result = result ^ ( (((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -269,7 +269,7 @@ void gcrs_m_2_w_4_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 4;
@@ -304,7 +304,7 @@ void gcrs_m_2_w_4_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -314,7 +314,7 @@ void gcrs_m_2_w_4_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -328,7 +328,7 @@ void gcrs_m_2_w_5_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 5;
@@ -363,7 +363,7 @@ void gcrs_m_2_w_5_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -373,7 +373,7 @@ void gcrs_m_2_w_5_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -387,7 +387,7 @@ void gcrs_m_2_w_6_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 6;
@@ -422,7 +422,7 @@ void gcrs_m_2_w_6_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -432,7 +432,7 @@ void gcrs_m_2_w_6_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -446,7 +446,7 @@ void gcrs_m_2_w_7_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 7;
@@ -481,7 +481,7 @@ void gcrs_m_2_w_7_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -491,7 +491,7 @@ void gcrs_m_2_w_7_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -505,7 +505,7 @@ void gcrs_m_2_w_8_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 8;
@@ -540,7 +540,7 @@ void gcrs_m_2_w_8_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -550,7 +550,7 @@ void gcrs_m_2_w_8_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -564,7 +564,7 @@ void gcrs_m_3_w_4_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 4;
@@ -601,7 +601,7 @@ void gcrs_m_3_w_4_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -612,7 +612,7 @@ void gcrs_m_3_w_4_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -627,7 +627,7 @@ void gcrs_m_3_w_5_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 5;
@@ -664,7 +664,7 @@ void gcrs_m_3_w_5_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -675,7 +675,7 @@ void gcrs_m_3_w_5_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -690,7 +690,7 @@ void gcrs_m_3_w_6_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 6;
@@ -727,7 +727,7 @@ void gcrs_m_3_w_6_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -738,7 +738,7 @@ void gcrs_m_3_w_6_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -753,7 +753,7 @@ void gcrs_m_3_w_7_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 7;
@@ -790,7 +790,7 @@ void gcrs_m_3_w_7_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -801,7 +801,7 @@ void gcrs_m_3_w_7_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -816,7 +816,7 @@ void gcrs_m_3_w_8_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 8;
@@ -853,7 +853,7 @@ void gcrs_m_3_w_8_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -864,7 +864,7 @@ void gcrs_m_3_w_8_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -879,7 +879,7 @@ void gcrs_m_4_w_4_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 4;
@@ -916,7 +916,7 @@ void gcrs_m_4_w_4_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -928,7 +928,7 @@ void gcrs_m_4_w_4_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -944,7 +944,7 @@ void gcrs_m_4_w_5_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 5;
@@ -981,7 +981,7 @@ void gcrs_m_4_w_5_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -993,7 +993,7 @@ void gcrs_m_4_w_5_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -1009,7 +1009,7 @@ void gcrs_m_4_w_6_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 6;
@@ -1046,7 +1046,7 @@ void gcrs_m_4_w_6_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -1058,7 +1058,7 @@ void gcrs_m_4_w_6_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -1074,7 +1074,7 @@ void gcrs_m_4_w_7_coding_dotprod(
   long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 7;
@@ -1111,7 +1111,7 @@ void gcrs_m_4_w_7_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -1123,7 +1123,7 @@ void gcrs_m_4_w_7_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 
@@ -1139,7 +1139,7 @@ void gcrs_m_4_w_8_coding_dotprod(
         long *__restrict out, 
   const unsigned int *__restrict bm, 
         long *__restrict shared_data, 
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   int size)
 {
   int w = 8;
@@ -1176,7 +1176,7 @@ void gcrs_m_4_w_8_coding_dotprod(
 
     shared_data[tid] = *(in + i*size + idx);
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
 
 #pragma unroll
     for ( j = 0; j < w; j++ ) {
@@ -1188,7 +1188,7 @@ void gcrs_m_4_w_8_coding_dotprod(
 
       ++index;
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   out[idx] = result[0];
@@ -1198,32 +1198,26 @@ void gcrs_m_4_w_8_coding_dotprod(
 }
 
 void m_1_w_4_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m1_w4_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m1_w4_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_1_w_4_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1232,32 +1226,26 @@ void m_1_w_4_coding(
 }
 
 void m_1_w_5_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m1_w5_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m1_w5_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_1_w_5_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1266,32 +1254,26 @@ void m_1_w_5_coding(
 }
 
 void m_1_w_6_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m1_w6_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m1_w6_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_1_w_6_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1300,32 +1282,26 @@ void m_1_w_6_coding(
 }
 
 void m_1_w_7_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m1_w7_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m1_w7_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_1_w_7_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1334,32 +1310,26 @@ void m_1_w_7_coding(
 }
 
 void m_1_w_8_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m1_w8_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m1_w8_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_1_w_8_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1369,32 +1339,26 @@ void m_1_w_8_coding(
 
 
 void m_2_w_4_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m2_w4_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m2_w4_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_2_w_4_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1403,32 +1367,26 @@ void m_2_w_4_coding(
 }
 
 void m_2_w_5_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m2_w5_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m2_w5_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_2_w_5_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1437,32 +1395,26 @@ void m_2_w_5_coding(
 }
 
 void m_2_w_6_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m2_w6_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m2_w6_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_2_w_6_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1471,32 +1423,26 @@ void m_2_w_6_coding(
 }
 
 void m_2_w_7_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m2_w7_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m2_w7_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_2_w_7_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1506,32 +1452,26 @@ void m_2_w_7_coding(
 
 
 void m_2_w_8_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m2_w8_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m2_w8_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_2_w_8_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1540,32 +1480,26 @@ void m_2_w_8_coding(
 }
 
 void m_3_w_4_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m3_w4_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m3_w4_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_3_w_4_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1574,32 +1508,26 @@ void m_3_w_4_coding(
 }
 
 void m_3_w_5_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m3_w5_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m3_w5_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_3_w_5_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1608,32 +1536,26 @@ void m_3_w_5_coding(
 }
 
 void m_3_w_6_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m3_w6_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m3_w6_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_3_w_6_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1642,32 +1564,26 @@ void m_3_w_6_coding(
 }
 
 void m_3_w_7_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m3_w7_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m3_w7_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_3_w_7_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1676,32 +1592,26 @@ void m_3_w_7_coding(
 }
 
 void m_3_w_8_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m3_w8_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m3_w8_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_3_w_8_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1710,32 +1620,26 @@ void m_3_w_8_coding(
 }
 
 void m_4_w_4_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m4_w4_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m4_w4_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_4_w_4_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1744,32 +1648,26 @@ void m_4_w_4_coding(
 }
 
 void m_4_w_5_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m4_w5_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m4_w5_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_4_w_5_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1778,32 +1676,26 @@ void m_4_w_5_coding(
 }
 
 void m_4_w_6_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m4_w6_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m4_w6_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_4_w_6_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1812,32 +1704,26 @@ void m_4_w_6_coding(
 }
 
 void m_4_w_7_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m4_w7_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m4_w7_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_4_w_7_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1846,32 +1732,26 @@ void m_4_w_7_coding(
 }
 
 void m_4_w_8_coding(
-    queue &q, 
+    sycl::queue &q, 
     int k, int index,
-    buffer<char, 1> &d_data, 
-    buffer<char, 1> &d_code,
-    buffer<unsigned int, 1> &d_bitmatrix,
+    char *d_data, 
+    char *d_code,
+    const unsigned int *d_bitmatrix,
     int threadDimX,
     int blockDimX,
     int workSizePerGridInLong)
 {
-  range<1> gws (blockDimX * threadDimX);
-  range<1> lws (threadDimX);
+  sycl::range<1> gws (blockDimX * threadDimX);
+  sycl::range<1> lws (threadDimX);
   
-  auto d_data_re = d_data.reinterpret<long>(range<1>(d_data.size()/sizeof(long)));
-  auto d_code_re = d_code.reinterpret<long>(range<1>(d_code.size()/sizeof(long)));
-  
-  q.submit([&] (handler &cgh) {
-    auto d = d_data_re.get_access<sycl_read>(cgh); 
-    auto c = d_code_re.get_access<sycl_discard_write>(cgh); 
-    auto bm = d_bitmatrix.get_access<sycl_read>(cgh); 
-    accessor<long, 1, sycl_read_write, access::target::local> sm (threadDimX, cgh);
-    cgh.parallel_for<class m4_w8_dp>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<long, 1> sm (sycl::range<1>(threadDimX), cgh);
+    cgh.parallel_for<class m4_w8_dp>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       gcrs_m_4_w_8_coding_dotprod(k, 
                                   index,
-                                  d.get_pointer(),
-                                  c.get_pointer(),
-                                  bm.get_pointer(),
+                                  (long *)d_data,
+                                  (long *)d_code,
+                                  d_bitmatrix,
                                   sm.get_pointer(),
                                   item,
                                   workSizePerGridInLong);
@@ -1880,11 +1760,11 @@ void m_4_w_8_coding(
 }
 
 void (*coding_func_array[])(
-    queue &q,
+    sycl::queue &q,
     int k, int index,
-    buffer<char, 1> &dataPtr, 
-    buffer<char, 1> &codeDevPtr,
-    buffer<unsigned int, 1> &bitMatrixPtr, 
+    char *dataPtr, 
+    char *codeDevPtr,
+    const unsigned int *bitMatrixPtr, 
     int threadDimX,int blockDimX,
     int workSizePerGridInLong) = {
   m_1_w_4_coding,m_1_w_5_coding,m_1_w_6_coding,m_1_w_7_coding,m_1_w_8_coding,

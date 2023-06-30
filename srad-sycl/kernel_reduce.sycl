@@ -10,8 +10,8 @@ int i;
 // copy data to shared memory
 if(ei<no){                              // do only for the number of elements, omit extra threads
 
-  d_psum[tx] = d_sums_acc[ei*mul];
-  d_psum2[tx] = d_sums2_acc[ei*mul];
+  d_psum[tx] = d_sums[ei*mul];
+  d_psum2[tx] = d_sums2[ei*mul];
 
 }
 
@@ -28,12 +28,12 @@ if(nf == NUMBER_THREADS){
       d_psum2[tx] = d_psum2[tx] + d_psum2[tx-i/2];
     }
     // synchronization
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
   // final sumation by last thread in every block
   if(tx==(NUMBER_THREADS-1)){                      // block result stored in global memory
-    d_sums_acc[bx*mul*NUMBER_THREADS] = d_psum[tx];
-    d_sums2_acc[bx*mul*NUMBER_THREADS] = d_psum2[tx];
+    d_sums[bx*mul*NUMBER_THREADS] = d_psum[tx];
+    d_sums2[bx*mul*NUMBER_THREADS] = d_psum2[tx];
   }
 }
 // reduction of sums if last block is not full (common case)
@@ -48,12 +48,12 @@ else{
         d_psum2[tx] = d_psum2[tx] + d_psum2[tx-i/2];
       }
       // synchronization
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
     }
     // final sumation by last thread in every block
     if(tx==(NUMBER_THREADS-1)){                    // block result stored in global memory
-      d_sums_acc[bx*mul*NUMBER_THREADS] = d_psum[tx];
-      d_sums2_acc[bx*mul*NUMBER_THREADS] = d_psum2[tx];
+      d_sums[bx*mul*NUMBER_THREADS] = d_psum[tx];
+      d_sums2[bx*mul*NUMBER_THREADS] = d_psum2[tx];
     }
   }
   // for not full block (last block)
@@ -72,20 +72,18 @@ else{
         d_psum2[tx] = d_psum2[tx] + d_psum2[tx-i/2];
       }
       // synchronization (all threads)
-      item.barrier(access::fence_space::local_space);
+      item.barrier(sycl::access::fence_space::local_space);
     }
     // remainder / final summation by last thread
     if(tx==(df-1)){                    //
       // compute the remainder and final summation by last busy thread
       for(i=(bx*NUMBER_THREADS)+df; i<(bx*NUMBER_THREADS)+nf; i++){            //
-        d_psum[tx] = d_psum[tx] + d_sums_acc[i];
-        d_psum2[tx] = d_psum2[tx] + d_sums2_acc[i];
+        d_psum[tx] = d_psum[tx] + d_sums[i];
+        d_psum2[tx] = d_psum2[tx] + d_sums2[i];
       }
       // final sumation by last thread in every block
-      d_sums_acc[bx*mul*NUMBER_THREADS] = d_psum[tx];
-      d_sums2_acc[bx*mul*NUMBER_THREADS] = d_psum2[tx];
+      d_sums[bx*mul*NUMBER_THREADS] = d_psum[tx];
+      d_sums2[bx*mul*NUMBER_THREADS] = d_psum2[tx];
     }
   }
 }
-
-

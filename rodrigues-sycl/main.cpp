@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
-void rotate (nd_item<1> &item, const int n, const float angle, const float3 w,
+using float3 = sycl::float3;
+using float4 = sycl::float4;
+
+void rotate (sycl::nd_item<1> &item, const int n, const float angle, const float3 w,
              float3 *d)
 {
   int i = item.get_global_id(0);
@@ -11,7 +14,7 @@ void rotate (nd_item<1> &item, const int n, const float angle, const float3 w,
 
   float s, c;
   s = sycl::sincos(angle, &c);
-  
+
   const float3 p = d[i];
   const float mc = 1.f - c;
 
@@ -19,11 +22,11 @@ void rotate (nd_item<1> &item, const int n, const float angle, const float3 w,
   float m1 = c+(w.x())*(w.x())*(mc);
   float m2 = (w.z())*s+(w.x())*(w.y())*(mc);
   float m3 =-(w.y())*s+(w.x())*(w.z())*(mc);
-  
+
   float m4 =-(w.z())*s+(w.x())*(w.y())*(mc);
   float m5 = c+(w.y())*(w.y())*(mc);
   float m6 = (w.x())*s+(w.y())*(w.z())*(mc);
-  
+
   float m7 = (w.y())*s+(w.x())*(w.z())*(mc);
   float m8 =-(w.x())*s+(w.y())*(w.z())*(mc);
   float m9 = c+(w.z())*(w.z())*(mc);
@@ -34,7 +37,7 @@ void rotate (nd_item<1> &item, const int n, const float angle, const float3 w,
   d[i] = {ox, oy, oz};
 }
 
-void rotate2 (nd_item<1> &item, const int n, const float angle, const float3 w,
+void rotate2 (sycl::nd_item<1> &item, const int n, const float angle, const float3 w,
               float4 *d)
 {
   int i = item.get_global_id(0);
@@ -42,7 +45,7 @@ void rotate2 (nd_item<1> &item, const int n, const float angle, const float3 w,
 
   float s, c;
   s = sycl::sincos(angle, &c);
-  
+
   const float4 p = d[i];
   const float mc = 1.f - c;
 
@@ -50,11 +53,11 @@ void rotate2 (nd_item<1> &item, const int n, const float angle, const float3 w,
   float m1 = c+(w.x())*(w.x())*(mc);
   float m2 = (w.z())*s+(w.x())*(w.y())*(mc);
   float m3 =-(w.y())*s+(w.x())*(w.z())*(mc);
-  
+
   float m4 =-(w.z())*s+(w.x())*(w.y())*(mc);
   float m5 = c+(w.y())*(w.y())*(mc);
   float m6 = (w.x())*s+(w.y())*(w.z())*(mc);
-  
+
   float m7 = (w.y())*s+(w.x())*(w.z())*(mc);
   float m8 =-(w.x())*s+(w.y())*(w.z())*(mc);
   float m9 = c+(w.z())*(w.z())*(mc);
@@ -73,7 +76,7 @@ int main(int argc, char* argv[])
   }
   const int n = atoi(argv[1]);
   const int repeat = atoi(argv[2]);
-    
+
   float3 w = {-0.33f, -0.66, 0.66};
   float angle = 0.5f;
 
@@ -91,27 +94,26 @@ int main(int argc, char* argv[])
   }
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  range<1> gws ((n + 255) / 256 * 256);
-  range<1> lws  (256);
- 
-  float3 *d = malloc_device<float3>(n, q);
+  sycl::range<1> gws ((n + 255) / 256 * 256);
+  sycl::range<1> lws  (256);
+
+  float3 *d = sycl::malloc_device<float3>(n, q);
   q.memcpy(d, h, sizeof(float3) * n);
 
-  float4 *d2 = malloc_device<float4>(n, q);
+  float4 *d2 = sycl::malloc_device<float4>(n, q);
   q.memcpy(d2, h2, sizeof(float4) * n);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class rr>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class rr>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         rotate(item, n, angle, w, d);
       });
     });
@@ -126,8 +128,9 @@ int main(int argc, char* argv[])
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class rr2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class rr2>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         rotate2(item, n, angle, w, d2);
       });
     });
@@ -138,8 +141,8 @@ int main(int argc, char* argv[])
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (float4): %f (us)\n", (time * 1e-3f) / repeat);
 
-  free(d, q);
-  free(d2, q);
+  sycl::free(d, q);
+  sycl::free(d2, q);
   free(h);
   free(h2);
   return 0;

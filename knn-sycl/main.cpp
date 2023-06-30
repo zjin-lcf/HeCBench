@@ -8,11 +8,10 @@
  */
 
 // Includes
-#include <cstdio>
 #include <sys/time.h>
 #include <algorithm>
-#include <time.h>
-#include "common.h"
+#include <cstdio>
+#include <sycl/sycl.hpp>
 
 // Constants used by the program
 #define BLOCK_DIM 16
@@ -34,40 +33,49 @@
  * matrix
   *
   */
-void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
+void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_host,
               int query_width, int height, int k, float *dist_host, int *ind_host) {
 
-  // Allocation of global memory for indexes CUDA_CHECK
-  buffer<float, 1> query_dev (query_host, query_width * height);
-  buffer<float, 1> dist_dev (query_width * ref_width);
-  buffer<int, 1> ind_dev (query_width * k);
-  buffer<float, 1> ref_dev (ref_host, ref_width * height);
+  unsigned int size_of_float = sizeof(float);
+  unsigned int size_of_int = sizeof(int);
+
+  // Allocation of global memory for indexes
+  float *query_dev = sycl::malloc_device<float>(query_width * height, q);
+  q.memcpy(query_dev, query_host, query_width * height * sizeof(float));
+
+  float *dist_dev  = sycl::malloc_device<float>(query_width * ref_width, q);
+
+    int *ind_dev   = sycl::malloc_device<int>(query_width * k, q);
+
+  float *ref_dev   = sycl::malloc_device<float>(ref_width * height, q);
+  q.memcpy(ref_dev, ref_host, ref_width * height * sizeof(float));
 
   // Grids ans threads
-  range<2> g_16x16((ref_width + 15) / 16 * 16, (query_width + 15) / 16 * 16);
-  range<2> t_16x16(16, 16);
+  sycl::range<2> g_16x16((ref_width + 15) / 16 * 16, (query_width + 15) / 16 * 16);
+  sycl::range<2> t_16x16(16, 16);
 
-  range<1> g_256x1((query_width + 255) / 256 * 256);
-  range<1> t_256x1(256);
+  sycl::range<1> g_256x1((query_width + 255) / 256 * 256);
+  sycl::range<1> t_256x1(256);
 
-  range<2> g_k_16x16((k + 15) / 16 * 16, (query_width + 15) / 16 * 16);
-  range<2> t_k_16x16(16, 16);
+  sycl::range<2> g_k_16x16((k + 15) / 16 * 16, (query_width + 15) / 16 * 16);
+  sycl::range<2> t_k_16x16(16, 16);
 
 
   // Kernel 1: Compute all the distances
   //cuComputeDistanceGlobal<<<g_16x16, t_16x16>>>(ref_dev, ref_width, query_dev, query_width, height, dist_dev);
-  q.submit([&] (handler &h) {
-    auto A = ref_dev.get_access<sycl_read>(h);
-    auto B = query_dev.get_access<sycl_read>(h);
-    auto AB = dist_dev.get_access<sycl_write>(h);
-    accessor<float, 2, sycl_read_write, access::target::local> shared_A ({BLOCK_DIM, BLOCK_DIM}, h);
-    accessor<float, 2, sycl_read_write, access::target::local> shared_B ({BLOCK_DIM, BLOCK_DIM}, h);
-    accessor<int, 1, sycl_read_write, access::target::local> begin_A (1, h);
-    accessor<int, 1, sycl_read_write, access::target::local> begin_B (1, h);
-    accessor<int, 1, sycl_read_write, access::target::local> step_A (1, h);
-    accessor<int, 1, sycl_read_write, access::target::local> step_B (1, h);
-    accessor<int, 1, sycl_read_write, access::target::local> end_A (1, h);
-    h.parallel_for<class ComputeDistanceGlobal>(nd_range<2>(g_16x16, t_16x16), [=] (nd_item<2> item) {
+  q.submit([&] (sycl::handler &h) {
+    auto A = ref_dev;
+    auto B = query_dev;
+    auto AB = dist_dev;
+    sycl::local_accessor<float, 2> shared_A (sycl::range<2>{BLOCK_DIM, BLOCK_DIM}, h);
+    sycl::local_accessor<float, 2> shared_B (sycl::range<2>{BLOCK_DIM, BLOCK_DIM}, h);
+    sycl::local_accessor<int, 0> begin_A (h);
+    sycl::local_accessor<int, 0> begin_B (h);
+    sycl::local_accessor<int, 0> step_A (h);
+    sycl::local_accessor<int, 0> step_B (h);
+    sycl::local_accessor<int, 0> end_A (h);
+    h.parallel_for<class ComputeDistanceGlobal>(
+      sycl::nd_range<2>(g_16x16, t_16x16), [=] (sycl::nd_item<2> item) {
       // Thread index
       int tx = item.get_local_id(1);
       int ty = item.get_local_id(0);
@@ -77,23 +85,22 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
       float ssd = 0;
 
       // Loop parameters
-      begin_A[0] = BLOCK_DIM * item.get_group(0);
-      begin_B[0] = BLOCK_DIM * item.get_group(1);
-      step_A[0]  = BLOCK_DIM * ref_width;
-      step_B[0]  = BLOCK_DIM * query_width;
-      end_A[0]   = begin_A[0] + (height - 1) * ref_width;
+      begin_A = BLOCK_DIM * item.get_group(0);
+      begin_B = BLOCK_DIM * item.get_group(1);
+      step_A  = BLOCK_DIM * ref_width;
+      step_B  = BLOCK_DIM * query_width;
+      end_A   = begin_A + (height - 1) * ref_width;
 
       // Conditions
-      int cond0 = (begin_A[0] + tx < ref_width); // used to write in shared memory
-      int cond1 = (begin_B[0] + tx < query_width); // used to write in shared memory & to
+      int cond0 = (begin_A + tx < ref_width); // used to write in shared memory
+      int cond1 = (begin_B + tx < query_width); // used to write in shared memory & to
                                        // computations and to write in output matrix
-      int cond2 =
-          (begin_A[0] + ty < ref_width); // used to computations and to write in output matrix
+      int cond2 = (begin_A + ty < ref_width); // used to computations and to write in output matrix
 
       // Loop over all the sub-matrices of A and B required to compute the block
       // sub-matrix
-      for (int a = begin_A[0], b = begin_B[0]; 
-               a <= end_A[0]; a += step_A[0], b += step_B[0]) {
+      for (int a = begin_A, b = begin_B;
+               a <= end_A; a += step_A, b += step_B) {
         // Load the matrices from device memory to shared memory; each thread loads
         // one element of each matrix
         if (a / ref_width + ty < height) {
@@ -105,7 +112,7 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
         }
 
         // Synchronize to make sure the matrices are loaded
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
 
         // Compute the difference between the two matrixes; each thread computes one
         // element of the block sub-matrix
@@ -118,31 +125,26 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
 
         // Synchronize to make sure that the preceding computation is done before
         // loading two new sub-matrices of A and B in the next iteration
-        item.barrier(access::fence_space::local_space);
+        item.barrier(sycl::access::fence_space::local_space);
       }
 
       // Write the block sub-matrix to device memory; each thread writes one element
       if (cond2 && cond1)
-        AB[(begin_A[0] + ty) * query_width + begin_B[0] + tx] = ssd;
+        AB[(begin_A + ty) * query_width + begin_B + tx] = ssd;
     });
   });
 
 #ifdef DEBUG
-  q.submit([&] (handler &h) {
-    auto AB_h = dist_dev.get_access<sycl_read>(h);
-    h.copy(AB_h, dist_host);
-    });
-  q.wait();
+  q.memcpy(dist_host, dist_dev, query_width * ref_width * size_of_float).wait();
   for (int i = 0; i < query_width * ref_width; i++)
     printf("k1 dist: %d %f\n", i, dist_host[i]);
 #endif
 
   // Kernel 2: Sort each column
   //cuInsertionSort<<<g_256x1, t_256x1>>>(dist_dev, ind_dev, query_width, ref_width, k);
-  q.submit([&] (handler &h) {
-    auto dist = dist_dev.get_access<sycl_read_write>(h);
-    auto ind = ind_dev.get_access<sycl_read_write>(h);
-    h.parallel_for<class insertionSort>(nd_range<1>(g_256x1, t_256x1), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &h) {
+    h.parallel_for<class insertionSort>(
+      sycl::nd_range<1>(g_256x1, t_256x1), [=] (sycl::nd_item<1> item) {
       int l, i, j;
       float *p_dist;
       int *p_ind;
@@ -152,8 +154,8 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
 
       if (xIndex < query_width) {
         // Pointer shift, initialization, and max value
-        p_dist = &dist[xIndex];
-        p_ind = &ind[xIndex];
+        p_dist = &dist_dev[xIndex];
+        p_ind = &ind_dev[xIndex];
         max_dist = p_dist[0];
         p_ind[0] = 0;
 
@@ -207,17 +209,10 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
   });
 
 #ifdef DEBUG
-  q.submit([&] (handler &h) {
-    auto AB_h = dist_dev.get_access<sycl_read>(h);
-    h.copy(AB_h, dist_host);
-    });
-
-  q.submit([&] (handler &h) {
-    auto AB_h = ind_dev.get_access<sycl_read>(h);
-    h.copy(AB_h, ind_host);
-    });
-
+  q.memcpy(dist_host, dist_dev, query_width * ref_width * size_of_float);
+  q.memcpy(ind_host, ind_dev, query_width * k * size_of_int);
   q.wait();
+
   for (int i = 0; i < query_width * ref_width; i++)
     printf("k2 dist: %d %f\n", i, dist_host[i]);
 
@@ -227,27 +222,24 @@ void knn_parallel(queue &q, float *ref_host, int ref_width, float *query_host,
 
   // Kernel 3: Compute square root of k first elements
   //cuParallelSqrt<<<g_k_16x16, t_k_16x16>>>(dist_dev, query_width, k);
-  q.submit([&] (handler &h) {
-    auto dist = dist_dev.get_access<sycl_write>(h);
-    h.parallel_for<class parallelSqrt>(nd_range<2>(g_k_16x16, t_k_16x16), [=] (nd_item<2> item) {
+  q.submit([&] (sycl::handler &h) {
+    h.parallel_for<class parallelSqrt>(
+      sycl::nd_range<2>(g_k_16x16, t_k_16x16), [=] (sycl::nd_item<2> item) {
       unsigned int xIndex = item.get_global_id(1);
       unsigned int yIndex = item.get_global_id(0);
       if (xIndex < query_width && yIndex < k)
-        dist[yIndex * query_width + xIndex] = cl::sycl::sqrt(dist[yIndex * query_width + xIndex]);
+        dist_dev[yIndex * query_width + xIndex] = sycl::sqrt(dist_dev[yIndex * query_width + xIndex]);
     });
   });
 
-  q.submit([&] (handler &h) {
-    auto dist_dev_acc = dist_dev.get_access<sycl_read>(h, range<1>(query_width * k));
-    h.copy(dist_dev_acc, dist_host);
-  });
-
-  q.submit([&] (handler &h) {
-    auto ind_dev_acc = ind_dev.get_access<sycl_read>(h);
-    h.copy(ind_dev_acc, ind_host);
-  });
+  q.memcpy(dist_host, dist_dev, query_width * k * size_of_float);
+  q.memcpy(ind_host, ind_dev, query_width * k * size_of_int);
   q.wait();
 
+  sycl::free(ref_dev, q);
+  sycl::free(ind_dev, q);
+  sycl::free(query_dev, q);
+  sycl::free(dist_dev, q);
 }
 
 float compute_distance(const float *ref, int ref_nb, const float *query,
@@ -399,12 +391,11 @@ int main(int argc, char* argv[]) {
   printf(" done in %f s for %d iterations (%f s by iteration)\n", elapsed_time,
          c_iterations, elapsed_time / (c_iterations));
 
-#ifdef USE_GPU 
-  gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   printf("on GPU: \n");
   gettimeofday(&tic, NULL);

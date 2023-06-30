@@ -34,10 +34,10 @@ bool isValid = IN_RANGE(tx, validXmin, validXmax);
 
 if(IN_RANGE(xidx, 0, cols-1))
 {
-  prev[tx] = gpuSrc_acc[xidx];
+  prev[tx] = d_gpuSrc[xidx];
 }
 
-item.barrier(access::fence_space::local_space);
+item.barrier(sycl::access::fence_space::local_space);
 
 bool computed;
 for (int i = 0; i < iteration; i++)
@@ -54,21 +54,21 @@ for (int i = 0; i < iteration; i++)
     shortest = MIN(shortest, right);
 
     int index = cols*(t+i)+xidx;
-    result[tx] = shortest + gpuWall_acc[index];
+    result[tx] = shortest + d_gpuWall[index];
 
     // ===================================================================
     // add debugging info to the debug output buffer...
     if (tx==11 && i==0)
     {
       // set bufIndex to what value/range of values you want to know.
-      int bufIndex = gpuSrc_acc[xidx];
+      int bufIndex = d_gpuSrc[xidx];
       // dont touch the line below.
-      outputBuffer_acc[bufIndex] = 1;
+      d_outputBuffer[bufIndex] = 1;
     }
     // ===================================================================
   }
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   if(i==iteration-1)
   {
@@ -82,7 +82,7 @@ for (int i = 0; i < iteration; i++)
     //Assign the computation range
     prev[tx] = result[tx];
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 }
 
 // update the global memory
@@ -90,7 +90,7 @@ for (int i = 0; i < iteration; i++)
 // small block perform the calculation and switch on "computed"
 if (computed)
 {
-  gpuResult_acc[xidx] = result[tx];
+  d_gpuResult[xidx] = result[tx];
 }
 
 

@@ -5,18 +5,18 @@
 #include <cstdlib>
 #include <list>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "MD.h"
 #include "reference.h"
 #include "utils.h"
 
 void md (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const POSVECTYPE* __restrict position,
         FORCEVECTYPE* __restrict force,
-  const int* __restrict neighborList, 
+  const int* __restrict neighborList,
   const int nAtom,
-  const int maxNeighbors, 
+  const int maxNeighbors,
   const FPTYPE lj1_t,
   const FPTYPE lj2_t,
   const FPTYPE cutsq_t )
@@ -84,7 +84,7 @@ int main(int argc, char** argv)
   srand(123);
 
   // Notes on positions
-  // When the potential energy becomes exceedingly large as the distance 
+  // When the potential energy becomes exceedingly large as the distance
   // between two atoms is very close, the host and device results may differ significantly
   for (int i = 0; i < nAtom; i++)
   {
@@ -100,30 +100,30 @@ int main(int argc, char** argv)
             << 100.0 * ((double)totalPairs / (nAtom*maxNeighbors)) << " %\n";
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
+  FORCEVECTYPE *d_force = sycl::malloc_device<FORCEVECTYPE>(nAtom, q);
 
-  buffer<FORCEVECTYPE, 1> d_force(nAtom);
-  buffer<POSVECTYPE, 1> d_position(position, nAtom);
-  buffer<int, 1> d_neighborList(neighborList, nAtom * maxNeighbors);
+  POSVECTYPE *d_position = sycl::malloc_device<POSVECTYPE>(nAtom, q);
+  q.memcpy(d_position, position, sizeof(POSVECTYPE) * nAtom);
 
-  range<1> lws (256);
-  range<1> gws ((nAtom + 255) / 256 * 256);
+  int *d_neighborList = sycl::malloc_device<int>(nAtom * maxNeighbors, q);
+  q.memcpy(d_neighborList, neighborList, sizeof(int) * nAtom * maxNeighbors);
+
+  sycl::range<1> lws (256);
+  sycl::range<1> gws ((nAtom + 255) / 256 * 256);
 
   // warmup and result verification
-  q.submit([&](handler& cgh) {
-    auto force = d_force.get_access<sycl_discard_write>(cgh);
-    auto position = d_position.get_access<sycl_read>(cgh);
-    auto neighborList = d_neighborList.get_access<sycl_read>(cgh);
-    cgh.parallel_for<class warmup>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&](sycl::handler& cgh) {
+    cgh.parallel_for<class warmup>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       md(item,
-         position.get_pointer(), 
-         force.get_pointer(), 
-         neighborList.get_pointer(), 
+         d_position,
+         d_force,
+         d_neighborList,
          nAtom,
          maxNeighbors,
          lj1,
@@ -132,10 +132,7 @@ int main(int argc, char** argv)
     });
   });
 
-  q.submit([&](handler& cgh) {
-    auto acc = d_force.get_access<sycl_read>(cgh);
-    cgh.copy(acc, force);
-  }).wait();
+  q.memcpy(force, d_force, nAtom * sizeof(FORCEVECTYPE)).wait();
 
   std::cout << "Performing Correctness Check (may take several minutes)\n";
 
@@ -145,15 +142,13 @@ int main(int argc, char** argv)
 
   for (int i = 0; i < iteration; i++)
   {
-    q.submit([&](handler& cgh) {
-      auto force = d_force.get_access<sycl_discard_write>(cgh);
-      auto position = d_position.get_access<sycl_read>(cgh);
-      auto neighborList = d_neighborList.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class run>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class run>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         md(item,
-           position.get_pointer(), 
-           force.get_pointer(), 
-           neighborList.get_pointer(), 
+           d_position,
+           d_force,
+           d_neighborList,
            nAtom,
            maxNeighbors,
            lj1,
@@ -167,6 +162,10 @@ int main(int argc, char** argv)
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "Average kernel execution time " << (time * 1e-9f) / iteration << " (s)\n";
+
+  sycl::free(d_position, q);
+  sycl::free(d_force, q);
+  sycl::free(d_neighborList, q);
 
   free(position);
   free(force);

@@ -1,11 +1,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 template <int n_threads, int n_elems_per_thread, typename func_t>
 void unfold_backward_elementwise_kernel(int total_n_elems, func_t f,
-                                        const nd_item<1> &item) {
+                                        const sycl::nd_item<1> &item) {
   constexpr int total_work_block = n_threads * n_elems_per_thread;
   int idx = total_work_block * item.get_group(0) + item.get_local_id(0);
   #pragma unroll
@@ -18,15 +18,15 @@ void unfold_backward_elementwise_kernel(int total_n_elems, func_t f,
 }
 
 template <int n_threads, int n_elems_per_thread, typename func_t>
-static void launch_unfold_backward_kernel(queue &q, int total_n_elems, func_t f) {
+static void launch_unfold_backward_kernel(sycl::queue &q, int total_n_elems, func_t f) {
   const int total_work_block = n_threads * n_elems_per_thread;
 
-  range<1> lws (n_threads);
-  range<1> gws ((total_n_elems + total_work_block - 1) /
-                total_work_block * n_threads);
+  sycl::range<1> lws (n_threads);
+  sycl::range<1> gws ((total_n_elems + total_work_block - 1) /
+                      total_work_block * n_threads);
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for(nd_range<1>(gws, lws), [=](nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       unfold_backward_elementwise_kernel
         <n_threads, n_elems_per_thread, func_t>(total_n_elems, f, item);
     });
@@ -35,7 +35,7 @@ static void launch_unfold_backward_kernel(queue &q, int total_n_elems, func_t f)
 
 template <typename scalar_t>
 void unfold_backward_internal_kernel(
-  queue &q,
+  sycl::queue &q,
   scalar_t* __restrict__ grad_out_ptr,
   const scalar_t* __restrict__ grad_in_ptr,
   const int64_t* __restrict__ idx_dim_ptr,
@@ -44,7 +44,7 @@ void unfold_backward_internal_kernel(
   int64_t grad_in_dim_stride,
   int64_t grad_in_last_dim_stride,
   int64_t grad_in_dim_size,
-  int64_t grad_out_dim_stride) 
+  int64_t grad_out_dim_stride)
 {
   // For each index in grad_out find
   // the elements contributing to it and sum them up.
@@ -109,11 +109,10 @@ int main(int argc, char* argv[])
   const int64_t h_idx_dim = 0; // one dimension
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   scalar_t *d_grad_in, *d_grad_out;
   d_grad_in = (scalar_t *)sycl::malloc_device(input_size_bytes, q);
@@ -156,9 +155,9 @@ int main(int argc, char* argv[])
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  free(d_grad_in, q);
-  free(d_grad_out, q);
-  free(d_idx_dim, q);
+  sycl::free(d_grad_in, q);
+  sycl::free(d_grad_out, q);
+  sycl::free(d_idx_dim, q);
 
   free(h_grad_in);
   free(h_grad_out);

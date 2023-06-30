@@ -8,7 +8,6 @@
 #include <sys/time.h>
 #include <iostream>
 #include <vector>
-#include "common.h"
 
 #include "heap.h"
 

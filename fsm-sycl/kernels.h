@@ -1,19 +1,31 @@
 #define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
-static inline void atomicFetchAdd(int& val, const int delta)
+static inline void atomicAdd(int& val, const int delta)
 {
   sycl::atomic_ref<int, 
-    memory_order::relaxed, memory_scope::device, 
-    access::address_space::global_space> ref(val);
+    sycl::memory_order::relaxed, sycl::memory_scope::device, 
+    sycl::access::address_space::global_space> ref(val);
   ref.fetch_add(delta);
 }
 
-static inline void atomicFetchMax(int& val, const int delta)
+static inline void atomicMax(int& val, const int delta)
 {
   sycl::atomic_ref<int,
-    memory_order::relaxed, memory_scope::device, 
-    access::address_space::global_space> ref(val);
+    sycl::memory_order::relaxed, sycl::memory_scope::device, 
+    sycl::access::address_space::global_space> ref(val);
   ref.fetch_max(delta);
+}
+
+inline void atomicCAS(unsigned long long *val,
+                     unsigned long long expected,
+                     unsigned long long desired) 
+{
+  auto expected_value = expected;
+  auto atm = sycl::atomic_ref<unsigned long long,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(*val);
+  atm.compare_exchange_strong(expected_value, desired);
 }
 
 unsigned int LCG_random(unsigned int * seed) {
@@ -32,7 +44,7 @@ void LCG_random_init(unsigned int * seed) {
 }
 
 void FSMKernel(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int length,
   const unsigned short *__restrict data,
   int *__restrict best,
@@ -95,14 +107,14 @@ void FSMKernel(
 
     // determine best FSM
     if (lid == 0) {
-      atomicFetchAdd(best[2], 1);  // increment generation count
+      atomicAdd(best[2], 1);  // increment generation count
       smax[bid] = 0;
       sbest[bid] = 0;
     }
     __syncthreads();
-    atomicFetchMax(smax[bid], length - misses);
+    atomicMax(smax[bid], length - misses);
     __syncthreads();
-    if (length - misses == smax[bid]) atomicFetchMax(sbest[bid], lid);
+    if (length - misses == smax[bid]) atomicMax(sbest[bid], lid);
     __syncthreads();
     bit = 0;
     if (sbest[bid] == lid) {
@@ -140,10 +152,7 @@ void FSMKernel(
     myresult = (myresult << 32) + id;
     current = *((unsigned long long *)best);
     while (myresult > current) {
-      //atomicCAS((unsigned long long *)best, current, myresult);
-      sycl::atomic<unsigned long long, access::address_space::global_space> obj (
-      (sycl::multi_ptr<unsigned long long, access::address_space::global_space>((unsigned long long *)best)));
-      obj.compare_exchange_strong(current, myresult);
+      atomicCAS((unsigned long long *)best, current, myresult);
       current = *((unsigned long long *)best);
     }
     for (i = 0; i < FSMSIZE * 2; i++) {

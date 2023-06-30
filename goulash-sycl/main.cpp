@@ -10,10 +10,10 @@
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "utils.h"
 
-void gate(nd_item<1> &item, double* __restrict m_gate, 
+void gate(sycl::nd_item<1> &item, double* __restrict m_gate, 
           const long nCells, const double* __restrict Vm) 
 {
   long i = item.get_global_id(0);
@@ -71,36 +71,33 @@ int main(int argc, char* argv[])
   if (Vm == NULL) printf ("failed calloc Vm\n");
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  queue q(dev_sel);
-  buffer<double, 1> d_m_gate (m_gate, nCells);
-  buffer<double, 1> d_Vm (Vm, nCells);
-  d_m_gate.set_final_data(nullptr);
+  double *d_m_gate = sycl::malloc_device<double>(nCells, q);
+  q.memcpy(d_m_gate, m_gate, sizeof(double) * nCells);
 
-  range<1> gws ((nCells + 255)/256*256);
-  range<1> lws (256);
+  double *d_Vm = sycl::malloc_device<double>(nCells, q);
+  q.memcpy(d_Vm, Vm, sizeof(double) * nCells);
+
+  sycl::range<1> gws ((nCells + 255)/256*256);
+  sycl::range<1> lws (256);
 
   double kernel_starttime, kernel_endtime, kernel_runtime;
 
   for (long itime=0; itime<=iterations; itime++) {
     /* Start timer after warm-up iteration 0 */
     if (itime == 1) {
-      q.submit([&] (handler &cgh) {
-        auto acc = d_m_gate.get_access<sycl_read>(cgh);
-	cgh.copy(acc, m_gate);
-      }).wait();
+      q.memcpy(m_gate, d_m_gate, sizeof(double) * nCells).wait();
       kernel_starttime = secs_elapsed();
     }
 
-    q.submit([&] (handler &cgh) {
-      auto m_gate = d_m_gate.get_access<sycl_read_write>(cgh);
-      auto Vm = d_Vm.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class mgate>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        gate(item, m_gate.get_pointer(), nCells, Vm.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class mgate>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        gate(item, d_m_gate, nCells, d_Vm);
       });
     });
   }
@@ -109,6 +106,9 @@ int main(int argc, char* argv[])
   kernel_endtime = secs_elapsed();
   kernel_runtime = kernel_endtime-kernel_starttime;
   printf("total kernel time %lf(s) for %ld iterations\n", kernel_runtime, iterations-1);
+
+  sycl::free(d_Vm, q);
+  sycl::free(d_m_gate, q);
 
   // verify
   reference(m_gate_h, nCells, Vm);

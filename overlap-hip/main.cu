@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
          serial_time / nreps);
   printf(" Avg. time when overlapped using %d streams\t: %f ms\n", STREAM_COUNT,
          overlap_time / nreps);
-  printf(" Avg. speedup gained (serialized - overlapped)\t: %f ms\n",
+  printf(" Avg. speedup gained (serialized - overlapped)\t: %f\n",
          (serial_time - overlap_time) / nreps);
 
   printf("\nMeasured throughput:\n");

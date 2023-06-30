@@ -267,7 +267,7 @@ void zoom (sycl::queue &q, int repeat, int input_sizes[4], float zoom_factor[2])
   int H = input_sizes[2];
   int W = input_sizes[3];
 
-  // {N, C, H, W} 
+  // {N, C, H, W}
   int output_sizes[] = {N, C, (int)floor(H * zoom_factor[0]), (int)floor(W * zoom_factor[1])};
 
   bool is_zoom_out = output_sizes[2] < H && output_sizes[3] < W;
@@ -311,7 +311,7 @@ void zoom (sycl::queue &q, int repeat, int input_sizes[4], float zoom_factor[2])
     slice_dims[1][1] = W + half;
   }
 
-  size_t img_size = N * C * H * W; 
+  size_t img_size = N * C * H * W;
   size_t img_size_bytes = sizeof(float) * img_size;
 
   float *input_img = (float*) malloc (img_size_bytes);
@@ -339,9 +339,7 @@ void zoom (sycl::queue &q, int repeat, int input_sizes[4], float zoom_factor[2])
 
     if (is_zoom_in) {
       q.submit([&](sycl::handler &cgh) {
-        sycl::accessor<float, 1,
-                       sycl::access::mode::read_write,
-                       sycl::access::target::local> sm (sycl::range<1>(smem_size), cgh);
+        sycl::local_accessor<float, 1> sm (sycl::range<1>(smem_size), cgh);
 
         auto o_h = output_sizes[2];
         auto o_w = output_sizes[3];
@@ -358,9 +356,7 @@ void zoom (sycl::queue &q, int repeat, int input_sizes[4], float zoom_factor[2])
     }
     else if (is_zoom_out) {
       q.submit([&](sycl::handler &cgh) {
-        sycl::accessor<float, 1,
-                       sycl::access::mode::read_write,
-                       sycl::access::target::local> sm (sycl::range<1>(smem_size), cgh);
+        sycl::local_accessor<float, 1> sm (sycl::range<1>(smem_size), cgh);
 
         auto o_h = output_sizes[2];
         auto o_w = output_sizes[3];
@@ -431,14 +427,13 @@ int main(int argc, char* argv[])
   int repeat = atoi(argv[5]);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order()); 
 
   float zf[2]; // zoom factor
-  
+
   zf[0] = 1.5f; zf[1] = 2.5f;
   zoom(q, repeat, input_sizes, zf);
 

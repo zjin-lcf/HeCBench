@@ -1111,7 +1111,7 @@ __global__ void bonds(inArgsStruct inArgs, resultsStruct results, int n)
   }
 }
 
-void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
+long getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, int numBonds)
 {
   bondsYieldTermStruct* discountCurveGpu;
   bondsYieldTermStruct* repoCurveGpu;
@@ -1165,7 +1165,17 @@ void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, i
   dim3  grid((ceil(((float)numBonds)/((float)256.0f))), 1, 1);
   dim3  threads(256, 1, 1);
 
+  struct timeval start;
+  struct timeval end;
+  gettimeofday(&start, NULL);
+
   bonds <<< dim3(grid), dim3(threads ) >>> (inArgs, results, numBonds);
+
+  hipDeviceSynchronize();
+  gettimeofday(&end, NULL);
+  long seconds  = end.tv_sec  - start.tv_sec;
+  long useconds = end.tv_usec - start.tv_usec;
+  long ktime = seconds * 1e6 + useconds;
 
   hipMemcpy(resultsFromGpu.dirtyPrice, dirtyPriceGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);
   hipMemcpy(resultsFromGpu.accruedAmountCurrDate, accruedAmountCurrDateGpu, numBonds*sizeof(dataType), hipMemcpyDeviceToHost);
@@ -1184,4 +1194,5 @@ void getBondsResultsGpu(inArgsStruct inArgsHost, resultsStruct resultsFromGpu, i
   hipFree(accruedAmountCurrDateGpu);
   hipFree(cleanPriceGpu);
   hipFree(bondForwardValGpu);
+  return ktime;
 }

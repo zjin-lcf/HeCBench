@@ -36,13 +36,8 @@ public:
   void inner_product_1(int, Vector& other, Vector& target, int offset);
   void inner_product_2(int, int, Vector& target);
 
-#ifndef CPU_ONLY
-  buffer<real,1> real_part;
-  buffer<real,1> imag_part;
-#else
   real* real_part;
   real* imag_part;
-#endif
 
 private:
   void initialize_gpu(int n);

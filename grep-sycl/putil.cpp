@@ -5,17 +5,17 @@ inline Frag pfrag(State *, Ptrlist *);
 inline Ptrlist* plist1(State **);
 inline void ppatch(Ptrlist *, State *);
 inline Ptrlist* pappend(Ptrlist *, Ptrlist *);
-inline State* ppost2nfa(char *, State *, int *, State *);
+inline State* ppost2nfa(char *, State *, int &, State *);
 
 
 /* Allocate and initialize State */
 inline State* pstate(int c, State *out, State *out1, 
-    State *lstate, int *pnstate)
+    State *lstate, int &pnstate)
 {
-  State *s = lstate + *pnstate; // assign a state
+  State *s = lstate + pnstate; // assign a state
 
-  s->id = *pnstate;
-  (*pnstate)++;
+  s->id = pnstate;
+  pnstate++;
   s->lastlist = 0;
   s->c = c;
   s->out = out;
@@ -80,8 +80,8 @@ pappend(Ptrlist *l1, Ptrlist *l2)
  * Return start state.
  */
 
-  inline State*
-ppost2nfa(char *postfix, State *lstate, int *pnstate, State *pmatchstate)
+inline State*
+ppost2nfa(char *postfix, State *lstate, int &pnstate, State *pmatchstate)
 {
   char *p;
   Frag stack[1000], *stackp, e1, e2, e;

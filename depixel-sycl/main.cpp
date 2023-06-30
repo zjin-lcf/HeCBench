@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <chrono>
 #include <random>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "kernels.h"
 
 #define nthreads 256
@@ -20,32 +20,31 @@ int main(int argc, char** argv) {
 
   size_t size = width * height;
   size_t size_output_bytes = size * sizeof(uint);
-  size_t size_image_bytes = size * sizeof(float3);
+  size_t size_image_bytes = size * sizeof(sycl::float3);
 
   std::mt19937 gen(19937);
   // reduce the upper bound can increase the kernel execution time of eliminate_crosses
   std::uniform_real_distribution<float> dis(0.f, 0.4f); 
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  float3 *h_img = (float3*) malloc(size_image_bytes);
+  sycl::float3 *h_img = (sycl::float3*) malloc(size_image_bytes);
 
   uint *h_out = (uint*) malloc(size_output_bytes);
 
-  float3 *d_img = sycl::malloc_device<float3>(size, q);
+  sycl::float3 *d_img = sycl::malloc_device<sycl::float3>(size, q);
 
   uint *d_tmp = sycl::malloc_device<uint>(size, q);
 
   uint *d_out = sycl::malloc_device<uint>(size, q);
 
   // assume that size is a multiple of nthreads
-  range<1> gws (size);
-  range<1> lws (nthreads);
+  sycl::range<1> gws (size);
+  sycl::range<1> lws (nthreads);
 
   float sum = 0;
   float total_time = 0;
@@ -58,28 +57,30 @@ int main(int argc, char** argv) {
       h_img[i].z() = dis(gen);
     }
 
+    q.memcpy(d_img, h_img, size_image_bytes).wait();
+
     auto start = std::chrono::steady_clock::now();
 
-    auto e_h2d = q.memcpy(d_img, h_img, size_image_bytes);
-    auto e_k1 = q.submit([&] (handler &cgh) {
-      cgh.depends_on(e_h2d);
-      cgh.parallel_for<class check>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class check>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         check_connect(item, d_img, d_tmp, width, height);
       });
     });
 
-    auto e_k2 = q.submit([&] (handler &cgh) {
-      cgh.depends_on(e_k1);
-      cgh.parallel_for<class remove>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class remove>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         eliminate_crosses(item, d_tmp, d_out, width, height);
       });
     });
   
-    q.memcpy(h_out, d_out, size_output_bytes, e_k2).wait();
-
+    q.wait();
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<float> time = end - start;
     total_time += time.count();
+
+    q.memcpy(h_out, d_out, size_output_bytes).wait();
 
     float lsum = 0;
     for (size_t i = 0; i < size; i++)
@@ -93,7 +94,7 @@ int main(int argc, char** argv) {
 
   printf("Image size: %d (width) x %d (height)\ncheckSum: %f\n",
          width, height, sum);
-  printf("Average device time over %d iterations: %f (s)\n",
+  printf("Average kernel time over %d iterations: %f (s)\n",
          repeat, total_time / repeat);
 
   sycl::free(d_out, q);

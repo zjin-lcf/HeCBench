@@ -4,12 +4,11 @@
 #include <vector>
 
 #include "matrix.h"
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 using std::vector;
 
 template <typename T>
-vector<T> gpu_lanczos_eigen(queue &q, const csr_matrix<T> &matrix,
-    int k, int steps);
+vector<T> gpu_lanczos_eigen(sycl::queue &q, const csr_matrix<T> &matrix, int k, int steps);
 
 #endif

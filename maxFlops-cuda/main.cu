@@ -30,7 +30,6 @@ void test (const int repeat, const int numFloats)
 
   // warmup
   for (int i = 0; i < 4; i++) {
-    memcpyH2D(deviceMem, hostMem, numFloats);
     Add1<T><<< blocks, threads >>>(deviceMem, repeat, 10.0);
     Add2<T><<< blocks, threads >>>(deviceMem, repeat, 10.0);
     Add4<T><<< blocks, threads >>>(deviceMem, repeat, 10.0);
@@ -72,7 +71,6 @@ void test (const int repeat, const int numFloats)
 
   // warmup
   for (int i = 0; i < 4; i++) {
-    memcpyH2D(deviceMem, hostMem, numFloats);
     Mul1<T><<< blocks, threads >>>(deviceMem, repeat, 1.01);
     Mul2<T><<< blocks, threads >>>(deviceMem, repeat, 1.01);
     Mul4<T><<< blocks, threads >>>(deviceMem, repeat, 1.01);
@@ -114,7 +112,6 @@ void test (const int repeat, const int numFloats)
 
   // warmup
   for (int i = 0; i < 4; i++) {
-    memcpyH2D(deviceMem, hostMem, numFloats);
     MAdd1<T><<< blocks, threads >>>(deviceMem, repeat, 10.0, 0.9899);
     MAdd2<T><<< blocks, threads >>>(deviceMem, repeat, 10.0, 0.9899);
     MAdd4<T><<< blocks, threads >>>(deviceMem, repeat, 10.0, 0.9899);
@@ -156,7 +153,6 @@ void test (const int repeat, const int numFloats)
 
   // warmup
   for (int i = 0; i < 4; i++) {
-    memcpyH2D(deviceMem, hostMem, numFloats);
     MulMAdd1<T><<< blocks, threads >>>(deviceMem, repeat, 3.75, 0.355);
     MulMAdd2<T><<< blocks, threads >>>(deviceMem, repeat, 3.75, 0.355);
     MulMAdd4<T><<< blocks, threads >>>(deviceMem, repeat, 3.75, 0.355);

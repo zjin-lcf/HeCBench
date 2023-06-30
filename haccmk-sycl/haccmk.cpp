@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <iostream>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 template <typename T> 
 class HACCmk;
@@ -24,55 +24,48 @@ void haccmk (
           T*__restrict vz2 ) 
 {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  range<1> numOfItems{n};
-  const  property_list props = {property::buffer::use_host_ptr()};
-  buffer<T, 1> buf_xx(xx, ilp, props);
-  buffer<T, 1> buf_yy(yy, ilp, props);
-  buffer<T, 1> buf_zz(zz, ilp, props);
-  buffer<T, 1> buf_mass(mass, ilp, props);
+  T *d_xx = sycl::malloc_device<T>(ilp, q);
+  q.memcpy(d_xx, xx, ilp * sizeof(T));
 
-  buffer<T, 1> buf_vx2(vx2, numOfItems, props);
-  buffer<T, 1> buf_vy2(vy2, numOfItems, props);
-  buffer<T, 1> buf_vz2(vz2, numOfItems, props);
+  T *d_yy = sycl::malloc_device<T>(ilp, q);
+  q.memcpy(d_yy, yy, ilp * sizeof(T));
+
+  T *d_zz = sycl::malloc_device<T>(ilp, q);
+  q.memcpy(d_zz, zz, ilp * sizeof(T));
+
+  T *d_mass = sycl::malloc_device<T>(ilp, q);
+  q.memcpy(d_mass, mass, ilp * sizeof(T));
+
+  T *d_vx2 = sycl::malloc_device<T>(n, q);
+  T *d_vy2 = sycl::malloc_device<T>(n, q);
+  T *d_vz2 = sycl::malloc_device<T>(n, q);
 
   float total_time = 0.f;
 
   for (int i = 0; i < repeat; i++) {
     // reset output
-    q.submit([&](handler& cgh) {
-      auto acc = buf_vx2.template get_access<sycl_discard_write>(cgh);
-      cgh.copy(vx2, acc);
-    });
-
-    q.submit([&](handler& cgh) {
-      auto acc = buf_vy2.template get_access<sycl_discard_write>(cgh);
-      cgh.copy(vy2, acc);
-    });
-
-    q.submit([&](handler& cgh) {
-      auto acc = buf_vz2.template get_access<sycl_discard_write>(cgh);
-      cgh.copy(vz2, acc);
-    });
-
+    q.memcpy(d_vx2, vx2, n * sizeof(T));
+    q.memcpy(d_vy2, vy2, n * sizeof(T));
+    q.memcpy(d_vz2, vz2, n * sizeof(T));
     q.wait();
+
+    sycl::range<1> gws ((n + 255) / 256 * 256);
+    sycl::range<1> lws (256);
+
     auto start = std::chrono::steady_clock::now();
     
-    q.submit([&](handler& cgh) {
-      auto acc_xx     = buf_xx.template get_access<sycl_read>(cgh);
-      auto acc_yy     = buf_yy.template get_access<sycl_read>(cgh);
-      auto acc_zz     = buf_zz.template get_access<sycl_read>(cgh);
-      auto acc_mass   = buf_mass.template get_access<sycl_read>(cgh);
-      auto acc_vx2    = buf_vx2.template get_access<sycl_read_write>(cgh);
-      auto acc_vy2    = buf_vy2.template get_access<sycl_read_write>(cgh);
-      auto acc_vz2    = buf_vz2.template get_access<sycl_read_write>(cgh);
+    q.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class HACCmk<T>>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
 
-      cgh.parallel_for<class HACCmk<T>>(numOfItems, [=](id<1> i) {
+        int i = item.get_global_id(0);
+        if (i >= n) return;
+
         const float ma0 = 0.269327f; 
         const float ma1 = -0.0750978f; 
         const float ma2 = 0.0114808f; 
@@ -86,18 +79,18 @@ void haccmk (
         yi = 0.f;
         zi = 0.f;
 
-        float xxi = acc_xx[i];
-        float yyi = acc_yy[i];
-        float zzi = acc_zz[i];
+        float xxi = d_xx[i];
+        float yyi = d_yy[i];
+        float zzi = d_zz[i];
 
         for ( int j = 0; j < ilp; j++ ) {
-          dxc = acc_xx[j] - xxi;
-          dyc = acc_yy[j] - yyi;
-          dzc = acc_zz[j] - zzi;
+          dxc = d_xx[j] - xxi;
+          dyc = d_yy[j] - yyi;
+          dzc = d_zz[j] - zzi;
 
           r2 = dxc * dxc + dyc * dyc + dzc * dzc;
 
-          if ( r2 < fsrrmax ) m = acc_mass[j]; else m = 0.f;
+          if ( r2 < fsrrmax ) m = d_mass[j]; else m = 0.f;
 
           f = r2 + mp_rsm;
           f = m * ( 1.f / ( f * sycl::sqrt( f ) ) - 
@@ -108,9 +101,9 @@ void haccmk (
           zi = zi + f * dzc;
         }
 
-        acc_vx2[i] = acc_vx2[i] + xi * fcoeff;
-        acc_vy2[i] = acc_vy2[i] + yi * fcoeff;
-        acc_vz2[i] = acc_vz2[i] + zi * fcoeff;
+        d_vx2[i] = d_vx2[i] + xi * fcoeff;
+        d_vy2[i] = d_vy2[i] + yi * fcoeff;
+        d_vz2[i] = d_vz2[i] + zi * fcoeff;
       });
     }).wait();
 
@@ -120,6 +113,19 @@ void haccmk (
   }
 
   printf("Average kernel execution time %f (s)\n", (total_time * 1e-9f) / repeat);
+
+  q.memcpy(vx2, d_vx2, sizeof(T) * n);
+  q.memcpy(vy2, d_vy2, sizeof(T) * n);
+  q.memcpy(vz2, d_vz2, sizeof(T) * n);
+  q.wait();
+
+  sycl::free(d_xx, q);
+  sycl::free(d_yy, q);
+  sycl::free(d_zz, q);
+  sycl::free(d_mass, q);
+  sycl::free(d_vx2, q);
+  sycl::free(d_vy2, q);
+  sycl::free(d_vz2, q);
 }
 
 void haccmk_gold(

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 #define P1 55
 #define P2 119
@@ -136,8 +136,7 @@ void lastEntGPU(uint32_t *__restrict x,
 }
 
 void colsGPU(uint32_t *x, int s, int r, sycl::nd_item<1> &item,
-             const sycl::accessor<uint32_t, 2, sycl::access_mode::read_write,
-                            sycl::access::target::local> &cx) {
+             const sycl::local_accessor<uint32_t, 2> &cx) {
   int lid = item.get_local_id(0);
   int gid = item.get_group(0);
   int dim = item.get_group_range(0);
@@ -181,26 +180,24 @@ void gLFIB4(sycl::queue &q, uint32_t n, uint32_t *x, int s, int r, uint32_t *see
   uint32_t one = 1;
 
   uint32_t *y = sycl::malloc_device<uint32_t>(3 * P4, q);
-  auto e_copy_y = q.memset(y + P4 * 2, 0, P4 * sizeof(uint32_t));
-  e_copy_y = q.memcpy(y + P4 * 2, &one, sizeof(uint32_t), e_copy_y);
+  q.memset(y + P4 * 2, 0, P4 * sizeof(uint32_t));
+  q.memcpy(y + P4 * 2, &one, sizeof(uint32_t));
 
   sycl::range<1> gws (P4);
   sycl::range<1> lws (P4);
 
-  auto e_firstCol = q.submit([&](sycl::handler &cgh) {
-    cgh.depends_on(e_copy_x);
-    sycl::accessor<uint32_t, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local> cx(sycl::range<1>(2 * P4), cgh);
-    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+  q.submit([&](sycl::handler &cgh) {
+    sycl::local_accessor<uint32_t, 1> cx (sycl::range<1>(2 * P4), cgh);
+    cgh.parallel_for<class firstCol>(
+      sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       firstColGPU(x, s, item, cx.get_pointer());
     });
   });
 
-  auto e_colY = q.submit([&](sycl::handler &cgh) {
-    cgh.depends_on(e_copy_y);
-    sycl::accessor<uint32_t, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local> cy(sycl::range<1>(3 * P4), cgh);
-    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+  q.submit([&](sycl::handler &cgh) {
+    sycl::local_accessor<uint32_t, 1> cy (sycl::range<1>(3 * P4), cgh);
+    cgh.parallel_for<class colY>(
+      sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       colYGPU(y, s, item, cy.get_pointer());
     });
   });
@@ -208,19 +205,14 @@ void gLFIB4(sycl::queue &q, uint32_t n, uint32_t *x, int s, int r, uint32_t *see
   sycl::range<1> gws2 (2*P4);
   sycl::range<1> lws2 (2*P4);
 
-  auto e_lastEnt = q.submit([&](sycl::handler &cgh) {
-    cgh.depends_on({e_firstCol, e_colY});
-    sycl::accessor<uint32_t, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local> a0(sycl::range<1>(3 * P4), cgh);
-    sycl::accessor<uint32_t, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local> b0(sycl::range<1>(2 * P4), cgh);
-    sycl::accessor<uint32_t, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local> c0(sycl::range<1>(2 * P4), cgh);
-    sycl::accessor<uint32_t, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local> d0(sycl::range<1>(2 * P4), cgh);
-
-    cgh.parallel_for(sycl::nd_range<1>(gws2, lws2), [=](sycl::nd_item<1> item) {
-      lastEntGPU(x, y, s, r, item, 
+  q.submit([&](sycl::handler &cgh) {
+    sycl::local_accessor<uint32_t, 1> a0 (sycl::range<1>(3 * P4), cgh);
+    sycl::local_accessor<uint32_t, 1> b0 (sycl::range<1>(2 * P4), cgh);
+    sycl::local_accessor<uint32_t, 1> c0 (sycl::range<1>(2 * P4), cgh);
+    sycl::local_accessor<uint32_t, 1> d0 (sycl::range<1>(2 * P4), cgh);
+    cgh.parallel_for<class lastEnt>(
+      sycl::nd_range<1>(gws2, lws2), [=](sycl::nd_item<1> item) {
+      lastEntGPU(x, y, s, r, item,
                  a0.get_pointer(), b0.get_pointer(),
                  c0.get_pointer(), d0.get_pointer());
     });
@@ -228,26 +220,17 @@ void gLFIB4(sycl::queue &q, uint32_t n, uint32_t *x, int s, int r, uint32_t *see
 
   sycl::range<1> gws3 ((r / LKNB + (r % LKNB ? 1 : 0)) * P4);
   q.submit([&](sycl::handler &cgh) {
-    cgh.depends_on(e_lastEnt);
-    sycl::accessor<uint32_t, 2, sycl::access_mode::read_write,
-                   sycl::access::target::local> cx (sycl::range<2>(LKNB, 2 * P4), cgh);
-
-    cgh.parallel_for(sycl::nd_range<1>(gws3, lws), [=](sycl::nd_item<1> item) {
+    sycl::local_accessor<uint32_t, 2> cx (sycl::range<2>(LKNB, 2 * P4), cgh);
+    cgh.parallel_for<class cols>(
+      sycl::nd_range<1>(gws3, lws), [=](sycl::nd_item<1> item) {
       colsGPU(x, s, r, item, cx);
     });
-  }).wait();
+  });
 
   sycl::free(y, q);
 }
 
 int main(int argc, char **argv) {
-
-#ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
-#else
-  sycl::cpu_selector dev_sel;
-#endif
-  sycl::queue q(dev_sel);
 
   if (argc < 1) {
     printf("Usage: ./main <n>\n");
@@ -258,6 +241,12 @@ int main(int argc, char **argv) {
 
   srand(1234);
   uint32_t *x = (uint32_t*) malloc(n * sizeof(uint32_t));
+
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
 
   for (uint32_t r = 16; r <= 4096; r = r * 2) {
 

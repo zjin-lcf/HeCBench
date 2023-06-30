@@ -54,7 +54,7 @@ int main(int argc, const char **argv)
     int **viterbiPathGPU = (int**)malloc(nDevice*sizeof(int*));
     float *viterbiProbCPU = (float*)malloc(nDevice*sizeof(float)); 
     float *viterbiProbGPU = (float*)malloc(nDevice*sizeof(float)); 
-    for (unsigned int iDevice = 0; iDevice < nDevice; iDevice++)
+    for (int iDevice = 0; iDevice < nDevice; iDevice++)
     {
         obs[iDevice] = (int*)malloc(sizeof(int)*nObs);
         for (int i = 0; i < nObs; i++)

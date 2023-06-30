@@ -1,29 +1,29 @@
 /*
    Copyright (c) 2014-2019, Intel Corporation
-   Redistribution and use in source and binary forms, with or without 
-   modification, are permitted provided that the following conditions 
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions
    are met:
- * Redistributions of source code must retain the above copyright 
+ * Redistributions of source code must retain the above copyright
  notice, this list of conditions and the following disclaimer.
- * Redistributions in binary form must reproduce the above 
- copyright notice, this list of conditions and the following 
- disclaimer in the documentation and/or other materials provided 
+ * Redistributions in binary form must reproduce the above
+ copyright notice, this list of conditions and the following
+ disclaimer in the documentation and/or other materials provided
  with the distribution.
- * Neither the name of Intel Corporation nor the names of its 
- contributors may be used to endorse or promote products 
- derived from this software without specific prior written 
+ * Neither the name of Intel Corporation nor the names of its
+ contributors may be used to endorse or promote products
+ derived from this software without specific prior written
  permission.
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
- "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
- LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
- FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE 
- COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
- INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
- BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER 
- CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN 
- ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -38,6 +38,7 @@
 #include <iostream>
 #include <algorithm>
 #include <iterator>
+#include <random>
 #include <vector>
 #include <map>
 #include <cuda.h>
@@ -48,7 +49,7 @@
 #define gpucheck(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
 {
-  if (code != cudaSuccess) 
+  if (code != cudaSuccess)
   {
     fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
     if (abort) exit(code);
@@ -64,18 +65,18 @@ typedef unsigned int uint;
 #undef max
 #endif
 
-/// return a timestamp with sub-second precision 
-/** QueryPerformanceCounter and clock_gettime have an undefined starting point (null/zero)     
- *  and can wrap around, i.e. be nulled again. **/ 
-double seconds() { 
-  struct timespec now;   
-  clock_gettime(CLOCK_MONOTONIC, &now);   
-  return now.tv_sec + now.tv_nsec / 1000000000.0; 
+/// return a timestamp with sub-second precision
+/** QueryPerformanceCounter and clock_gettime have an undefined starting point (null/zero)
+ *  and can wrap around, i.e. be nulled again. **/
+double seconds() {
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return now.tv_sec + now.tv_nsec / 1000000000.0;
 }
 
 
 bool parseArgs(int argc, char** argv, unsigned int* test_iterations, unsigned int* widthReSz, unsigned int* heightReSz)
-{  
+{
   const char sUsageString[512] = "Usage: Quicksort [num test iterations] [SurfWidth(^2 only)] [SurfHeight(^2 only)]";
 
   if (argc != 4)
@@ -138,7 +139,7 @@ void quicksort(T* data, int left, int right)
 
   if (nleft < right) {
     if (right - nleft > 32)  {
-      quicksort(data, nleft, right); 
+      quicksort(data, nleft, right);
     } else {
       std::sort(data + nleft, data + right + 1);
     }
@@ -146,8 +147,8 @@ void quicksort(T* data, int left, int right)
 }
 
 template <class T>
-void gqsort(T *db, 
-    T *dnb, 
+void gqsort(T *db,
+    T *dnb,
     std::vector<block_record<T>>& blocks,
     std::vector<parent_record>& parents,
     std::vector<work_record<T>>& news,
@@ -179,7 +180,7 @@ void gqsort(T *db,
   gpucheck(cudaMemcpy(newsb, news.data(), sizeof(work_record<T>)*news.size(), cudaMemcpyHostToDevice));
 
   gqsort_kernel<<<dim3(blocks.size()), dim3(GQSORT_LOCAL_WORKGROUP_SIZE)>>>(
-      db, dnb, blocksb, parentsb, newsb); 
+      db, dnb, blocksb, parentsb, newsb);
 
   gpucheck( cudaPeekAtLastError() );
   gpucheck( cudaDeviceSynchronize() );
@@ -212,7 +213,7 @@ void lqsort(T *db, T *dnb, std::vector<work_record<T>>& done) {
   beginClock = seconds();
 #endif
   work_record<T>* doneb;
-  //std::cout << "done size is " << done.size() << std::endl; 
+  //std::cout << "done size is " << done.size() << std::endl;
 
   gpucheck(cudaMalloc((void**)&doneb, sizeof(work_record<T>)*done.size()));
   gpucheck(cudaMemcpy(doneb, done.data(), sizeof(work_record<T>)*done.size(), cudaMemcpyHostToDevice));
@@ -309,7 +310,8 @@ void GPUQSort(size_t size, T* d, T* dn)  {
       done.push_back(*it);
   }
 
-  lqsort<T>(db, dnb, done);
+  if (done.size() > 0)
+    lqsort<T>(db, dnb, done);
 
   cudaMemcpy(d, db, ((sizeof(T)*size)/64 + 1)*64, cudaMemcpyDeviceToHost);
   cudaFree(db);
@@ -317,18 +319,18 @@ void GPUQSort(size_t size, T* d, T* dn)  {
 }
 
 template <class T>
-int test(uint arraySize, unsigned int  NUM_ITERATIONS, 
-    const std::string& type_name) 
+int test(uint arraySize, unsigned int  NUM_ITERATIONS,
+         const std::string& type_name)
 {
   double totalTime, quickSortTime, stdSortTime;
   double beginClock, endClock;
 
   printf("\n\n\n--------------------------------------------------------------------\n");
-  printf("Allocating array size of %d\n", arraySize);
+  printf("Allocating array size of %d (data type: %s)\n", arraySize, type_name.c_str());
   T* pArray = (T*)aligned_alloc (4096, ((arraySize*sizeof(T))/64 + 1)*64);
   T* pArrayCopy = (T*)aligned_alloc (4096, ((arraySize*sizeof(T))/64 + 1)*64);
   std::generate(pArray, pArray + arraySize, [](){static T i = 0; return ++i; });
-  std::random_shuffle(pArray, pArray + arraySize);
+  std::shuffle(pArray, pArray + arraySize, std::mt19937(19937));
 
 #ifdef RUN_CPU_SORTS
   std::cout << "Sorting the regular way..." << std::endl;
@@ -422,7 +424,7 @@ int test(uint arraySize, unsigned int  NUM_ITERATIONS,
   AverageTime = AverageTime/NUM_ITERATIONS;
   std::cout << "Average Time: " << AverageTime * 1000 << " ms" << std::endl;
   double stdDev = 0.0, minTime = 1000000.0, maxTime = 0.0;
-  for(uint k = 0; k < NUM_ITERATIONS; k++) 
+  for(uint k = 0; k < NUM_ITERATIONS; k++)
   {
     stdDev += (AverageTime - times[k])*(AverageTime - times[k]);
     minTime = std::min(minTime, times[k]);

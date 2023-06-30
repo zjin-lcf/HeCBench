@@ -73,7 +73,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #ifndef RCBForceTree_h
 #define RCBForceTree_h
 
-#include <CL/sycl.hpp>
 #include "BasicDefinition.h"
 #include "ForceLaw.h"
 #include "bigchunk.h"
@@ -81,6 +80,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <sycl/sycl.hpp>
 
 // The number of points used for the pseudo-particle t-design.
 #define QUADRUPOLE_TDPTS 12 // 14

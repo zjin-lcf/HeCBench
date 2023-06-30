@@ -4,6 +4,7 @@
 
 # Compiler can be set below, or via environment variable
 CC        = mpiicpc
+CXX       = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 
@@ -29,10 +30,11 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -cxx=clang++ -std=c++17 -Wall -I../include -I${MKLROOT}/include -DMKL_ILP64 
+CFLAGS := $(EXTRA_CFLAGS) -cxx=${CXX} -std=c++17 -Wall \
+          -fsycl -I${MKLROOT}/include -DMKL_ILP64 
 
 # Linker Flags
-LDFLAGS = ${MKLROOT}/lib/intel64/libmkl_sycl.a \
+LDFLAGS = -fsycl ${MKLROOT}/lib/intel64/libmkl_sycl.a \
           -fsycl-device-code-split=per_kernel \
           -Wl,-export-dynamic -Wl,--start-group \
           ${MKLROOT}/lib/intel64/libmkl_intel_ilp64.a \
@@ -41,7 +43,7 @@ LDFLAGS = ${MKLROOT}/lib/intel64/libmkl_sycl.a \
           -Wl,--end-group -ltbb -lsycl -lOpenCL -lpthread -lm -ldl 
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif

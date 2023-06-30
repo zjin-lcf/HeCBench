@@ -2,7 +2,7 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 //
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "cuda/CudaUtils.dp.hpp"
 #include "cuda/DeviceTensor.dp.hpp"
 #include "cuda/NumericLimits.dp.hpp"

@@ -44,7 +44,7 @@ June 2018.
 #include <stdio.h>
 #include <set>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "graph.h"
 
 static const int ThreadsPerBlock = 256;
@@ -53,23 +53,30 @@ static const int ThreadsPerBlock = 256;
 #define WARPSIZE 32
 #endif
 
-template <typename T, access::address_space 
-          addressSpace = access::address_space::global_space>
-T atomicCAS(
-    T *addr, T expected, T desired,
-    memory_order success = memory_order::relaxed,
-    memory_order fail = memory_order::relaxed)
+inline int atomicCAS(int &val, int expected, int desired) 
 {
-  // add a pair of parentheses to declare a variable
-  atomic<T, addressSpace> obj((multi_ptr<T, addressSpace>(addr)));
-  obj.compare_exchange_strong(expected, desired, success, fail);
-  return expected;
+  int expected_value = expected;
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(val);
+  atm.compare_exchange_strong(expected_value, desired);
+  return expected_value;
+}
+
+inline int atomicAdd(int *val, int operand) 
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(*val);
+  return atm.fetch_add(operand);
 }
 
 /* initialize with first smaller neighbor ID */
 
 static 
-void init(nd_item<1> &item,
+void init(sycl::nd_item<1> &item,
           const int nodes,
           const int* const __restrict nidx,
           const int* const __restrict nlist,
@@ -116,7 +123,7 @@ static inline int representative(const int idx, int* const __restrict nstat)
 /* process low-degree vertices at thread granularity and fill worklists */
 
 static 
-void compute1(nd_item<1> &item,
+void compute1(sycl::nd_item<1> &item,
               const int nodes,
               const int* const __restrict nidx,
               const int* const __restrict nlist,
@@ -137,9 +144,9 @@ void compute1(nd_item<1> &item,
       if (deg > 16) {
         int idx;
         if (deg <= 352) {
-          idx = sycl::atomic<int>(sycl::global_ptr<int>(topL)).fetch_add(1);
+          idx = atomicAdd(topL, 1);
         } else {
-          idx = sycl::atomic<int>(sycl::global_ptr<int>(topH)).fetch_add(-1);
+          idx = atomicAdd(topH, -1);
         }
         wl[idx] = v;
       } else {
@@ -154,13 +161,12 @@ void compute1(nd_item<1> &item,
               if (vstat != ostat) {
                 int ret;
                 if (vstat < ostat) {
-                  if ((ret = atomicCAS(
-                           &nstat[ostat], ostat, vstat)) != ostat) {
+                  if ((ret = atomicCAS(nstat[ostat], ostat, vstat)) != ostat) {
                     ostat = ret;
                     repeat = true;
                   }
                 } else {
-                  if ((ret = atomicCAS(&nstat[vstat], vstat, ostat)) != vstat) {
+                  if ((ret = atomicCAS(nstat[vstat], vstat, ostat)) != vstat) {
                     vstat = ret;
                     repeat = true;
                   }
@@ -177,7 +183,7 @@ void compute1(nd_item<1> &item,
 /* process medium-degree vertices at warp granularity */
 
 static 
-void compute2(nd_item<1> &item,
+void compute2(sycl::nd_item<1> &item,
               const int nodes,
               const int* const __restrict nidx,
               const int* const __restrict nlist,
@@ -189,7 +195,7 @@ void compute2(nd_item<1> &item,
   const int lane = item.get_local_id(0) % WARPSIZE;
 
   int idx;
-  if (lane == 0) idx = sycl::atomic<int>(sycl::global_ptr<int>(posL)).fetch_add(1);
+  if (lane == 0) idx = atomicAdd(posL, 1);
   idx = sycl::select_from_group(item.get_sub_group(), idx, 0);
   while (idx < *topL) {
     const int v = wl[idx];
@@ -204,12 +210,12 @@ void compute2(nd_item<1> &item,
           if (vstat != ostat) {
             int ret;
             if (vstat < ostat) {
-              if ((ret = atomicCAS(&nstat[ostat], ostat, vstat)) != ostat) {
+              if ((ret = atomicCAS(nstat[ostat], ostat, vstat)) != ostat) {
                 ostat = ret;
                 repeat = true;
               }
             } else {
-              if ((ret = atomicCAS(&nstat[vstat], vstat, ostat)) != vstat) {
+              if ((ret = atomicCAS(nstat[vstat], vstat, ostat)) != vstat) {
                 vstat = ret;
                 repeat = true;
               }
@@ -218,7 +224,7 @@ void compute2(nd_item<1> &item,
         } while (repeat);
       }
     }
-    if (lane == 0) idx = sycl::atomic<int>(sycl::global_ptr<int>(posL)).fetch_add(1);
+    if (lane == 0) idx = atomicAdd(posL, 1);
     idx = sycl::select_from_group(item.get_sub_group(), idx, 0);
   }
 }
@@ -226,7 +232,7 @@ void compute2(nd_item<1> &item,
 /* process high-degree vertices at block granularity */
 
 static 
-void compute3(nd_item<1> &item,
+void compute3(sycl::nd_item<1> &item,
               const int nodes,
               const int* const __restrict nidx,
               const int* const __restrict nlist,
@@ -234,18 +240,18 @@ void compute3(nd_item<1> &item,
               const int* const __restrict wl,
               const int* const __restrict topH,
                     int* const __restrict posH,
-                    int* const __restrict vB)
+                    int& vB)
 {
 
   if (item.get_local_id(0) == 0) {
-    const int idx = sycl::atomic<int>(sycl::global_ptr<int>(posH)).fetch_add(-1);
-    *vB = (idx > *topH) ? wl[idx] : -1;
+    const int idx = atomicAdd(posH, -1);
+    vB = (idx > *topH) ? wl[idx] : -1;
   }
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
-  while (*vB >= 0) {
-    const int v = (*vB);
-    item.barrier(access::fence_space::local_space);
+  while (vB >= 0) {
+    const int v = (vB);
+    item.barrier(sycl::access::fence_space::local_space);
 
     int vstat = representative(v, nstat);
     for (int i = nidx[v] + item.get_local_id(0); i < nidx[v + 1];
@@ -259,12 +265,12 @@ void compute3(nd_item<1> &item,
           if (vstat != ostat) {
             int ret;
             if (vstat < ostat) {
-              if ((ret = atomicCAS(&nstat[ostat], ostat, vstat)) != ostat) {
+              if ((ret = atomicCAS(nstat[ostat], ostat, vstat)) != ostat) {
                 ostat = ret;
                 repeat = true;
               }
             } else {
-              if ((ret = atomicCAS(&nstat[vstat], vstat, ostat)) != vstat) {
+              if ((ret = atomicCAS(nstat[vstat], vstat, ostat)) != vstat) {
                 vstat = ret;
                 repeat = true;
               }
@@ -274,18 +280,18 @@ void compute3(nd_item<1> &item,
       }
     }
     if (item.get_local_id(0) == 0) {
-      const int idx = sycl::atomic<int>(sycl::global_ptr<int>(posH)).fetch_add(-1);
-      *vB = (idx > *topH) ? wl[idx] : -1;
+      const int idx = atomicAdd(posH, -1);
+      vB = (idx > *topH) ? wl[idx] : -1;
     }
 
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 }
 
 /* link all vertices to sink */
 
 static 
-void flatten(nd_item<1> &item,
+void flatten(sycl::nd_item<1> &item,
              const int nodes,
              const int* const __restrict nidx,
              const int* const __restrict nlist,
@@ -311,13 +317,12 @@ static void computeCC(const int repeat,
                             int *const __restrict nstat) 
 {
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  const int SMs = q.get_device().get_info<info::device::max_compute_units>();
+  const int SMs = q.get_device().get_info<sycl::info::device::max_compute_units>();
   // not supported by SYCL yet
   const int mTSM = 2048;
   const int blocks = SMs * mTSM / ThreadsPerBlock;
@@ -325,89 +330,67 @@ static void computeCC(const int repeat,
   printf("Max threads per multiprocessor = %d\n", mTSM);
   printf("Number of thread blocks in a grid = %d\n", blocks);
 
-  buffer<int, 1> topL_d (1);
-  buffer<int, 1> posL_d (1);
-  buffer<int, 1> topH_d (1);
-  buffer<int, 1> posH_d (1);
-  buffer<int, 1> nidx_d (nidx, nodes + 1);
-  buffer<int, 1> nlist_d (nlist, edges);
-  buffer<int, 1> nstat_d (nstat, nodes);
-  buffer<int, 1> wl_d (nodes);
+  int *topL_d = sycl::malloc_device<int>(1, q);
+  int *posL_d = sycl::malloc_device<int>(1, q);
+  int *topH_d = sycl::malloc_device<int>(1, q);
+  int *posH_d = sycl::malloc_device<int>(1, q);
 
-  range<1> gws (blocks * ThreadsPerBlock);
-  range<1> lws (ThreadsPerBlock);
+  int *nidx_d = sycl::malloc_device<int>(nodes+1, q);
+  q.memcpy(nidx_d, nidx, (nodes + 1) * sizeof(int));
+
+  int *nlist_d = sycl::malloc_device<int>(edges, q);
+  q.memcpy(nlist_d, nlist, edges * sizeof(int));
+
+  int *nstat_d = sycl::malloc_device<int>(nodes, q);
+
+  int *wl_d = sycl::malloc_device<int>(nodes, q);
+
+  sycl::range<1> gws (blocks * ThreadsPerBlock);
+  sycl::range<1> lws (ThreadsPerBlock);
 
   q.wait();
 
   auto start = std::chrono::high_resolution_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&] (handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist_d.get_access<sycl_read>(cgh);
-      auto nstat = nstat_d.get_access<sycl_discard_write>(cgh);
-      auto topL = topL_d.get_access<sycl_write>(cgh);
-      auto topH = topH_d.get_access<sycl_write>(cgh);
-      auto posL = posL_d.get_access<sycl_write>(cgh);
-      auto posH = posH_d.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class initialize>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        init(item, nodes, nidx.get_pointer(), nlist.get_pointer(), nstat.get_pointer(), 
-             topL.get_pointer(), posL.get_pointer(),
-             topH.get_pointer(), posH.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class initialize>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        init(item, nodes, nidx_d, nlist_d, nstat_d, 
+             topL_d, posL_d, topH_d, posH_d);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist_d.get_access<sycl_read>(cgh);
-      auto nstat = nstat_d.get_access<sycl_read_write>(cgh);
-      auto wl = wl_d.get_access<sycl_write>(cgh);
-      auto topL = topL_d.get_access<sycl_read_write>(cgh);
-      auto topH = topH_d.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class compute_low>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        compute1(item, nodes, nidx.get_pointer(), nlist.get_pointer(), 
-                 nstat.get_pointer(), wl.get_pointer(),
-                 topL.get_pointer(), topH.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class compute_low>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        compute1(item, nodes, nidx_d, nlist_d, 
+                 nstat_d, wl_d, topL_d, topH_d);
       });
     });
 
-    q.submit([&](handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist_d.get_access<sycl_read>(cgh);
-      auto nstat = nstat_d.get_access<sycl_read_write>(cgh);
-      auto wl = wl_d.get_access<sycl_read>(cgh);
-      auto topL = topL_d.get_access<sycl_read>(cgh);
-      auto posL = posL_d.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class compute_med>(nd_range<1>(gws, lws), [=] (nd_item<1> item)
-          [[intel::reqd_sub_group_size(WARPSIZE)]] {
-        compute2(item, nodes, nidx.get_pointer(), nlist.get_pointer(),
-                 nstat.get_pointer(), wl.get_pointer(),
-                 topL.get_pointer(), posL.get_pointer());
+    q.submit([&](sycl::handler &cgh) {
+      cgh.parallel_for<class compute_med>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
+          [[sycl::reqd_sub_group_size(WARPSIZE)]] {
+        compute2(item, nodes, nidx_d, nlist_d,
+                 nstat_d, wl_d, topL_d, posL_d);
       });
     });
 
-    q.submit([&](handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist_d.get_access<sycl_read>(cgh);
-      auto nstat = nstat_d.get_access<sycl_read_write>(cgh);
-      auto wl = wl_d.get_access<sycl_read>(cgh);
-      auto topH = topH_d.get_access<sycl_read>(cgh);
-      auto posH = posH_d.get_access<sycl_read_write>(cgh);
-      accessor<int, 1, sycl_read_write, access::target::local> vB (1, cgh);
-      cgh.parallel_for<class compute_high>(nd_range<1>(gws, lws), [=] (nd_item<1> item)
-          [[intel::reqd_sub_group_size(WARPSIZE)]] {
-        compute3(item, nodes, nidx.get_pointer(), nlist.get_pointer(),
-                 nstat.get_pointer(), wl.get_pointer(),
-                 topH.get_pointer(), posH.get_pointer(), vB.get_pointer());
+    q.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<int, 0> vB (cgh);
+      cgh.parallel_for<class compute_high>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        compute3(item, nodes, nidx_d, nlist_d,
+                 nstat_d, wl_d, topH_d, posH_d, vB);
       });
     });
 
-    q.submit([&](handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist_d.get_access<sycl_read>(cgh);
-      auto nstat = nstat_d.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class link>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-        flatten(item, nodes, nidx.get_pointer(), nlist.get_pointer(), nstat.get_pointer());
+    q.submit([&](sycl::handler &cgh) {
+      cgh.parallel_for<class link>(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        flatten(item, nodes, nidx_d, nlist_d, nstat_d);
       });
     });
   }
@@ -421,6 +404,16 @@ static void computeCC(const int repeat,
   printf("compute time: %.4f s\n", runtime);
   printf("throughput: %.3f Mnodes/s\n", nodes * 0.000001 / runtime);
   printf("throughput: %.3f Medges/s\n", edges * 0.000001 / runtime);
+
+  q.memcpy(nstat, nstat_d, nodes * sizeof(int)).wait();
+  sycl::free(wl_d, q);
+  sycl::free(nstat_d, q);
+  sycl::free(nlist_d, q);
+  sycl::free(nidx_d, q);
+  sycl::free(topL_d, q);
+  sycl::free(posL_d, q);
+  sycl::free(topH_d, q);
+  sycl::free(posH_d, q);
 }
 
 static void verify(const int v, const int id, const int* const __restrict nidx, 

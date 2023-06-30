@@ -1255,11 +1255,9 @@ void gen_grid_kern_r2049(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
 
     int threads_per_block = 512;
   stream->submit([&](sycl::handler &cgh) {
-    sycl::accessor<K, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local>
+    sycl::local_accessor<K, 1>
         smem_acc_ct1(sycl::range<1>(2048), cgh);
-    sycl::accessor<int, 1, sycl::access_mode::read_write,
-                   sycl::access::target::local>
+    sycl::local_accessor<int, 1>
         tmem_acc_ct1(sycl::range<1>(2048), cgh);
 
     cgh.parallel_for(
@@ -1284,8 +1282,7 @@ void gen_grid_kern_r2049(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
         stride <<= 1)
     {
     stream->submit([&](sycl::handler &cgh) {
-      sycl::accessor<K, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local>
+      sycl::local_accessor<K, 1>
           smem_acc_ct1(sycl::range<1>(2048 /*128*16*/), cgh);
 
       cgh.parallel_for(

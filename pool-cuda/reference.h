@@ -1,3 +1,5 @@
+#include <algorithm> // max/min
+
 template <typename PoolProcess, typename T>
 void reference(
     const int nthreads,
@@ -37,8 +39,8 @@ void reference(
 
     int phstart = (h_offset < ksize_height) ? 0 : (h_offset - ksize_height) / stride_height + 1;
     int pwstart = (w_offset < ksize_width) ? 0 : (w_offset - ksize_width) / stride_width + 1;
-    int phend = min(h_offset / stride_height + 1, output_height);
-    int pwend = min(w_offset / stride_width + 1, output_width);
+    int phend = std::min(h_offset / stride_height + 1, output_height);
+    int pwend = std::min(w_offset / stride_width + 1, output_width);
 
     // initial gradient value
     T gradient = static_cast<T>(0.0);
@@ -59,10 +61,10 @@ void reference(
         int pool_size;
         int hstart = ph * stride_height - padding_height;
         int wstart = pw * stride_width - padding_width;
-        int hend = min(hstart + ksize_height, input_height);
-        int wend = min(wstart + ksize_width, input_width);
-        hstart = max(hstart, 0);
-        wstart = max(wstart, 0);
+        int hend = std::min(hstart + ksize_height, input_height);
+        int wend = std::min(wstart + ksize_width, input_width);
+        hstart = std::max(hstart, 0);
+        wstart = std::max(wstart, 0);
         pool_size = exclusive ? (hend - hstart) * (wend - wstart)
           : ksize_height * ksize_width;
 
