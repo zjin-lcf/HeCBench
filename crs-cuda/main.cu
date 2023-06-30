@@ -2,11 +2,9 @@
 //  Copyright (c) 2017 csliu. All rights reserved.
 //
 
-#include <sys/time.h>
 #include <cuda.h>
 #include "GCRSMatrix.h"
 #include "utils.h"
-
 #include "kernels.cu"
 
 int main(int argc, const char * argv[]) {
