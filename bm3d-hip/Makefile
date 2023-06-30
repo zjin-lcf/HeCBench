@@ -25,7 +25,7 @@ obj = $(source:.cu=.o)
 CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../bm3d-cuda
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = -lpthread
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
