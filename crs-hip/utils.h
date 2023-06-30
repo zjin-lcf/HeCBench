@@ -1,8 +1,10 @@
 #ifndef __UTILS
 #define __UTILS
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <hip/hip_runtime.h>
 
 size_t align_value(size_t valueToAlign, size_t alignMask);
