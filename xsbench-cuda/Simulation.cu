@@ -178,14 +178,18 @@ run_event_based_simulation(Inputs in, SimulationData SD,
   cudaMalloc((void**)&index_grid_d, sizeof(int) * (unsigned long long)SD.length_index_grid);
   cudaMemcpy(index_grid_d, SD.index_grid, sizeof(int) * (unsigned long long )SD.length_index_grid, cudaMemcpyHostToDevice);
 
+  cudaDeviceSynchronize();
+
   ////////////////////////////////////////////////////////////////////////////////
   // Define Device Kernel
   ////////////////////////////////////////////////////////////////////////////////
-  cudaDeviceSynchronize();
+  dim3 grids  ((in.lookups + 255) / 256);
+  dim3 blocks (256);
+
   double kstart = get_time();
 
   for (int i = 0; i < in.kernel_repeat; i++) { 
-    lookup<<< dim3((in.lookups + 255) / 256), dim3(256) >>> (
+    lookup<<< grids, blocks >>> (
         num_nucs_d, concs_d, mats_d, 
         nuclide_grid_d, verification_d, unionized_energy_array_d,
         index_grid_d, in.lookups, in.n_isotopes, in.n_gridpoints, 
