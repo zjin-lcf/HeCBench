@@ -7,7 +7,6 @@
 #ifndef _GSIMULATION_HPP
 #define _GSIMULATION_HPP
 
-#include <CL/sycl.hpp>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -16,6 +15,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <sycl/sycl.hpp>
 
 #include "Particle.hpp"
 
