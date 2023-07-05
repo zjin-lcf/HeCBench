@@ -1,5 +1,3 @@
-#include <CL/sycl.hpp>
-
 #define IDX(x, y, z, nx, ny, nz)    ((x + (nx))%(nx) + ((y + (ny))%(ny) + ((z + (nz))%(nz))*(ny))*(nx))
 #define IDF(x, y, z, f, nx, ny, nz) ((x + (nx))%(nx) + ((y + (ny))%(ny) + ((z + (nz))%(nz))*(ny))*(nx)) + (f)*(nx)*(ny)*(nz)
 #define IBAR(i,nbdir) ((((i) + (nbdir)/2 - 1)%((nbdir) - 1) + 1))
