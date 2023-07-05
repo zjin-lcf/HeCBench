@@ -2,16 +2,11 @@
 # User Options
 #===============================================================================
 
-# Compiler can be set below, or via environment variable
-ifeq ($(VENDOR), codeplay)
-CC        = compute++
-else
 CC        = clang++
-endif
-
 OPTIMIZE  = yes
 DEBUG     = no
 
+SYCL      = yes
 GPU       = yes
 CUDA      = no
 CUDA_ARCH = sm_70
@@ -23,32 +18,26 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 # Program name & source code list
 #===============================================================================
 
+program = main
+
+source = main.cpp
+
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include
-
-ifeq ($(VENDOR), codeplay)
-CFLAGS += -I$(HOME)/computecpp/ComputeCpp-CE-2.7.0-x86_64-linux-gnu/include/ \
-          -no-serial-memop -sycl -sycl-driver
-else
-CFLAGS += -fsycl
-endif
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl \
+          --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 # Linker Flags
 LDFLAGS = 
 
-ifeq ($(VENDOR), codeplay)
-LDFLAGS += -lComputeCpp
-endif
-
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
 endif
 
 ifeq ($(HIP), yes)
@@ -70,60 +59,28 @@ endif
 ifeq ($(GPU),yes)
   CFLAGS +=-DUSE_GPU
 endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-./myocyte.out:./main.o \
-              ./kernel/kernel_wrapper.o \
-              ./util/file/file.o \
-              ./util/num/num.o
-	$(CC) $(CFLAGS)	./main.o \
-		./kernel/kernel_wrapper.o \
-		./util/file/file.o \
-		./util/num/num.o \
-		$(LDFLAGS) \
-		-o myocyte.out
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-./main.o:./common.h ./main.c
-	$(CC) $(CFLAGS)	./main.c \
-		-c \
-		-o ./main.o 
-
-./kernel/kernel_wrapper.o:./common.h \
-	./kernel/kernel_wrapper.h \
-	./kernel/kernel_wrapper.c \
-	./kernel/solver.c \
-	./kernel/embedded_fehlberg_7_8.c \
-	./kernel/master.c \
-	./kernel/kernel_cam.sycl \
-	./kernel/kernel_ecc.sycl
-	$(CC) $(CFLAGS)	./kernel/kernel_wrapper.c \
-		-c \
-		-o ./kernel/kernel_wrapper.o 
-
-./util/file/file.o:./common.h \
-	./util/file/file.h \
-	./util/file/file.c
-	$(CC)	./util/file/file.c \
-		-c \
-		-o ./util/file/file.o \
-		-O3
-
-./util/num/num.o:./common.h \
-	./util/num/num.h \
-	./util/num/num.c
-	$(CC)	./util/num/num.c \
-		-c \
-		-o ./util/num/num.o \
-		-O3
+%.o: %.cpp work.cpp \
+	solver.cpp \
+	embedded_fehlberg_7_8.cpp \
+	master.cpp \
+	kernel.cpp \
+	kernel_ecc.cpp \
+	kernel_cam.cpp \
+	kernel_fin.cpp \
+	define.h \
+	file.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm	*.o *.out \
-		./kernel/*.o \
-		./util/file/*.o \
-		./util/num/*.o \
-		./output.txt
+	rm -rf $(program) $(obj) output.txt
 
-run: myocyte.out
-	./myocyte.out -time 100
+run: $(program)
+	./$(program) 100

@@ -1,26 +1,23 @@
-void kernel_cam(
-    FP timeinst,
-    const accessor<FP,1,sycl_read, sycl_global_buffer> &d_initvalu,
-    const accessor<FP,1,sycl_write, sycl_global_buffer> &d_finavalu,
-    int valu_offset,
-    const accessor<FP,1,sycl_read, sycl_global_buffer> &d_params,
-    int params_offset,
-    const accessor<FP,1,sycl_write, sycl_global_buffer> &d_com,
-    int com_offset,
-    FP Ca)
-{
+//=====================================================================
+//  MAIN FUNCTION
+//=====================================================================
+void kernel_cam(const fp timeinst, const fp *d_initvalu,
+                fp *d_finavalu, const int valu_offset,
+                const fp *d_params, const int params_offset,
+                fp *d_com, const int com_offset, const fp Ca) {
+
   //=====================================================================
   //  VARIABLES
   //=====================================================================
 
   // inputs
-  // FP CaMtot;
-  FP Btot;
-  FP CaMKIItot;
-  FP CaNtot;
-  FP PP1tot;
-  FP K;
-  FP Mg;
+  // fp CaMtot;
+  fp Btot;
+  fp CaMKIItot;
+  fp CaNtot;
+  fp PP1tot;
+  fp K;
+  fp Mg;
 
   // variable references
   int offset_1;
@@ -40,129 +37,129 @@ void kernel_cam(
   int offset_15;
 
   // decoding input array
-  FP CaM;
-  FP Ca2CaM;
-  FP Ca4CaM;
-  FP CaMB;
-  FP Ca2CaMB;
-  FP Ca4CaMB;           
-  FP Pb2;
-  FP Pb;
-  FP Pt;
-  FP Pt2;
-  FP Pa;                            
-  FP Ca4CaN;
-  FP CaMCa4CaN;
-  FP Ca2CaMCa4CaN;
-  FP Ca4CaMCa4CaN;
+  fp CaM;
+  fp Ca2CaM;
+  fp Ca4CaM;
+  fp CaMB;
+  fp Ca2CaMB;
+  fp Ca4CaMB;           
+  fp Pb2;
+  fp Pb;
+  fp Pt;
+  fp Pt2;
+  fp Pa;                            
+  fp Ca4CaN;
+  fp CaMCa4CaN;
+  fp Ca2CaMCa4CaN;
+  fp Ca4CaMCa4CaN;
 
   // Ca/CaM parameters
-  FP Kd02;                                    // [uM^2]
-  FP Kd24;                                    // [uM^2]
-  FP k20;                                      // [s^-1]      
-  FP k02;                                      // [uM^-2 s^-1]
-  FP k42;                                      // [s^-1]      
-  FP k24;                                      // [uM^-2 s^-1]
+  fp Kd02;                                    // [uM^2]
+  fp Kd24;                                    // [uM^2]
+  fp k20;                                      // [s^-1]      
+  fp k02;                                      // [uM^-2 s^-1]
+  fp k42;                                      // [s^-1]      
+  fp k24;                                      // [uM^-2 s^-1]
 
   // CaM buffering (B) parameters
-  FP k0Boff;                                    // [s^-1] 
-  FP k0Bon;                                    // [uM^-1 s^-1] kon = koff/Kd
-  FP k2Boff;                                    // [s^-1] 
-  FP k2Bon;                                    // [uM^-1 s^-1]
-  FP k4Boff;                                    // [s^-1]
-  FP k4Bon;                                    // [uM^-1 s^-1]
+  fp k0Boff;                                    // [s^-1] 
+  fp k0Bon;                                    // [uM^-1 s^-1] kon = koff/Kd
+  fp k2Boff;                                    // [s^-1] 
+  fp k2Bon;                                    // [uM^-1 s^-1]
+  fp k4Boff;                                    // [s^-1]
+  fp k4Bon;                                    // [uM^-1 s^-1]
 
   // using thermodynamic constraints
-  FP k20B;                                    // [s^-1] thermo constraint on loop 1
-  FP k02B;                                    // [uM^-2 s^-1] 
-  FP k42B;                                    // [s^-1] thermo constraint on loop 2
-  FP k24B;                                    // [uM^-2 s^-1]
+  fp k20B;                                    // [s^-1] thermo constraint on loop 1
+  fp k02B;                                    // [uM^-2 s^-1] 
+  fp k42B;                                    // [s^-1] thermo constraint on loop 2
+  fp k24B;                                    // [uM^-2 s^-1]
 
   // Wi Wa Wt Wp
-  FP kbi;                                      // [s^-1] (Ca4CaM dissocation from Wb)
-  FP kib;                                      // [uM^-1 s^-1]
-  FP kpp1;                                    // [s^-1] (PP1-dep dephosphorylation rates)
-  FP Kmpp1;                                    // [uM]
-  FP kib2;
-  FP kb2i;
-  FP kb24;
-  FP kb42;
-  FP kta;                                      // [s^-1] (Ca4CaM dissociation from Wt)
-  FP kat;                                      // [uM^-1 s^-1] (Ca4CaM reassociation with Wa)
-  FP kt42;
-  FP kt24;
-  FP kat2;
-  FP kt2a;
+  fp kbi;                                      // [s^-1] (Ca4CaM dissocation from Wb)
+  fp kib;                                      // [uM^-1 s^-1]
+  fp kpp1;                                    // [s^-1] (PP1-dep dephosphorylation rates)
+  fp Kmpp1;                                    // [uM]
+  fp kib2;
+  fp kb2i;
+  fp kb24;
+  fp kb42;
+  fp kta;                                      // [s^-1] (Ca4CaM dissociation from Wt)
+  fp kat;                                      // [uM^-1 s^-1] (Ca4CaM reassociation with Wa)
+  fp kt42;
+  fp kt24;
+  fp kat2;
+  fp kt2a;
 
   // CaN parameters
-  FP kcanCaoff;                                  // [s^-1] 
-  FP kcanCaon;                                  // [uM^-1 s^-1] 
-  FP kcanCaM4on;                                  // [uM^-1 s^-1]
-  FP kcanCaM4off;                                  // [s^-1]
-  FP kcanCaM2on;
-  FP kcanCaM2off;
-  FP kcanCaM0on;
-  FP kcanCaM0off;
-  FP k02can;
-  FP k20can;
-  FP k24can;
-  FP k42can;
+  fp kcanCaoff;                                  // [s^-1] 
+  fp kcanCaon;                                  // [uM^-1 s^-1] 
+  fp kcanCaM4on;                                  // [uM^-1 s^-1]
+  fp kcanCaM4off;                                  // [s^-1]
+  fp kcanCaM2on;
+  fp kcanCaM2off;
+  fp kcanCaM0on;
+  fp kcanCaM0off;
+  fp k02can;
+  fp k20can;
+  fp k24can;
+  fp k42can;
 
   // CaM Reaction fluxes
-  FP rcn02;
-  FP rcn24;
+  fp rcn02;
+  fp rcn24;
 
   // CaM buffer fluxes
-  FP B;
-  FP rcn02B;
-  FP rcn24B;
-  FP rcn0B;
-  FP rcn2B;
-  FP rcn4B;
+  fp B;
+  fp rcn02B;
+  fp rcn24B;
+  fp rcn0B;
+  fp rcn2B;
+  fp rcn4B;
 
   // CaN reaction fluxes 
-  FP Ca2CaN;
-  FP rcnCa4CaN;
-  FP rcn02CaN; 
-  FP rcn24CaN;
-  FP rcn0CaN;
-  FP rcn2CaN;
-  FP rcn4CaN;
+  fp Ca2CaN;
+  fp rcnCa4CaN;
+  fp rcn02CaN; 
+  fp rcn24CaN;
+  fp rcn0CaN;
+  fp rcn2CaN;
+  fp rcn4CaN;
 
   // CaMKII reaction fluxes
-  FP Pix;
-  FP rcnCKib2;
-  FP rcnCKb2b;
-  FP rcnCKib;
-  FP T;
-  FP kbt;
-  FP rcnCKbt;
-  FP rcnCKtt2;
-  FP rcnCKta;
-  FP rcnCKt2a;
-  FP rcnCKt2b2;
-  FP rcnCKai;
+  fp Pix;
+  fp rcnCKib2;
+  fp rcnCKb2b;
+  fp rcnCKib;
+  fp T;
+  fp kbt;
+  fp rcnCKbt;
+  fp rcnCKtt2;
+  fp rcnCKta;
+  fp rcnCKt2a;
+  fp rcnCKt2b2;
+  fp rcnCKai;
 
   // CaM equations
-  FP dCaM;
-  FP dCa2CaM;
-  FP dCa4CaM;
-  FP dCaMB;
-  FP dCa2CaMB;
-  FP dCa4CaMB;
+  fp dCaM;
+  fp dCa2CaM;
+  fp dCa4CaM;
+  fp dCaMB;
+  fp dCa2CaMB;
+  fp dCa4CaMB;
 
   // CaMKII equations
-  FP dPb2;                                          // Pb2
-  FP dPb;                                          // Pb
-  FP dPt;                                          // Pt
-  FP dPt2;                                          // Pt2
-  FP dPa;                                          // Pa
+  fp dPb2;                                          // Pb2
+  fp dPb;                                          // Pb
+  fp dPt;                                          // Pt
+  fp dPt2;                                          // Pt2
+  fp dPa;                                          // Pa
 
   // CaN equations
-  FP dCa4CaN;                                      // Ca4CaN
-  FP dCaMCa4CaN;                                  // CaMCa4CaN
-  FP dCa2CaMCa4CaN;                                // Ca2CaMCa4CaN
-  FP dCa4CaMCa4CaN;                                // Ca4CaMCa4CaN
+  fp dCa4CaN;                                      // Ca4CaN
+  fp dCaMCa4CaN;                                  // CaMCa4CaN
+  fp dCa2CaMCa4CaN;                                // Ca2CaMCa4CaN
+  fp dCa4CaMCa4CaN;                                // Ca4CaMCa4CaN
 
   //=====================================================================
   //  EXECUTION                          
@@ -270,22 +267,22 @@ void kernel_cam(
   k42can = k20/2508;
 
   // CaM Reaction fluxes
-  rcn02 = k02*cl::sycl::pow(Ca,(FP)2)*CaM - k20*Ca2CaM;
-  rcn24 = k24*cl::sycl::pow(Ca,(FP)2)*Ca2CaM - k42*Ca4CaM;
+  rcn02 = k02 * Ca * Ca * CaM - k20 * Ca2CaM;
+  rcn24 = k24 * Ca * Ca * Ca2CaM - k42 * Ca4CaM;
 
   // CaM buffer fluxes
   B = Btot - CaMB - Ca2CaMB - Ca4CaMB;
-  rcn02B = k02B*cl::sycl::pow(Ca,(FP)2)*CaMB - k20B*Ca2CaMB;
-  rcn24B = k24B*cl::sycl::pow(Ca,(FP)2)*Ca2CaMB - k42B*Ca4CaMB;
+  rcn02B = k02B * Ca * Ca * CaMB - k20B * Ca2CaMB;
+  rcn24B = k24B * Ca * Ca * Ca2CaMB - k42B * Ca4CaMB;
   rcn0B = k0Bon*CaM*B - k0Boff*CaMB;
   rcn2B = k2Bon*Ca2CaM*B - k2Boff*Ca2CaMB;
   rcn4B = k4Bon*Ca4CaM*B - k4Boff*Ca4CaMB;
 
   // CaN reaction fluxes 
   Ca2CaN = CaNtot - Ca4CaN - CaMCa4CaN - Ca2CaMCa4CaN - Ca4CaMCa4CaN;
-  rcnCa4CaN = kcanCaon*cl::sycl::pow(Ca,(FP)2)*Ca2CaN - kcanCaoff*Ca4CaN;
-  rcn02CaN = k02can*cl::sycl::pow(Ca,(FP)2)*CaMCa4CaN - k20can*Ca2CaMCa4CaN; 
-  rcn24CaN = k24can*cl::sycl::pow(Ca,(FP)2)*Ca2CaMCa4CaN - k42can*Ca4CaMCa4CaN;
+  rcnCa4CaN = kcanCaon * Ca * Ca * Ca2CaN - kcanCaoff * Ca4CaN;
+  rcn02CaN = k02can * Ca * Ca * CaMCa4CaN - k20can * Ca2CaMCa4CaN;
+  rcn24CaN = k24can * Ca * Ca * Ca2CaMCa4CaN - k42can * Ca4CaMCa4CaN;
   rcn0CaN = kcanCaM0on*CaM*Ca4CaN - kcanCaM0off*CaMCa4CaN;
   rcn2CaN = kcanCaM2on*Ca2CaM*Ca4CaN - kcanCaM2off*Ca2CaMCa4CaN;
   rcn4CaN = kcanCaM4on*Ca4CaM*Ca4CaN - kcanCaM4off*Ca4CaMCa4CaN;
@@ -293,12 +290,12 @@ void kernel_cam(
   // CaMKII reaction fluxes
   Pix = 1 - Pb2 - Pb - Pt - Pt2 - Pa;
   rcnCKib2 = kib2*Ca2CaM*Pix - kb2i*Pb2;
-  rcnCKb2b = kb24*cl::sycl::pow(Ca,(FP)2)*Pb2 - kb42*Pb;
+  rcnCKb2b = kb24 * Ca * Ca * Pb2 - kb42 * Pb;
   rcnCKib = kib*Ca4CaM*Pix - kbi*Pb;
   T = Pb + Pt + Pt2 + Pa;
-  kbt = 0.055*T + 0.0074*cl::sycl::pow(T,(FP)2) + 0.015*cl::sycl::pow(T,(FP)3);
+  kbt = 0.055 * T + 0.0074 * T * T + 0.015 * sycl::pown(T, 3);
   rcnCKbt = kbt*Pb - kpp1*PP1tot*Pt/(Kmpp1+CaMKIItot*Pt);
-  rcnCKtt2 = kt42*Pt - kt24*cl::sycl::pow(Ca,(FP)2)*Pt2;
+  rcnCKtt2 = kt42 * Pt - kt24 * Ca * Ca * Pt2;
   rcnCKta = kta*Pt - kat*Ca4CaM*Pa;
   rcnCKt2a = kt2a*Pt2 - kat2*Ca2CaM*Pa;
   rcnCKt2b2 = kpp1*PP1tot*Pt2/(Kmpp1+CaMKIItot*Pt2);
@@ -345,5 +342,5 @@ void kernel_cam(
   // write to global variables for adjusting Ca buffering in EC coupling model
   d_finavalu[com_offset] = 1e-3*(2*CaMKIItot*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
   //d_finavalu[JCa] = 1; // [uM/msec]
-}
 
+}

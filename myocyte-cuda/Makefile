@@ -56,6 +56,7 @@ $(program): $(obj) Makefile
 	kernel_cam.cu \
 	kernel_fin.cu \
 	file.c \
+	define.h \
 	Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
