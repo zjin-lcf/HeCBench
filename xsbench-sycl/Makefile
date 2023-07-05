@@ -29,15 +29,15 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../xsbench-cuda -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../xsbench-cuda -fsycl \
+          --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 # Linker Flags
 LDFLAGS = 
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
 endif
 
 ifeq ($(HIP), yes)

@@ -1,4 +1,4 @@
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "XSbench_header.h"
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -9,16 +9,86 @@
 // Following these functions are a number of optimized variants,
 // which each deploy a different combination of optimizations strategies. By
 // default, XSBench will only run the baseline implementation. Optimized variants
-// are not yet implemented in this SYCL port.
+// are not yet implemented in this CUDA port.
 ////////////////////////////////////////////////////////////////////////////////////
+void lookup (
+    const int *__restrict__ num_nucs,
+    const double *__restrict__ concs,
+    const int *__restrict__ mats,
+    const NuclideGridPoint *__restrict__ nuclide_grid,
+    int*__restrict__  verification,
+    const double *__restrict__ unionized_energy_array,
+    const int *__restrict__ index_grid,
+    const int n_lookups,
+    const long n_isotopes,
+    const long n_gridpoints,
+    const int grid_type,
+    const int hash_bins,
+    const int max_num_nucs ,
+    const sycl::nd_item<1> &item) {
 
-// use SYCL namespace to reduce symbol names
-using namespace cl::sycl;
+  // get the index to operate on, first dimemsion
+  size_t i = item.get_global_id(0);
+
+  if (i < n_lookups) {
+
+    // Set the initial seed value
+    uint64_t seed = STARTING_SEED;
+
+    // Forward seed to lookup index (we need 2 samples per lookup)
+    seed = fast_forward_LCG(seed, 2*i);
+
+    // Randomly pick an energy and material for the particle
+    double p_energy = LCG_random_double(&seed);
+    int mat         = pick_mat(&seed);
+
+    // debugging
+    //printf("E = %lf mat = %d\n", p_energy, mat);
+
+    double macro_xs_vector[5] = {0};
+
+    // Perform macroscopic Cross Section Lookup
+    calculate_macro_xs(
+        p_energy,     // Sampled neutron energy (in lethargy)
+        mat,          // Sampled material type index neutron is in
+        n_isotopes,   // Total number of isotopes in simulation
+        n_gridpoints, // Number of gridpoints per isotope in simulation
+        num_nucs,     // 1-D array with number of nuclides per material
+        concs,        // Flattened 2-D array with concentration of each nuclide in each material
+        unionized_energy_array, // 1-D Unionized energy array
+        index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
+        nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
+        mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
+        macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
+        grid_type,    // Lookup type (nuclide, hash, or unionized)
+        hash_bins,    // Number of hash bins used (if using hash lookup type)
+        max_num_nucs  // Maximum number of nuclides present in any material
+     );
+
+    // For verification, and to prevent the compiler from optimizing
+    // all work out, we interrogate the returned macro_xs_vector array
+    // to find its maximum value index, then increment the verification
+    // value by that index. In this implementation, we store to a global
+    // array that will get tranferred back and reduced on the host.
+    double max = -1.0;
+    int max_idx = 0;
+    for(int j = 0; j < 5; j++ )
+    {
+      if( macro_xs_vector[j] > max )
+      {
+        max = macro_xs_vector[j];
+        max_idx = j;
+      }
+    }
+    verification[i] = max_idx+1;
+  }
+}
+
+
 unsigned long long
 run_event_based_simulation(Inputs in, SimulationData SD,
                            int mype, double *kernel_time)
 {
-
   ////////////////////////////////////////////////////////////////////////////////
   // SUMMARY: Simulation Data Structure Manifest for "SD" Object
   // Here we list all heap arrays (and lengths) in SD that would need to be
@@ -30,7 +100,7 @@ run_event_based_simulation(Inputs in, SimulationData SD,
   // double * unionized_energy_array;    // Length = length_unionized_energy_array
   // int * index_grid;                   // Length = length_index_grid
   // NuclideGridPoint * nuclide_grid;    // Length = length_nuclide_grid
-  // 
+  //
   // Note: "unionized_energy_array" and "index_grid" can be of zero length
   //        depending on lookup method.
   //
@@ -47,130 +117,98 @@ run_event_based_simulation(Inputs in, SimulationData SD,
 
   int * verification_h = (int *) malloc(in.lookups * sizeof(int));
 
-  // Scope here is important, as when we exit this blocl we will automatically sync with device
-  // to ensure all work is done and that we can read from verification_h array.
-  {
-    // create a queue using the default device for the platform (cpu, gpu)
-    queue sycl_q{default_selector()};
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
 
-    if(mype == 0 ) {
-      printf("Running on: %s\n", sycl_q.get_device().get_info<cl::sycl::info::device::name>().c_str());
-      printf("Initializing device buffers and JIT compiling kernel...\n");
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // Create Device Buffers
-    ////////////////////////////////////////////////////////////////////////////////
-
-    buffer<int, 1> num_nucs_d(SD.num_nucs,SD.length_num_nucs);
-    buffer<double, 1> concs_d(SD.concs, SD.length_concs);
-    buffer<int, 1> mats_d(SD.mats, SD.length_mats);
-    buffer<NuclideGridPoint, 1> nuclide_grid_d(SD.nuclide_grid, SD.length_nuclide_grid);
-    buffer<int, 1> verification_d(verification_h, in.lookups);
-
-    // These two are a bit of a hack. Sometimes they are empty buffers (if using hash or nuclide
-    // grid methods). OpenCL will throw an example when we try to create an empty buffer. So, we
-    // will just allocate some memory for them and move them as normal. The rest of our code
-    // won't actually use them if they aren't needed, so this is safe. Probably a cleaner way
-    // of doing this.
-    if( SD.length_unionized_energy_array == 0 )
-    {
-      SD.length_unionized_energy_array = 1;
-      SD.unionized_energy_array = (double *) malloc(sizeof(double));
-    }
-
-    buffer<double,1> unionized_energy_array_d(SD.unionized_energy_array, SD.length_unionized_energy_array);
-    if( SD.length_index_grid == 0 )
-    {
-      SD.length_index_grid = 1;
-      SD.index_grid = (int *) malloc(sizeof(int));
-    }
-
-    // For the unionized grid, this is a large array. Enforce that it is able to be allocated on the
-    // OpenCL device (as some OpenCL devices have fairly low limts here for some reason...)
-    //size_t index_grid_allocation_sz = ceil((SD.length_index_grid * sizeof(int)));
-    //assert( index_grid_allocation_sz <= sycl_q.get_device().get_info<cl::sycl::info::device::max_mem_alloc_size>() );
-    buffer<int, 1> index_grid_d(SD.index_grid, (unsigned long long ) SD.length_index_grid);
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // Define Device Kernel
-    ////////////////////////////////////////////////////////////////////////////////
-    sycl_q.wait();
-    double kstart = get_time();
-
-    for (int i = 0; i < in.kernel_repeat; i++) {
-      sycl_q.submit([&](handler &cgh) {
-        // Create Device Accessors for Device Buffers
-        auto num_nucs = num_nucs_d.get_access<access::mode::read>(cgh);
-        auto concs = concs_d.get_access<access::mode::read>(cgh);
-        auto mats = mats_d.get_access<access::mode::read>(cgh);
-        auto nuclide_grid = nuclide_grid_d.get_access<access::mode::read>(cgh);
-        auto verification = verification_d.get_access<access::mode::discard_write>(cgh);
-        auto unionized_energy_array = unionized_energy_array_d.get_access<access::mode::read>(cgh);
-        auto index_grid = index_grid_d.get_access<access::mode::read>(cgh);
-
-        // XS Lookup Simulation Loop
-        cgh.parallel_for<kernel>(range<1>(in.lookups), [=](id<1> idx) {
-          // get the index to operate on, first dimemsion
-          size_t i = idx[0];
-
-          // Set the initial seed value
-          uint64_t seed = STARTING_SEED;  
-
-          // Forward seed to lookup index (we need 2 samples per lookup)
-          seed = fast_forward_LCG(seed, 2*i);
-
-          // Randomly pick an energy and material for the particle
-          double p_energy = LCG_random_double(&seed);
-          int mat         = pick_mat(&seed); 
-
-          // debugging
-          //printf("E = %lf mat = %d\n", p_energy, mat);
-
-          double macro_xs_vector[5] = {0};
-
-          // Perform macroscopic Cross Section Lookup
-          calculate_macro_xs(
-              p_energy,        // Sampled neutron energy (in lethargy)
-              mat,             // Sampled material type index neutron is in
-              in.n_isotopes,   // Total number of isotopes in simulation
-              in.n_gridpoints, // Number of gridpoints per isotope in simulation
-              num_nucs,     // 1-D array with number of nuclides per material
-              concs,        // Flattened 2-D array with concentration of each nuclide in each material
-              unionized_energy_array, // 1-D Unionized energy array
-              index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
-              nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
-              mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
-              macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
-              in.grid_type,    // Lookup type (nuclide, hash, or unionized)
-              in.hash_bins,    // Number of hash bins used (if using hash lookup type)
-              SD.max_num_nucs  // Maximum number of nuclides present in any material
-          );
-
-          // For verification, and to prevent the compiler from optimizing
-          // all work out, we interrogate the returned macro_xs_vector array
-          // to find its maximum value index, then increment the verification
-          // value by that index. In this implementation, we store to a global
-          // array that will get tranferred back and reduced on the host.
-          double max = -1.0;
-          int max_idx = 0;
-          for(int j = 0; j < 5; j++ )
-          {
-            if( macro_xs_vector[j] > max )
-            {
-              max = macro_xs_vector[j];
-              max_idx = j;
-            }
-          }
-          verification[i] = max_idx+1;
-        });
-      });
-    }
-
-    sycl_q.wait();
-    double kstop = get_time();
-    *kernel_time = (kstop - kstart) / in.kernel_repeat;
+  if (mype == 0) {
+    printf("Running on: %s\n", q.get_device().get_info<sycl::info::device::name>().c_str());
+    printf("Initializing device buffers and JIT compiling kernel...\n");
   }
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // Create Device Buffers
+  ////////////////////////////////////////////////////////////////////////////////
+
+  int *num_nucs_d = sycl::malloc_device<int>(SD.length_num_nucs, q);
+  q.memcpy(num_nucs_d, SD.num_nucs, sizeof(int) * SD.length_num_nucs);
+
+  double *concs_d = sycl::malloc_device<double>(SD.length_concs, q);
+  q.memcpy(concs_d, SD.concs, sizeof(double) * SD.length_concs);
+
+  int *mats_d = sycl::malloc_device<int>(SD.length_mats, q);
+  q.memcpy(mats_d, SD.mats, sizeof(int) * SD.length_mats);
+
+  NuclideGridPoint *nuclide_grid_d =
+      sycl::malloc_device<NuclideGridPoint>(SD.length_nuclide_grid, q);
+  q.memcpy(nuclide_grid_d, SD.nuclide_grid,
+           sizeof(NuclideGridPoint) * SD.length_nuclide_grid);
+
+  int *verification_d = sycl::malloc_device<int>(in.lookups, q);
+
+  // These two are a bit of a hack. Sometimes they are empty buffers (if using hash or nuclide
+  // grid methods). OpenCL will throw an example when we try to create an empty buffer. So, we
+  // will just allocate some memory for them and move them as normal. The rest of our code
+  // won't actually use them if they aren't needed, so this is safe. Probably a cleaner way
+  // of doing this.
+  if( SD.length_unionized_energy_array == 0 )
+  {
+    SD.length_unionized_energy_array = 1;
+    SD.unionized_energy_array = (double *) malloc(sizeof(double));
+  }
+
+  double *unionized_energy_array_d =
+      sycl::malloc_device<double>(SD.length_unionized_energy_array, q);
+  q.memcpy(unionized_energy_array_d, SD.unionized_energy_array,
+           sizeof(double) * SD.length_unionized_energy_array);
+
+  if( SD.length_index_grid == 0 )
+  {
+    SD.length_index_grid = 1;
+    SD.index_grid = (int *) malloc(sizeof(int));
+  }
+
+  //buffer<int, 1> index_grid_d(SD.index_grid, (unsigned long long ) SD.length_index_grid);
+  int *index_grid_d = (int *)sycl::malloc_device(
+      sizeof(int) * (unsigned long long)SD.length_index_grid, q);
+  q.memcpy(index_grid_d, SD.index_grid,
+           sizeof(int) * (unsigned long long)SD.length_index_grid);
+
+  q.wait();
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // Define Device Kernel
+  ////////////////////////////////////////////////////////////////////////////////
+  sycl::range<1> gws ((in.lookups + 255)/256*256);
+  sycl::range<1> lws (256);
+
+  double kstart = get_time();
+
+  for (int i = 0; i < in.kernel_repeat; i++) {
+    q.parallel_for<class kernel>(sycl::nd_range<1>(gws, lws),
+      [=](sycl::nd_item<1> item) {
+        lookup(num_nucs_d, concs_d, mats_d, nuclide_grid_d, verification_d,
+               unionized_energy_array_d, index_grid_d, in.lookups,
+               in.n_isotopes, in.n_gridpoints, in.grid_type, in.hash_bins,
+               SD.max_num_nucs, item);
+    });
+  }
+
+  q.wait();
+  double kstop = get_time();
+  *kernel_time = (kstop - kstart) / in.kernel_repeat;
+
+  q.memcpy(verification_h, verification_d, sizeof(int) * in.lookups).wait();
+
+  sycl::free(verification_d, q);
+  sycl::free(mats_d, q);
+  sycl::free(num_nucs_d, q);
+  sycl::free(concs_d, q);
+  sycl::free(nuclide_grid_d, q);
+  sycl::free(unionized_energy_array_d, q);
+  sycl::free(index_grid_d, q);
 
   // Host reduces the verification array
   unsigned long long verification_scalar = 0;
@@ -188,6 +226,7 @@ run_event_based_simulation(Inputs in, SimulationData SD,
 // binary search for energy on unionized energy grid
 // returns lower index
 template <class T>
+
 long grid_search( long n, double quarry, T A)
 {
   long lowerLimit = 0;
@@ -212,11 +251,17 @@ long grid_search( long n, double quarry, T A)
 
 // Calculates the microscopic cross section for a given nuclide & energy
 template <class Double_Type, class Int_Type, class NGP_Type>
-void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
-    long n_gridpoints,
-    Double_Type  egrid, Int_Type  index_data,
-    NGP_Type  nuclide_grids,
-    long idx, double *  xs_vector, int grid_type, int hash_bins ){
+/*
+DPCT1110:0: The total declared local variable size in device function
+calculate_micro_xs exceeds 128 bytes and may cause high register pressure.
+Consult with your hardware vendor to find the total register size available and
+adjust the code, or use smaller sub-group size to avoid high register pressure.
+*/
+
+void calculate_micro_xs(double p_energy, int nuc, long n_isotopes,
+                        long n_gridpoints, Double_Type egrid,
+                        Int_Type index_data, NGP_Type nuclide_grids, long idx,
+                        double *xs_vector, int grid_type, int hash_bins) {
   // Variables
   double f;
   NuclideGridPoint low, high;
@@ -305,8 +350,9 @@ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
   xs_vector[4] = high.nu_fission_xs - f * (high.nu_fission_xs - low.nu_fission_xs);
 }
 
-// Calculates macroscopic cross section based on a given material & energy 
+// Calculates macroscopic cross section based on a given material & energy
 template <class Double_Type, class Int_Type, class NGP_Type, class E_GRID_TYPE, class INDEX_TYPE>
+
 void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
     long n_gridpoints, Int_Type  num_nucs,
     Double_Type  concs,
@@ -315,7 +361,7 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
     Int_Type  mats,
     double * macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs ){
   int p_nuc; // the nuclide we are looking up
-  long idx = -1;  
+  long idx = -1;
   double conc; // the concentration of the nuclide in the material
 
   // cleans out macro_xs_vector
@@ -328,7 +374,7 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
   // done inside of the "calculate_micro_xs" function for each different
   // nuclide in the material.
   if( grid_type == UNIONIZED )
-    idx = grid_search( n_isotopes * n_gridpoints, p_energy, egrid);  
+    idx = grid_search( n_isotopes * n_gridpoints, p_energy, egrid);
   else if( grid_type == HASH )
   {
     double du = 1.0 / hash_bins;
@@ -359,14 +405,15 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
 }
 
 // picks a material based on a probabilistic distribution
+
 int pick_mat( unsigned long * seed )
 {
   // I have a nice spreadsheet supporting these numbers. They are
-  // the fractions (by volume) of material in the core. Not a 
+  // the fractions (by volume) of material in the core. Not a
   // *perfect* approximation of where XS lookups are going to occur,
   // but this will do a good job of biasing the system nonetheless.
 
-  // Also could be argued that doing fractions by weight would be 
+  // Also could be argued that doing fractions by weight would be
   // a better approximation, but volume does a good enough job for now.
 
   double dist[12];
@@ -398,6 +445,7 @@ int pick_mat( unsigned long * seed )
   return 0;
 }
 
+
 double LCG_random_double(uint64_t * seed)
 {
   // LCG parameters
@@ -406,7 +454,8 @@ double LCG_random_double(uint64_t * seed)
   const uint64_t c = 1ULL;
   *seed = (a * (*seed) + c) % m;
   return (double) (*seed) / (double) m;
-}  
+}
+
 
 uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
 {
@@ -420,7 +469,7 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
   uint64_t a_new = 1;
   uint64_t c_new = 0;
 
-  while(n > 0) 
+  while(n > 0)
   {
     if(n & 1)
     {
