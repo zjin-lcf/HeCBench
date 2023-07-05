@@ -47,7 +47,7 @@ LDFLAGS += -lComputeCpp
 endif
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
@@ -98,13 +98,13 @@ leukocyte: detect_main.o \
 
 detect_main.o: detect_main.c \
                kernel_GICOV.sycl kernel_dilated.sycl \
-               track_ellipse.h helper.h misc_math.h common.h
+               track_ellipse.h helper.h misc_math.h
 
 find_ellipse.o: find_ellipse.c find_ellipse.h avilib.h misc_math.h
 
 track_ellipse.o: track_ellipse.c find_ellipse.h $(MATRIX_DIR)/matrix.h avilib.h helper.h
 
-track_ellipse_sycl.o: track_ellipse_sycl.c track_ellipse.h common.h kernel_IMGVF.sycl
+track_ellipse_sycl.o: track_ellipse_sycl.c track_ellipse.h kernel_IMGVF.sycl
 
 
 # Use the sycl compiler to build the library
