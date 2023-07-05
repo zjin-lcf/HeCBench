@@ -14,12 +14,10 @@
 #include <stdlib.h>
 #include <errno.h>
 //----------------
-#if !defined(__CUDACC__)
-// Define the keywords, so that the IDE does not complain about them
+#if !defined(__CUDACC__) && !defined(__HIPCC__)
 #define __global__
 #define __device__
 #define __shared__
-#define  std
 #define __host__
 #endif
 //----------------
@@ -53,25 +51,36 @@
 
 //-----------------------------------------------------------------------------------
 
+#if defined(__CUDACC__)
 /**
  * This macro checks return value of the CUDA runtime call and exits
  * the application if the call failed.
  */
-#define CUDA_CHECK_RETURN(value) {                      \
-  cudaError_t _m_cudaStat = value;                    \
-  if (_m_cudaStat != cudaSuccess) {                    \
-    fprintf(stderr, "Error %s at line %d in file %s\n",          \
-        cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__);    \
-    exit(1);                              \
-  } }
+#define CUDA_CHECK_RETURN(value) {                           \
+  cudaError_t _m_cudaStat = value;                           \
+  if (_m_cudaStat != cudaSuccess) {                          \
+    fprintf(stderr, "Error %s at line %d in file %s\n",      \
+        cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__);\
+    exit(1);                                                 \
+  }}
 
+#endif
+
+#if defined(__HIPCC__)
 /**
- * This macro checks return value of the CUDARAND call and exits
+ * This macro checks return value of the HIP runtime call and exits
  * the application if the call failed.
  */
-#define CUDA_CHECK_STATUS(x) do { if((x) != CURAND_STATUS_SUCCESS) {   \
-  printf("Error at %s:%d\n",__FILE__,__LINE__);               \
-  return EXIT_FAILURE;}} while(0)
+#define HIP_CHECK_RETURN(value) {                           \
+  hipError_t _m_hipStat = value;                            \
+  if (_m_hipStat != hipSuccess) {                           \
+    fprintf(stderr, "Error %s at line %d in file %s\n",     \
+        hipGetErrorString(_m_hipStat), __LINE__, __FILE__); \
+    exit(1);                                                \
+  }}
+
+#endif
+
 
 //-----------------------------------------------------------------------------------
 
