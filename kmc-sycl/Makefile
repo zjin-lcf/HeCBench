@@ -7,12 +7,12 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 
-SYCL      = yes
 GPU       = yes
 CUDA      = no
 CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
+ONEMKL    = no
 GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
@@ -27,7 +27,8 @@ obj = main.o svm.o
 # Sets Flags
 #===============================================================================
 
-ONEMKL = /path/to/oneMKL
+# path to the install of the oneMKL interface
+ONEMKL_PATH = /path/to/oneMKL
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../kmc-cuda -fsycl
@@ -36,16 +37,25 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../kmc-cuda -fsycl
 LDFLAGS = 
 
 ifeq ($(CUDA), yes)
+  ONEMKL = yes
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN) \
-            -I$(ONEMKL)/include
-  LDFLAGS += -L$(ONEMKL)/lib -lonemkl_blas_cublas -lonemkl
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
+  LDFLAGS = -L$(ONEMKL_PATH)/lib -lonemkl -lonemkl_blas_cublas
 endif
 
 ifeq ($(HIP), yes)
+  ONEMKL = yes
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) \
+            --gcc-toolchain=$(GCC_TOOLCHAIN)
+  LDFLAGS = -L$(ONEMKL_PATH)/lib -lonemkl -lonemkl_blas_rocblas
+endif
+
+ifeq ($(ONEMKL), yes)
+  CFLAGS += -I$(ONEMKL_PATH)/include
+else
+  CFLAGS += -qmkl=parallel
 endif
 
 # Debug Flags

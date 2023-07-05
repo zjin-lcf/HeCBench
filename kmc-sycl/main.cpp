@@ -1,8 +1,11 @@
+#include <chrono>
+#include <sycl/sycl.hpp>
+#include <oneapi/mkl.hpp>
+#include <math.h>
 #include "driver.c"
 
-#include <chrono>
-#include <CL/sycl.hpp>
-#include <oneapi/mkl.hpp>
+// in-order SYCL queue
+#define IN_ORDER
 
 void cal_km(struct svm_problem *pecm)
 {
@@ -42,11 +45,18 @@ void cal_km(struct svm_problem *pecm)
   // offload
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v
+  #ifdef IN_ORDER
+  , sycl::property::queue::in_order()
+  #endif
+  );
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v
+  #ifdef IN_ORDER
+  , sycl::property::queue::in_order()
+  #endif
+  );
 #endif
-  sycl::queue q(dev_sel);
 
   const float alpha = 1;
   const float beta = 0;
@@ -64,6 +74,15 @@ void cal_km(struct svm_problem *pecm)
   {
     auto start = std::chrono::steady_clock::now();
 
+#ifdef IN_ORDER
+    q.memcpy(g_vtm, tva + trvei * len_tv, len_tv * sizeof(float));
+
+    oneapi::mkl::blas::column_major::gemv(
+      q, oneapi::mkl::transpose::nontrans, ntv, len_tv, alpha, g_tva,
+      ntv, g_vtm, 1, beta, g_dp, 1);
+
+    q.memcpy(dp, g_dp, ntv * sizeof(float)).wait();
+#else
     auto copy_e = q.memcpy(g_vtm, tva + trvei * len_tv, len_tv * sizeof(float));
 
     auto gemv_e = oneapi::mkl::blas::column_major::gemv(
@@ -71,6 +90,7 @@ void cal_km(struct svm_problem *pecm)
       ntv, g_vtm, 1, beta, g_dp, 1, {copy_e});
 
     q.memcpy(dp, g_dp, ntv * sizeof(float), gemv_e).wait();
+#endif
 
     auto end = std::chrono::steady_clock::now();
     time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -83,7 +103,6 @@ void cal_km(struct svm_problem *pecm)
 
     for ( i_c = 0; i_c < ntv; i_c++ )
       pecm-> x[trvei].values[i_c + 1] = v_f_g[i_c];
-    break;
   }
 
   printf("Average kernel matrix offload time: %lf (us)\n", (time * 1e-3f) / ntv);

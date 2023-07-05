@@ -1,8 +1,8 @@
-#include "driver.c"
-
 #include <chrono>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
+#include <math.h>
+#include "driver.c"
 
 void cal_km(struct svm_problem *pecm)
 {
@@ -23,8 +23,8 @@ void cal_km(struct svm_problem *pecm)
   double g_val = (double)gamma;
 
   for ( i_r = 0; i_r < ntv ; i_r++ )
-  {         
-    for ( i_c = 0; i_c < len_tv; i_c++ ) 
+  {
+    for ( i_c = 0; i_c < len_tv; i_c++ )
       tva[i_r * len_tv + i_c] = (float)prob.x[i_r].values[i_c];
   }
 
@@ -53,18 +53,21 @@ void cal_km(struct svm_problem *pecm)
   cudaMalloc((void**)&g_dp, ntv * sizeof(float));
 
   // Copy cpu vector to gpu vector
-  cublasSetVector( len_tv * ntv, sizeof(float), tr_ar, 1, g_tva, 1 );
+  //cublasSetVector( len_tv * ntv, sizeof(float), tr_ar, 1, g_tva, 1 );
+  cudaMemcpy(g_tva, tr_ar, len_tv * ntv * sizeof(float), cudaMemcpyHostToDevice);
 
   double time = 0.0;
   for ( trvei = 0; trvei < ntv; trvei++ )
   {
     auto start = std::chrono::steady_clock::now();
 
-    cublasSetVector( len_tv, sizeof(float), &tva[trvei * len_tv], 1, g_vtm, 1 );
+    //cublasSetVector( len_tv, sizeof(float), &tva[trvei * len_tv], 1, g_vtm, 1 );
+    cudaMemcpy( g_vtm, &tva[trvei * len_tv], len_tv * sizeof(float), cudaMemcpyHostToDevice);
 
     cublasSgemv( handle, CUBLAS_OP_N, ntv, len_tv, &alpha, g_tva, ntv , g_vtm, 1, &beta, g_dp, 1 );
 
-    cublasGetVector( ntv, sizeof(float), g_dp, 1, dp, 1 );
+    //cublasGetVector( ntv, sizeof(float), g_dp, 1, dp, 1 );
+    cudaMemcpy(dp, g_dp, ntv * sizeof(float), cudaMemcpyDeviceToHost);
 
     auto end = std::chrono::steady_clock::now();
     time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -76,7 +79,7 @@ void cal_km(struct svm_problem *pecm)
     pecm-> x[trvei].values[0] = trvei + 1;
 
     for ( i_c = 0; i_c < ntv; i_c++ )
-      pecm-> x[trvei].values[i_c + 1] = v_f_g[i_c];        
+      pecm-> x[trvei].values[i_c + 1] = v_f_g[i_c];
   }
 
   printf("Average kernel matrix offload time: %lf (us)\n", (time * 1e-3f) / ntv);
