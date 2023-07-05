@@ -1,0 +1,58 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+# Compiler can be set below, or via environment variable
+CC        = hipcc
+OPTIMIZE  = yes
+DEBUG     = no
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = main
+
+source = main.cu Filter.cu
+
+obj = $(source:.cu=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../stsg-cuda
+
+# Linker Flags
+LDFLAGS = -lgdal
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+Filter.o: ../stsg-cuda/Filter.cu Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+main.o: main.cu ../stsg-cuda/Filter.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+run: $(program)
+	./$(program) example.txt
