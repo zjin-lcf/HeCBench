@@ -1,7 +1,5 @@
 // Lukasz G. Szafaryn 24 JAN 09
 
-//	DESCRIPTION
-
 // Myocyte application models cardiac myocyte (heart muscle cell) and simulates its behavior according to the work by Saucerman and Bers [8]. The model integrates 
 // cardiac myocyte electrical activity with the calcineurin pathway, which is a key aspect of the development of heart failure. The model spans large number of temporal 
 // scales to reflect how changes in heart rate as observed during exercise or stress contribute to calcineurin pathway activation, which ultimately leads to the expression 
@@ -14,22 +12,22 @@
 // (usually reduced) time step. Since the ODEs are stiff (exhibit fast rate of change within short time intervals), they need to be simulated at small time scales with an 
 // adaptive step size solver. 
 
-//	1) The original version of the current solver code was obtained from: Mathematics Source Library (http://mymathlib.webtrellis.net/index.html). The solver has been 
+//  1) The original version of the current solver code was obtained from: Mathematics Source Library (http://mymathlib.webtrellis.net/index.html). The solver has been 
 //      somewhat modified to tailor it to our needs. However, it can be reverted back to original form or modified to suit other simulations.
 // 2) This solver and particular solving algorithm used with it (embedded_fehlberg_7_8) were adapted to work with a set of equations, not just one like in original version.
-//	3) In order for solver to provide deterministic number of steps (needed for particular amount of memore previousely allocated for results), every next step is 
+//  3) In order for solver to provide deterministic number of steps (needed for particular amount of memore previousely allocated for results), every next step is 
 //      incremented by 1 time unit (h_init).
-//	4) Function assumes that simulation starts at some point of time (whatever time the initial values are provided for) and runs for the number of miliseconds (xmax) 
+//  4) Function assumes that simulation starts at some point of time (whatever time the initial values are provided for) and runs for the number of miliseconds (xmax) 
 //      specified by the uses as a parameter on command line.
 // 5) The appropriate amount of memory is previousely allocated for that range (y).
-//	6) This setup in 3) - 5) allows solver to adjust the step ony from current time instance to current time instance + 0.9. The next time instance is current time instance + 1;
-//	7) The original solver cannot handle cases when equations return NAN and INF values due to discontinuities and /0. That is why equations provided by user need to 
+//  6) This setup in 3) - 5) allows solver to adjust the step ony from current time instance to current time instance + 0.9. The next time instance is current time instance + 1;
+//  7) The original solver cannot handle cases when equations return NAN and INF values due to discontinuities and /0. That is why equations provided by user need to 
 //      make sure that no NAN and INF are returned.
 // 8) Application reads initial data and parameters from text files: y.txt and params.txt respectively that need to be located in the same folder as source files. 
 //     For simplicity and testing purposes only, when multiple number of simulation instances is specified, application still reads initial data from the same input files. That 
 //     can be modified in this source code.
 
-//	IMPLEMENTATION-SPECIFIC DESCRIPTION
+//    IMPLEMENTATION-SPECIFIC DESCRIPTION
 
 // The original single-threaded code was written in MATLAB and used MATLAB ode45 ODE solver. In the process of accelerating this code, we arrived with the 
 // intermediate versions that used single-threaded Sundials CVODE solver which evaluated model parallelized with CUDA at each time step. In order to convert entire 
@@ -60,171 +58,40 @@
 
 // The following are the command parameters to the application:
 // 1) Simulation time interval which is the number of miliseconds to simulate. Needs to be integer > 0
+// 2) Number of instances of simulation to run. Needs to be integer > 0.
+// 3) Method of parallelization. Need to be 0 for parallelization inside each simulation instance, or 1 for parallelization across instances.
 // Example:
-// ./a.out -time 100
+// a.out 100 100 1
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "./common.h"
-#include "./util/file/file.h"
-#include "./util/num/num.h"
-#include "./kernel/kernel_wrapper.h"
+#include <math.h>
+#include <string.h>
+#include <chrono>
+#include "define.h"
+#include "file.c"
+#include "work.cpp"
 
 int main(int argc, char *argv []){
 
-  int cur_arg;
   int xmax;
   int workload = 1;
 
-  // go through arguments
-  if(argc==3){
-    for(cur_arg=1; cur_arg<argc; cur_arg++){
-      // check if -time
-      if(strcmp(argv[cur_arg], "-time")==0){
-        // check if value provided
-        if(argc>=cur_arg+1){
-          // check if value is a number
-          if(isInteger(argv[cur_arg+1])==1){
-            xmax = atoi(argv[cur_arg+1]);
-            if(xmax<0){
-              printf("ERROR: Wrong value to -time argument, cannot be <=0\n");
-              return 0;
-            }
-            cur_arg = cur_arg+1;
-          }
-          // value is not a number
-          else{
-            printf("ERROR: Value to -time argument in not a number\n");
-            return 0;
-          }
-        }
-        // value not provided
-        else{
-          printf("ERROR: Missing value to -time argument\n");
-          return 0;
-        }
-      }
-      // unknown
-      else{
-        printf("ERROR: Unknown argument\n");
-        return 0;
-      }
-    }
-    // Print configuration
-    //printf("Configuration used: arch = %d, cores = %d, time = %d\n", arch_arg, cores_arg, xmax);
-  }
-  else{
-    printf("Provide time argument, example: -time 100");
+  if(argc!=2){
+    printf("%s <simulation interval (default is 100)>\n", argv[0]);
     return 0;
   }
 
-  //	EXECUTION IF THERE IS 1 WORKLOAD, PARALLELIZE INSIDE 1 WORKLOAD
+  else{
 
-  if(workload == 1){
-
-    //	VARIABLES
-
-    int i,j;
-
-    //	MEMORY CHECK
-
-    long long memory;
-    memory = workload*(xmax+1)*EQUATIONS*4;
-    if(memory>1000000000){
-      printf("ERROR: trying to allocate more than 1.0GB of memory, decrease workload and span parameters or change memory parameter\n");
+    xmax = atoi(argv[1]);
+    if(xmax<0){
+      printf("ERROR: %d is the incorrect end of simulation interval, use numbers > 0\n", xmax);
       return 0;
     }
-
-    //	ALLOCATE ARRAYS
-
-    fp*** y;
-    y = (fp ***) malloc(workload* sizeof(fp **));
-    for(i=0; i<workload; i++){
-      y[i] = (fp**)malloc((1+xmax)*sizeof(fp*));
-      for(j=0; j<(1+xmax); j++){
-        y[i][j]= (fp *) malloc(EQUATIONS* sizeof(fp));
-      }
-    }
-
-    fp** x;
-    x = (fp **) malloc(workload * sizeof(fp *));
-    for (i= 0; i<workload; i++){
-      x[i]= (fp *)malloc((1+xmax) *sizeof(fp));
-    }
-
-    fp** params;
-    params = (fp **) malloc(workload * sizeof(fp *));
-    for (i= 0; i<workload; i++){
-      params[i]= (fp *)malloc(PARAMETERS * sizeof(fp));
-    }
-
-    fp* com;
-    com = (fp*)malloc(3 * sizeof(fp));
-
-    //	INITIAL VALUES
-
-    // y
-    char* ytext = (char*) "../data/myocyte/y.txt";
-    for(i=0; i<workload; i++){
-      read_file(ytext, y[i][0], EQUATIONS, 1, 0);
-    }
-
-    // params
-    char* params_text = (char*) "../data/myocyte/params.txt";
-    for(i=0; i<workload; i++){
-      read_file(params_text, params[i], PARAMETERS, 1, 0);
-    }
-
-    //	COMPUTATION
-
-    kernel_wrapper(xmax, workload, y, x, params, com);
-
-    FILE * pFile;
-    pFile = fopen ("output.txt","w");
-    if (pFile==NULL)
-    {
-      fprintf (stderr, "ERROR: failed to fopen output.txt for writing");
-      return -1;
-    }
-    // print results
-    int k;
-    for(i=0; i<workload; i++){
-      fprintf(pFile, "WORKLOAD %d:\n", i);
-      for(j=0; j<(xmax+1); j++){
-        fprintf(pFile, "\tTIME %d:\n", j);
-        for(k=0; k<EQUATIONS; k++){
-          fprintf(pFile, "\t\ty[%d][%d][%d]=%10.7e\n", i, j, k, y[i][j][k]);
-        }
-      }
-    }
-
-    fclose (pFile);
-
-    //	FREE SYSTEM MEMORY
-
-    // y values
-    for (i= 0; i< workload; i++){
-      for (j= 0; j< (1+xmax); j++){
-        free(y[i][j]);
-      }
-      free(y[i]);
-    }
-    free(y);
-
-    // x values
-    for (i= 0; i< workload; i++){
-      free(x[i]);
-    }
-    free(x);
-
-    // parameters
-    for (i= 0; i< workload; i++){
-      free(params[i]);
-    }
-    free(params);
-
-    free(com);
   }
+
+  work(xmax, workload);
 
   return 0;
 }

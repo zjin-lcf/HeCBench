@@ -1,24 +1,4 @@
-//  Summary of changes by Lukasz G. Szafaryn:
-
-//  1) The original code was obtained from: Mathematics Source Library (http://mymathlib.webtrellis.net/index.html)
-//  2) This solver and particular solving algorithm used with it (embedded_fehlberg_7_8) were adapted to work with a set of equations, not just one like in original version.
-
-//  3) In order for solver to provide deterministic number of steps (needed for particular amount of memore previousely allocated for results), every next step is incremented by 1 time unit (h_init).
-//  4) Function assumes that time interval starts at 0 (xmin) and ends at integer value (xmax) specified by the uses as a parameter on command line.
-//  5) The appropriate amount of memory is previousely allocated for that range (y).
-
-//  5) This setup in 3) - 5) allows solver to adjust the step ony from current time instance to current time instance + 0.9. The next time instance is current time instance + 1;
-
-//  6) Solver also takes parameters (params) that it then passes to the equations.
-
-//  7) The original solver cannot handle cases when equations return NAN and INF values due to discontinuities and /0. That is why equations provided by user need to make sure that no NAN and INF are returned.
-
-//  Last update: 15 DEC 09
-
-//======================================================================================================================================================150
-//  DESCRIPTION
-//======================================================================================================================================================150
-
+////////////////////////////////////////////////////////////////////////////////
 // int solver( fp (*f)(fp, fp), fp y[],        //
 //       fp x, fp h, fp xmax, fp *h_next, fp tolerance )  //
 //                                                                            //
@@ -47,21 +27,35 @@
 //         h_next has the value to the next size to try.                      //
 //    -1   The solution of y' = f(x,y) from x to xmax failed.                 //
 //    -2   Failed because either xmax < x or the step size h <= 0.            //
-//    -3   Memory limit allocated for results was reached                     //
+//    -3   Memory limit allocated for results was reached                                //
+////////////////////////////////////////////////////////////////////////////////
 
-//========================================================================================================================================================================================================200
-//  DEFINE/INCLUDE
-//========================================================================================================================================================================================================200
+////////////////////////////////////////////////////////////////////////////////
+//  Summary of changes by Lukasz G. Szafaryn:
 
-//======================================================================================================================================================150
-//  COMMON
-//======================================================================================================================================================150
+//  1) The original code was obtained from: Mathematics Source Library (http://mymathlib.webtrellis.net/index.html)
+// 2) This solver and particular solving algorithm used with it (embedded_fehlberg_7_8) were adapted to work with a set of equations, not just one like in original version.
 
-#include "../common.h"                // (in path provided here)
+//  3) In order for solver to provide deterministic number of steps (needed for particular amount of memore previousely allocated for results), every next step is incremented by 1 time unit (h_init).
+//  4) Function assumes that time interval starts at 0 (xmin) and ends at integer value (xmax) specified by the uses as a parameter on command line.
+// 5) The appropriate amount of memory is previousely allocated for that range (y).
 
-//======================================================================================================================================================150
-//  DEFINE
-//======================================================================================================================================================150
+//  5) This setup in 3) - 5) allows solver to adjust the step ony from current time instance to current time instance + 0.9. The next time instance is current time instance + 1;
+
+//  6) Solver also takes parameters (params) that it then passes to the equations.
+
+//  7) The original solver cannot handle cases when equations return NAN and INF values due to discontinuities and /0. That is why equations provided by user need to make sure that no NAN and INF are returned.
+
+//  Last update: 15 DEC 09
+////////////////////////////////////////////////////////////////////////////////
+
+//======================================================================================================================================================
+//======================================================================================================================================================
+//    INCLUDE
+//======================================================================================================================================================
+//======================================================================================================================================================
+
+#include <math.h>
 
 #define max(x,y) ( (x) < (y) ? (y) : (x) )
 #define min(x,y) ( (x) < (y) ? (x) : (y) )
@@ -70,65 +64,38 @@
 #define MIN_SCALE_FACTOR 0.125
 #define MAX_SCALE_FACTOR 4.0
 
-//======================================================================================================================================================150
-//  KERNEL
-//======================================================================================================================================================150
-
-#include "./embedded_fehlberg_7_8.c"        // (in path provided here)
-
-//======================================================================================================================================================150
-//  LIBRARIES
-//======================================================================================================================================================150
-
-#include <stdlib.h>                  // (in path known to compiler)  needed by malloc, free
-#include <math.h>                  // (in path known to compiler)  needed by pow, fabs
-
-//======================================================================================================================================================150
-//  END
-//======================================================================================================================================================150
-
-//========================================================================================================================================================================================================200
-//  FUNCTION
-//========================================================================================================================================================================================================200
-
-int 
-solver(  FP **y,
-    FP *x,
+int solver(
+    sycl::queue &q,
+    fp** y,
+    fp* x,
     int xmax,
-    FP *params,
-    FP *com,
+    fp* params,
+    fp* com,
 
-    buffer<FP,1>& d_initvalu,
-    buffer<FP,1>& d_finavalu,
-    buffer<FP,1>& d_params,
-    buffer<FP,1>& d_com,
-
-    queue &command_queue,
-
-    double *timecopyin,
-    double *timecopykernel,
-    double *timecopyout)
-{
+    fp* d_initvalu,
+    fp* d_finavalu,
+    fp* d_params,
+    fp* d_com) {
 
   //========================================================================================================================
   //  VARIABLES
   //========================================================================================================================
 
   // solver parameters
-  FP err_exponent;
+  fp err_exponent;
   int error;
   int outside;
-  FP h;
-  FP h_init;
-  FP tolerance;
+  fp h;
+  fp h_init;
+  fp tolerance;
   int xmin;
 
   // memory
-  FP scale_min;
-  FP scale_fina;
-  FP* err= (FP *) malloc(EQUATIONS* sizeof(FP));
-  FP* scale= (FP *) malloc(EQUATIONS* sizeof(FP));
-  FP* yy= (FP *) malloc(EQUATIONS* sizeof(FP));
+  fp scale_min;
+  fp scale_fina;
+  fp* err= (fp *) malloc(EQUATIONS* sizeof(fp));
+  fp* scale= (fp *) malloc(EQUATIONS* sizeof(fp));
+  fp* yy= (fp *) malloc(EQUATIONS* sizeof(fp));
 
   // counters
   int i, j, k;
@@ -142,7 +109,7 @@ solver(  FP **y,
   h_init = 1;
   h = h_init;
   xmin = 0;
-  tolerance = 10 / (FP)(xmax-xmin);
+  tolerance = 10 / (fp)(xmax-xmin);
 
   // save value for initial time instance
   x[0] = 0;
@@ -163,17 +130,13 @@ solver(  FP **y,
 
   // Insure that the step size h is not larger than the length of the integration interval.                                            //
   if (h > (xmax - xmin) ) { 
-    h = (FP)xmax - (FP)xmin; 
+    h = (fp)xmax - (fp)xmin; 
   }
 
   //========================================================================================================================
   //    SOLVING
   //========================================================================================================================
-
-#ifdef DEBUG
-  printf("Time Steps: ");
-  fflush(0);
-#endif
+  double ktime_total = 0.0;
 
   for(k=1; k<=xmax; k++) {                      // start after initial value
 
@@ -205,7 +168,8 @@ solver(  FP **y,
       //    EVALUATE ALL EQUATIONS
       //============================================================
 
-      embedded_fehlberg_7_8(
+      ktime_total += embedded_fehlberg_7_8(
+          q,
           x[k],
           h,
           y[k-1],
@@ -217,13 +181,7 @@ solver(  FP **y,
           d_initvalu,
           d_finavalu,
           d_params,
-          d_com,
-
-          command_queue,
-
-          timecopyin,
-          timecopykernel,
-          timecopyout);
+          d_com);
 
       //============================================================
       //    IF THERE WAS NO ERROR FOR ANY OF EQUATIONS, SET SCALE AND LEAVE THE LOOP
@@ -248,9 +206,9 @@ solver(  FP **y,
           yy[i] = tolerance;
         }
         else{
-          yy[i] = std::fabs(y[k-1][i]);
+          yy[i] = fabs(y[k-1][i]);
         }
-        scale[i] = 0.8 * std::pow( tolerance * yy[i] / err[i] , err_exponent );
+        scale[i] = 0.8 * pow(tolerance * yy[i] / err[i], err_exponent);
         if(scale[i]<scale_min){
           scale_min = scale[i];
         }
@@ -283,12 +241,12 @@ solver(  FP **y,
       }
 
       // if instance+step exceeds range limit, limit to that range
-      if ( x[k] + h > (FP)xmax ){
-        h = (FP)xmax - x[k];
+      if ( x[k] + h > (fp)xmax ){
+        h = (fp)xmax - x[k];
       }
 
       // if getting closer to range limit, decrease step
-      else if ( x[k] + h + 0.5 * h > (FP)xmax ){
+      else if ( x[k] + h + 0.5 * h > (fp)xmax ){
         h = 0.5 * h;
       }
 
@@ -308,17 +266,9 @@ solver(  FP **y,
       return -1; 
     }
 
-#ifdef DEBUG
-    printf("%d ", k);
-    fflush(0);
-#endif
-
   }
 
-#ifdef DEBUG
-  printf("\n");
-  fflush(0);
-#endif
+  printf("Total kernel execution time %f (s)\n\n", ktime_total * 1e-9f);
 
   //========================================================================================================================
   //    FREE MEMORY
@@ -333,4 +283,7 @@ solver(  FP **y,
   //========================================================================================================================
 
   return 0;
+
+  //    END OF SOLVER FUNCTION
+
 } 

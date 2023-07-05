@@ -1,9 +1,14 @@
+//========================================================================================================================
+//  INCLUDE/DEFINE
+//========================================================================================================================
+
 #include <stdio.h>
-#include "file.h"
 
+//========================================================================================================================
 //  WRITE FUNCTION
+//========================================================================================================================
 
-void write_file(
+void write(
     const char* filename,
     fp* input, 
     int data_rows, 
@@ -24,8 +29,7 @@ void write_file(
 
   fid = fopen(filename, "w");
   if( fid == NULL ){
-    printf( "ERROR: the file was not created/opened for writing\n" );
-    fflush(0);
+    printf( "The file was not created/opened for writing\n" );
     return;
   }
 
@@ -57,11 +61,14 @@ void write_file(
   //=====================================================================
 
   fclose(fid);
+
 }
 
+//========================================================================================================================
 //  READ FUNCTION
+//========================================================================================================================
 
-void read_file(
+void read(
     const char* filename,
     fp* input,
     int data_rows, 
@@ -82,8 +89,7 @@ void read_file(
 
   fid = fopen(filename, "r");
   if( fid == NULL ){
-    printf( "ERROR: the file was not opened for reading\n" );
-    fflush(0);
+    printf( "The file was not opened for reading\n" );
     return;
   }
 
@@ -113,4 +119,5 @@ void read_file(
   //=====================================================================
 
   fclose(fid);
+
 }
