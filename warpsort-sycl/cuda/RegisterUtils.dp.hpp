@@ -1,7 +1,7 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 #pragma once
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "cuda/CudaUtils.dp.hpp"
 #include "cuda/DeviceTensor.dp.hpp"
 #include "cuda/Pair.dp.hpp"
