@@ -36,8 +36,8 @@ Each benchmark falls into a single category. While such classification is not ac
 ### Finance
     aop, black-scholes, binomial, bonds, libor
 
-### Geographic information system
-    aidw, coordinates, geodesic, hausdorff, haversine
+### Geoscience
+    aidw, coordinates, geodesic, hausdorff, haversine, stsg
 
 ### Graph and Tree
     cc, floydwarshall, floydwarshall2, gc, hbc, hungarian, mis, sssp, rsmt
@@ -1271,6 +1271,9 @@ Early results are shown [here](results/README.md)
 
 ### streamcluster (opencl)
   Streamcluster in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### stsg (cuda)
+  Spatial-temporal Savitzky-Golay method for reconstructing high-quality NDVI time series (https://github.com/HPSCIL/cuSTSG)
 
 ### su3 (sycl)
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
