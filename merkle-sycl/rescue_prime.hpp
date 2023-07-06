@@ -75,14 +75,14 @@ apply_constants(const sycl::ulong4* state_in,
 //
 // Adapted from here
 // https://github.com/itzmeanjan/vectorized-rescue-prime/blob/614500dd1f271e4f8badf1305c8077e2532eb510/kernel.cl#L143-L166
-SYCL_EXTERNAL sycl::ulong
+SYCL_EXTERNAL unsigned long
 accumulate_vec4(sycl::ulong4 a);
 
 // Accumulates state of rescue prime hash into single prime field element
 //
 // Takes some inspiration from
 // https://github.com/itzmeanjan/vectorized-rescue-prime/blob/614500dd1f271e4f8badf1305c8077e2532eb510/kernel.cl#L168-L199
-SYCL_EXTERNAL sycl::ulong
+SYCL_EXTERNAL unsigned long
 accumulate_state(const sycl::ulong4* state);
 
 // Performs matrix vector multiplication; updates state of rescue prime
@@ -104,7 +104,7 @@ apply_mds(const sycl::ulong4* state_in,
 // https://github.com/itzmeanjan/vectorized-rescue-prime/blob/614500dd1f271e4f8badf1305c8077e2532eb510/kernel.cl#L242-L258
 // for source of inspiration
 SYCL_EXTERNAL void
-exp_acc(const sycl::ulong m,
+exp_acc(const unsigned long m,
         const sycl::ulong4* base,
         const sycl::ulong4* tail,
         sycl::ulong4* const out);
@@ -156,9 +156,9 @@ apply_rescue_permutation(const sycl::ulong4* state_in,
 // Adapted from
 // https://github.com/itzmeanjan/vectorized-rescue-prime/blob/614500dd1f271e4f8badf1305c8077e2532eb510/kernel.cl#L345-L422
 SYCL_EXTERNAL void
-hash_elements(const sycl::ulong* input_elements,
-              const sycl::ulong count,
-              sycl::ulong* const hash,
+hash_elements(const unsigned long* input_elements,
+              const unsigned long count,
+              unsigned long* const hash,
               const sycl::ulong4* mds,
               const sycl::ulong4* ark1,
               const sycl::ulong4* ark2);
@@ -175,8 +175,8 @@ hash_elements(const sycl::ulong* input_elements,
 // Adapted from
 // https://github.com/itzmeanjan/vectorized-rescue-prime/blob/77e371ef2fb11ba7d7369005a60a0888393729f0/kernel.cl#L424-L474
 SYCL_EXTERNAL void
-merge(const sycl::ulong* input_hashes,
-      sycl::ulong* const merged_hash,
+merge(const unsigned long* input_hashes,
+      unsigned long* const merged_hash,
       const sycl::ulong4* mds,
       const sycl::ulong4* ark1,
       const sycl::ulong4* ark2);
@@ -196,7 +196,7 @@ prepare_ark1(sycl::ulong4* const ark1);
 void
 prepare_ark2(sycl::ulong4* const ark2);
 
-inline constexpr sycl::ulong MDS[144] = {
+inline constexpr unsigned long MDS[144] = {
   2108866337646019936ull,  11223275256334781131ull, 2318414738826783588ull,
   11240468238955543594ull, 8007389560317667115ull,  11080831380224887131ull,
   3922954383102346493ull,  17194066286743901609ull, 152620255842323114ull,
@@ -258,7 +258,7 @@ inline constexpr sycl::ulong MDS[144] = {
   12096331252283646217ull, 13208137848575217268ull, 5548519654341606996ull,
 };
 
-inline constexpr sycl::ulong ARK1[84] = {
+inline constexpr unsigned long ARK1[84] = {
   13917550007135091859ull, 16002276252647722320ull, 4729924423368391595ull,
   10059693067827680263ull, 9804807372516189948ull,  15666751576116384237ull,
   10150587679474953119ull, 13627942357577414247ull, 2323786301545403792ull,
@@ -295,7 +295,7 @@ inline constexpr sycl::ulong ARK1[84] = {
   17040450522225825296ull, 8787650312632423701ull,  7431110942091427450ull,
 };
 
-inline constexpr sycl::ulong ARK2[84] = {
+inline constexpr unsigned long ARK2[84] = {
   7989257206380839449ull,  8639509123020237648ull,  6488561830509603695ull,
   5519169995467998761ull,  2972173318556248829ull,  14899875358187389787ull,
   14160104549881494022ull, 5969738169680657501ull,  5116050734813646528ull,
