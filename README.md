@@ -1082,6 +1082,9 @@ Early results are shown [here](results/README.md)
 ### radixsort (opencl)
   A parallel radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
   
+### radixsort2 (cuda)
+  A library-based radix sort (https://github.com/NVIDIA/cuda-samples)
+  
 ### rainflow (c)
   A fast rainflow cycle counting algorithm (https://github.com/carlos-souto/rainflow-cycle-counting)
   
