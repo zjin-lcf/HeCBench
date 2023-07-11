@@ -10,7 +10,7 @@
  */
 
 /*
- * This application demonstrates how to use the CUDA API to use multiple GPUs
+ * This application demonstrates how to use the SYCL API to use multiple GPUs
  */
 
 #include <math.h>

@@ -10,7 +10,7 @@
  */
 
 /*
- * This application demonstrates how to use the CUDA API to use multiple GPUs
+ * This application demonstrates how to use the HIP API to use multiple GPUs
  */
 
 #include <math.h>
@@ -23,7 +23,7 @@
 #endif
 
 #include "simpleMultiDevice.h"
-
+-
 // Data configuration
 #ifndef MAX_GPU_COUNT 
   #define MAX_GPU_COUNT 8
