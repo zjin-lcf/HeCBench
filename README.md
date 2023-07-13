@@ -43,7 +43,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, floydwarshall2, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, tensorAccessor, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, tensorAccessor, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     accuracy, adam, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, sampling, scel, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
@@ -980,6 +980,9 @@ Early results are shown [here](results/README.md)
 ### norm2 (cuda)
   Compute the Euclidean norm of a vector (https://docs.nvidia.com/cuda/cublas)
 
+### nosync (cuda)
+  Stream synchronization in Thrust and oneDPL (https://github.com/NVIDIA/thrust/tree/main/examples)
+
 ### nqueen (cuda)
   N-Queens (https://github.com/tcarneirop/ChOp)
 
@@ -1083,7 +1086,7 @@ Early results are shown [here](results/README.md)
   A parallel radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
   
 ### radixsort2 (cuda)
-  A library-based radix sort (https://github.com/NVIDIA/cuda-samples)
+  A library-based sort-by-key (https://github.com/NVIDIA/cuda-samples)
   
 ### rainflow (c)
   A fast rainflow cycle counting algorithm (https://github.com/carlos-souto/rainflow-cycle-counting)
