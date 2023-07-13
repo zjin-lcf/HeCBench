@@ -4,13 +4,8 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cublas_v2.h>
+#include "utils.h"
 
-int8_t float2int8(float f, float scale) {
-  int8_t i = int8_t(f * scale);
-  if (i < -127) i = -127;
-  if (i > 127) i = 127;
-  return i;
-}
 
 template <typename T, typename S>
 void allocate_memory(int m, int n, int k, T **A, T **B, S **C) {
@@ -66,7 +61,7 @@ void test_gemm(cublasHandle_t handle,
   T *A, T *B, S *C,
   const S *alpha, const S *beta, int algo, const int iteration)
 {
-  float total_time = 0;
+  double total_time = 0;
   struct timeval start, end;
 
   for (int i = 0; i < iteration; ++i) {
@@ -95,18 +90,24 @@ void test_gemm(cublasHandle_t handle,
       total_time += (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) * 0.001;
     }
   }
-  if (total_time > 0)
-    printf("algo %d: %.3f ms\n", algo, total_time / (iteration - 1));
+  if (total_time > 0.0) {
+    double avg_time = total_time / (iteration - 1);
+    printf("algo %d: %.3f ms\n", algo, avg_time);
+    performance(m, n, k, std::is_same<T, int8_t>::value, avg_time * 1e-3);
+  }
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <iterations>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <M> <N> <K> <iterations>\n", argv[0]);
+    printf("C = A X B (A: M * K, B: K * N, C: M * N)\n");
     return 1;
   }
-  const int iteration = atoi(argv[1]);
+  const int m = atoi(argv[1]);
+  const int n = atoi(argv[2]);
+  const int k = atoi(argv[3]);
+  const int iteration = atoi(argv[4]);
 
-  const int m = 4096, n = 8192, k = 1024;
   printf("shape: (%d, %d) x (%d, %d)\n", m, k, k, n);
   int start_algo = CUBLAS_GEMM_DEFAULT;
   int end_algo = CUBLAS_GEMM_DEFAULT;
