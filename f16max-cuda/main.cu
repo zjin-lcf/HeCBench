@@ -7,7 +7,7 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 
-#define NUM_OF_BLOCKS 1024
+#define NUM_OF_BLOCKS 1048576
 #define NUM_OF_THREADS 256
 
 __device__ half2 half_max(const half2 a, const half2 b) {
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
   }
   const int repeat = atoi(argv[1]);
 
-  size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
+  size_t size = (size_t)NUM_OF_BLOCKS * NUM_OF_THREADS;
 
   const size_t size_bytes = size * sizeof(half2);
 
