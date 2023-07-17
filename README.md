@@ -25,7 +25,7 @@ Each benchmark falls into a single category. While such classification is not ac
     affine, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, colorwheel, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
     
 ### Cryptography
-    aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
+    aes, bitcracker, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
     atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, minmax, mpc, mtf, sc, scan, scan2, scan3, segment-reduce
@@ -257,6 +257,9 @@ Early results are shown [here](results/README.md)
 ### binomial (cuda)
   Evaluate fair call price for a given set of European options under binomial model (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
+### bitcracker (cuda)
+  Open-source password cracking tool for storage devices (https://github.com/e-ago/bitcracker.git)
+
 ### bitonic-sort (sycl)
   Bitonic sorting (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/)
 
@@ -448,7 +451,7 @@ Early results are shown [here](results/README.md)
   
 ### deredundancy (sycl)
   Gene sequence de-redundancy is a precise gene sequence de-redundancy software that supports heterogeneous acceleration (https://github.com/JuZhenCS/gene-sequences-de-redundancy)
-  
+
 ### diamond (opencl)
   Mask sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
 
