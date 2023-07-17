@@ -34,8 +34,7 @@ obj = $(source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl \
-          -I$(HOME)/mini-app/HeCBench/oneDPL/include \
-          -I$(HOME)/mini-app/HeCBench/oneTBB/include 
+          -I./oneDPL/include -I./oneTBB/include
 
 ifeq ($(CUDA), yes)
   ONEMKL = yes
