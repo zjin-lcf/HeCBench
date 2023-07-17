@@ -67,7 +67,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
