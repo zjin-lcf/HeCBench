@@ -470,7 +470,7 @@
     ]
   ],
   "all-pairs-distance-cuda": [
-    "(?:Average kernel execution time \\(w/o shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
+    "(?:Average kernel execution time \\(w/o? shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000"
     ]
@@ -877,7 +877,7 @@
     ]
   ],
   "all-pairs-distance-hip": [
-    "(?:Average kernel execution time \\(w/o shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
+    "(?:Average kernel execution time \\(w/o? shared memory\\): )([0-9.+-e]+)(?: \\(us\\))",
     [
       "1000"
     ]
