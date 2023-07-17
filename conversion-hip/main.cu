@@ -5,8 +5,6 @@
 #include <hip/hip_bfloat16.h>
 #include <hip/hip_fp16.h>
 
-typedef unsigned char uchar;
-
 template <typename Td, typename Ts>
 __global__
 void cvt (      Td *__restrict__ dst,
