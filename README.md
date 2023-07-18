@@ -64,7 +64,7 @@ Each benchmark falls into a single category. While such classification is not ac
     extrema, fft, lombscargle, sosfil, zmddft
 
 ### Simulation
-    ace, adv, amgmk, axhelm, bh, bspline-vgh, burger, cooling, ccsd-trpdrv, che, chemv, chi2, clenergy, cmp, cobahh, d2q9_bgk, d3q19_bgk, damage, ddbp, dslash, easyWave, eikonal, fdtd3d, feynman-kac, fhd, fluidSim, gibbs, goulash, gpp, grrt, haccmk, halo-finder, heartwall, heat, heat2d, henry, hexicton, hotspot3D, hwt1d, hypterm, ising, iso2dfd, laplace, laplace3d, lavaMD, lid-driven-cavity, loopback, lsqt, lulesh, mcmd, md, mdh, metropolis, miniFE, minimod, minisweep, miniWeather, multimaterial, myocte, nbody, particle-diffusion, particlefilter, particles, pathfinder, pns, projectile, pso, rainflow, reaction, rsbench, rtm8, rushlarsen, s3d, su3sheath, simplemoc, sparkler, sph, sw4ck, tensorT, testSNAP, tissue, tpacf, tqs, tridiagonal, tsa, vanGenuchten, vmc, wlcpow, wsm5, xlqc, xsbench
+    ace, adv, amgmk, axhelm, bh, bspline-vgh, burger, cooling, ccsd-trpdrv, che, chemv, chi2, clenergy, cmp, cobahh, d2q9_bgk, d3q19_bgk, damage, ddbp, dslash, easyWave, eikonal, fdtd3d, feynman-kac, fhd, fluidSim, gibbs, goulash, gpp, grrt, haccmk, halo-finder, heartwall, heat, heat2d, henry, hexicton, hotspot3D, hwt1d, hypterm, ising, iso2dfd, laplace, laplace3d, lavaMD, lid-driven-cavity, loopback, lsqt, lulesh, mcmd, md, mdh, metropolis, miniFE, minimod, minisweep, miniWeather, multimaterial, myocte, nbody, particle-diffusion, particlefilter, particles, pathfinder, pns, projectile, pso, rainflow, reaction, rsbench, rtm8, rushlarsen, s3d, su3sheath, simplemoc, slit, sparkler, sph, sw4ck, tensorT, testSNAP, tissue, tpacf, tqs, tridiagonal, tsa, vanGenuchten, vmc, wlcpow, wsm5, xlqc, xsbench
 
 ### Sorting
     bitonic-sort, hybridsort, is, merge, quicksort, radixsort, segsort, sort, sortKV, split, warpsort
@@ -1227,6 +1227,9 @@ Early results are shown [here](results/README.md)
 
 ### simpleSpmv (cuda)
   Simple sparse matrix vector multiply (https://github.com/passlab/CUDAMicroBench) 
+
+### slit (cuda)
+  Slit experiment to compute diffraction patterns (https://github.com/bamaratunga/cuda_fft.git)
 
 ### slu (cuda)
   Sparse LU factorization (https://github.com/sheldonucr/GLU_public)
