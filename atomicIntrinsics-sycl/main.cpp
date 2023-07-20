@@ -51,13 +51,36 @@ void testKernel(sycl::nd_item<1> &item, T *g_odata)
   auto ao6 = ATOMIC_REF(g_odata[6]);
   ao6.fetch_xor((T)(i));
 
-  // atomicInc and atomicDec are not implemented yet
+  // atomicInc and atomicDec are not fully supported across
+  // vendors' GPUs. The implementations are from Syclomatic.
+  /*
+  auto ao7 = ATOMIC_REF(g_odata[7]);
+  while (true) {
+    T old = ao7.load();
+    if (old >= 17) {
+      if (ao7.compare_exchange_strong(old, 0))
+        break;
+    } else if (ao7.compare_exchange_strong(old, old + 1))
+      break;
+  }
+
+  auto ao8 = ATOMIC_REF(g_odata[8]);
+  while (true) {
+    T old = ao8.load();
+    if (old <= 0) {
+      if (ao8.compare_exchange_strong(old, 137))
+        break;
+    } else if (ao8.compare_exchange_strong(old, old - 1))
+      break;
+  }
+  */
 }
 
 template <typename T>
 void testcase(sycl::queue &q, const int repeat)
 {
-  unsigned int len = 1 << 27;
+  //unsigned int len = 1 << 27;
+  unsigned int len = 1 << 16;
   unsigned int localWorkSize = 256;
   unsigned int globalWorkSize = (len + localWorkSize - 1) /
                                 localWorkSize * localWorkSize;
