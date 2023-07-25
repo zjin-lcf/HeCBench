@@ -71,7 +71,7 @@ class Benchmark:
             print("%%%%%%%% " + self.name)
             with lock:
                 with open(outfile_name, 'a') as f:
-                    f.write(self.name + ",FAILED, N/A, " + "failed compilation\n")
+                    f.write(self.name + ",FAILED,N/A," + "failed compilation\n")
             print("***write to file - failed compilation***")
             with lock:
                 benches.remove(self)
@@ -113,9 +113,8 @@ class Benchmark:
                 print(i)
             res_l.append(sum([float(i) for i in res])) #in case of multiple outputs sum them
             if self.invert:
-                res[0] = 1/res[0]
+                res_l[2] = 1/res_l[2]
         if verify_res:
-            print("****VERIFY****")
             passing = True
             for v in verify_res:
                 if ("pass" not in v.lower() and "succe" not in v.lower() and "correct" not in v.lower()) or v.lower() == "not passed":
@@ -207,10 +206,10 @@ def main():
     t0 = time.time()
     try:
         # Print out a list of benchmarks to be compiled
-        print("********************************")
+        print("*************FROM JSON FILE - START LIST*************")
         for b in benches:
             print(b.name)
-        print("********************************")
+        print("**************FROM JSON FILE - END LIST**************")
         # Compile with multiprocessing
         with multiprocessing.Pool() as p:
             p.starmap(comp, [(b, benches, args.output, lock) for b in benches])
@@ -220,10 +219,10 @@ def main():
         sys.exit(1)
 
     # Print out a list of benchmarks after compiling (failed-to-compile ones are removed)
-    print("*******************AFTER MODIFY*******************")
+    print("**********COMPILED BENCHMARKS (READY TO RUN) - START LIST**********")
     for b in benches:
         print(b.name)
-    print("*******************AFTER MODIFY*******************")
+    print("**********COMPILED BENCHMARKS (READY TO RUN) - END LIST**********")
 
     t_compiled = time.time()
 
@@ -237,7 +236,7 @@ def main():
                 print("running: {}".format(b.name))
 
             if args.warmup:
-                print("***warmup***")
+                print("***" + b.name + " warmup***")
                 b.run()
 
             # Run args.repeat times (set the min to the first run, then compare) (if output is not float, directly attatch)
