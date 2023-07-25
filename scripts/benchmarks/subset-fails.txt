@@ -23,6 +23,8 @@ concat-hip
 bm3d-cuda
 ans-hip
 cm-hip
+bh-hip
+myocyte-hip
 
 
 
