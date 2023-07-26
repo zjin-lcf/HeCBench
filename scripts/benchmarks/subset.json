@@ -2219,16 +2219,20 @@
   "rsbench-hip": [
     "(?:Kernel initialization, compilation, and execution took )([0-9:.+-e]+)(?: seconds.)",
     [
-      "-s small",
-      "-m event"
+      "-s",
+      "small",
+      "-m",
+      "event"
     ],
     "rsbench"
   ],
   "rsbench-sycl": [
     "(?:Kernel initialization, compilation, and execution took )([0-9:.+-e]+)(?: seconds.)",
     [
-      "-s small",
-      "-m event"
+      "-s",
+      "small",
+      "-m",
+      "event"
     ],
     "rsbench"
   ],
