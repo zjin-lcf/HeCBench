@@ -73,8 +73,11 @@ $(program): $(obj)
 clean:
 	rm -rf $(program) $(obj)
 
-test: $(program)
+output.tns: ../mmcsf-cuda/generate_tensor.py
+	python ../mmcsf-cuda/generate_tensor.py output.tns 2%4096 2%4096 2%4096 2%512
+
+test: ../mmcsf-cuda/toy.tns $(program)
 	./$(program) -i ../mmcsf-cuda/toy.tns -m 0 -R 32 -f 128 -w 1
   
-run: $(program)
-	./$(program) -i ../mmcsf-cuda/output.tns -m 0 -R 32 -f 128 -w 4
+run: output.tns $(program)
+	./$(program) -i output.tns -m 0 -R 32 -f 128 -w 4
