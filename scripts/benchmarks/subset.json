@@ -41,9 +41,9 @@
   "aidw-sycl": [
     "(?:Average kernel execution time )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
     [
-      "100",
+      "10",
       "1",
-      "10"
+      "100"
     ]
   ],
   "all-pairs-distance-sycl": [
@@ -466,9 +466,9 @@
   "aidw-cuda": [
     "(?:Average kernel execution time )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
     [
-      "100",
+      "10",
       "1",
-      "10"
+      "100"
     ]
   ],
   "all-pairs-distance-cuda": [
@@ -875,9 +875,9 @@
   "aidw-hip": [
     "(?:Average kernel execution time )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
     [
-      "100",
+      "10",
       "1",
-      "10"
+      "100"
     ]
   ],
   "all-pairs-distance-hip": [
