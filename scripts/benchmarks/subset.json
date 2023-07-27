@@ -264,7 +264,7 @@
     ]
   ],
   "jacobi-sycl": [
-    "(?:Total elapsed time: )([0-9.+-e]+)(?: seconds)"
+    "(?:Average execution time per iteration: )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))"
   ],
   "laplace-sycl": [
     "(?:iterations: )([0-9.+-e]+)(?: (?:s|ms|us))"
@@ -681,7 +681,7 @@
     "(?:elapsed time: )([0-9.+-e]+)(?: sec)"
   ],
   "jacobi-cuda": [
-    "(?:Total elapsed time: )([0-9.+-e]+)(?: seconds)"
+    "(?:Average execution time per iteration: )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))"
   ],
   "laplace-cuda": [
     "(?:iterations: )([0-9.+-e]+)(?: (?:s|ms|us))"
