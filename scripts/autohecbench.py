@@ -261,7 +261,7 @@ def main():
         except Exception as err:
             print("Error running: ", b.name)
             print(err)
-            outfile.write(b.name + ",COMPILED,ERR," + str(err).replace('\n', ' ').replace(',', ' ') + ",N/A," + b.res_regex + "\n")
+            outfile.write(b.name + ",COMPILED,ERR," + str(err).replace('\n', ' ').replace(',', ' ') + ",N/A," + str(b.res_regex).replace(',', ' ') + "\n")
             print("***write to file - error***")
         print("####DONE BENCHMARK - " + b.name + "####")
 
