@@ -23,7 +23,8 @@ concat-hip
 bm3d-cuda
 ans-hip
 cm-hip
-
+bh-hip
+myocyte-hip
 
 
 ###Benchmarks without input data (Please refer to the error sheet for benchmark set)###

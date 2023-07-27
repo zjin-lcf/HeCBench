@@ -46,6 +46,7 @@ class Benchmark:
         self.invert = invert
         self.clean = args.clean
         self.verbose = args.verbose
+        self.timeout = args.timeout
 
     def __eq__(self, other):
         return self.name == other.name
@@ -82,7 +83,7 @@ class Benchmark:
 
     def run(self):
         cmd = ["./" + self.binary] + self.args
-        proc = subprocess.run(cmd, cwd=self.path, stdout=subprocess.PIPE, encoding="ascii")
+        proc = subprocess.run(cmd, cwd=self.path, stdout=subprocess.PIPE, encoding="ascii", timeout=self.timeout)
         out = proc.stdout
         if self.verbose:
             print(" ".join(cmd))
@@ -163,10 +164,13 @@ def main():
                         help='List of failing benchmarks to ignore')
     parser.add_argument('bench', nargs='+',
                         help='Either specific benchmark name or sycl, cuda, or hip')
+    parser.add_argument('--timeout', '-t', type=int,
+                        help='Timeout limit in seconds', default=120)
 
     args = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
+
 
     # Load benchmark data
     if args.bench_data:
