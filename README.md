@@ -74,7 +74,7 @@ Each benchmark falls into a single category. While such classification is not ac
 
 
 # Run a benchmark
-  Option 1: Makefile scripts   
+  Option 1: Makefile scripts that build and run an individual benchmark 
   
       Navigate to a benchmark in CUDA (benchmark-cuda) and type  
       `make ARCH=sm_70 run`  // run on a NIVIDA GPU device with compute capability 7.0
@@ -93,7 +93,9 @@ Each benchmark falls into a single category. While such classification is not ac
       `make -f Makefile.aomp run` (targeting AMD GPUs)
       `make run`                  (targeting Intel GPUs) 
       
-      Users need to choose appropriate values (e.g., `sm_80`, `sm_90`, `gfx906`, `gfx1030`) for their target devices  
+      Users may need to set appropriate values (e.g., `sm_80`, `sm_90`, `gfx906`, `gfx1030`) for their target offloading devices  
+      `make -f Makefile.nvc SM=cc80 run`
+      `make -f Makefile.aomp ARCH=gfx906 run`
       
   Option 2: Python scripts that help build, run and gather results from the benchmarks. As well as a basic script to compare results from two different runs.
 
