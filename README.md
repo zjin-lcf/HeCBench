@@ -107,7 +107,7 @@ Each benchmark falls into a single category. While such classification is not ac
     addition if there are failing benchmarks in the `.json` list, an
     additional text file can be provided with a list of benchmarks to skip
     when running all of them. Benchmarks in the text file can still be run
-    explicitely.
+    explicitly.
 
     For example to run all the SYCL benchmarks and then all the CUDA
     benchmarks and compare the two:
