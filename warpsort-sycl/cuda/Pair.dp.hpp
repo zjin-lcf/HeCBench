@@ -1,7 +1,7 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 #pragma once
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 namespace facebook { namespace cuda {
 

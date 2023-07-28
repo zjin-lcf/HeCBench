@@ -4,7 +4,7 @@
 
 # Compiler can be set below, or via environment variable
 CC        = hipcc
-OPTIMIZE  = yes 
+OPTIMIZE  = yes
 DEBUG     = no
 INPUT_SIZE = 1024
 
@@ -30,7 +30,7 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
 

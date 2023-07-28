@@ -1,6 +1,9 @@
 # HeCBench
 This repository contains a collection of heterogeneous computing benchmarks written with CUDA, HIP, SYCL/DPC++, and OpenMP-4.5 target offloading for studying performance, portability, and productivity. 
 
+## Background, use cases and future work
+Z. Jin and J. S. Vetter, "A Benchmark Suite for Improving Performance Portability of the SYCL Programming Model," 2023 IEEE International Symposium on Performance Analysis of Systems and Software (ISPASS), Raleigh, NC, USA, 2023, pp. 325-327, doi: 10.1109/ISPASS57527.2023.00041. (https://ieeexplore.ieee.org/document/10158214)
+
 # Software installation
 [AMD ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html)  
 [Intel DPC++ compiler](https://github.com/intel/llvm/blob/sycl/sycl/doc/GetStartedGuide.md) or [Intel oneAPI toolkit](https://software.intel.com/content/www/us/en/develop/articles/installation-guide-for-intel-oneapi-toolkits.html)  
@@ -19,13 +22,13 @@ Each benchmark falls into a single category. While such classification is not ac
     cmembench, babelstream, memcpy, memtest, randomAccess, shmembench, triad 
 
 ### Bioinformatics
-    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, prna, sa, snake
+    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
 
 ### Computer vision and image processing
-    affine, agsg, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
+    affine, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, colorwheel, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
     
 ### Cryptography
-    aes, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
+    aes, bitcracker, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
     atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, minmax, mpc, mtf, sc, scan, scan2, scan3, segment-reduce
@@ -36,20 +39,20 @@ Each benchmark falls into a single category. While such classification is not ac
 ### Finance
     aop, black-scholes, binomial, bonds, libor
 
-### Geographic information system
-    aidw, coordinates, geodesic, hausdorff, haversine
+### Geoscience
+    aidw, coordinates, geodesic, hausdorff, haversine, stsg
 
 ### Graph and Tree
     cc, floydwarshall, floydwarshall2, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, tensorAccessor, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, ert, interleave, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, tensorAccessor, threadfence, vote, wordcount, zerocopy 
 
 ### Machine learning  
     accuracy, adam, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, sampling, scel, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
 
 ### Math
-    atan2, complex, cross, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, michalewicz, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
+    atan2, complex, cross, determinant, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, michalewicz, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, sptrsv, thomas, wyllie, zeropoint
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -71,7 +74,7 @@ Each benchmark falls into a single category. While such classification is not ac
 
 
 # Run a benchmark
-  Option 1: Makefile scripts  
+  Option 1: Makefile scripts   
   
       Navigate to a benchmark in CUDA (benchmark-cuda) and type  
       `make ARCH=sm_70 run`  // run on a NIVIDA GPU device with compute capability 7.0
@@ -80,9 +83,10 @@ Each benchmark falls into a single category. While such classification is not ac
       `make run`
       
       Navigate to a benchmark in SYCL (benchmark-sycl) and type   
-     `make CUDA=yes CUDA_ARCH=sm_70 GCC_TOOLCHAIN="" run` (targeting NVIDIA GPUs)
-     `make HIP=yes HIP_ARCH=gfx908 run`                   (targeting AMD GPUs)  
-     `make run` or `make CC=icpx run`                     (targeting Intel GPUs)
+     `make CUDA=yes CUDA_ARCH=sm_70 GCC_TOOLCHAIN="" run` (targeting an NVIDIA GPU)
+     `make HIP=yes HIP_ARCH=gfx908 run`                   (targeting an AMD GPU)  
+     `make run` or `make CC=icpx run`                     (targeting an Intel GPU)
+      NOTE: `--gcc-toolchain` may be required for the SYCL compiler to select the proper GNU toolchain; otherwise unset GCC_TOOLCHAIN
      
       Navigate to a benchmark in OpenMP (benchmark-omp) and type  
       `make -f Makefile.nvc run`  (targeting NVIDIA GPUs)
@@ -170,9 +174,6 @@ Early results are shown [here](results/README.md)
 ### affine (opencl)
   Affine transformation (https://github.com/Xilinx/SDAccel_Examples/tree/master/vision/affine)
 
-### agsg (cuda)
-  Accelerated gSLIC for superpixel generation used in object segmentation (https://vgg.fiit.stuba.sk/2015-10/accelerated-gslic-for-superpixel-generation-used-in-object-segmentation/)
-
 ### aidw (cuda)
   Adaptive inverse distance weighting (Mei, G., Xu, N. & Xu, L. Improving GPU-accelerated adaptive IDW interpolation algorithm using fast kNN search. SpringerPlus 5, 1389 (2016))
 
@@ -259,6 +260,9 @@ Early results are shown [here](results/README.md)
 
 ### binomial (cuda)
   Evaluate fair call price for a given set of European options under binomial model (https://docs.nvidia.com/cuda/cuda-samples/index.html)
+
+### bitcracker (cuda)
+  Open-source password cracking tool for storage devices (https://github.com/e-ago/bitcracker.git)
 
 ### bitonic-sort (sycl)
   Bitonic sorting (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/)
@@ -362,6 +366,9 @@ Early results are shown [here](results/README.md)
 ### collision (cuda)
   Check collision of duplicate values (https://github.com/facebookarchive/fbcuda)
 
+### colorwheel (c/c++)
+   Color encoding of flow vectors (https://vision.middlebury.edu/flow/code/flow-code/colorcode.cpp)
+
 ### columnarSolver (cuda)
   Dimitrov, M. and Esslinger, B., 2021. CUDA Tutorial--Cryptanalysis of Classical Ciphers Using Modern GPUs and CUDA. arXiv preprint arXiv:2103.13937.
 
@@ -448,6 +455,9 @@ Early results are shown [here](results/README.md)
   
 ### deredundancy (sycl)
   Gene sequence de-redundancy is a precise gene sequence de-redundancy software that supports heterogeneous acceleration (https://github.com/JuZhenCS/gene-sequences-de-redundancy)
+
+### determinant (cuda)
+  Calculate the determinant of a matrix using library-based decomposition and strided reduction (https://github.com/OrangeOwlSolutions/Linear-Algebra)
   
 ### diamond (opencl)
   Mask sequences kernel in Diamond (https://github.com/bbuchfink/diamond)
@@ -980,6 +990,9 @@ Early results are shown [here](results/README.md)
 ### norm2 (cuda)
   Compute the Euclidean norm of a vector (https://docs.nvidia.com/cuda/cublas)
 
+### nosync (cuda)
+  Stream synchronization in Thrust and oneDPL (https://github.com/NVIDIA/thrust/tree/main/examples)
+
 ### nqueen (cuda)
   N-Queens (https://github.com/tcarneirop/ChOp)
 
@@ -1021,6 +1034,9 @@ Early results are shown [here](results/README.md)
 
 ### pathfinder (opencl)
   PathFinder in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### pcc (cuda)
+  Compute pairwise Pearson’s correlation coefficient (https://github.com/pcdslab/Fast-GPU-PCC)
 
 ### perlin (cuda)
   Perlin noise generator (https://github.com/silverweed/perlin_cuda)
@@ -1078,6 +1094,9 @@ Early results are shown [here](results/README.md)
 
 ### radixsort (opencl)
   A parallel radix sort (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+  
+### radixsort2 (cuda)
+  A library-based sort-by-key (https://github.com/NVIDIA/cuda-samples)
   
 ### rainflow (c)
   A fast rainflow cycle counting algorithm (https://github.com/carlos-souto/rainflow-cycle-counting)
@@ -1269,6 +1288,9 @@ Early results are shown [here](results/README.md)
 ### streamcluster (opencl)
   Streamcluster in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
 
+### stsg (cuda)
+  Spatial-temporal Savitzky-Golay method for reconstructing high-quality NDVI time series (https://github.com/HPSCIL/cuSTSG)
+
 ### su3 (sycl)
   Lattice QCD SU(3) matrix-matrix multiply microbenchmark (https://gitlab.com/NERSC/nersc-proxies/su3_bench)
 
@@ -1392,4 +1414,3 @@ Abhishek Bagusetty, Andrey Alekseenko, Anton Gorshkov, Beau Johnston, Bernhard E
 Codeplay<sup>®</sup> and Intel<sup>®</sup> for their contributions to the oneAPI ecosystem   
 
 The project uses resources at the Intel<sup>®</sup> DevCloud, the Chameleon testbed supported by the National Science Foundation, the Argonne Leadership Computing Facility supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC02-06CH11357, and the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.
-

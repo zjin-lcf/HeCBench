@@ -68,7 +68,7 @@
 #include <math.h>
 #include <string.h>
 #include <chrono>
-#include "define.c"
+#include "define.h"
 #include "file.c"
 #include "work.cu"
 

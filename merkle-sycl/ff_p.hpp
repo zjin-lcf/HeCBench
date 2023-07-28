@@ -1,5 +1,5 @@
 #pragma once
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 // Prime modulas of selected field, F_p,
 // where p = 2 ** 64 - 2 ** 32 + 1

@@ -120,7 +120,7 @@
 			}
 
 			// Keep track of the total change of this thread's matrix elements
-			total_diff += cl::sycl::fabs(new_val - old_val);
+			total_diff += sycl::fabs(new_val - old_val);
 			
 			// We need to synchronize between virtual thread blocks to prevent
 			//  threads from writing the values from the buffer to the actual

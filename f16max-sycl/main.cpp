@@ -4,7 +4,7 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 
-#define NUM_OF_BLOCKS 1024
+#define NUM_OF_BLOCKS 1048576
 #define NUM_OF_THREADS 256
 
 /*==================================================
@@ -13,33 +13,15 @@
  https://github.com/cpc/hipcl
  ==================================================*/
 
-typedef struct __attribute__((__aligned__(4)))
-{
-  union {
-    unsigned char c[4];
-    unsigned int ui;
-  };
-} ucharHolder;
-
-typedef struct __attribute__((__aligned__(8)))
-{
-  union {
-    unsigned int ui[2];
-    unsigned char c[8];
-  };
-} uchar2Holder;
-
-inline
-unsigned int __byte_perm(unsigned int x, unsigned int y, unsigned int s) {
-  uchar2Holder cHoldVal;
-  ucharHolder cHoldOut;
-  cHoldVal.ui[0] = x;
-  cHoldVal.ui[1] = y;
-  cHoldOut.c[0] = cHoldVal.c[s & 0x7];
-  cHoldOut.c[1] = cHoldVal.c[(s >> 4) & 0x7];
-  cHoldOut.c[2] = cHoldVal.c[(s >> 8) & 0x7];
-  cHoldOut.c[3] = cHoldVal.c[(s >> 12) & 0x7];
-  return cHoldOut.ui;
+inline unsigned int __byte_perm(unsigned int a, unsigned int b,
+                                unsigned int s) {
+  unsigned int res;
+  res =
+      ((((std::uint64_t)b << 32 | a) >> (s & 0x7) * 8) & 0xff) |
+      (((((std::uint64_t)b << 32 | a) >> ((s >> 4) & 0x7) * 8) & 0xff) << 8) |
+      (((((std::uint64_t)b << 32 | a) >> ((s >> 8) & 0x7) * 8) & 0xff) << 16) |
+      (((((std::uint64_t)b << 32 | a) >> ((s >> 12) & 0x7) * 8) & 0xff) << 24);
+  return res;
 }
 
 sycl::half2 half_max(const sycl::half2 a, const sycl::half2 b) {
@@ -92,7 +74,7 @@ int main(int argc, char *argv[])
   }
   const int repeat = atoi(argv[1]);
 
-  size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
+  size_t size = (size_t)NUM_OF_BLOCKS * NUM_OF_THREADS;
 
   const size_t size_bytes = size * sizeof(sycl::half2);
 
