@@ -31,7 +31,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, bitcracker, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, minmax, mpc, mtf, sc, scan, scan2, scan3, segment-reduce
+    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, minmax, mpc, mtf, rle, sc, scan, scan2, scan3, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3
@@ -1132,6 +1132,9 @@ Early results are shown [here](results/README.md)
 
 ### ring (sycl)
   Non-P2P transfers in a circular manner among GPU devices
+
+### rle (cuda)
+  Computes a run-length encoding of a sequence (https://github.com/NVIDIA/cub)
 
 ### rng-wallace (cuda)
   Random number generation using the Wallace algorithm (https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-37-efficient-random-number-generation-and-application)
