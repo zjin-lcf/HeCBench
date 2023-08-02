@@ -22,7 +22,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cmembench, babelstream, memcpy, memtest, randomAccess, shmembench, triad 
 
 ### Bioinformatics
-    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistatis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
+    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
 
 ### Computer vision and image processing
     affine, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, colorwheel, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
@@ -512,7 +512,7 @@ Early results are shown [here](results/README.md)
 ### entropy (cuda)
   Compute the entropy for each point of a 2D matrix using a 5x5 window (https://lan-jing.github.io/parallel%20computing/system/entropy/)
 
-### epistatis (sycl)
+### epistasis (sycl)
   Epistasis detection (https://github.com/rafatcampos/bio-epistasis-detection)
    
 ### ert (cuda)
