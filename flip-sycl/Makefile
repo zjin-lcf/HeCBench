@@ -7,7 +7,6 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 
-SYCL      = yes
 GPU       = yes
 CUDA      = no
 CUDA_ARCH = sm_70

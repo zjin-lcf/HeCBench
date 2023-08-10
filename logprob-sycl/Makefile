@@ -9,7 +9,6 @@ DEBUG     = no
 WAVEFRONT = 32
 SYCL_REDUCE = no   # invoke sycl::reduce_over_group()
 
-SYCL      = yes
 GPU       = yes
 CUDA      = no
 CUDA_ARCH = sm_70
