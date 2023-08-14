@@ -8,7 +8,6 @@ OPTIMIZE  = yes
 DEBUG     = no
 MAX_GPU   = 4 
 
-SYCL      = yes
 GPU       = yes
 CUDA      = no
 CUDA_ARCH = sm_70
