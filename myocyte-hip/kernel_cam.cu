@@ -273,22 +273,22 @@ __device__ void kernel_cam(
   k42can = k20/2508;
 
   // CaM Reaction fluxes
-  rcn02 = k02*pow(Ca,2)*CaM - k20*Ca2CaM;
-  rcn24 = k24*pow(Ca,2)*Ca2CaM - k42*Ca4CaM;
+  rcn02 = k02*pow(Ca,fp(2))*CaM - k20*Ca2CaM;
+  rcn24 = k24*pow(Ca,fp(2))*Ca2CaM - k42*Ca4CaM;
 
   // CaM buffer fluxes
   B = Btot - CaMB - Ca2CaMB - Ca4CaMB;
-  rcn02B = k02B*pow(Ca,2)*CaMB - k20B*Ca2CaMB;
-  rcn24B = k24B*pow(Ca,2)*Ca2CaMB - k42B*Ca4CaMB;
+  rcn02B = k02B*pow(Ca,fp(2))*CaMB - k20B*Ca2CaMB;
+  rcn24B = k24B*pow(Ca,fp(2))*Ca2CaMB - k42B*Ca4CaMB;
   rcn0B = k0Bon*CaM*B - k0Boff*CaMB;
   rcn2B = k2Bon*Ca2CaM*B - k2Boff*Ca2CaMB;
   rcn4B = k4Bon*Ca4CaM*B - k4Boff*Ca4CaMB;
 
   // CaN reaction fluxes 
   Ca2CaN = CaNtot - Ca4CaN - CaMCa4CaN - Ca2CaMCa4CaN - Ca4CaMCa4CaN;
-  rcnCa4CaN = kcanCaon*pow(Ca,2)*Ca2CaN - kcanCaoff*Ca4CaN;
-  rcn02CaN = k02can*pow(Ca,2)*CaMCa4CaN - k20can*Ca2CaMCa4CaN; 
-  rcn24CaN = k24can*pow(Ca,2)*Ca2CaMCa4CaN - k42can*Ca4CaMCa4CaN;
+  rcnCa4CaN = kcanCaon*pow(Ca,fp(2))*Ca2CaN - kcanCaoff*Ca4CaN;
+  rcn02CaN = k02can*pow(Ca,fp(2))*CaMCa4CaN - k20can*Ca2CaMCa4CaN; 
+  rcn24CaN = k24can*pow(Ca,fp(2))*Ca2CaMCa4CaN - k42can*Ca4CaMCa4CaN;
   rcn0CaN = kcanCaM0on*CaM*Ca4CaN - kcanCaM0off*CaMCa4CaN;
   rcn2CaN = kcanCaM2on*Ca2CaM*Ca4CaN - kcanCaM2off*Ca2CaMCa4CaN;
   rcn4CaN = kcanCaM4on*Ca4CaM*Ca4CaN - kcanCaM4off*Ca4CaMCa4CaN;
@@ -296,12 +296,12 @@ __device__ void kernel_cam(
   // CaMKII reaction fluxes
   Pix = 1 - Pb2 - Pb - Pt - Pt2 - Pa;
   rcnCKib2 = kib2*Ca2CaM*Pix - kb2i*Pb2;
-  rcnCKb2b = kb24*pow(Ca,2)*Pb2 - kb42*Pb;
+  rcnCKb2b = kb24*pow(Ca,fp(2))*Pb2 - kb42*Pb;
   rcnCKib = kib*Ca4CaM*Pix - kbi*Pb;
   T = Pb + Pt + Pt2 + Pa;
-  kbt = 0.055*T + 0.0074*pow(T,2) + 0.015*pow(T,3);
+  kbt = 0.055*T + 0.0074*pow(T,fp(2)) + 0.015*pow(T,fp(3));
   rcnCKbt = kbt*Pb - kpp1*PP1tot*Pt/(Kmpp1+CaMKIItot*Pt);
-  rcnCKtt2 = kt42*Pt - kt24*pow(Ca,2)*Pt2;
+  rcnCKtt2 = kt42*Pt - kt24*pow(Ca,fp(2))*Pt2;
   rcnCKta = kta*Pt - kat*Ca4CaM*Pa;
   rcnCKt2a = kt2a*Pt2 - kat2*Ca2CaM*Pa;
   rcnCKt2b2 = kpp1*PP1tot*Pt2/(Kmpp1+CaMKIItot*Pt2);

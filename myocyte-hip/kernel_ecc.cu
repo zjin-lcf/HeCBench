@@ -1,3 +1,4 @@
+#include <hip/hip_runtime.h>
 //=====================================================================
 //  MAIN FUNCTION                            
 //=====================================================================
@@ -552,7 +553,7 @@ __device__ void kernel_ecc(  const fp timeinst,
   // DcaSLcyto = 1.22e-6;                                // Dca SL to cyto [cm^2/sec]
   // DnaJuncSL = 1.09e-5;                                // Dna junc to SL [cm^2/sec]
   // DnaSLcyto = 1.79e-5;                                // Dna SL to cyto [cm^2/sec] 
-  Vcell = pi*pow(cellRadius,2)*cellLength*1e-15;                      // [L]
+  Vcell = pi*pow(cellRadius,fp(2))*cellLength*1e-15;                      // [L]
   Vmyo = 0.65*Vcell; 
   Vsr = 0.035*Vcell; 
   Vsl = 0.02*Vcell; 
@@ -694,8 +695,8 @@ __device__ void kernel_ecc(  const fp timeinst,
   d_finavalu[offset_1] = am*(1-d_initvalu_1)-bm*d_initvalu_1;
   d_finavalu[offset_2] = ah*(1-d_initvalu_2)-bh*d_initvalu_2;
   d_finavalu[offset_3] = aj*(1-d_initvalu_3)-bj*d_initvalu_3;
-  I_Na_junc = Fjunc*GNa*pow(d_initvalu_1,3)*d_initvalu_2*d_initvalu_3*(d_initvalu_39-ena_junc);
-  I_Na_sl = Fsl*GNa*pow(d_initvalu_1,3)*d_initvalu_2*d_initvalu_3*(d_initvalu_39-ena_sl);
+  I_Na_junc = Fjunc*GNa*pow(d_initvalu_1,fp(3))*d_initvalu_2*d_initvalu_3*(d_initvalu_39-ena_junc);
+  I_Na_sl = Fsl*GNa*pow(d_initvalu_1,fp(3))*d_initvalu_2*d_initvalu_3*(d_initvalu_39-ena_sl);
   // I_Na = I_Na_junc+I_Na_sl;
 
   // I_nabk: Na Background Current
@@ -706,8 +707,8 @@ __device__ void kernel_ecc(  const fp timeinst,
   // I_nak: Na/K Pump Current
   sigma = (exp(Nao/67.3)-1)/7;
   fnak = 1/(1+0.1245*exp(-0.1*d_initvalu_39*FoRT)+0.0365*sigma*exp(-d_initvalu_39*FoRT));
-  I_nak_junc = Fjunc*IbarNaK*fnak*Ko /(1+pow((KmNaip/d_initvalu_32),4)) /(Ko+KmKo);
-  I_nak_sl = Fsl*IbarNaK*fnak*Ko /(1+pow((KmNaip/d_initvalu_33),4)) /(Ko+KmKo);
+  I_nak_junc = Fjunc*IbarNaK*fnak*Ko /(1+pow((KmNaip/d_initvalu_32),fp(4))) /(Ko+KmKo);
+  I_nak_sl = Fsl*IbarNaK*fnak*Ko /(1+pow((KmNaip/d_initvalu_33),fp(4))) /(Ko+KmKo);
   I_nak = I_nak_junc+I_nak_sl;
 
   // I_kr: Rapidly Activating K Current
@@ -727,8 +728,8 @@ __device__ void kernel_ecc(  const fp timeinst,
   xsss = 1/(1+exp(-(d_initvalu_39-1.5)/16.7));
   tauxs = 1/(7.19e-5*(d_initvalu_39+30)/(1-exp(-0.148*(d_initvalu_39+30)))+1.31e-4*(d_initvalu_39+30)/(exp(0.0687*(d_initvalu_39+30))-1)); 
   d_finavalu[offset_13] = (xsss-d_initvalu_13)/tauxs;
-  I_ks_junc = Fjunc*gks_junc*pow(d_initvalu_12,2)*(d_initvalu_39-eks);
-  I_ks_sl = Fsl*gks_sl*pow(d_initvalu_13,2)*(d_initvalu_39-eks);
+  I_ks_junc = Fjunc*gks_junc*pow(d_initvalu_12,fp(2))*(d_initvalu_39-eks);
+  I_ks_sl = Fsl*gks_sl*pow(d_initvalu_13,fp(2))*(d_initvalu_39-eks);
   I_ks = I_ks_junc+I_ks_sl;
 
   // I_kp: Plateau K current
@@ -773,7 +774,7 @@ __device__ void kernel_ecc(  const fp timeinst,
   dss = 1/(1+exp(-(d_initvalu_39+14.5)/6.0));
   taud = dss*(1-exp(-(d_initvalu_39+14.5)/6.0))/(0.035*(d_initvalu_39+14.5));
   fss = 1/(1+exp((d_initvalu_39+35.06)/3.6))+0.6/(1+exp((50-d_initvalu_39)/20));
-  tauf = 1/(0.0197*exp(-pow(0.0337*(d_initvalu_39+14.5),2))+0.02);
+  tauf = 1/(0.0197*exp(-pow(0.0337*(d_initvalu_39+14.5),double(2)))+0.02);
   d_finavalu[offset_4] = (dss-d_initvalu_4)/taud;
   d_finavalu[offset_5] = (fss-d_initvalu_5)/tauf;
   d_finavalu[offset_6] = 1.7*d_initvalu_36*(1-d_initvalu_6)-11.9e-3*d_initvalu_6;                      // fCa_junc  
@@ -796,14 +797,14 @@ __device__ void kernel_ecc(  const fp timeinst,
   // I_Catot = I_Ca+I_CaK+I_CaNa;
 
   // I_ncx: Na/Ca Exchanger flux
-  Ka_junc = 1/(1+pow((Kdact/d_initvalu_36),3));
-  Ka_sl = 1/(1+pow((Kdact/d_initvalu_37),3));
-  s1_junc = exp(nu*d_initvalu_39*FoRT)*pow(d_initvalu_32,3)*Cao;
-  s1_sl = exp(nu*d_initvalu_39*FoRT)*pow(d_initvalu_33,3)*Cao;
-  s2_junc = exp((nu-1)*d_initvalu_39*FoRT)*pow(Nao,3)*d_initvalu_36;
-  s3_junc = (KmCai*pow(Nao,3)*(1+pow((d_initvalu_32/KmNai),3))+pow(KmNao,3)*d_initvalu_36+ pow(KmNai,3)*Cao*(1+d_initvalu_36/KmCai)+KmCao*pow(d_initvalu_32,3)+pow(d_initvalu_32,3)*Cao+pow(Nao,3)*d_initvalu_36)*(1+ksat*exp((nu-1)*d_initvalu_39*FoRT));
-  s2_sl = exp((nu-1)*d_initvalu_39*FoRT)*pow(Nao,3)*d_initvalu_37;
-  s3_sl = (KmCai*pow(Nao,3)*(1+pow((d_initvalu_33/KmNai),3)) + pow(KmNao,3)*d_initvalu_37+pow(KmNai,3)*Cao*(1+d_initvalu_37/KmCai)+KmCao*pow(d_initvalu_33,3)+pow(d_initvalu_33,3)*Cao+pow(Nao,3)*d_initvalu_37)*(1+ksat*exp((nu-1)*d_initvalu_39*FoRT));
+  Ka_junc = 1/(1+pow((Kdact/d_initvalu_36),fp(3)));
+  Ka_sl = 1/(1+pow((Kdact/d_initvalu_37),fp(3)));
+  s1_junc = exp(nu*d_initvalu_39*FoRT)*pow(d_initvalu_32,fp(3))*Cao;
+  s1_sl = exp(nu*d_initvalu_39*FoRT)*pow(d_initvalu_33,fp(3))*Cao;
+  s2_junc = exp((nu-1)*d_initvalu_39*FoRT)*pow(Nao,fp(3))*d_initvalu_36;
+  s3_junc = (KmCai*pow(Nao,fp(3))*(1+pow((d_initvalu_32/KmNai),fp(3)))+pow(KmNao,fp(3))*d_initvalu_36+ pow(KmNai,fp(3))*Cao*(1+d_initvalu_36/KmCai)+KmCao*pow(d_initvalu_32,fp(3))+pow(d_initvalu_32,fp(3))*Cao+pow(Nao,fp(3))*d_initvalu_36)*(1+ksat*exp((nu-1)*d_initvalu_39*FoRT));
+  s2_sl = exp((nu-1)*d_initvalu_39*FoRT)*pow(Nao,fp(3))*d_initvalu_37;
+  s3_sl = (KmCai*pow(Nao,fp(3))*(1+pow((d_initvalu_33/KmNai),fp(3))) + pow(KmNao,fp(3))*d_initvalu_37+pow(KmNai,fp(3))*Cao*(1+d_initvalu_37/KmCai)+KmCao*pow(d_initvalu_33,fp(3))+pow(d_initvalu_33,fp(3))*Cao+pow(Nao,fp(3))*d_initvalu_37)*(1+ksat*exp((nu-1)*d_initvalu_39*FoRT));
   I_ncx_junc = Fjunc*IbarNCX*pow(Q10NCX,Qpow)*Ka_junc*(s1_junc-s2_junc)/s3_junc;
   I_ncx_sl = Fsl*IbarNCX*pow(Q10NCX,Qpow)*Ka_sl*(s1_sl-s2_sl)/s3_sl;
   I_ncx = I_ncx_junc+I_ncx_sl;
@@ -828,9 +829,9 @@ __device__ void kernel_ecc(  const fp timeinst,
   koSRCa = koCa/kCaSR;
   kiSRCa = kiCa*kCaSR;
   RI = 1-d_initvalu_14-d_initvalu_15-d_initvalu_16;
-  d_finavalu[offset_14] = (kim*RI-kiSRCa*d_initvalu_36*d_initvalu_14)-(koSRCa*pow(d_initvalu_36,2)*d_initvalu_14-kom*d_initvalu_15);      // R
-  d_finavalu[offset_15] = (koSRCa*pow(d_initvalu_36,2)*d_initvalu_14-kom*d_initvalu_15)-(kiSRCa*d_initvalu_36*d_initvalu_15-kim*d_initvalu_16);      // O
-  d_finavalu[offset_16] = (kiSRCa*d_initvalu_36*d_initvalu_15-kim*d_initvalu_16)-(kom*d_initvalu_16-koSRCa*pow(d_initvalu_36,2)*RI);      // I
+  d_finavalu[offset_14] = (kim*RI-kiSRCa*d_initvalu_36*d_initvalu_14)-(koSRCa*pow(d_initvalu_36,fp(2))*d_initvalu_14-kom*d_initvalu_15);      // R
+  d_finavalu[offset_15] = (koSRCa*pow(d_initvalu_36,fp(2))*d_initvalu_14-kom*d_initvalu_15)-(kiSRCa*d_initvalu_36*d_initvalu_15-kim*d_initvalu_16);      // O
+  d_finavalu[offset_16] = (kiSRCa*d_initvalu_36*d_initvalu_15-kim*d_initvalu_16)-(kom*d_initvalu_16-koSRCa*pow(d_initvalu_36,fp(2))*RI);      // I
   J_SRCarel = ks*d_initvalu_15*(d_initvalu_31-d_initvalu_36);                          // [mM/ms]
   J_serca = pow(Q10SRCaP,Qpow)*Vmax_SRCaP*(pow((d_initvalu_38/Kmf),hillSRCaP)-pow((d_initvalu_31/Kmr),hillSRCaP))
     /(1+pow((d_initvalu_38/Kmf),hillSRCaP)+pow((d_initvalu_31/Kmr),hillSRCaP));
