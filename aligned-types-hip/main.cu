@@ -62,31 +62,31 @@ uint8_misaligned;
 ////////////////////////////////////////////////////////////////////////////////
 // Aligned types
 ////////////////////////////////////////////////////////////////////////////////
-typedef struct __align__(4)
+typedef struct
 {
   unsigned char r, g, b, a;
 }
-uchar4_aligned;
+uchar4_aligned __attribute__((aligned(4)));
 
 typedef unsigned int uint_aligned;
 
-typedef struct __align__(8)
+typedef struct
 {
   unsigned int l, a;
 }
-uint2_aligned;
+uint2_aligned __attribute__((aligned(8)));
 
-typedef struct __align__(16)
+typedef struct
 {
   unsigned int r, g, b;
 }
-uint3_aligned;
+uint3_aligned __attribute__((aligned(16)));
 
-typedef struct __align__(16)
+typedef struct
 {
   unsigned int r, g, b, a;
 }
-uint4_aligned;
+uint4_aligned __attribute__((aligned(16)));
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -98,11 +98,11 @@ uint4_aligned;
 // "Structure of arrays" storage strategy offers best performance
 // in general case. See section 5.1.2 of the Programming Guide.
 ////////////////////////////////////////////////////////////////////////////////
-typedef struct __align__(16)
+typedef struct
 {
   uint4_aligned c1, c2;
 }
-uint8_aligned;
+uint8_aligned __attribute__((aligned(16)));
 
 
 
