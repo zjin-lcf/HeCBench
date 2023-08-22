@@ -1,5 +1,5 @@
-#define one_over_theta0  (5.0/(2.0*pow(M_PI,4)))
-#define kappa (pow(M_PI,2)/3.0 - 2 * 1.2020569031595942)
+#define one_over_theta0  (5.0/(2.0*pow(M_PI,4.0)))
+#define kappa (pow(M_PI,2.0)/3.0 - 2 * 1.2020569031595942)
 
 #pragma omp declare target
 /*
@@ -52,7 +52,7 @@ double Sum_NL(int l, const double c[])
 {
   double sum = 0.0;
   for(int n=1; n<L_max; n++)
-    sum += pow(c[n],2)/(4.0*n+1);
+    sum += pow(c[n],2.0)/(4.0*n+1);
   return sum * (2*l-1)*(l+1)*c[l]/3.0;
 }
 #pragma omp end declare target
