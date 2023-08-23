@@ -143,7 +143,7 @@ void get_shared_key(int sk, int T_x, int T_y, int *shared_x, int *shared_y, unsi
 }
 
 void k_slow (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int sk,
   const int P_x,
   const int P_y, 
@@ -159,7 +159,7 @@ void k_slow (
 }
 
 void k_fast (
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const int sk,
   const int P_x,
   const int P_y, 
