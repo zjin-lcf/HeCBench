@@ -13,7 +13,7 @@ ARCH      = sm_60
 # Program name & source code list
 #===============================================================================
 
-program = test
+program = main
 
 source = ccsd_tengy.cu  ccsd_trpdrv.cu  main.cu
 
