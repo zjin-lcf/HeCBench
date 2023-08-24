@@ -169,7 +169,7 @@ template<class TData> int testCPU(
 ////////////////////////////////////////////////////////////////////////////////
 //Memory chunk size in bytes. Reused for test
 const int       MEM_SIZE = 50000000;
-const int NUM_ITERATIONS = 100;
+const int NUM_ITERATIONS = 1000;
 
 //CPU input data and instance of GPU output data
 unsigned char *h_idataCPU;
