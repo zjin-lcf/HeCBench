@@ -59,7 +59,7 @@ template <typename InputIteratorT,
           typename LengthsOutputIteratorT,
           typename NumRunsIterator,
           typename OffsetT>
-HIPCUB_RUNTIME_FUNCTION __forceinline__ hipError_t Dispatch(int timing_timing_iterations,
+HIPCUB_RUNTIME_FUNCTION __forceinline__ hipError_t Dispatch(int timing_iterations,
                                                           void *d_temp_storage,
                                                           size_t &temp_storage_bytes,
                                                           InputIteratorT d_in,
@@ -69,7 +69,7 @@ HIPCUB_RUNTIME_FUNCTION __forceinline__ hipError_t Dispatch(int timing_timing_it
                                                           OffsetT num_items)
 {
   hipError_t error = hipSuccess;
-  for (int i = 0; i < timing_timing_iterations; ++i)
+  for (int i = 0; i < timing_iterations; ++i)
   {
     error = DeviceRunLengthEncode::Encode(d_temp_storage,
                                           temp_storage_bytes,

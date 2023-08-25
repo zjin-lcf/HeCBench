@@ -59,7 +59,7 @@ template <typename InputIteratorT,
           typename LengthsOutputIteratorT,
           typename NumRunsIterator,
           typename OffsetT>
-CUB_RUNTIME_FUNCTION __forceinline__ cudaError_t Dispatch(int timing_timing_iterations,
+CUB_RUNTIME_FUNCTION __forceinline__ cudaError_t Dispatch(int timing_iterations,
                                                           void *d_temp_storage,
                                                           size_t &temp_storage_bytes,
                                                           InputIteratorT d_in,
@@ -69,7 +69,7 @@ CUB_RUNTIME_FUNCTION __forceinline__ cudaError_t Dispatch(int timing_timing_iter
                                                           OffsetT num_items)
 {
   cudaError_t error = cudaSuccess;
-  for (int i = 0; i < timing_timing_iterations; ++i)
+  for (int i = 0; i < timing_iterations; ++i)
   {
     error = DeviceRunLengthEncode::Encode(d_temp_storage,
                                           temp_storage_bytes,
