@@ -25,7 +25,7 @@ Each benchmark falls into a single category. While such classification is not ac
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
 
 ### Computer vision and image processing
-    affine, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, colorwheel, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, stencil1d, stencil3d, surfel, zoom
+    affine, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, colorwheel, convolution1D, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, ssim, stencil1d, stencil3d, surfel, zoom
     
 ### Cryptography
     aes, bitcracker, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
@@ -1280,6 +1280,9 @@ Early results are shown [here](results/README.md)
 
 ### ss (opencl)
   String search (https://github.com/OpenCL/AMD_APP_samples)
+
+### ssim (cuda)
+  Compute structual similarity index measure (https://github.com/VIDILabs/instantvnr)
 
 ### sssp (opencl)
   The single-source shortest path (https://github.com/chai-benchmarks/chai)
