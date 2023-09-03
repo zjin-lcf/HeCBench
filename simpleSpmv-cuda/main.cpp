@@ -68,12 +68,24 @@ int main(int argc, char *argv[])
 
   for (int bs = 32; bs <= 1024; bs = bs * 2) {
     printf("\nThread block size: %d\n", bs);
+
     // warmup run
     mv_csr_parallel(1, bs, num_rows, x, nnz, matrix, y_warmup);
 
     long elapsed = mv_csr_parallel(repeat, bs, num_rows, x, nnz, matrix, y_csr);
 
-    printf("Average csr kernel execution time (ms): %lf\n", elapsed * 1e-6 / repeat);
+    printf("Average sparse kernel execution time (ms): %lf\n", elapsed * 1e-6 / repeat);
+    printf("Error rate: %f\n", check(y, y_csr, num_rows));
+  }
+
+  {
+    printf("\n");
+    // warmup run
+    spmv_csr(1, num_rows, x, nnz, matrix, y_warmup);
+
+    long elapsed = spmv_csr(repeat, num_rows, x, nnz, matrix, y_csr);
+
+    printf("Average library kernel execution time (ms): %lf\n", elapsed * 1e-6 / repeat);
     printf("Error rate: %f\n", check(y, y_csr, num_rows));
   }
 
