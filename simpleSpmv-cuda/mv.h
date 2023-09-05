@@ -1,8 +1,8 @@
 #ifndef SPMV_H
 #define SPMV_H
 
-//#define REAL float
-#define REAL double
+#define REAL float
+//#define REAL double
 
 void mv_csr_serial( const int num_rows, const size_t *row_indices, const int *col_indices, const REAL *data, const REAL *x, REAL *y);
 long mv_csr_parallel(const int repeat, const int bs, const int num_rows, const REAL *x, const size_t nnz, REAL *matrix, REAL *y);

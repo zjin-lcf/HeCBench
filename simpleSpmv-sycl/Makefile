@@ -12,6 +12,7 @@ CUDA      = no
 CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
+ONEMKL    = no
 #GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
@@ -35,15 +36,22 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall \
 # Linker Flags
 LDFLAGS = 
 
+# sparse functions not supported
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
+# sparse functions not supported
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
 	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+endif
+
+ifeq ($(ONEMKL), yes)
+  CC = icpx
+  CFLAGS +=-DONEMKL -qmkl=parallel
 endif
 
 # Debug Flags
