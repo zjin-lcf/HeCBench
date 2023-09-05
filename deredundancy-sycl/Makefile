@@ -20,7 +20,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.buffer.cpp utils.cpp
+source = main.cpp utils.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -66,7 +66,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.buffer.cpp kernels.buffer.cpp utils.h
+main.o: main.cpp kernels.cpp utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 utils.o: utils.cpp utils.h
