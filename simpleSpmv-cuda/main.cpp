@@ -78,6 +78,7 @@ int main(int argc, char *argv[])
     printf("Error rate: %f\n", check(y, y_csr, num_rows));
   }
 
+  #ifdef ONEMKL
   {
     printf("\n");
     // warmup run
@@ -88,6 +89,7 @@ int main(int argc, char *argv[])
     printf("Average library kernel execution time (ms): %lf\n", elapsed * 1e-6 / repeat);
     printf("Error rate: %f\n", check(y, y_csr, num_rows));
   }
+  #endif
 
   free(row_indices);
   free(col_indices);
