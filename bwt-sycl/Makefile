@@ -67,11 +67,10 @@ $(program): $(obj)
 main.o: ../bwt-cuda/main.cpp ../bwt-cuda/bwt.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-bwt.o: bwt.buffer.cpp ../bwt-cuda/bwt.hpp
+bwt.o: bwt.cpp ../bwt-cuda/bwt.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
 	./$(program) 10000000
-
