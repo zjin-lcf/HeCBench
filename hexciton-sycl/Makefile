@@ -20,7 +20,7 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main-buffer.cpp utils.cpp reference.cpp
+source = main.cpp utils.cpp reference.cpp
 
 obj = $(source:.cpp=.o)
 
