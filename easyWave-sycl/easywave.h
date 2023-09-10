@@ -52,7 +52,8 @@
 #define iTime 10
 #define iTopo 11
 
-#define Node(idx1, idx2) node[(idx1)*MAX_VARS_PER_NODE+idx2] 
+#define Node(idx1, idx2) node[(idx1)*MAX_VARS_PER_NODE+idx2]
+#define NodeD(idx1, idx2) d_node[(idx1)*MAX_VARS_PER_NODE+idx2]
 
 // Global data
 struct EWPARAMS {
