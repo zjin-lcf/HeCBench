@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
   int repeat = 1;
 
   if (argc != 5) {
-    printf("The function converts the dense MxN matrix into a sparse matrix\n");
+    printf("The function converts a dense MxN matrix into a sparse matrix\n");
     printf("The sparse matrix is represented in CSR (Compressed Sparse Row) storage format\n");
     printf("Usage %s <M> <N> <nnz> <repeat>\n", argv[0]);
     printf("nnz is the number of non-zero elements\n");
@@ -96,10 +96,13 @@ int main(int argc, char *argv[])
   const int64_t num_rows = m;
   const int64_t num_cols = n;
   const int64_t dense_size = m * n;
-  float *h_dense = (float*) malloc (dense_size * sizeof(float));
+
+  const int64_t dense_size_bytes  = dense_size * sizeof(float);
   const int64_t value_size_bytes  = h_nnz * sizeof(float);
   const int64_t colidx_size_bytes = h_nnz * sizeof(int64_t);
   const int64_t rowidx_size_bytes = (num_rows + 1) * sizeof(int64_t);
+
+  float *h_dense = (float*) malloc (dense_size_bytes);
 
   // device results
   float *h_csr_values = (float*) malloc (value_size_bytes);
@@ -119,10 +122,10 @@ int main(int argc, char *argv[])
   // Device memory management
   int64_t   *d_csr_offsets, *d_csr_columns;
   float *d_csr_values,  *d_dense;
-  CHECK_CUDA( cudaMalloc((void**) &d_dense, dense_size * sizeof(float)))
+  CHECK_CUDA( cudaMalloc((void**) &d_dense, dense_size_bytes))
   CHECK_CUDA( cudaMalloc((void**) &d_csr_offsets,
                          (num_rows + 1) * sizeof(int64_t)) )
-  CHECK_CUDA( cudaMemcpy(d_dense, h_dense, dense_size * sizeof(float),
+  CHECK_CUDA( cudaMemcpy(d_dense, h_dense, dense_size_bytes,
                          cudaMemcpyHostToDevice) )
   //--------------------------------------------------------------------------
   // CUSPARSE APIs
@@ -158,7 +161,7 @@ int main(int argc, char *argv[])
   CHECK_CUSPARSE( cusparseSpMatGetSize(matB, &num_rows_tmp, &num_cols_tmp,
                                        &nnz) )
   // allocate CSR column indices and values
-  CHECK_CUDA( cudaMalloc((void**) &d_csr_columns, nnz * sizeof(int64_t))   )
+  CHECK_CUDA( cudaMalloc((void**) &d_csr_columns, nnz * sizeof(int64_t)) )
   CHECK_CUDA( cudaMalloc((void**) &d_csr_values,  nnz * sizeof(float)) )
   // reset offsets, column indices, and values pointers
   CHECK_CUSPARSE( cusparseCsrSetPointers(matB, d_csr_offsets, d_csr_columns,
@@ -167,7 +170,7 @@ int main(int argc, char *argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    // execute Sparse to Dense conversion
+    // execute Dense to Sparse conversion
     CHECK_CUSPARSE( cusparseDenseToSparse_convert(handle, matA, matB,
                                         CUSPARSE_DENSETOSPARSE_ALG_DEFAULT,
                                         dBuffer) )
