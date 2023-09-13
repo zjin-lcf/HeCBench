@@ -52,7 +52,7 @@ Each benchmark falls into a single category. While such classification is not ac
     accuracy, adam, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, sampling, scel, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
 
 ### Math
-    atan2, complex, cross, determinant, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, michalewicz, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, spmm, spsort, sptrsv, thomas, wyllie, zeropoint
+    atan2, complex, cross, determinant, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, michalewicz, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, rfs, romberg, rsc, secp256k1, simpleSpmv, slu, spmm, spnnz, spsort, sptrsv, thomas, wyllie, zeropoint
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -1274,6 +1274,9 @@ Early results are shown [here](results/README.md)
 
 ### spmm (cuda)
   Library-based sparse matrix sparse matrix product (https://docs.nvidia.com/cuda/cusparse/index.html)
+
+### spnnz (cuda)
+  Count the number of nonzero elements per row or column and the total number of nonzero elements in a dense matrix (https://docs.nvidia.com/cuda/cusparse/index.html#cusparse-t-nnz)
 
 ### spsort (cuda and sycl)
   Sort a sparse matrix represented in CSR format (https://docs.nvidia.com/cuda/cusparse/index.html#cusparsexcsrsort)
