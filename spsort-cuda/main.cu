@@ -159,32 +159,51 @@ int sort_sparse_matrix(intType a_nrows, intType a_ncols,
                                                  a_ncols, a_nnz, a_rowptr,
                                                  a_colind, &bufferSize) )
   CHECK_CUDA( cudaMalloc(&d_buffer, bufferSize) )
-  CHECK_CUDA( cudaMalloc((void**)&d_permutation, sizeof(intType)*a_nnz) )
 
   // Setup permutation vector to identity
+  CHECK_CUDA( cudaMalloc((void**)&d_permutation, sizeof(intType)*a_nnz) )
   CHECK_CUSPARSE( cusparseCreateIdentityPermutation(handle, a_nnz,
                                                     d_permutation) )
+
+  // Deprecated cusparseDgthr and cusparseSgthr replaced with cusparseGather
+  cusparseSpVecDescr_t vec_permutation;
+  cusparseDnVecDescr_t vec_values;
+
+  cudaDataType valueType;
+  if constexpr (std::is_same_v<fp, double>) // C++17
+    valueType = CUDA_R_64F;
+  else
+    valueType = CUDA_R_32F;
+
+  // Create sparse vector for the permutation
+  CHECK_CUSPARSE( cusparseCreateSpVec(&vec_permutation, a_nnz, a_nnz,
+                                      d_permutation, a_val_sorted,
+                                      CUSPARSE_INDEX_32I,
+                                      CUSPARSE_INDEX_BASE_ZERO, valueType) )
+
+  // Create dense vector for the csr values
+  CHECK_CUSPARSE( cusparseCreateDnVec(&vec_values, a_nnz, a_val, valueType) )
+
   CHECK_CUDA( cudaDeviceSynchronize() )
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
     CHECK_CUSPARSE( cusparseXcsrsort(handle, a_nrows, a_ncols, a_nnz, descr,
                                      a_rowptr, a_colind, d_permutation, d_buffer) )
-    // TODO cusparseDgthr/cusparseSgthr are deprecated
-    if constexpr (std::is_same_v<fp, double>) // C++17
-      CHECK_CUSPARSE( cusparseDgthr(handle, a_nnz, a_val, a_val_sorted,
-                                    d_permutation, CUSPARSE_INDEX_BASE_ZERO) )
-    else  // float
-      CHECK_CUSPARSE( cusparseSgthr(handle, a_nnz, a_val, a_val_sorted,
-                                    d_permutation, CUSPARSE_INDEX_BASE_ZERO) )
-    CHECK_CUDA( cudaDeviceSynchronize() )
+
+    CHECK_CUSPARSE( cusparseGather(handle, vec_values, vec_permutation) )
+
   }
+
+  CHECK_CUDA( cudaDeviceSynchronize() )
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "Average execution time of CSR sort: " << (time * 1e-3f) / repeat
             << " us" << std::endl;
 
   // destroy matrix/vector descriptors
+  CHECK_CUSPARSE( cusparseDestroySpVec(vec_permutation) )
+  CHECK_CUSPARSE( cusparseDestroyDnVec(vec_values) )
   CHECK_CUSPARSE( cusparseDestroyMatDescr(descr) )
   CHECK_CUSPARSE( cusparseDestroy(handle) )
   //--------------------------------------------------------------------------
