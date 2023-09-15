@@ -25,27 +25,26 @@ void kernel_add_source(struct grid_t grid,
     // Nothing needed
 }
 
-
 void find_min_max_u(struct grid_t grid,
                     const float *__restrict__ u, float *__restrict__ min_u, float *__restrict__ max_u)
 {
-   const llint nx = grid.nx;
-   const llint ny = grid.ny;
-   const llint nz = grid.nz;
-   const llint lx = grid.lx;
-   const llint ly = grid.ly;
-   const llint lz = grid.lz;
+    const llint nx = grid.nx;
+    const llint ny = grid.ny;
+    const llint nz = grid.nz;
+    const llint lx = grid.lx;
+    const llint ly = grid.ly;
+    const llint lz = grid.lz;
 
-   llint u_size = (nx + 2 * lx) * (ny + 2 * ly) * (nz + 2 * lz);
+    llint u_size = (nx + 2 * lx) * (ny + 2 * ly) * (nz + 2 * lz);
 
-   //find_min_max_kernel(q, u, u_size, min_u, max_u);
    float min_val = FLT_MAX;
-   float max_val = FLT_MIN;
    #pragma omp parallel for reduction(min: min_val)
    for (llint i = 0; i < u_size; i++) {
      min_val = fmin(u[i], min_val);
    }
    *min_u = min_val;
+
+   float max_val = FLT_MIN;
    #pragma omp parallel for reduction(max: max_val)
    for (llint i = 0; i < u_size; i++) {
      max_val = fmax(u[i], max_val);

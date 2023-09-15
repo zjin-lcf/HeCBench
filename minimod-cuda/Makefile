@@ -34,7 +34,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -54,4 +53,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --warm-up --niters 1 --grid 100 --nsteps 1000
+	./$(program) --warm-up --niters 1 --grid 256 --nsteps 1000

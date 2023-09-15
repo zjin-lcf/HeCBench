@@ -32,7 +32,7 @@ void pml_profile_init(float *profile, llint i_min, llint i_max, llint n_first, l
     }
 }
 
-void pml_profile_extend(llint nx, llint ny, llint nz,
+void pml_profile_extend(llint ldimy, llint ldimz, llint lx, llint ly, int lz,
                         float *eta, const float *etax, const float *etay, const float *etaz,
                         llint xbeg, llint xend, llint ybeg, llint yend, llint zbeg, llint zend)
 {
@@ -40,13 +40,13 @@ void pml_profile_extend(llint nx, llint ny, llint nz,
     for (llint ix = xbeg-n_ghost; ix <= xend+n_ghost; ++ix) {
         for (llint iy = ybeg-n_ghost; iy <= yend+n_ghost; ++iy) {
             for (llint iz = zbeg-n_ghost; iz <= zend+n_ghost; ++iz) {
-                eta[IDX3_eta0(ix,iy,iz)] = etax[ix] + etay[iy] + etaz[iz];
+                eta[IDX3(ix,iy,iz)] = etax[ix] + etay[iy] + etaz[iz];
             }
         }
     }
 }
 
-void pml_profile_extend_all(llint nx, llint ny, llint nz,
+void pml_profile_extend_all(llint ldimy, llint ldimz, llint lx, llint ly, int lz,
                             float *eta, const float *etax, const float *etay, const float *etaz,
                             llint xmin, llint xmax, llint ymin, llint ymax,
                             llint x1, llint x2, llint x5, llint x6,
@@ -55,54 +55,52 @@ void pml_profile_extend_all(llint nx, llint ny, llint nz,
 {
     // Top.
     if (z1 != -1)
-    pml_profile_extend(nx,ny,nz,eta,etax,etay,etaz,xmin,xmax,ymin,ymax,z1,z2);
+    pml_profile_extend(ldimy,ldimz,lx,ly,lz,eta,etax,etay,etaz,xmin,xmax,ymin,ymax,z1,z2);
     // Bottom.
     if (z5 != -5)
-    pml_profile_extend(nx,ny,nz,eta,etax,etay,etaz,xmin,xmax,ymin,ymax,z5,z6);
+    pml_profile_extend(ldimy,ldimz,lx,ly,lz,eta,etax,etay,etaz,xmin,xmax,ymin,ymax,z5,z6);
     // Front.
     if ((y1!=-1) && (z3!=-3))
-    pml_profile_extend(nx,ny,nz,eta,etax,etay,etaz,xmin,xmax,y1,y2,z3,z4);
+    pml_profile_extend(ldimy,ldimz,lx,ly,lz,eta,etax,etay,etaz,xmin,xmax,y1,y2,z3,z4);
     // Back.
     if ((y6!=-6) && (z3!=-3))
-    pml_profile_extend(nx,ny,nz,eta,etax,etay,etaz,xmin,xmax,y5,y6,z3,z4);
+    pml_profile_extend(ldimy,ldimz,lx,ly,lz,eta,etax,etay,etaz,xmin,xmax,y5,y6,z3,z4);
     // Left.
     if ((x1!=-1) && (y3!=-3) && (z3!=-3))
-    pml_profile_extend(nx,ny,nz,eta,etax,etay,etaz,x1,x2,y3,y4,z3,z4);
+    pml_profile_extend(ldimy,ldimz,lx,ly,lz,eta,etax,etay,etaz,x1,x2,y3,y4,z3,z4);
     // Right.
     if ((x6!=-6) && (y3!=-3) && (z3!=-3))
-    pml_profile_extend(nx,ny,nz,eta,etax,etay,etaz,x5,x6,y3,y4,z3,z4);
+    pml_profile_extend(ldimy,ldimz,lx,ly,lz,eta,etax,etay,etaz,x5,x6,y3,y4,z3,z4);
 }
 
-void init_eta(llint nx, llint ny, llint nz, struct grid_t grid,
-              float dt_sch,
-              float *eta)
+void init_eta(struct grid_t grid, float dt_sch, float *eta)
 {
-    for (llint i = -1; i < nx+1; ++i) {
-        for (llint j = -1; j < ny+1; ++j) {
-            for (llint k = -1; k < nz+1; ++k) {
-                eta[IDX3_eta1(i,j,k)] = 0.f;
+    for (llint i = -1; i < grid.nx+1; ++i) {
+        for (llint j = -1; j < grid.ny+1; ++j) {
+            for (llint k = -1; k < grid.nz+1; ++k) {
+                eta[IDX3_grid(i,j,k,grid)] = 0.f;
             }
         }
     }
 
     /* etax */
     float param = dt_sch * 3.f * vmax * logf(1000.f)/(2.f*grid.ndampx*grid.dx);
-    float *etax = (float*) malloc(sizeof(float)*(nx+2));
+    float *etax = (float*) malloc(sizeof(float)*(grid.nx+2));
     pml_profile_init(etax, 0, grid.nx+1, grid.ndampx, grid.ndampx, param);
 
     /* etay */
     param = dt_sch*3.f*vmax*logf(1000.f)/(2.f*grid.ndampy*grid.dy);
-    float *etay = (float*) malloc(sizeof(float)*(ny+2));
+    float *etay = (float*) malloc(sizeof(float)*(grid.ny+2));
     pml_profile_init(etay, 0, grid.ny+1, grid.ndampy, grid.ndampy, param);
 
     /* etaz */
     param = dt_sch*3.f*vmax*logf(1000.f)/(2.f*grid.ndampz*grid.dz);
-    float *etaz = (float*) malloc(sizeof(float)*(nz+2));
+    float *etaz = (float*) malloc(sizeof(float)*(grid.nz+2));
     pml_profile_init(etaz, 0, grid.nz+1, grid.ndampz, grid.ndampz, param);
 
-    (void)pml_profile_extend_all(nx, ny, nz,
+    (void)pml_profile_extend_all(grid.ldimy, grid.ldimz, grid.lx, grid.ly, grid.lz,
                 eta, etax, etay, etaz,
-                1, nx, 1, ny,
+                1, grid.nx, 1, grid.ny,
                 grid.x1+1, grid.x2, grid.x5+1, grid.x6,
                 grid.y1+1, grid.y2, grid.y3+1, grid.y4, grid.y5+1, grid.y6,
                 grid.z1+1, grid.z2, grid.z3+1, grid.z4, grid.z5+1, grid.z6);
