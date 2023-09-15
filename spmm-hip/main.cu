@@ -171,35 +171,32 @@ int main(int argc, char *argv[])
         *dC_offsets, *dC_columns;
   float *dA_values, *dB_values, *dC_values;
   // allocate A
-  CHECK_HIP( hipMalloc((void**) &dA_offsets,
-                         (A_num_rows + 1) * sizeof(int)) )
+  CHECK_HIP( hipMalloc((void**) &dA_offsets, (A_num_rows + 1) * sizeof(int)) )
   CHECK_HIP( hipMalloc((void**) &dA_columns, A_nnz * sizeof(int))   )
   CHECK_HIP( hipMalloc((void**) &dA_values,  A_nnz * sizeof(float)) )
   // allocate B
-  CHECK_HIP( hipMalloc((void**) &dB_offsets,
-                         (B_num_rows + 1) * sizeof(int)) )
+  CHECK_HIP( hipMalloc((void**) &dB_offsets, (B_num_rows + 1) * sizeof(int)) )
   CHECK_HIP( hipMalloc((void**) &dB_columns, B_nnz * sizeof(int))   )
   CHECK_HIP( hipMalloc((void**) &dB_values,  B_nnz * sizeof(float)) )
   // allocate C offsets
-  CHECK_HIP( hipMalloc((void**) &dC_offsets,
-                         (A_num_rows + 1) * sizeof(int)) )
+  CHECK_HIP( hipMalloc((void**) &dC_offsets, (A_num_rows + 1) * sizeof(int)) )
 
   // copy A
   CHECK_HIP( hipMemcpy(dA_offsets, hA_offsets,
-                         (A_num_rows + 1) * sizeof(int),
-                         hipMemcpyHostToDevice) )
+                       (A_num_rows + 1) * sizeof(int),
+                       hipMemcpyHostToDevice) )
   CHECK_HIP( hipMemcpy(dA_columns, hA_columns, A_nnz * sizeof(int),
-                         hipMemcpyHostToDevice) )
+                       hipMemcpyHostToDevice) )
   CHECK_HIP( hipMemcpy(dA_values, hA_values,
-                         A_nnz * sizeof(float), hipMemcpyHostToDevice) )
+                       A_nnz * sizeof(float), hipMemcpyHostToDevice) )
   // copy B
   CHECK_HIP( hipMemcpy(dB_offsets, hB_offsets,
-                         (B_num_rows + 1) * sizeof(int),
-                         hipMemcpyHostToDevice) )
+                       (B_num_rows + 1) * sizeof(int),
+                       hipMemcpyHostToDevice) )
   CHECK_HIP( hipMemcpy(dB_columns, hB_columns, B_nnz * sizeof(int),
-                         hipMemcpyHostToDevice) )
+                       hipMemcpyHostToDevice) )
   CHECK_HIP( hipMemcpy(dB_values, hB_values,
-                         B_nnz * sizeof(float), hipMemcpyHostToDevice) )
+                       B_nnz * sizeof(float), hipMemcpyHostToDevice) )
   //--------------------------------------------------------------------------
   // HIPSPARSE APIs
   hipsparseHandle_t     handle = NULL;
@@ -209,17 +206,17 @@ int main(int argc, char *argv[])
   CHECK_HIPSPARSE( hipsparseCreate(&handle) )
   // Create sparse matrix A in CSR format
   CHECK_HIPSPARSE( hipsparseCreateCsr(&matA, A_num_rows, A_num_cols, A_nnz,
-                                    dA_offsets, dA_columns, dA_values,
-                                    HIPSPARSE_INDEX_32I, HIPSPARSE_INDEX_32I,
-                                    HIPSPARSE_INDEX_BASE_ZERO, HIP_R_32F) )
+                                      dA_offsets, dA_columns, dA_values,
+                                      HIPSPARSE_INDEX_32I, HIPSPARSE_INDEX_32I,
+                                      HIPSPARSE_INDEX_BASE_ZERO, HIP_R_32F) )
   CHECK_HIPSPARSE( hipsparseCreateCsr(&matB, B_num_rows, B_num_cols, B_nnz,
-                                    dB_offsets, dB_columns, dB_values,
-                                    HIPSPARSE_INDEX_32I, HIPSPARSE_INDEX_32I,
-                                    HIPSPARSE_INDEX_BASE_ZERO, HIP_R_32F) )
+                                      dB_offsets, dB_columns, dB_values,
+                                      HIPSPARSE_INDEX_32I, HIPSPARSE_INDEX_32I,
+                                      HIPSPARSE_INDEX_BASE_ZERO, HIP_R_32F) )
   CHECK_HIPSPARSE( hipsparseCreateCsr(&matC, A_num_rows, B_num_cols, 0,
-                                    NULL, NULL, NULL,
-                                    HIPSPARSE_INDEX_32I, HIPSPARSE_INDEX_32I,
-                                    HIPSPARSE_INDEX_BASE_ZERO, HIP_R_32F) )
+                                      dC_offsets, NULL, NULL,
+                                      HIPSPARSE_INDEX_32I, HIPSPARSE_INDEX_32I,
+                                      HIPSPARSE_INDEX_BASE_ZERO, HIP_R_32F) )
   //--------------------------------------------------------------------------
   // SpGEMM Computation
 
@@ -229,24 +226,24 @@ int main(int argc, char *argv[])
   // ask bufferSize1 bytes for external memory
   CHECK_HIPSPARSE(
       hipsparseSpGEMM_workEstimation(handle, opA, opB,
-                                    &alpha, matA, matB, &beta, matC,
-                                    computeType, HIPSPARSE_SPGEMM_DEFAULT,
-                                    spgemmDesc, &bufferSize1, NULL) )
+                                     &alpha, matA, matB, &beta, matC,
+                                     computeType, HIPSPARSE_SPGEMM_DEFAULT,
+                                     spgemmDesc, &bufferSize1, NULL) )
   CHECK_HIP( hipMalloc((void**) &dBuffer1, bufferSize1) )
   // inspect the matrices A and B to understand the memory requirement for
   // the next step
   CHECK_HIPSPARSE(
       hipsparseSpGEMM_workEstimation(handle, opA, opB,
-                                    &alpha, matA, matB, &beta, matC,
-                                    computeType, HIPSPARSE_SPGEMM_DEFAULT,
-                                    spgemmDesc, &bufferSize1, dBuffer1) )
+                                     &alpha, matA, matB, &beta, matC,
+                                     computeType, HIPSPARSE_SPGEMM_DEFAULT,
+                                     spgemmDesc, &bufferSize1, dBuffer1) )
 
   // ask bufferSize2 bytes for external memory
   CHECK_HIPSPARSE(
       hipsparseSpGEMM_compute(handle, opA, opB,
-                             &alpha, matA, matB, &beta, matC,
-                             computeType, HIPSPARSE_SPGEMM_DEFAULT,
-                             spgemmDesc, &bufferSize2, NULL) )
+                              &alpha, matA, matB, &beta, matC,
+                              computeType, HIPSPARSE_SPGEMM_DEFAULT,
+                              spgemmDesc, &bufferSize2, NULL) )
   CHECK_HIP( hipMalloc((void**) &dBuffer2, bufferSize2) )
 
   hipDeviceSynchronize();
@@ -256,9 +253,9 @@ int main(int argc, char *argv[])
 
     // compute the intermediate product of A * B
     CHECK_HIPSPARSE( hipsparseSpGEMM_compute(handle, opA, opB,
-                                           &alpha, matA, matB, &beta, matC,
-                                           computeType, HIPSPARSE_SPGEMM_DEFAULT,
-                                           spgemmDesc, &bufferSize2, dBuffer2) )
+                                             &alpha, matA, matB, &beta, matC,
+                                             computeType, HIPSPARSE_SPGEMM_DEFAULT,
+                                             spgemmDesc, &bufferSize2, dBuffer2) )
   }
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
@@ -267,8 +264,8 @@ int main(int argc, char *argv[])
 
   // get matrix C non-zero entries C_nnz1
   int64_t C_num_rows1, C_num_cols1, C_nnz1;
-  CHECK_HIPSPARSE( hipsparseSpMatGetSize(matC, &C_num_rows1, &C_num_cols1,
-                                       &C_nnz1) )
+  CHECK_HIPSPARSE( hipsparseSpMatGetSize(matC, &C_num_rows1, &C_num_cols1, &C_nnz1) )
+
   // allocate the CSR structures for the matrix C
   CHECK_HIP( hipMalloc((void**) &dC_columns, C_nnz1 * sizeof(int))   )
   CHECK_HIP( hipMalloc((void**) &dC_values,  C_nnz1 * sizeof(float)) )
@@ -277,16 +274,15 @@ int main(int argc, char *argv[])
   //       of dC_values, and before the call of cusparseSpGEMM_copy
 
   // update matC with the new pointers
-  CHECK_HIPSPARSE(
-      hipsparseCsrSetPointers(matC, dC_offsets, dC_columns, dC_values) )
+  CHECK_HIPSPARSE( hipsparseCsrSetPointers(matC, dC_offsets, dC_columns, dC_values) )
 
   // if beta != 0, cusparseSpGEMM_copy reuses/updates the values of dC_values
 
   // copy the final products to the matrix C
   CHECK_HIPSPARSE(
       hipsparseSpGEMM_copy(handle, opA, opB,
-                          &alpha, matA, matB, &beta, matC,
-                          computeType, HIPSPARSE_SPGEMM_DEFAULT, spgemmDesc) )
+                           &alpha, matA, matB, &beta, matC,
+                           computeType, HIPSPARSE_SPGEMM_DEFAULT, spgemmDesc) )
 
   // destroy matrix/vector descriptors
   CHECK_HIPSPARSE( hipsparseSpGEMM_destroyDescr(spgemmDesc) )
@@ -312,12 +308,12 @@ int main(int argc, char *argv[])
     float *hC_values_tmp = (float*) malloc (C_nnz * sizeof(float));
 
     CHECK_HIP( hipMemcpy(hC_offsets_tmp, dC_offsets,
-                           (A_num_rows + 1) * sizeof(int),
-                           hipMemcpyDeviceToHost) )
+                         (A_num_rows + 1) * sizeof(int),
+                         hipMemcpyDeviceToHost) )
     CHECK_HIP( hipMemcpy(hC_columns_tmp, dC_columns, C_nnz * sizeof(int),
-                           hipMemcpyDeviceToHost) )
+                         hipMemcpyDeviceToHost) )
     CHECK_HIP( hipMemcpy(hC_values_tmp, dC_values, C_nnz * sizeof(float),
-                           hipMemcpyDeviceToHost) )
+                         hipMemcpyDeviceToHost) )
     int correct = 1;
     for (int i = 0; i < A_num_rows + 1; i++) {
       if (hC_offsets_tmp[i] != hC_offsets[i]) {
