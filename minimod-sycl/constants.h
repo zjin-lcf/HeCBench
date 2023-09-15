@@ -2,10 +2,8 @@
 #define CONSTANTS_H
 
 #define POW2(x) ((x)*(x))
-#define IDX3(i,j,k) (nz*ny*(i) + nz*(j) + (k))
-#define IDX3_l(i,j,k) ((nz+2*lz)*(ny+2*ly)*((i)+lx) + (nz+2*lz)*((j)+ly) + ((k)+lz))
-#define IDX3_eta1(i,j,k) ((nz+2)*(ny+2)*((i)+1) + (nz+2)*((j)+1) + ((k)+1))
-#define IDX3_eta0(i,j,k) ((nz+2)*(ny+2)*(i) + (nz+2)*(j) + (k))
+#define IDX3(i,j,k)((llint)((i + lx) * ldimy + j + ly) * (llint)ldimz + k + lz)
+#define IDX3_grid(i, j, k, grid) (((i + grid.lx) * grid.ldimy + j + grid.ly) * grid.ldimz + k + grid.lz)
 
 extern const float _fmax;
 extern const float vmin;

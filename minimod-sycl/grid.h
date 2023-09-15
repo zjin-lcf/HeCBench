@@ -1,12 +1,14 @@
 #ifndef GRID_H
 #define GRID_H
 
+#include <sycl/sycl.hpp>
 #include "constants.h"
 
 struct grid_t {
     llint ntaperx, ntapery, ntaperz;
     llint ndampx, ndampy, ndampz;
     llint nx, ny, nz;
+    llint ldimx, ldimy, ldimz;
     llint dx, dy, dz;
     llint x1, x2, x3, x4, x5, x6;
     llint y1, y2, y3, y4, y5, y6;
@@ -21,5 +23,16 @@ struct grid_t {
 
 struct grid_t init_grid(llint nx, llint ny, llint nz, llint tsx, llint tsy,
                         llint ngpu);
+
+// Allocate or release a grid on GPU
+float * allocateDeviceGrid (sycl::queue &q, struct grid_t grid);
+void freeDeviceGrid (sycl::queue &q, float *ptr, struct grid_t grid);
+
+// Allocate or release a grid on host
+float * allocateHostGrid (sycl::queue &q, struct grid_t grid);
+void freeHostGrid (sycl::queue &q, float *ptr, struct grid_t grid);
+
+// Useful size of the grid, in bytes
+size_t gridSize (struct grid_t grid);
 
 #endif

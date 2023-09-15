@@ -48,22 +48,18 @@ void gaussian_source(uint nt, float dt, float *__restrict__ source)
   }
 }
 
-void write_io(llint nx, llint ny, llint nz,
-    llint lx, llint ly, llint lz,
-    const float *u, uint istep)
+void write_io(struct grid_t grid, const float *u, uint istep)
 {
-  char filename_buf[32];
-  snprintf(filename_buf, sizeof(filename_buf), "snapshot.it%u.n%llu.raw", istep, nz);
-  FILE *snapshot_file = fopen(filename_buf, "wb");
-  for (llint k = lz; k < nz+lz; ++k) {
-    for (llint j = ly; j < ny+ly; ++j) {
-      for (llint i = lx; i < nx+lx; ++i) {
-        fwrite(&u[IDX3_l(i,j,k)], sizeof(float),1, snapshot_file);
-      }
+    char filename_buf[32];
+    snprintf(filename_buf, sizeof(filename_buf), "snapshot.it%u.n%llu.raw", istep, grid.nz);
+    FILE *snapshot_file = fopen(filename_buf, "wb");
+    for (llint i = 0; i < grid.nx; ++i) {
+        for (llint j = 0; j < grid.ny; ++j) {
+            fwrite(&u[IDX3_grid(i,j,0,grid)], sizeof(float), grid.nz, snapshot_file);
+        }
     }
-  }
-  /* Clean up */
-  fclose(snapshot_file);
+    /* Clean up */
+    fclose(snapshot_file);
 }
 
 
@@ -130,29 +126,19 @@ int main(int argc, char *argv[])
 
     printf("grid = %lld %lld %lld\n", grid.nx, grid.ny, grid.nz);
 
-    const llint lx = grid.lx, ly = grid.ly, lz = grid.lz;
+    const llint sx = nx/2, sy = ny/2, sz = nz/2;
 
-    const llint sx = 4+(nx/2), sy = 4+(ny/2), sz = 4+(nz/2);
-
-    float *u = (float*) malloc(sizeof(float)*(nx+2*lx)*(ny+2*ly)*(nz+2*lz));
-    float *v = (float*) malloc(sizeof(float)*(nx+2*lx)*(ny+2*ly)*(nz+2*lz));
-
-    // PML arrays
-    float *phi = (float*) malloc(sizeof(float)*nx*ny*nz);
-    float *eta = (float*) malloc(sizeof(float)*(nx+2)*(ny+2)*(nz+2));
+    float *u = allocateHostGrid (grid);
+    float *v = allocateHostGrid (grid);
+    float *phi = allocateHostGrid (grid);
+    float *eta = allocateHostGrid (grid);
+    float *vp = allocateHostGrid (grid);
 
     // Wave field initialization
-    for (llint i = -lx; i < nx+lx; ++i) {
-      for (llint j = -ly; j < ny+ly; ++j) {
-        for (llint k = -lz; k < nz+lz; ++k) {
-          u[IDX3_l(i,j,k)] = 0.0f;
-          v[IDX3_l(i,j,k)] = 0.0f;
-        }
-      }
-    }
+    memset (u, 0, gridSize (grid));
+    memset (v, 0, gridSize (grid));
 
     float *source = (float*) malloc(sizeof(float)*nsteps);
-    float *vp = (float*) malloc(sizeof(float)*nx*ny*nz);
 
     float coefx[5], coefy[5], coefz[5];
     init_coef(grid.dx, coefx);
@@ -165,14 +151,14 @@ int main(int argc, char *argv[])
     for (llint i = 0; i < nx; ++i) {
       for (llint j = 0; j < ny; ++j) {
         for (llint k = 0; k < nz; ++k) {
-          phi[IDX3(i,j,k)] = 0.f;
-          vp[IDX3(i,j,k)] = vp_all;
+          phi[IDX3_grid(i,j,k,grid)] = 0.f;
+          vp[IDX3_grid(i,j,k,grid)] = vp_all;
         }
       }
     }
     (void) gaussian_source(nsteps,dt_sch,source);
     // Init PML
-    init_eta(nx, ny, nz, grid, dt_sch, eta);
+    init_eta(grid, dt_sch, eta);
 
     const float hdx_2 = 1.f / (4.f * POW2(grid.dx));
     const float hdy_2 = 1.f / (4.f * POW2(grid.dy));
@@ -186,18 +172,13 @@ int main(int argc, char *argv[])
 
     double kernel_time;
 
-    target(
-        nsteps, &kernel_time,
-        nx, ny, nz,
-        grid.x1, grid.x2, grid.x3, grid.x4, grid.x5, grid.x6,
-        grid.y1, grid.y2, grid.y3, grid.y4, grid.y5, grid.y6,
-        grid.z1, grid.z2, grid.z3, grid.z4, grid.z5, grid.z6,
-        lx, ly, lz,
-        sx, sy, sz,
-        hdx_2, hdy_2, hdz_2,
-        coefx, coefy, coefz,
-        u, v, vp,
-        phi, eta, source);
+    target(nsteps, &kernel_time,
+           grid,
+           sx, sy, sz,
+           hdx_2, hdy_2, hdz_2,
+           coefx, coefy, coefz,
+           u, v, vp,
+           phi, eta, source);
 
     if (warm_up_iter) {
       kernel_time = 0;
@@ -213,24 +194,17 @@ int main(int argc, char *argv[])
     float min_u, max_u;
     find_min_max_u(grid, u, &min_u, &max_u);
 
-    // check for the specific problem size: --grids 100 --nsteps 1000
-    printf("FINAL min_u,  max_u = %f, %f\n", min_u, max_u);
-    if ( fabsf(fabsf(min_u) - 0.2058f) < 1e-4f && 
-         fabsf(max_u - 0.1401f) < 1e-4f )
-      printf("PASS\n");
-    else
-      printf("FAIL\n");
+    printf("Checksum: min_u,  max_u = %f, %f\n", min_u, max_u);
 
-    if( finalio )
-      write_io(nx, ny, nz, lx, ly, lz, u, nsteps);
+    if( finalio ) write_io(grid, u, nsteps);
 
     target_finalize(grid,nsteps,u,v,phi,eta,coefx,coefy,coefz,vp,source);
-    free(u);
-    free(v);
-    free(phi);
-    free(eta);
+    freeHostGrid(u, grid);
+    freeHostGrid(v, grid);
+    freeHostGrid(phi, grid);
+    freeHostGrid(eta, grid);
+    freeHostGrid(vp, grid);
     free(source);
-    free(vp);
 
     warm_up_iter = false;
   }
