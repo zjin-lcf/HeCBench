@@ -175,7 +175,7 @@ int main(int argc, char ** argv) {
     eval_abc(d2Af,tz,&d2c[0]);              
     cudaMemcpy(d_d2c, d2c, sizeof(float)*4, cudaMemcpyHostToDevice);
 
-    dim3 global_size((spline_num_splines+255)/256*256);
+    dim3 global_size((spline_num_splines+255)/256);
     dim3 local_size(256);
 
     cudaDeviceSynchronize();
