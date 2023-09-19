@@ -19,16 +19,11 @@ void init_matrix(float *matrix, int num_rows, int num_cols, int nnz)
     }
   }
 
-#ifdef DEBUG
   for (int i = 0; i < num_rows; i++) {
     for (int j = 0; j < num_cols; j++) {
       matrix[i*num_cols+j] = (d[i*num_cols+j] >= nnz) ? 0 : (float)(drand48()+1);
-      printf("%f ", matrix[i*num_cols+j]);
     }
-    printf("\n");
   }
-  printf("\n");
-#endif
 
   free(d);
 }
