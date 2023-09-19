@@ -22,7 +22,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../sddmm-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../sddmm-batch-cuda
 
 # Linker Flags
 LDFLAGS = -lhipsparse
@@ -44,7 +44,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../sddmm-cuda/utils.h Makefile
+%.o: %.cu ../sddmm-batch-cuda/utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
