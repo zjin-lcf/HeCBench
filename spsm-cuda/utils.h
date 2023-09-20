@@ -42,7 +42,7 @@ void init_csr(int *row_indices, float *values,
     int nnz_per_row = 0; // nnz per row
     for (int j = 0; j < num_cols; j++) {
       if(matrix[i*num_cols+j] != 0) {
-        values[tmp] = matrix[i*num_rows+j];
+        values[tmp] = matrix[i*num_cols+j];
         col_indices[tmp] = j;
         tmp++;
         nnz_per_row++;
