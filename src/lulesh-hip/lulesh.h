@@ -1,7 +1,6 @@
 #ifndef __LULESH
 #define __LULESH
 
-#include <math.h>
 #include <vector>
 #include <hip/hip_runtime.h>
 
