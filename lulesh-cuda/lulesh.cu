@@ -142,8 +142,6 @@ notice, this list of conditions and the disclaimer (as noted below)
 
   */
 
-#include <climits>
-#include <vector>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -151,15 +149,16 @@ notice, this list of conditions and the disclaimer (as noted below)
 #include <ctype.h>
 #include <time.h>
 #include <sys/time.h>
-#include <iostream>
 #include <unistd.h>
-#include <iomanip>
+#include <climits>
+#include <iostream>
 #include <sstream>
 #include <limits>
 #include <fstream>
 #include <string>
 #ifdef VERIFY
-#include <assert.h>
+#include <cassert>
+#include <random>
 #endif
 #include "lulesh.h"
 
@@ -2244,10 +2243,12 @@ int main(int argc, char *argv[])
   Index_t *nodelist = &locDom->m_nodelist[0];
 
 #ifdef VERIFY
+  std::mt19937 gen(19937);
+  std::uniform_real_distribution<> dis(0.1, 1);
   for (int i = 0; i < numNode; i++) {
-    xd[i] = ((float)rand()/(float)(RAND_MAX));
-    yd[i] = ((float)rand()/(float)(RAND_MAX));
-    zd[i] = ((float)rand()/(float)(RAND_MAX));
+    xd[i] = dis(gen);
+    yd[i] = dis(gen);
+    zd[i] = dis(gen);
   }
 #endif
 
@@ -2626,8 +2627,8 @@ int main(int argc, char *argv[])
 #ifdef VERIFY
       // initialize data for testing
       for (int i = 0; i < numElem; i++) {
-        ss[i] = ((float)rand()/(float)(RAND_MAX));
-        elemMass[i] = ((float)rand()/(float)(RAND_MAX));
+        ss[i] = dis(gen);
+        elemMass[i] = dis(gen);
       }
 #endif
       cudaMemcpy(d_ss, ss, sizeof(Real_t)*numElem, cudaMemcpyHostToDevice);
@@ -2896,8 +2897,8 @@ int main(int argc, char *argv[])
     Index_t *lzetam = &domain.m_lzetam[0];
     Index_t *lzetap = &domain.m_lzetap[0];
     Real_t *elemMass = &domain.m_elemMass[0];
-    Real_t *ql = &domain.m_ql[0];
-    Real_t *qq = &domain.m_qq[0];
+    //Real_t *ql = &domain.m_ql[0];
+    //Real_t *qq = &domain.m_qq[0];
 
     cudaMemcpy(d_lzetam, lzetam, sizeof(Index_t)*numElem, cudaMemcpyHostToDevice); 
     cudaMemcpy(d_lzetap, lzetap, sizeof(Index_t)*numElem, cudaMemcpyHostToDevice); 

@@ -144,8 +144,6 @@ notice, this list of conditions and the disclaimer (as noted below)
 
   */
 
-#include <climits>
-#include <vector>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -153,17 +151,17 @@ notice, this list of conditions and the disclaimer (as noted below)
 #include <ctype.h>
 #include <time.h>
 #include <sys/time.h>
-#include <iostream>
 #include <unistd.h>
-#include <iomanip>
+#include <climits>
+#include <iostream>
 #include <sstream>
 #include <limits>
 #include <fstream>
 #include <string>
 #ifdef VERIFY
-#include <assert.h>
+#include <cassert>
+#include <random>
 #endif
-
 #include "lulesh.h"
 
 #define EPSILON 1e-7
@@ -1061,10 +1059,12 @@ int main(int argc, char *argv[])
   Index_t *elemElem = &locDom->m_elemElem[0];
 
 #ifdef VERIFY
+  std::mt19937 gen(19937);
+  std::uniform_real_distribution<> dis(0.1, 1);
   for (int i = 0; i < numNode; i++) {
-    xd[i] = ((float)rand()/(float)(RAND_MAX));
-    yd[i] = ((float)rand()/(float)(RAND_MAX));
-    zd[i] = ((float)rand()/(float)(RAND_MAX));
+    xd[i] = dis(gen);
+    yd[i] = dis(gen);
+    zd[i] = dis(gen);
   }
 #endif
 
@@ -1459,8 +1459,8 @@ int main(int argc, char *argv[])
 #ifdef VERIFY
       // initialize data for testing
       for (int i = 0; i < numElem; i++) {
-        ss[i] = ((float)rand()/(float)(RAND_MAX));
-        elemMass[i] = ((float)rand()/(float)(RAND_MAX));
+        ss[i] = dis(gen);
+        elemMass[i] = dis(gen);
       }
 #endif
 

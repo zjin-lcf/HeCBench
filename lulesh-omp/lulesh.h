@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <vector>
+#include <omp.h>
 
 // Emulate the number of CPU threads
 #define NT 2
