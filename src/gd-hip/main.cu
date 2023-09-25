@@ -34,11 +34,11 @@ compute (
     }
 
     // compute objective 
-    float v = logf(1+expf(-1*A_y_label[i]*xp)) ;
+    float v = logf(1.f + expf(-xp * A_y_label[i]));
     atomicAdd(total_obj_val, v);
 
     // compute errors
-    float prediction = 1.f/(1.f + expf(-xp));
+    float prediction = 1.f / (1.f + expf(-xp));
     int t = (prediction >= 0.5f) ? 1 : -1;
     if (A_y_label[i] == t) atomicAdd(correct, 1);
 
@@ -46,7 +46,7 @@ compute (
     float accum = expf(-A_y_label[i] * xp);
     accum = accum / (1.f + accum);
     for(int j = A_row_ptr[i]; j < A_row_ptr[i+1]; ++j){
-      float temp = -accum*A_value[j]*A_y_label[i];
+      float temp = -accum * A_value[j] * A_y_label[i];
       atomicAdd(&grad[A_col_index[j]], temp);
     }
   }

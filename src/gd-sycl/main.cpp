@@ -105,11 +105,11 @@ int main(int argc, const char *argv[]) {
           }
 
           // compute objective 
-          float v = sycl::log(1+sycl::exp(-1*d_y_label[i]*xp));
+          float v = sycl::log(1.f + sycl::exp(-xp * d_y_label[i]));
           atomicAdd(d_total_obj_val, v);
 
           // compute errors
-          float prediction = 1.f/(1.f + sycl::exp(-xp));
+          float prediction = 1.f / (1.f + expf(-xp));
           int t = (prediction >= 0.5f) ? 1 : -1;
           if (d_y_label[i] == t) {
             atomicAdd(d_correct, 1);
@@ -119,7 +119,7 @@ int main(int argc, const char *argv[]) {
           float accum = sycl::exp(-d_y_label[i] * xp);
           accum = accum / (1.f + accum);
           for(int j = d_row_ptr[i]; j < d_row_ptr[i+1]; ++j){
-            float temp = -accum*d_value[j]*d_y_label[i];
+            float temp = -accum * d_value[j] * d_y_label[i];
             atomicAdd(d_grad+d_col_index[j], temp);
           }
         }

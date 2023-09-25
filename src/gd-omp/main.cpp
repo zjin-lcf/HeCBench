@@ -79,15 +79,15 @@ int main(int argc, const char *argv[]) {
       }
 
       // compute objective 
-      float v = logf(1+expf(-1*d_A_y_label[i]*xp));
+      float v = logf(1.f + expf(-xp * d_A_y_label[i]));
       #pragma omp atomic update
       total_obj_val[0] += v;
 
       // compute errors
-      float prediction = 1.f/(1.f + expf(-xp));
+      float prediction = 1.f / (1.f + expf(-xp));
       int t = (prediction >= 0.5f) ? 1 : -1;
       if (d_A_y_label[i] == t) {
-      #pragma omp atomic update
+        #pragma omp atomic update
         correct[0]++;
       }
 
@@ -95,8 +95,8 @@ int main(int argc, const char *argv[]) {
       float accum = expf(-d_A_y_label[i] * xp);
       accum = accum / (1.f + accum);
       for(int j = d_A_row_ptr[i]; j < d_A_row_ptr[i+1]; ++j) {
-        float temp = -accum*d_A_value[j]*d_A_y_label[i];
-      #pragma omp atomic update
+        float temp = -accum * d_A_value[j] * d_A_y_label[i];
+        #pragma omp atomic update
         d_grad[d_A_col_index[j]] += temp;
       }
     }
