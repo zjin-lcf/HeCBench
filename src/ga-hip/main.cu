@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
 
     current_position = end_position;
   }
-  printn("Total kernel execution time %f (s)\n", total_time * 1e-9f);
+  printf("Total kernel execution time %f (s)\n", total_time * 1e-9f);
   printf("%s\n", error ? "FAIL" : "PASS");
   
   hipFree(d_target);
