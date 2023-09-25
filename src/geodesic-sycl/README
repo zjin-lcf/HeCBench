@@ -1,0 +1,1 @@
+Please extract the data file (locations.tar.gz) before running the benchmark in CUDA, HIP, SYCL or OpenMP
