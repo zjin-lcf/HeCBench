@@ -73,4 +73,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../gd-hip/gisette_scale 0.0001 10 100
+	./$(program) gisette_scale 0.0001 10 100
