@@ -4,30 +4,24 @@
 #include <math.h>
 #include <iostream>
 #include <chrono>
+#include <random>
 #include <sycl/sycl.hpp>
 #include "reference.h"
 
 int main(int argc, char* argv[]) {
 
-  if (argc != 8) {
-    printf("Usage: %s <filename> <rows> <cols> <cases> <controls> "
+  if (argc != 7) {
+    printf("Usage: %s <rows> <cols> <cases> <controls> "
            "<threads> <repeat>\n", argv[0]);
     return 1;
   }
 
-  // check if the data file is readable
-  FILE *fp = fopen(argv[1], "r");
-  if (fp == NULL) {
-    printf("Cannot open the file %s\n", argv[1]);
-    return 1;
-  }
-
-  unsigned int rows = atoi(argv[2]);
-  unsigned int cols = atoi(argv[3]);
-  int ncases = atoi(argv[4]);
-  int ncontrols = atoi(argv[5]);
-  int nthreads = atoi(argv[6]);
-  int repeat = atoi(argv[7]);
+  unsigned int rows = atoi(argv[1]);
+  unsigned int cols = atoi(argv[2]);
+  int ncases = atoi(argv[3]);
+  int ncontrols = atoi(argv[4]);
+  int nthreads = atoi(argv[5]);
+  int repeat = atoi(argv[6]);
 
   printf("Individuals=%d SNPs=%d cases=%d controls=%d nthreads=%d\n",
          rows,cols,ncases,ncontrols,nthreads);
@@ -50,6 +44,12 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  std::mt19937 gen(19937); // mersenne_twister_engin
+  std::uniform_int_distribution<> distrib(0, 2);
+  for (size_t i = 0; i < snpdata_size; i++) {
+    dataT[i] = distrib(gen) + '0';
+  }
+
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
@@ -57,11 +57,10 @@ int main(int argc, char* argv[]) {
 #endif
 
   // allocate SNP device data
-
   unsigned char *snpdata = sycl::malloc_device<unsigned char>(size, q);
-  q.memcpy(dataT, snpdata, snpdata_size);
-
   float *chi_result = sycl::malloc_device<float>(cols, q);
+
+  q.memcpy(snpdata, dataT, snpdata_size);
 
   unsigned jobs = cols;
   sycl::range<1> gws ((jobs + nthreads - 1)/nthreads * nthreads);
@@ -77,8 +76,6 @@ int main(int argc, char* argv[]) {
         unsigned char y;
         int m, n;
         unsigned int p = 0;
-        int cases[3];
-        int controls[3];
         int tot_cases = 1;
         int tot_controls= 1;
         int total = 1;
@@ -92,12 +89,12 @@ int main(int argc, char* argv[]) {
         int tid  = item.get_global_id(0);
         if (tid >= cols) return;
 
-        cases[0]=1;cases[1]=1;cases[2]=1;
-        controls[0]=1;controls[1]=1;controls[2]=1;
+        int cases[3] = {1,1,1};
+        int controls[3] = {1,1,1};
 
         // read cases: each thread reads a column of snpdata matrix
         for ( m = 0 ; m < ncases ; m++ ) {
-          y = snpdata[m * cols + tid];
+          y = snpdata[(size_t)m * (size_t)cols + tid];
           if ( y == '0') { cases[0]++; }
           else if ( y == '1') { cases[1]++; }
           else if ( y == '2') { cases[2]++; }
@@ -105,23 +102,26 @@ int main(int argc, char* argv[]) {
 
         // read controls: each thread reads a column of snpdata matrix
         for ( n = ncases ; n < ncases + ncontrols ; n++ ) {
-          y = snpdata[n * cols + tid];
+          y = snpdata[(size_t)n * (size_t)cols + tid];
           if ( y == '0' ) { controls[0]++; }
           else if ( y == '1') { controls[1]++; }
           else if ( y == '2') { controls[2]++; }
         }
 
-        tot_cases = cases[0]+cases[1]+cases[2];
-        tot_controls = controls[0]+controls[1]+controls[2];
+        for( p = 0 ; p < 3; p++ ) {
+          tot_cases += cases[p];
+          tot_controls += controls[p];
+        }
         total = tot_cases + tot_controls;
 
-        for( p = 0 ; p < 3; p++) {
+        for( p = 0 ; p < 3; p++ ) {
           exp[p] = (float)cases[p] + controls[p]; 
           Cexpected[p] = tot_cases * exp[p] / total;
           Conexpected[p] = tot_controls * exp[p] / total;
           numerator1 = (float)cases[p] - Cexpected[p];
           numerator2 = (float)controls[p] - Conexpected[p];
-          chisquare += numerator1 * numerator1 / Cexpected[p] +  numerator2 * numerator2 / Conexpected[p];
+          chisquare += numerator1 * numerator1 / Cexpected[p] +
+                       numerator2 * numerator2 / Conexpected[p];
         }
         chi_result[tid] = chisquare;
       });
@@ -133,7 +133,7 @@ int main(int argc, char* argv[]) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time = %f (s)\n", time * 1e-9f / repeat);
 
-  q.memcpy(chi_result, h_results, result_size).wait();
+  q.memcpy(h_results, chi_result, result_size).wait();
 
   sycl::free(snpdata, q);
   sycl::free(chi_result, q);
