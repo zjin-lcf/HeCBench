@@ -9,14 +9,18 @@
 
 int main(int argc, char* argv[])
 {
-  if (argc != 3) {
-    printf("Usage: %s dimx dimy\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <dim_x> <dim_y> <nt>\n", argv[0]);
+    printf("dim_x: number of grid points in the x axis\n");
+    printf("dim_y: number of grid points in the y axis\n");
+    printf("nt: number of time steps\n");
     exit(-1);
   }
 
   // Define the domain
   const int x_points = atoi(argv[1]);
   const int y_points = atoi(argv[2]);
+  const int num_itrs = atoi(argv[3]);
   const double x_len = 2.0;
   const double y_len = 2.0;
   const double del_x = x_len/(x_points-1);
@@ -36,13 +40,13 @@ int main(int argc, char* argv[])
   double *d_v = (double*) malloc (grid_size);
 
   // Define the parameters
-  const int num_itrs = 100;     // Number of time iterations
   const double nu = 0.01;
   const double sigma = 0.0009;
   const double del_t = sigma * del_x * del_y / nu;      // CFL criteria
 
   printf("2D Burger's equation\n");
   printf("Grid dimension: x = %d y = %d\n", x_points, y_points);
+  printf("Number of time steps: %d\n", num_itrs);
 
   for(int i = 0; i < x_points; i++) x[i] = i * del_x;
   for(int i = 0; i < y_points; i++) y[i] = i * del_y;
