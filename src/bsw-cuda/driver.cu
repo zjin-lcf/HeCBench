@@ -264,17 +264,22 @@ void kernel_driver_aa(std::string filename,
             << "Total loop iteration time (seconds):"<< diff.count() << "\n";
 
   std::ofstream results_file(filename);
+  if (results_file.is_open()) {
 
-  for (unsigned int k = 0; k < reads.size(); k++) {
-    results_file << h_top_scores[k] <<"\t"
-      << h_ref_begin[k] <<"\t"
-      << h_ref_end[k] - 1 <<"\t"
-      << h_query_begin[k] <<"\t"
-      << h_query_end[k] - 1
-      << std::endl;
+    for(unsigned int k = 0; k < reads.size(); k++){
+      results_file << h_top_scores[k] <<"\t"
+                   << h_ref_begin[k] <<"\t"
+                   << h_ref_end[k] - 1 <<"\t"
+                   << h_query_begin[k] <<"\t"
+                   << h_query_end[k] - 1
+                   << std::endl;
+    }
+    results_file.flush();
+    results_file.close();
+  } else {
+    std::cerr << "Error opening the result file "
+              << filename << std::endl;
   }
-  results_file.flush();
-  results_file.close();
 
   long long int total_cells = 0;
   for (unsigned int l = 0; l < reads.size(); l++) {

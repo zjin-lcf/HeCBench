@@ -25,7 +25,12 @@ void proteinSampleRun(std::string refFile, std::string queFile, std::string out_
       }
     }
     ref_file.close();
+  } else {
+    std::cerr << "Error opening the reference file "
+              << refFile << std::endl;
+    return;
   }
+
 
   if (quer_file.is_open())
   {
@@ -45,6 +50,10 @@ void proteinSampleRun(std::string refFile, std::string queFile, std::string out_
       }
     }
     quer_file.close();
+  } else {
+    std::cerr << "Error opening the query file "
+              << queFile << std::endl;
+    return;
   }
 
   short scores_matrix[] = {
@@ -74,7 +83,6 @@ void proteinSampleRun(std::string refFile, std::string queFile, std::string out_
     -4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,1}; // blosum 62
 
   kernel_driver_aa(out_file, G_sequencesB, G_sequencesA, scores_matrix, -6, -1);
-
 }
 
 int main(int argc, char* argv[])
