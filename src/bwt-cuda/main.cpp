@@ -38,14 +38,15 @@ std::string bwt_cpu(const std::string sequence) {
 
 int main(int argc, char const *argv[])
 {
-  // bioinformatics 
-  std::string alphabet("ATCG");
   const int N = (argc > 1) ? atoi(argv[1]) : 1E6;
   std::cout << "running a sample sequence of length " << N << std::endl;
 
-  // initialize sequence
+  // initialize the alphabet used in bioinformatics
+  std::string alphabet("ATCG");
+
   srand(123);
   char* sequence = (char*) malloc((N+1) * sizeof(char));
+
   for (int i = 0; i < N; i++) {
     sequence[i] = alphabet[rand() % alphabet.size()];
   }
