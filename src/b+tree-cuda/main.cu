@@ -1824,11 +1824,9 @@ destroy_tree(node* root)
 //========================================================================================================================================================================================================200
 
   int 
-main(  int argc, 
-    char** argv ) 
+main( int argc, char** argv )
 {
 
-  srand(2);
   printf("WG size of kernel 1 & 2  = %d \n", DEFAULT_ORDER);
 
   // ------------------------------------------------------------60
@@ -2130,7 +2128,7 @@ main(  int argc,
 
           printf("\n ******command: k count=%d \n",count);
           if(count > 65535){
-            printf("ERROR: Number of requested querries should be 65,535 at most. (limited by # of CUDA blocks)\n");
+            printf("ERROR: Number of requested querries should be 65,535 at most. (limited by # of GPU thread blocks)\n");
             exit(0);
           }
 
@@ -2162,6 +2160,7 @@ main(  int argc,
           int *keys;
           keys = (int *)malloc(count*sizeof(int));
           // INPUT: keys CPU initialization
+          srand(123);
           int i;
           for(i = 0; i < count; i++){
             keys[i] = (rand()/(float)RAND_MAX)*size;
@@ -2174,7 +2173,7 @@ main(  int argc,
             ans[i].value = -1;
           }
 
-          // CUDA kernel
+          // GPU kernel
           kernel_wrapper(records,
               records_mem,
               knodes,
@@ -2305,6 +2304,7 @@ main(  int argc,
           int *end;
           end = (int *)malloc(count*sizeof(int));
           // INPUT: start, end CPU initialization
+          srand(123);
           int i;
           for(i = 0; i < count; i++){
             start[i] = (rand()/(float)RAND_MAX)*size;
@@ -2326,7 +2326,7 @@ main(  int argc,
             reclength[i] = 0;
           }
 
-          // CUDA kernel
+          // GPU kernel
           kernel2_wrapper(  knodes,
               knodes_elem,
               knodes_mem,
