@@ -1604,9 +1604,8 @@ node* destroy_tree(node* root)
   return NULL;
 }
 
-int main(int argc, char** argv ) 
+int main(int argc, char** argv)
 {
-  srand(2);
   printf("WG size of kernel 1 = %d WG size of kernel 2 = %d \n", DEFAULT_ORDER, DEFAULT_ORDER_2);
   // ------------------------------------------------------------60
   // figure out and display whether 32-bit or 64-bit architecture
@@ -1912,7 +1911,7 @@ int main(int argc, char** argv )
 
           printf("\n ******command: k count=%d \n",count);
           if(count > 65535){
-            printf("ERROR: Number of requested querries should be 65,535 at most. (limited by # of CUDA blocks)\n");
+            printf("ERROR: Number of requested querries should be 65,535 at most. (limited by # of work-groups)\n");
             exit(0);
           }
 
@@ -1944,6 +1943,7 @@ int main(int argc, char** argv )
           int *keys;
           keys = (int *)malloc(count*sizeof(int));
           // INPUT: keys CPU initialization
+          srand(123);
           int i;
           for(i = 0; i < count; i++){
             keys[i] = (rand()/(float)RAND_MAX)*size;
@@ -2083,6 +2083,7 @@ int main(int argc, char** argv )
           int *end;
           end = (int *)malloc(count*sizeof(int));
           // INPUT: start, end CPU initialization
+          srand(123);
           int i;
           for(i = 0; i < count; i++){
             start[i] = (rand()/(float)RAND_MAX)*size;
