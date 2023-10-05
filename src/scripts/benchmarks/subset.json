@@ -1,4 +1,28 @@
 {
+  "adam-hip": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "10000",
+      "200",
+      "100"
+    ]
+  ],
+  "adam-sycl": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "10000",
+      "200",
+      "100"
+    ]
+  ],
+  "adam-cuda": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "10000",
+      "200",
+      "100"
+    ]
+  ],
   "backprop-sycl": [
     "(?:time = )([0-9.+-e]+)(?:\\(s\\))",
     [
@@ -77,23 +101,80 @@
   "asta-sycl": [
     "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))"
   ],
-  "bezier-surface-sycl": [
-    "(?:device execution time: )([0-9.+-e]+)(?: ms)",
+  "atomicAggregate-hip": [
+    "(?:Total kernel time: )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
     [
-      "-m",
-      "10",
-      "-n",
-      "500"
+      "1000"
     ]
   ],
-  "bilateral-sycl": [
-    "(?:Average kernel execution time \\([1-9]x[1-9]\\) )([0-9.+-e]+)(?: \\(s\\))",
+  "atomicAggregate-sycl": [
+    "(?:Total kernel time: )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
     [
-      "1000",
-      "1000",
-      "1",
-      "5",
-      "1"
+      "1000"
+    ]
+  ],
+  "atomicAggregate-cuda": [
+    "(?:Total kernel time: )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
+    [
+      "1000"
+    ]
+  ],
+  "atomicCAS-hip": [
+    "(?:Average execution time: )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
+    [
+      "10000"
+    ]
+  ],
+  "atomicCAS-sycl": [
+    "(?:Average execution time: )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
+    [
+      "10000"
+    ]
+  ],
+  "atomicCAS-cuda": [
+    "(?:Average execution time: )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
+    [
+      "10000"
+    ]
+  ],
+  "atomicCost-hip": [
+    "(?:Average execution time of (WithoutAtomicOnGlobalMem|WithAtomicOnGlobalMem): )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
+    [
+      "10"
+    ]
+  ],
+  "atomicCost-sycl": [
+    "(?:Average execution time of (WithoutAtomicOnGlobalMem|WithAtomicOnGlobalMem): )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
+    [
+      "10"
+    ]
+  ],
+  "atomicCost-cuda": [
+    "(?:Average execution time of (WithoutAtomicOnGlobalMem|WithAtomicOnGlobalMem): )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
+    [
+      "10"
+    ]
+  ],
+  "atomicReduction-hip": [
+    "(?:The average performance of reduction is )([0-9.+-e]+)(?: GBytes/sec)",
+    [],
+    "reduction"
+  ],
+  "atomicReduction-sycl": [
+    "(?:The average performance of reduction is )([0-9.+-e]+)(?: GBytes/sec)",
+    [],
+    "reduction"
+  ],
+  "atomicReduction-cuda": [
+    "(?:The average performance of reduction is )([0-9.+-e]+)(?: GBytes/sec)",
+    [],
+    "reduction"
+  ],
+  "bezier-surface-sycl": [
+    "(?:kernel execution time: )([0-9.+-e]+)(?: ms)",
+    [
+      "-n",
+      "8192"
     ]
   ],
   "binomial-sycl": [
@@ -102,8 +183,8 @@
   "bitonic-sort-sycl": [
     "(?:Parallel bitonic time )([0-9.+-e]+)(?: \\(s\\))",
     [
-      "22",
-      "1"
+      "25",
+      "2"
     ]
   ],
   "bonds-sycl": [
@@ -498,10 +579,8 @@
   "bezier-surface-cuda": [
     "(?:device execution time: )([0-9.+-e]+)(?: ms)",
     [
-      "-m",
-      "10",
       "-n",
-      "500"
+      "8192"
     ],
     "bs"
   ],
@@ -518,8 +597,8 @@
   "bitonic-sort-cuda": [
     "(?:Parallel bitonic time )([0-9.+-e]+)(?: \\(s\\))",
     [
-      "22",
-      "1"
+      "25",
+      "2"
     ]
   ],
   "bn-cuda": [
@@ -917,12 +996,10 @@
     ]
   ],
   "bezier-surface-hip": [
-    "(?:device execution time: )([0-9.+-e]+)(?: ms)",
+    "(?:kernel execution time: )([0-9.+-e]+)(?: ms)",
     [
-      "-m",
-      "10",
       "-n",
-      "500"
+      "8192"
     ]
   ],
   "bh-hip": [
@@ -933,13 +1010,33 @@
     ]
   ],
   "bilateral-hip": [
-    "(?:Average kernel execution time \\([1-9]x[1-9]\\) )([0-9.+-e]+)(?: \\(s\\))",
+    "(?:Average kernel execution time \\([1-9]x[1-9]\\) )([0-9.+-e]+)(?: \\(ms\\))",
     [
-      "1000",
-      "1000",
-      "1",
-      "5",
-      "1"
+      "2960",
+      "1440",
+      "0.5",
+      "0.5",
+      "1000"
+    ]
+  ],
+  "bilateral-sycl": [
+    "(?:Average kernel execution time \\([1-9]x[1-9]\\) )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "2960",
+      "1440",
+      "0.5",
+      "0.5",
+      "1000"
+    ]
+  ],
+  "bilateral-cuda": [
+    "(?:Average kernel execution time \\([1-9]x[1-9]\\) )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "2960",
+      "1440",
+      "0.5",
+      "0.5",
+      "1000"
     ]
   ],
   "binomial-hip": [
@@ -948,8 +1045,8 @@
   "bitonic-sort-hip": [
     "(?:Parallel bitonic time )([0-9.+-e]+)(?: \\(s\\))",
     [
-      "22",
-      "1"
+      "25",
+      "2"
     ]
   ],
   "bn-hip": [
