@@ -1686,5 +1686,48 @@
       "--dimy=184",
       "--timesteps=90"
     ]
+  ],
+  "winograd-hip": [
+    "(?:Co-execution time: )([0-9.+-e]+)(?: s)",
+    [ ]
+  ],
+  "zerocopy-hip": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: s|ms|us)",
+    [
+      "100"
+    ]
+  ],
+  "zerocopy-sycl": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: s|ms|us)",
+    [
+      "100"
+    ]
+  ],
+  "zerocopy-cuda": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: s|ms|us)",
+    [
+      "100"
+    ]
+  ],
+  "zeropoint-hip": [
+    "(?:Average execution time of zero-point kernel: )([0-9.+-e]+)(?: \\(s|ms|us\\))",
+    [
+      "10000000",
+      "100"
+    ]
+  ],
+  "zeropoint-sycl": [
+    "(?:Average execution time of zero-point kernel: )([0-9.+-e]+)(?: \\(s|ms|us\\))",
+    [
+      "10000000",
+      "100"
+    ]
+  ],
+  "zeropoint-cuda": [
+    "(?:Average execution time of zero-point kernel: )([0-9.+-e]+)(?: \\(s|ms|us\\))",
+    [
+      "10000000",
+      "100"
+    ]
   ]
 }
