@@ -3,11 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-
 
 #===============================================================================
 # Program name & source code list
@@ -15,7 +14,7 @@ DEVICE    = gpu
 
 program = test
 
-source = ccsd_tengy.cpp  ccsd_trpdrv.cpp  main.cpp
+source = ccsd_tengy.cpp ccsd_trpdrv.cpp main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -35,15 +34,13 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
@@ -51,10 +48,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -62,4 +59,3 @@ clean:
 
 run: $(program)
 	./$(program) 40 200 100
-
