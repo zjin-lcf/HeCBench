@@ -1996,5 +1996,86 @@
       "1024",
       "100"
     ]
+  ],
+  "goulash-hip": [
+    "(?:total kernel time )([0-9.+-e]+)(?:\\(s\\))",
+    [
+      "101",
+      "5"
+    ]
+  ],
+  "goulash-sycl": [
+    "(?:total kernel time )([0-9.+-e]+)(?:\\(s\\))",
+    [
+      "101",
+      "5"
+    ]
+  ],
+  "goulash-cuda": [
+    "(?:total kernel time )([0-9.+-e]+)(?:\\(s\\))",
+    [
+      "101",
+      "5"
+    ]
+  ],
+  "haccmk-hip": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "1000"
+    ],
+    "haccmk"
+  ],
+  "haccmk-sycl": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "1000"
+    ],
+    "haccmk"
+  ],
+  "haccmk-cuda": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "1000"
+    ],
+    "haccmk"
+  ],
+  "hausdorff-hip": [
+    "(?:Average execution time of kernels: )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "100000",
+      "100000",
+      "100"
+    ]
+  ],
+  "hausdorff-sycl": [
+    "(?:Average execution time of kernels: )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "100000",
+      "100000",
+      "100"
+    ]
+  ],
+  "hausdorff-cuda": [
+    "(?:Average execution time of kernels: )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "100000",
+      "100000",
+      "100"
+    ]
+  ],
+  "hmm-hip": [
+    "(?:Device execution time of Viterbi iterations )([0-9.+-e]+)(?: \\(s\\))",
+    [],
+    "hmm"
+  ],
+  "hmm-cuda": [
+    "(?:Device execution time of Viterbi iterations )([0-9.+-e]+)(?: \\(s\\))",
+    [],
+    "hmm"
+  ],
+  "hmm-sycl": [
+    "(?:Device execution time of Viterbi iterations )([0-9.+-e]+)(?: \\(s\\))",
+    [],
+    "hmm"
   ]
 }
