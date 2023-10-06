@@ -1729,5 +1729,41 @@
       "10000000",
       "100"
     ]
+  ],
+  "dct8x8-hip": [
+    "(?:Average DCT8x8 kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "8192",
+      "8192",
+      "100"
+    ]
+  ],
+  "dct8x8-sycl": [
+    "(?:Average DCT8x8 kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "8192",
+      "8192",
+      "100"
+    ]
+  ],
+  "dct8x8-cuda": [
+    "(?:Average DCT8x8 kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "8192",
+      "8192",
+      "100"
+    ]
+  ],
+  "degrid-hip": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [ ]
+  ],
+  "degrid-sycl": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [ ]
+  ],
+  "degrid-cuda": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [ ]
   ]
 }
