@@ -1789,5 +1789,116 @@
       "256",
       "1000"
     ]
+  ],
+  "dxtc1-hip": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "../dxtc1-sycl/data/lena_std.ppm",
+      "../dxtc1-sycl/data/lena_ref.dds",
+      "100"
+    ]
+  ],
+  "dxtc1-sycl": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "../dxtc1-sycl/data/lena_std.ppm",
+      "../dxtc1-sycl/data/lena_ref.dds",
+      "100"
+    ]
+  ],
+  "dxtc1-cuda": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "../dxtc1-sycl/data/lena_std.ppm",
+      "../dxtc1-sycl/data/lena_ref.dds",
+      "100"
+    ]
+  ],
+  "f16sp-hip": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "100000"
+    ]
+  ],
+  "f16sp-sycl": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "100000"
+    ]
+  ],
+  "f16sp-cuda": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "100000"
+    ]
+  ],
+  "filter-hip": [
+    "(?:Average execution time of filter \\(shared memory\\) )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "100000000",
+      "256",
+      "100"
+    ]
+  ],
+  "filter-sycl": [
+    "(?:Average execution time of filter \\(shared memory\\) )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "100000000",
+      "256",
+      "100"
+    ]
+  ],
+  "filter-cuda": [
+    "(?:Average execution time of filter \\(shared memory\\) )([0-9.+-e]+)(?: \\(ms\\))",
+    [
+      "100000000",
+      "256",
+      "100"
+    ]
+  ], 
+  "floydwarshall-hip": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "1024",
+      "100",
+      "16"
+    ]
+  ],
+  "floydwarshall-sycl": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "1024",
+      "100",
+      "16"
+    ]
+  ],
+  "floydwarshall-cuda": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "1024",
+      "100",
+      "16"
+    ]
+  ],
+  "fpc-hip": [
+    "(?:fpc2: average device offload time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "256",
+      "100"
+    ]
+  ],
+  "fpc-sycl": [
+    "(?:fpc2: average device offload time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "256",
+      "100"
+    ]
+  ],
+  "fpc-cuda": [
+    "(?:fpc2: average device offload time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "256",
+      "100"
+    ]
   ]
 }
