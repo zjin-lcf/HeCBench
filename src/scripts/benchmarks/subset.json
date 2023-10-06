@@ -2185,5 +2185,86 @@
     [
       "1000"
     ]
+  ],
+  "libor-hip": [
+    "(?:Average kernel execution time : )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
+  ],
+  "libor-sycl": [
+    "(?:Average kernel execution time : )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
+  ],
+  "libor-cuda": [
+    "(?:Average kernel execution time : )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
+  ],
+  "lif-hip": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "1000",
+      "1000",
+      "400"
+    ]
+  ],
+  "lif-sycl": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "1000",
+      "1000",
+      "400"
+    ]
+  ],
+  "lif-cuda": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "1000",
+      "1000",
+      "400"
+    ]
+  ],
+  "linearprobing-hip": [
+    "(?:Kernel execution time \\(iterate\\): )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "16",
+      "8"
+    ]
+  ],
+  "linearprobing-sycl": [
+    "(?:Kernel execution time \\(iterate\\): )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "16",
+      "8"
+    ]
+  ],
+  "linearprobing-cuda": [
+    "(?:Kernel execution time \\(iterate\\): )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "16",
+      "8"
+    ]
+  ],
+  "lombscargle-hip": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "100"
+    ]
+  ],
+  "lombscargle-sycl": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "100"
+    ]
+  ],
+  "lombscargle-cuda": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "100"
+    ]
   ]
 }
