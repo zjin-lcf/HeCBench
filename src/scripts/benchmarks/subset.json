@@ -1900,5 +1900,101 @@
       "256",
       "100"
     ]
+  ],
+  "fwt-hip": [
+    "(?:Average device execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
+  ],
+  "fwt-sycl": [
+    "(?:Average device execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
+  ],
+  "fwt-cuda": [
+    "(?:Average device execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
+  ],
+  "gabor-hip": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "8640",
+      "15360",
+      "1000"
+    ]
+  ],
+  "gabor-sycl": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "8640",
+      "15360",
+      "1000"
+    ]
+  ],
+  "gabor-cuda": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "8640",
+      "15360",
+      "1000"
+    ]
+  ],
+  "gamma-correction-hip": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "7680",
+      "4320",
+      "256",
+      "100"
+    ],
+    "gamma-correction"
+  ],
+  "gamma-correction-sycl": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "7680",
+      "4320",
+      "256",
+      "100"
+    ],
+    "gamma-correction"
+  ],
+  "gamma-correction-cuda": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "7680",
+      "4320",
+      "256",
+      "100"
+    ],
+    "gamma-correction"
+  ],
+  "glu-hip": [
+    "(?:Average execution time of GLU kernel \\(split dimension = 2\\): )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "3",
+      "1024",
+      "100"
+    ]
+  ],
+  "glu-sycl": [
+    "(?:Average execution time of GLU kernel \\(split dimension = 2\\): )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "3",
+      "1024",
+      "100"
+    ]
+  ],
+  "glu-cuda": [
+    "(?:Average execution time of GLU kernel \\(split dimension = 2\\): )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "3",
+      "1024",
+      "100"
+    ]
   ]
 }
