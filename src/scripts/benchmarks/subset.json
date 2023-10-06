@@ -2077,5 +2077,71 @@
     "(?:Device execution time of Viterbi iterations )([0-9.+-e]+)(?: \\(s\\))",
     [],
     "hmm"
+  ],
+  "hwt1d-hip": [
+    "(?:Average device offload time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "8388608",
+      "100"
+    ]
+  ],
+  "hwt1d-sycl": [
+    "(?:Average device offload time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "8388608",
+      "100"
+    ]
+  ],
+  "hwt1d-cuda": [
+    "(?:Average device offload time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "8388608",
+      "100"
+    ]
+  ],
+  "hybridsort-hip": [
+    "(?:GPU execution time: )([0-9.+-e]+)(?: ms)",
+    [
+      "r"
+    ],
+    "hybridsort"
+  ],
+  "hybridsort-sycl": [
+    "(?:GPU execution time: )([0-9.+-e]+)(?: ms)",
+    [
+      "r"
+    ],
+    "hybridsort"
+  ],
+  "hybridsort-cuda": [
+    "(?:GPU execution time: )([0-9.+-e]+)(?: ms)",
+    [
+      "r"
+    ],
+    "hybridsort"
+  ],
+  "inversek2j-hip": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "../inversek2j-sycl/coord_in.txt",
+      "100000"
+    ],
+    "invkin"
+  ],
+  "inversek2j-sycl": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "../inversek2j-sycl/coord_in.txt",
+      "100000"
+    ],
+    "invkin"
+  ],
+  "inversek2j-cuda": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "../inversek2j-sycl/coord_in.txt",
+      "100000"
+    ],
+    "invkin"
   ]
 }
