@@ -2143,5 +2143,47 @@
       "100000"
     ],
     "invkin"
+  ],
+  "jenkins-hash-hip": [
+    "(?:Average kernel execution time : )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "256",
+      "16777216",
+      "100"
+    ]
+  ],
+  "jenkins-hash-sycl": [
+    "(?:Average kernel execution time : )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "256",
+      "16777216",
+      "100"
+    ]
+  ],
+  "jenkins-hash-cuda": [
+    "(?:Average kernel execution time : )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "256",
+      "16777216",
+      "100"
+    ]
+  ],
+  "layout-hip": [
+    "(?:Average kernel execution time \\(SoA\\): )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "1000"
+    ]
+  ],
+  "layout-sycl": [
+    "(?:Average kernel execution time \\(SoA\\): )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "1000"
+    ]
+  ],
+  "layout-cuda": [
+    "(?:Average kernel execution time \\(SoA\\): )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "1000"
+    ]
   ]
 }
