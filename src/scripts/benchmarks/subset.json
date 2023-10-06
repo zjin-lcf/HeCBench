@@ -1765,5 +1765,29 @@
   "degrid-cuda": [
     "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
     [ ]
+  ],
+  "dense-embedding-hip": [
+    "(?:Average execution time of dense embedding kernel \\(k2\\): )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "100000",
+      "256",
+      "1000"
+    ]
+  ],
+  "dense-embedding-sycl": [
+    "(?:Average execution time of dense embedding kernel \\(k2\\): )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "100000",
+      "256",
+      "1000"
+    ]
+  ],
+  "dense-embedding-cuda": [
+    "(?:Average execution time of dense embedding kernel \\(k2\\): )([0-9.+-e]+)(?: \\(us\\))",
+    [
+      "100000",
+      "256",
+      "1000"
+    ]
   ]
 }
