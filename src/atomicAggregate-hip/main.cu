@@ -10,6 +10,7 @@
 
 __device__ int atomicAggInc(int* ptr) {
   int mask;
+  //mask = __match_any((unsigned long long)ptr);
   for (int i = 0; i < warpSize; i++){
     unsigned long long tptr = __shfl((unsigned long long)ptr, i);
     unsigned my_mask = __ballot((tptr == (unsigned long long)ptr));
@@ -25,12 +26,10 @@ __device__ int atomicAggInc(int* ptr) {
   return res + __popc(mask & ((1 << lane_id) - 1)); //compute old value
 }
 
-__global__ void k(int *d) {
-  int *ptr = d + threadIdx.x % 32;
+__global__ void k(int *d, int s) {
+  int *ptr = d + threadIdx.x % s;
   atomicAggInc(ptr);
 }
-
-const int ds = 32;
 
 int main(int argc, char* argv[]) {
   if (argc != 2) {
@@ -39,34 +38,39 @@ int main(int argc, char* argv[]) {
   }
   const int repeat = atoi(argv[1]);
 
-  int *d_d, *h_d;
-  h_d = new int[ds];
-  hipMalloc(&d_d, ds*sizeof(d_d[0]));
-  hipMemset(d_d, 0, ds*sizeof(d_d[0]));
+  const int nBlocks = 65536;
+  const int blockSize = 256;
 
-  hipDeviceSynchronize();
-  
-  auto start = std::chrono::steady_clock::now();
+  for (int ds = 32; ds >= 1; ds = ds / 2) {
+    int *d_d, *h_d;
+    h_d = new int[ds];
+    hipMalloc(&d_d, ds*sizeof(int));
+    hipMemset(d_d, 0, ds*sizeof(int));
 
-  for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(k, 256*32, 256, 0, 0, d_d);
-  hipDeviceSynchronize();
+    hipDeviceSynchronize();
 
-  auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<float> time = end - start;
-  printf("Total kernel time: %f (s)\n", time.count());
+    auto start = std::chrono::steady_clock::now();
 
-  hipMemcpy(h_d, d_d, ds*sizeof(d_d[0]), hipMemcpyDeviceToHost);
+    for (int i = 0; i < repeat; i++)
+      k<<<nBlocks, blockSize>>>(d_d, ds);
+    hipDeviceSynchronize();
 
-  bool ok = true;
-  for (int i = 0; i < ds; i++) {
-    if (h_d[i] != 256 * 256 * repeat) {
-      ok = false;
-      break;
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<float> time = end - start;
+    printf("Total kernel time (%d locations): %f (s)\n", ds, time.count());
+
+    hipMemcpy(h_d, d_d, ds*sizeof(int), hipMemcpyDeviceToHost);
+
+    bool ok = true;
+    for (int i = 0; i < ds; i++) {
+      if (h_d[i] != blockSize / ds * nBlocks * repeat) {
+        ok = false;
+        break;
+      }
     }
+    printf("%s\n", ok ? "PASS" : "FAIL");
+    hipFree(d_d);
+    delete [] h_d;
   }
-  printf("%s\n", ok ? "PASS" : "FAIL");
-  hipFree(d_d);
-  delete [] h_d;
   return 0;
 }
