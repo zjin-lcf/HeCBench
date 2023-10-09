@@ -1,3 +1,4 @@
+
 __device__ double LCG_random_double(uint64_t * seed)
 {
   const uint64_t m = 9223372036854775808ULL; // 2^63
@@ -95,3 +96,4 @@ __global__ void complex_double (char* checkSum, int n)
 
   checkSum[i] = s;
 }
+

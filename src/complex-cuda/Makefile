@@ -45,7 +45,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernels.h complex.h Makefile
+%.o: %.cu reference.h kernels.h complex.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
