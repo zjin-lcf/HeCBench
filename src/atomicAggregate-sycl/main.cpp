@@ -37,12 +37,10 @@ int atomicAggInc(int* ptr, sycl::nd_item<1> &item) {
   return res + sycl::popcount(mask & ((1 << lane_id) - 1)); // compute old value
 }
 
-void k(int *d, sycl::nd_item<1> &item) {
-  int *ptr = d + item.get_local_id(0) % 32;
+void k(int *d, int s, sycl::nd_item<1> &item) {
+  int *ptr = d + item.get_local_id(0) % s;
   atomicAggInc(ptr, item);
 }
-
-const int ds = 32;
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
@@ -51,8 +49,8 @@ int main(int argc, char *argv[]) {
   }
   const int repeat = atoi(argv[1]);
 
-  int *d_d, *h_d;
-  h_d = new int[ds];
+  const int nBlocks = 65536;
+  const int blockSize = 256;
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -60,43 +58,49 @@ int main(int argc, char *argv[]) {
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  d_d = (int *)sycl::malloc_device(ds * sizeof(d_d[0]), q);
-  q.memset(d_d, 0, ds * sizeof(d_d[0]));
+  for (int ds = 32; ds >= 1; ds = ds / 2) {
 
-  q.wait();
+    int *d_d, *h_d;
+    h_d = new int[ds];
 
-  sycl::range<1> gws (256 * 32 * 256);
-  sycl::range<1> lws (256);
+    d_d = (int *)sycl::malloc_device(ds * sizeof(d_d[0]), q);
+    q.memset(d_d, 0, ds * sizeof(d_d[0]));
 
-  auto start = std::chrono::steady_clock::now();
+    q.wait();
 
-  for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class kernel>(
-        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) 
-                       [[sycl::reqd_sub_group_size(warpSize)]] {
-        k(d_d, item);
+    sycl::range<1> gws (blockSize * nBlocks);
+    sycl::range<1> lws (blockSize);
+
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class kernel>(
+          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) 
+                         [[sycl::reqd_sub_group_size(warpSize)]] {
+          k(d_d, ds, item);
+        });
       });
-    });
-  }
-
-  q.wait();
-
-  auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<float> time = end - start;
-  printf("Total kernel time: %f (s)\n", time.count());
-
-  q.memcpy(h_d, d_d, ds * sizeof(d_d[0])).wait();
-
-  bool ok = true;
-  for (int i = 0; i < ds; i++) {
-    if (h_d[i] != 256 * 256 * repeat) {
-      ok = false;
-      break;
     }
+
+    q.wait();
+
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<float> time = end - start;
+    printf("Total kernel time (%d locations): %f (s)\n", ds, time.count());
+
+    q.memcpy(h_d, d_d, ds * sizeof(d_d[0])).wait();
+
+    bool ok = true;
+    for (int i = 0; i < ds; i++) {
+      if (h_d[i] != blockSize / ds * nBlocks * repeat) {
+        ok = false;
+        break;
+      }
+    }
+    printf("%s\n", ok ? "PASS" : "FAIL");
+    sycl::free(d_d, q);
+    delete [] h_d;
   }
-  printf("%s\n", ok ? "PASS" : "FAIL");
-  sycl::free(d_d, q);
-  delete [] h_d;
   return 0;
 }
