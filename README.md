@@ -148,6 +148,9 @@ Raw performance of any program may be suboptimal
 Some programs may take long to complete on an integrated GPU  
 Some host programs contain platform-specific intrinsics, so they may cause compile error on a PowerPC platform
 
+# Emulation
+When double-precision floating-point operations are not supported on certain Intel GPU devices, software emulation may be enabled. [FP64 emulation](https://github.com/intel/compute-runtime/blob/master/opencl/doc/FAQ.md#feature-double-precision-emulation-fp64)
+
 # Feedback
 I appreciate your feedback when any examples don't look right.
 
