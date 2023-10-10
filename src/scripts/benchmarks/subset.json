@@ -2419,5 +2419,23 @@
       "100000",
       "100"
     ]
+  ],
+  "minkowski-hip": [
+    "(?:Average kernel execution time: ) )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
+  ],
+  "minkowski-sycl": [
+    "(?:Average kernel execution time: ) )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
+  ],
+  "minkowski-cuda": [
+    "(?:Average kernel execution time: ) )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "100"
+    ]
   ]
 }
