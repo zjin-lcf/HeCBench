@@ -2335,5 +2335,26 @@
       "96",
       "100"
     ]
+  ],
+  "md-hip": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "3",
+      "1000"
+    ]
+  ],
+  "md-sycl": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "3",
+      "1000"
+    ]
+  ],
+  "md-cuda": [
+    "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "3",
+      "1000"
+    ]
   ]
 }
