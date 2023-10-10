@@ -2377,5 +2377,26 @@
       "../meanshift-cuda/dataset/data.csv",
       "../meanshift-cuda/dataset/centroids.csv"
     ]
+  ],
+  "medianfilter-hip": [
+    "(?:Average kernel execution time: ) )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "../medianfilter-sycl/data/SierrasRGB.ppm",
+      "1000"
+    ]
+  ],
+  "medianfilter-sycl": [
+    "(?:Average kernel execution time: ) )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "../medianfilter-sycl/data/SierrasRGB.ppm",
+      "1000"
+    ]
+  ],
+  "medianfilter-cuda": [
+    "(?:Average kernel execution time: ) )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "../medianfilter-sycl/data/SierrasRGB.ppm",
+      "1000"
+    ]
   ]
 }
