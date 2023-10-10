@@ -2356,5 +2356,26 @@
       "3",
       "1000"
     ]
+  ],
+  "meanshift-hip": [
+    "(?:Average execution time of mean-shift \\(opt\\) )([0-9.+-e]+)(?: ms)",
+    [
+      "../meanshift-cuda/dataset/data.csv",
+      "../meanshift-cuda/dataset/centroids.csv"
+    ]
+  ],
+  "meanshift-sycl": [
+    "(?:Average execution time of mean-shift \\(opt\\) )([0-9.+-e]+)(?: ms)",
+    [
+      "../meanshift-cuda/dataset/data.csv",
+      "../meanshift-cuda/dataset/centroids.csv"
+    ]
+  ],
+  "meanshift-cuda": [
+    "(?:Average execution time of mean-shift \\(opt\\) )([0-9.+-e]+)(?: ms)",
+    [
+      "../meanshift-cuda/dataset/data.csv",
+      "../meanshift-cuda/dataset/centroids.csv"
+    ]
   ]
 }
