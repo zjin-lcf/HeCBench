@@ -2308,5 +2308,32 @@
       "5000",
       "100"
     ]
+  ],
+  "maxpool3d-hip": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "2048",
+      "2048",
+      "96",
+      "100"
+    ]
+  ],
+  "maxpool3d-cuda": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "2048",
+      "2048",
+      "96",
+      "100"
+    ]
+  ],
+  "maxpool3d-sycl": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
+    [
+      "2048",
+      "2048",
+      "96",
+      "100"
+    ]
   ]
 }
