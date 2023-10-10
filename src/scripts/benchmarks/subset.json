@@ -2266,5 +2266,26 @@
     [
       "100"
     ]
+  ], 
+  "mandelbrot-hip": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: ms)",
+    [
+      "1000"
+    ],
+    "mandelbrot"
+  ],
+  "mandelbrot-sycl": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: ms)",
+    [
+      "1000"
+    ],
+    "mandelbrot"
+  ],
+  "mandelbrot-cuda": [
+    "(?:Average kernel execution time: )([0-9.+-e]+)(?: ms)",
+    [
+      "1000"
+    ],
+    "mandelbrot"
   ]
 }
