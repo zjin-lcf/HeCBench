@@ -76,13 +76,10 @@ int main(int argc, char* argv[]) {
   convert<float, half>(nelems, niters); 
   printf("half -> int\n");
   convert<int, half>(nelems, niters); 
-
-  /* nvcc compiler errors
   printf("half -> char\n");
   convert<char, half>(nelems, niters); 
   printf("half -> uchar\n");
   convert<uchar, half>(nelems, niters); 
-  */
 
   printf("float -> float\n");
   convert<float, float>(nelems, niters); 
