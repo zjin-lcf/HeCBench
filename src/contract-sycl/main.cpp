@@ -350,11 +350,11 @@ int rounded_division(int number1, int number2) {
 template <typename T>
 void contract (sycl::queue &q, const int max_N, const int max_C, const int repeat) {
   // tensor
-  const size_t tensor_size = max_N * max_N * max_N * max_C * sizeof(T);
+  const size_t tensor_size = (size_t)max_N * max_N * max_N * max_C;
   const size_t tensor_size_byte = tensor_size * sizeof(T);
 
   T* tensor_value = (T*) malloc (tensor_size_byte);
-  for (size_t i = 0; i < max_N * max_N * max_N * max_C; i++)
+  for (size_t i = 0; i < tensor_size; i++)
     tensor_value[i] = 1;
 
   T* d_tensor_value = (T*) sycl::malloc_device (tensor_size_byte, q);
