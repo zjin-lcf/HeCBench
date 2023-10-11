@@ -20,7 +20,7 @@ bool check (const char *cs, int n)
 
 int main(int argc, char* argv[]) {
   if (argc != 3) {
-    printf("Usage: %s <size> <repeat>\n", argv[0]);
+    printf("Usage: %s <problem size> <repeat>\n", argv[0]);
     return 1;
   }
   const int n = atoi(argv[1]);
