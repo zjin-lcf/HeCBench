@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -53,4 +54,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../inversek2j-sycl/coord_in.txt 100000
+	$(LAUNCHER) ./$(program) ../inversek2j-sycl/coord_in.txt 100000

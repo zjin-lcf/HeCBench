@@ -30,4 +30,4 @@ clean:
 	rm -f $(RM_FLAGS) $(OBJ_DIR)/$(EXEC_NAME)
 
 run: $(OBJ_DIR)/$(EXEC_NAME)
-	./$(OBJ_DIR)/$(EXEC_NAME) 10
+	$(LAUNCHER) ./$(OBJ_DIR)/$(EXEC_NAME) 10

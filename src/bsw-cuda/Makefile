@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -54,7 +55,7 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) \
+	$(LAUNCHER) ./$(program) \
                 ./test-data/protein-reference.fasta \
                 ./test-data/protein-query.fasta test_regression_protein_out 
 	diff test_regression_protein_out ./test-data/result_aa

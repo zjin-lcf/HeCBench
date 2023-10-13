@@ -41,6 +41,7 @@ LIBS=
 
 CXX=icpc
 CC=icc
+LAUNCHER  =
 
 #CXX=clang++
 #CC=clang

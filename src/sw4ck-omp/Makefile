@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -68,4 +69,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../sw4ck-cuda/sw4ck.in 100
+	$(LAUNCHER) ./$(program) ../sw4ck-cuda/sw4ck.in 100

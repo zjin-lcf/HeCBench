@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -56,6 +57,6 @@ process: fpc.c
 	./fpc < msg_sp.trace.fpc > msg_sp.trace.out
 
 run: process $(program)
-	./$(program) msg_sp.trace.out 1
+	$(LAUNCHER) ./$(program) msg_sp.trace.out 1
 	./$(program) msg_sp.trace.out.mpc 
 	diff msg_sp.trace.out msg_sp.trace.out.mpc.org

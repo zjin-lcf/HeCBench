@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 POINTS    = 97178
 DATAPARS  = -d ./data/small/Datapnts.1 -p $(POINTS)
@@ -61,4 +62,4 @@ clean:
 	rm -rf $(program) $(obj) $(OUTFILE)
 
 run: $(program)
-	./$(program) $(DATAPARS) $(RANDPARS) $(ANALPARS) -o $(OUTFILE)
+	$(LAUNCHER) ./$(program) $(DATAPARS) $(RANDPARS) $(ANALPARS) -o $(OUTFILE)

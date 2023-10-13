@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -53,5 +54,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../floydwarshall2-cuda/CollegeMsg.egr 1000
+	$(LAUNCHER) ./$(program) ../floydwarshall2-cuda/CollegeMsg.egr 1000
 	#./$(program) ../floydwarshall2-cuda/soc-sign-bitcoin-alpha.egr 1000

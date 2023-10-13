@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -53,4 +54,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100 ./Datasets/ERR240727_1_E2_30000Pairs.txt 30000 1000
+	$(LAUNCHER) ./$(program) 100 ./Datasets/ERR240727_1_E2_30000Pairs.txt 30000 1000

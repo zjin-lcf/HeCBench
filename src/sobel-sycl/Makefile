@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -76,4 +77,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) SobelFilter_Input.bmp 100000
+	$(LAUNCHER) ./$(program) SobelFilter_Input.bmp 100000

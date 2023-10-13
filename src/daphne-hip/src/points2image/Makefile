@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 SHARED_DATA_PATH = ../../../daphne-cuda/data
 SHARED_SRC_PATH = ../../../daphne-cuda/src
+LAUNCHER        =
 
 #===============================================================================
 # Program name & source code list
@@ -70,4 +71,4 @@ clean:
 
 # TODO: when p > 1, results mismatch
 run: $(program)
-	./$(program) -p 1
+	$(LAUNCHER) ./$(program) -p 1

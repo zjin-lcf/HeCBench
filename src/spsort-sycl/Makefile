@@ -6,6 +6,7 @@
 CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -71,5 +72,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 20082 20082 150616 1000
+	$(LAUNCHER) ./$(program) 20082 20082 150616 1000
 	./$(program) 41490 41490 17590850 1000

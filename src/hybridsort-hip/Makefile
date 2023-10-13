@@ -1,6 +1,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 # Standard flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
@@ -45,7 +46,7 @@ mergesort.o: mergesort.cu mergesort.h kernel_mergeSortPass.h
 	$(CC) $(CFLAGS) -o mergesort.o -c mergesort.cu
 
 run: hybridsort
-	./hybridsort r
+	$(LAUNCHER) ./hybridsort r
 
 clean:
 	rm -f *.o hybridsort

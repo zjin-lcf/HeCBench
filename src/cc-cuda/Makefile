@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -54,5 +55,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	ulimit -s unlimited	
+	$(LAUNCHER) ulimit -s unlimited	
 	./$(program) delaunay_n24.egr 100

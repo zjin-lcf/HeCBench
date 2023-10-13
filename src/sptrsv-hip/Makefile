@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -59,4 +60,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../sptrsv-sycl/lp1.mtx 2000
+	$(LAUNCHER) ./$(program) ../sptrsv-sycl/lp1.mtx 2000

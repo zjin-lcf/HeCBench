@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -53,4 +54,4 @@ clean:
 	rm -rf $(program) $(obj) result.raw
 
 run: $(program)
-	./$(program) data/CT-MONO2-16-brain.raw result.raw 1000000
+	$(LAUNCHER) ./$(program) data/CT-MONO2-16-brain.raw result.raw 1000000

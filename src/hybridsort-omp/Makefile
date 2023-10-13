@@ -2,6 +2,7 @@ CC          = icpc
 OPTIMIZE    = yes
 DEBUG       = no
 DEVICE      = gpu
+LAUNCHER    =
 
 
 
@@ -61,7 +62,7 @@ mergesort.o: mergesort.c mergesort.h kernel_mergeSortPass.h
 	$(CC) $(CFLAGS) -o mergesort.o -c mergesort.c 
 
 run: hybridsort
-	./hybridsort r
+	$(LAUNCHER) ./hybridsort r
 
 clean:
 	rm -f  *.o hybridsort

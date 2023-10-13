@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
 INPUT_SIZE = 1024
+LAUNCHER   =
 
 #===============================================================================
 # Program name & source code list
@@ -55,4 +56,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program)
+	$(LAUNCHER) ./$(program)

@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 
 #===============================================================================
@@ -65,4 +66,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -q -n 100 -s 1
+	$(LAUNCHER) ./$(program) -q -n 100 -s 1

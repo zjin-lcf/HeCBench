@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -78,4 +79,4 @@ clean:
 	rm -f $(RM_FLAGS) $(OBJ_DIR)/$(EXEC_NAME)
 
 run: $(OBJ_DIR)/$(EXEC_NAME)
-	./$(OBJ_DIR)/$(EXEC_NAME) 10
+	$(LAUNCHER) ./$(OBJ_DIR)/$(EXEC_NAME) 10

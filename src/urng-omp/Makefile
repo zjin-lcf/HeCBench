@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -58,4 +59,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../urng-sycl/URNG_Input.bmp 16 16 1000
+	$(LAUNCHER) ./$(program) ../urng-sycl/URNG_Input.bmp 16 16 1000

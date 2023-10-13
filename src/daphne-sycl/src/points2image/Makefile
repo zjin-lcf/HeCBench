@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -91,4 +92,4 @@ clean:
 
 # TODO: when p > 1, results mismatch
 run: $(program)
-	./$(program) -p 1
+	$(LAUNCHER) ./$(program) -p 1

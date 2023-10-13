@@ -8,6 +8,7 @@ CC        = compute++
 else
 CC        = clang++
 endif
+LAUNCHER=
 
 OPTIMIZE  = yes
 DEBUG     = no
@@ -93,5 +94,5 @@ clean:
 	rm -rf *.bmp.dwt.*
 
 run: $(program)
-	#./$(program) 192.bmp -d 192x192 -f -5 -l 3
+	$(LAUNCHER) #./$(program) 192.bmp -d 192x192 -f -5 -l 3
 	./$(program) rgb.bmp -d 1024x1024 -f -5 -l 3

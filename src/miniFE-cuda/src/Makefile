@@ -45,6 +45,7 @@ LIBS=
 
 CXX=nvcc
 CC=nvcc
+LAUNCHER  =
 
 #CXX=xlC
 #CC=xlc

@@ -7,6 +7,7 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -87,4 +88,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) $(inc)/data/dirty_4096.img $(inc)/data/psf_4096.img 1000
+	$(LAUNCHER) ./$(program) $(inc)/data/dirty_4096.img $(inc)/data/psf_4096.img 1000

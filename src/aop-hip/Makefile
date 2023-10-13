@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -54,5 +55,5 @@ test: $(program)
 	./$(program)
 
 run: $(program)
-	./$(program) -runs 100
+	$(LAUNCHER) ./$(program) -runs 100
 

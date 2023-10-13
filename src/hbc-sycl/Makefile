@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -87,4 +88,4 @@ clean:
 	rm -rf $(program) $(obj) output.txt
 
 run: $(program)
-	./$(program) -i ../hbc-cuda/graphs/breast_coexpress.txt -v --printscores=output.txt
+	$(LAUNCHER) ./$(program) -i ../hbc-cuda/graphs/breast_coexpress.txt -v --printscores=output.txt

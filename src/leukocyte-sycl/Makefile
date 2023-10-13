@@ -8,6 +8,7 @@ CC        = compute++
 else
 CC        = clang++
 endif
+LAUNCHER=
 
 OPTIMIZE  = yes
 DEBUG     = no
@@ -117,4 +118,4 @@ clean:
 	cd $(MATRIX_DIR); make cleanup
 
 run: leukocyte
-	./leukocyte ../data/leukocyte/testfile.avi 100
+	$(LAUNCHER) ./leukocyte ../data/leukocyte/testfile.avi 100

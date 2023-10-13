@@ -7,6 +7,7 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 BOOST     = $(HOME)/boost_1_76_0
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -80,4 +81,4 @@ test: ../mmcsf-cuda/toy.tns $(program)
 	./$(program) -i ../mmcsf-cuda/toy.tns -m 0 -R 32 -f 128 -w 1
   
 run: output.tns $(program)
-	./$(program) -i output.tns -m 0 -R 32 -f 128 -w 4
+	$(LAUNCHER) ./$(program) -i output.tns -m 0 -R 32 -f 128 -w 4

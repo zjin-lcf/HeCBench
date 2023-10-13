@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -53,7 +54,7 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) \
+	$(LAUNCHER) ./$(program) \
                 ../bsw-cuda/test-data/protein-reference.fasta \
                 ../bsw-cuda/test-data/protein-query.fasta test_regression_protein_out 
 	diff test_regression_protein_out ../bsw-cuda/test-data/result_aa

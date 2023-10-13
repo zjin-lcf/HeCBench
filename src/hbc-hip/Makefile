@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -64,4 +65,4 @@ clean:
 	rm -rf $(program) $(obj) output.txt
 
 run: $(program)
-	./$(program) -i ../hbc-cuda/graphs/breast_coexpress.txt -v --printscores=output.txt
+	$(LAUNCHER) ./$(program) -i ../hbc-cuda/graphs/breast_coexpress.txt -v --printscores=output.txt

@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -74,5 +75,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --dimx=192 --dimy=184 --timesteps=90
+	$(LAUNCHER) ./$(program) --dimx=192 --dimy=184 --timesteps=90
 

@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -52,6 +53,6 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -f ./hash_pass/img_win8_user_hash.txt \
+	$(LAUNCHER) ./$(program) -f ./hash_pass/img_win8_user_hash.txt \
                      -d ./hash_pass/user_passwords_60000.txt \
                      -b 60000

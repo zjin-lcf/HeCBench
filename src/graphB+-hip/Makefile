@@ -7,6 +7,7 @@ CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -56,4 +57,4 @@ clean:
 	rm -rf $(program) $(obj) output
 
 run: $(program)
-	./$(program) ../graphB+-cuda/graph.csv 10000 output
+	$(LAUNCHER) ./$(program) ../graphB+-cuda/graph.csv 10000 output
