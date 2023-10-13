@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
 VERIFY    = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -57,4 +58,4 @@ clean:
 	rm -rf $(program) $(obj) output
 
 run: $(program)
-	./$(program) graph.csv 10000 output
+	$(LAUNCHER) ./$(program) graph.csv 10000 output

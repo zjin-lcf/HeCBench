@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -73,4 +74,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../rsmt-cuda/newblue7.kraftwerk70.3d.80.20.82.m8.gr
+	$(LAUNCHER) ./$(program) ../rsmt-cuda/newblue7.kraftwerk70.3d.80.20.82.m8.gr

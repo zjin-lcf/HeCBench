@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 
 #===============================================================================
@@ -54,5 +55,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 40 200 100
+	$(LAUNCHER) ./$(program) 40 200 100
 

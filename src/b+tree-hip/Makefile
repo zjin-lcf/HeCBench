@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Sets Flags
@@ -90,7 +91,7 @@ main.o:	./common.h \
 			-o ./util/num/num.o 
 
 run: b+tree.out
-	        ./b+tree.out file ../data/b+tree/mil.txt command ../data/b+tree/command.txt
+	$(LAUNCHER) ./b+tree.out file ../data/b+tree/mil.txt command ../data/b+tree/command.txt
 
 clean:
 	rm	-rf *.o *.out \

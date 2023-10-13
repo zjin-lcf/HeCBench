@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -76,4 +77,4 @@ clean:
 	rm -rf $(program) $(obj) *.out
 
 run: $(program)
-	./$(program) ../lsqt-cuda/examples/input.txt
+	$(LAUNCHER) ./$(program) ../lsqt-cuda/examples/input.txt

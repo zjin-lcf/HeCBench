@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -51,4 +52,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../ge-spmm-cuda/data/snap/amazon0302/amazon0302.mtx 8 1000
+	$(LAUNCHER) ./$(program) ../ge-spmm-cuda/data/snap/amazon0302/amazon0302.mtx 8 1000

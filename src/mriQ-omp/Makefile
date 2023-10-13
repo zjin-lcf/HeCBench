@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -62,4 +63,4 @@ clean:
 	rm -rf $(program) $(obj) output*
 
 run: $(program)
-	./$(program) ../mriQ-cuda/datasets/128x128x128/input/128x128x128.bin output_128
+	$(LAUNCHER) ./$(program) ../mriQ-cuda/datasets/128x128x128/input/128x128x128.bin output_128

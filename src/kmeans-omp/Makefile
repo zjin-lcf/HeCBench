@@ -7,6 +7,7 @@ CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 
 
@@ -54,6 +55,6 @@ clean:
 	rm -f *.o *~ kmeans *.linkinfo
 
 run: kmeans
-	./kmeans -r -n 5 -m 15 -l 10 -o -i ../data/kmeans/kdd_cup
+	$(LAUNCHER) ./kmeans -r -n 5 -m 15 -l 10 -o -i ../data/kmeans/kdd_cup
 
 

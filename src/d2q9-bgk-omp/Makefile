@@ -7,6 +7,7 @@ CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 CheckSize ?= 256x256
 FINAL_STATE_FILE = ./final_state.dat
@@ -66,7 +67,7 @@ clean:
 	rm -rf $(program) $(obj) *.dat
 
 run: $(program)
-	./$(program) Inputs/input_256x256.params Obstacles/obstacles_256x256.dat
+	$(LAUNCHER) ./$(program) Inputs/input_256x256.params Obstacles/obstacles_256x256.dat
 
 check: $(REF_FINAL_STATE_FILE)  $(FINAL_STATE_FILE)
 	python check/check.py --ref-av-vels-file=$(REF_AV_VELS_FILE) \

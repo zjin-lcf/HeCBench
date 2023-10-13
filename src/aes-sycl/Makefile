@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -74,5 +75,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100 0 ../urng-sycl/URNG_Input.bmp
+	$(LAUNCHER) ./$(program) 100 0 ../urng-sycl/URNG_Input.bmp
 	./$(program) 100 1 ../urng-sycl/URNG_Input.bmp

@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DUMP      = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -63,4 +64,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 16384 10
+	$(LAUNCHER) ./$(program) 16384 10

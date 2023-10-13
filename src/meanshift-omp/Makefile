@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -58,4 +59,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../meanshift-cuda/dataset/data.csv ../meanshift-cuda/dataset/centroids.csv
+	$(LAUNCHER) ./$(program) ../meanshift-cuda/dataset/data.csv ../meanshift-cuda/dataset/centroids.csv

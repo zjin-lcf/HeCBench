@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 VERIFY    = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -73,4 +74,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) $(src)/data/dirty_4096.img $(src)/data/psf_4096.img 1000
+	$(LAUNCHER) ./$(program) $(src)/data/dirty_4096.img $(src)/data/psf_4096.img 1000

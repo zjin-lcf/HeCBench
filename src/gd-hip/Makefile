@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -56,4 +57,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) gisette_scale 0.0001 10 100  
+	$(LAUNCHER) ./$(program) gisette_scale 0.0001 10 100  

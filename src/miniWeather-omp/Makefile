@@ -7,6 +7,7 @@ CC        = mpicc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -63,5 +64,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	mpiexec -n 1 ./$(program)
+	$(LAUNCHER) mpiexec -n 1 ./$(program)
 

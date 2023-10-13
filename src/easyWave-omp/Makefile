@@ -7,6 +7,7 @@ CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -66,5 +67,5 @@ clean:
 	rm -rf $(program) $(obj) eWave.2D.*
 
 run: $(program)
-	./$(program) -grid ./data/grids/e2Asean.grd -source ./data/faults/BengkuluSept2007.flt -time 120 
+	$(LAUNCHER) ./$(program) -grid ./data/grids/e2Asean.grd -source ./data/faults/BengkuluSept2007.flt -time 120 
 

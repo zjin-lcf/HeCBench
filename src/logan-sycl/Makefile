@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -90,4 +91,4 @@ demo: $(program)
 	./$(program) ../logan-cuda/inputs/example.txt 17 21 1
 
 run: $(program)
-	./$(program) ../logan-cuda/inputs/100k.txt 17 100 1
+	$(LAUNCHER) ./$(program) ../logan-cuda/inputs/100k.txt 17 100 1

@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -74,5 +75,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -g data/social-large-800k.txt -n 800000 -k 3 -d float
+	$(LAUNCHER) ./$(program) -g data/social-large-800k.txt -n 800000 -k 3 -d float
 

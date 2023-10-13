@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -73,4 +74,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) StringSearch_Input.txt clEnqueueNDRangeKernel 20000
+	$(LAUNCHER) ./$(program) StringSearch_Input.txt clEnqueueNDRangeKernel 20000

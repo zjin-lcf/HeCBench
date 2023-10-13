@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -73,6 +74,6 @@ clean:
 	rm -rf $(program) $(obj) *.mpc *.org
 
 run: $(program)
-	./$(program) ../mpc-cuda/msg_sp.trace.out 1
+	$(LAUNCHER) ./$(program) ../mpc-cuda/msg_sp.trace.out 1
 	./$(program) ../mpc-cuda/msg_sp.trace.out.mpc 
 	diff ../mpc-cuda/msg_sp.trace.out msg_sp.trace.out.mpc.org

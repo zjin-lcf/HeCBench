@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -145,5 +146,5 @@ test: $(program)
 	./$(program) blastx -q short.fastq.gz -d ARDB -o short_cur.m8 --tmpdir /dev/shm -p1
 
 run: $(program)
-	./$(program) blastx -q long.fastq.gz -d ARDB -o long_cur.m8 --tmpdir /dev/shm -p1
+	$(LAUNCHER) ./$(program) blastx -q long.fastq.gz -d ARDB -o long_cur.m8 --tmpdir /dev/shm -p1
 

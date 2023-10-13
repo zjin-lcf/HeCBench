@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -65,4 +66,4 @@ clean:
 
 # TODO: when p > 1, results mismatch
 run: $(program)
-	./$(program) -p 1
+	$(LAUNCHER) ./$(program) -p 1

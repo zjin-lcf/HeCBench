@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -55,4 +56,4 @@ compress:
 	bzip2 -9 -z -k alphas.csv
 
 run: $(program)
-	./$(program) alphas.csv 10
+	$(LAUNCHER) ./$(program) alphas.csv 10

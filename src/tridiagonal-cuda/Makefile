@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -71,6 +72,6 @@ clean:
 	rm -rf $(program) $(obj) *.dat *.timing *.txt *.csv
 
 run: $(program)
-	./$(program) -num_systems=524288
+	$(LAUNCHER) ./$(program) -num_systems=524288
 	./$(program) --lmem -num_systems=524288
 	./$(program) --vec4 -num_systems=524288 

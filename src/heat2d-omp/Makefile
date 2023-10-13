@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -61,4 +62,4 @@ data.txt: mkinit.py
 	python2 mkinit.py 4096 8192 data.txt
 
 run: $(program) data.txt
-	./$(program) 4096 8192 1000 data.txt
+	$(LAUNCHER) ./$(program) 4096 8192 1000 data.txt

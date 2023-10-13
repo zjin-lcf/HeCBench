@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -73,4 +74,4 @@ clean:
 	rm -rf $(program) $(obj) output.txt
 
 run: $(program)
-	./$(program) ../nms-cuda/detections.txt output.txt 1000
+	$(LAUNCHER) ./$(program) ../nms-cuda/detections.txt output.txt 1000

@@ -2,6 +2,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 
 # Standard flags
@@ -47,7 +48,7 @@ mergesort.o: mergesort.cu mergesort.h kernel_mergeSortPass.h
 	$(CC) $(CFLAGS) -o mergesort.o -c mergesort.cu
 
 run: hybridsort
-	./hybridsort r
+	$(LAUNCHER) ./hybridsort r
 
 clean:
 	rm -f *.o hybridsort

@@ -2,6 +2,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 # Matrix library path
 MATRIX_DIR = ./meschach_lib
@@ -64,7 +65,7 @@ $(MATRIX_DIR)/meschach.a:
 	cd $(MATRIX_DIR); make cleanup; make all CC=$(CC); make clean
 
 run: leukocyte
-	./leukocyte ../data/leukocyte/testfile.avi 100
+	$(LAUNCHER) ./leukocyte ../data/leukocyte/testfile.avi 100
 
 clean:
 	rm -f *.o *~ leukocyte 

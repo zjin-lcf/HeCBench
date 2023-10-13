@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -63,4 +64,4 @@ clean:
 	rm -rf $(program) fileio.o fluid.o geometry.o *.csv
 
 run: $(program)
-	./$(program)
+	$(LAUNCHER) ./$(program)

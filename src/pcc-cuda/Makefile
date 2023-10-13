@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -55,4 +56,4 @@ clean:
 	rm -rf $(program) $(obj) *.txt
 
 run: $(program)
-	./$(program) 90112 165
+	$(LAUNCHER) ./$(program) 90112 165

@@ -8,6 +8,7 @@ CC        = compute++
 else
 CC        = clang++
 endif
+LAUNCHER=
 
 OPTIMIZE  = yes
 DEBUG     = no
@@ -148,5 +149,5 @@ clean:
 		./util/timer/*.o 
 
 run: heartwall
-	./heartwall 104
+	$(LAUNCHER) ./heartwall 104
 

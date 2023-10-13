@@ -7,6 +7,7 @@ CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -62,5 +63,5 @@ debug: $(program)
 	./$(program) -g data/social-small.txt -n 100 -k 3 -d float
 
 run: $(program)
-	./$(program) -g data/social-large-800k.txt -n 800000 -k 3 -d float
+	$(LAUNCHER) ./$(program) -g data/social-large-800k.txt -n 800000 -k 3 -d float
 

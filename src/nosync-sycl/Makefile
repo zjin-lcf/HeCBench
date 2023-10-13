@@ -13,6 +13,7 @@ CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
 GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+LAUNCHER      =
 
 #===============================================================================
 # Program name & source code list
@@ -78,4 +79,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 268435456 100
+	$(LAUNCHER) ./$(program) 268435456 100

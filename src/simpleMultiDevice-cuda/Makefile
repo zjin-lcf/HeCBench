@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
 MAX_GPU   = 4 
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -54,4 +55,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 1000
+	$(LAUNCHER) ./$(program) 1000

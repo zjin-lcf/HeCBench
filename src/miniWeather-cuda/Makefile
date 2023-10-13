@@ -9,6 +9,7 @@ DEBUG     = no
 ARCH      = sm_60
 MPI_INCLUDE = "/opt/nvidia/hpc_sdk/Linux_x86_64/22.11/comm_libs/mpi/include"
 MPI_LIB_DIR = "/opt/nvidia/hpc_sdk/Linux_x86_64/22.11/comm_libs/mpi/lib"
+LAUNCHER    =
 
 #===============================================================================
 # Program name & source code list
@@ -60,4 +61,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	mpiexec -n 1 ./$(program)
+	$(LAUNCHER) mpiexec -n 1 ./$(program)

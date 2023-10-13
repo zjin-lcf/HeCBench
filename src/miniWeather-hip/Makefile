@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 MPI_INCLUDE = "/usr/lib/x86_64-linux-gnu/openmpi/include"
 MPI_LIB_DIR = "/usr/lib/x86_64-linux-gnu/openmpi/lib"
+LAUNCHER    =
 
 #===============================================================================
 # Program name & source code list
@@ -59,4 +60,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	mpiexec -n 1 ./$(program)
+	$(LAUNCHER) mpiexec -n 1 ./$(program)

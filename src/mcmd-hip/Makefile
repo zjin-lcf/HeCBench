@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -59,4 +60,4 @@ clean:
 	rm -rf ../mcmd-cuda/dataset/*.dat
 
 run: $(program)
-	cd ../mcmd-cuda/dataset && ../../mcmd-hip/$(program) mcmd.inp && cd ../../mcmd-hip
+	$(LAUNCHER) cd ../mcmd-cuda/dataset && ../../mcmd-hip/$(program) mcmd.inp && cd ../../mcmd-hip

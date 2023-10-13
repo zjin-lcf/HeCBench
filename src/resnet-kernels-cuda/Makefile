@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -66,7 +67,7 @@ data_gen: data_generator.py
 	python3 data_generator.py
 
 run: $(program)
-	./$(program) 0 100
+	$(LAUNCHER) ./$(program) 0 100
 	./$(program) 1 100
 	./$(program) 2 100
 	./$(program) 3 100

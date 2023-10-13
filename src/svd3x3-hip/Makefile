@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -52,7 +53,7 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../svd3x3-cuda/Dataset_1M.txt 100
+	$(LAUNCHER) ./$(program) ../svd3x3-cuda/Dataset_1M.txt 100
 	./$(program) ../svd3x3-cuda/Dataset_1M.txt 300
 	./$(program) ../svd3x3-cuda/Dataset_1M.txt 600
 	./$(program) ../svd3x3-cuda/Dataset_1M.txt 900

@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
 DUMP      = yes
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -58,5 +59,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../data/cfd/fvcorr.domn.097K
+	$(LAUNCHER) ./$(program) ../data/cfd/fvcorr.domn.097K
 

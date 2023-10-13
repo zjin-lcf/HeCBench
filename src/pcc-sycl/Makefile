@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -89,4 +90,4 @@ clean:
 	rm -rf $(program) $(obj) *.txt
 
 run: $(program)
-	./$(program) 90112 165
+	$(LAUNCHER) ./$(program) 90112 165
