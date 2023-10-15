@@ -10,7 +10,7 @@
 int main(int argc, char** argv) {
 
   if (argc != 4) {
-    printf("Usage: %s <width> <height> <repeat>\n", argv[0]);
+    printf("Usage: %s <image width> <image height> <repeat>\n", argv[0]);
     return 1;
   }
 
@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
   int height = atoi(argv[2]);
   int repeat = atoi(argv[3]);
 
-  size_t size = width * height;
+  size_t size = (size_t)width * height;
   size_t size_output_bytes = size * sizeof(uint);
   size_t size_image_bytes = size * sizeof(sycl::float3);
 
