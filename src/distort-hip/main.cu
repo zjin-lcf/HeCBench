@@ -9,7 +9,7 @@ int main(int argc, char **argv)
   if (argc != 5) {
     std::cout << "Usage: " << argv[0] <<
       "<input image width> <input image height> <coefficient of distortion> <repeat>\n";
-      return 1;
+    return 1;
   }
 
   const int width = atoi(argv[1]);
@@ -36,14 +36,15 @@ int main(int argc, char **argv)
   prop.xscale = (prop.width - prop.xshift - xshift_2) / prop.width;
   prop.yscale = (prop.height - prop.yshift - yshift_2) / prop.height;
 
-  const int imageSize = height * width;
-  const int imageSize_bytes = imageSize * sizeof(uchar3);
+  const size_t imageSize = (size_t)height * width;
+  const size_t imageSize_bytes = imageSize * sizeof(uchar3);
 
   uchar3* h_src = (uchar3*) malloc (imageSize_bytes);
   uchar3* h_dst = (uchar3*) malloc (imageSize_bytes);
   uchar3* r_dst = (uchar3*) malloc (imageSize_bytes);
+
   srand(123);
-  for (int i = 0; i < imageSize; i++) {
+  for (size_t i = 0; i < imageSize; i++) {
     h_src[i] = make_uchar3(rand() % 256, rand() % 256, rand() % 256);
   }
 
@@ -77,7 +78,7 @@ int main(int argc, char **argv)
   // verify
   int ex = 0, ey = 0, ez = 0;
   reference(h_src, r_dst, &prop);
-  for (int i = 0; i < imageSize; i++) {
+  for (size_t i = 0; i < imageSize; i++) {
     ex = max(abs(h_dst[i].x - r_dst[i].x), ex);
     ey = max(abs(h_dst[i].y - r_dst[i].y), ey);
     ez = max(abs(h_dst[i].z - r_dst[i].z), ez);

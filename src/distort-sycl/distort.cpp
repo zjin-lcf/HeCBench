@@ -40,7 +40,7 @@ inline float getRadialY(float x, float y, const struct Properties* prop)
 inline void sampleImageTest(const sycl::uchar3* src, float idx0, float idx1,
                             sycl::uchar3& result, const struct Properties* prop)
 {
-  // if one of index is out-of-bound
+  // out-of-bound check
   if((idx0 < 0) || (idx1 < 0) || (idx0 > prop->height - 1) || (idx1 > prop->width - 1))
   {
     result.x() = 0;
