@@ -48,7 +48,7 @@ int main() {
   std::array<float, TOTAL_RUN_COUNT> results;
 
   //------------------------------------------------------------------------------------
-  // HIP kernel launch enqueue rate:
+  // Kernel launch enqueue rate:
   // Measure time taken to enqueue a kernel on the GPU
   //------------------------------------------------------------------------------------
   for (auto i = 0; i < TOTAL_RUN_COUNT; ++i) {
