@@ -41,10 +41,10 @@ int main(int argc, char **argv)
   // rounded up to the nearest multiple of the LocalWorkSize
   const int szGlobalWorkSize = shrRoundUp((int)szLocalWorkSize, iNumElements);  
 
-  const size_t src_size = szGlobalWorkSize * 4;
+  const int src_size = szGlobalWorkSize * 4;
   const size_t src_size_bytes = src_size * sizeof(float);
 
-  const size_t dst_size = szGlobalWorkSize;
+  const int dst_size = szGlobalWorkSize;
   const size_t dst_size_bytes = dst_size * sizeof(float);
 
   // Allocate and initialize host arrays
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
   float *d_dst = sycl::malloc_device<float>(dst_size, q);
 
   printf("Global Work Size \t\t= %d\nLocal Work Size \t\t= %d\n# of Work Groups \t\t= %d\n\n", 
-           szGlobalWorkSize, szLocalWorkSize, (szGlobalWorkSize % szLocalWorkSize + szGlobalWorkSize/szLocalWorkSize)); 
+         szGlobalWorkSize, szLocalWorkSize, (szGlobalWorkSize/szLocalWorkSize)); 
   sycl::range<1> gws (szGlobalWorkSize);
   sycl::range<1> lws (szLocalWorkSize);
 
