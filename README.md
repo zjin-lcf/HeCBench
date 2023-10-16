@@ -492,7 +492,7 @@ Early results are shown [here](results/README.md)
   Depth-wise convolution (https://pytorch.org/)
 
 ### easyWave (cuda)
-  Simulation of tsunami generation and propagation in the context of early warning (https://gitext.gfz-potsdam.de/geoperil/easyWave)
+  Simulation of tsunami generation and propagation in the context of early warning (https://git.gfz-potsdam.de/id2/geoperil/easyWave)
 
 ### ecdh (c++)
   Elliptic curve Diffie-Hellman key exchange (https://github.com/jaw566/ECDH)
