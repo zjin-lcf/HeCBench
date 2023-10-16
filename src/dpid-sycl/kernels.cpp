@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <chrono>
-#include "common.h"
+#include "shared.h"
 
 #define THREADS 128
 #define WSIZE 32
@@ -16,19 +16,6 @@
 #define PY item.get_group(0)
 #define WTHREAD  (TX % WSIZE)
 
-//-------------------------------------------------------------------
-// SHARED
-//-------------------------------------------------------------------
-struct Params {
-  uint32_t oWidth;
-  uint32_t oHeight;
-  uint32_t iWidth;
-  uint32_t iHeight;
-     float pWidth;
-     float pHeight;
-     float lambda;
-  uint32_t repeat;
-};
 
 inline
 void normalize(float4& var) {
@@ -58,7 +45,7 @@ struct Local {
   float sx, ex, sy, ey;
   uint32_t sxr, syr, exr, eyr, xCount, yCount, pixelCount;
 
-  inline Local(nd_item<2> &item, const Params& p) {
+  inline Local(sycl::nd_item<2> &item, const Params& p) {
     sx      = sycl::fmax( PX    * p.pWidth, 0.f);
     ex      = sycl::fmin((PX+1) * p.pWidth, (float)p.iWidth);
     sy      = sycl::fmax( PY    * p.pHeight, 0.f);
@@ -85,19 +72,19 @@ float contribution(const Local& l, float f, const uint32_t x, const uint32_t y) 
 
 // https://devblogs.nvidia.com/parallelforall/faster-parallel-reductions-kepler/
 inline
-float4 __shfl_down(nd_item<2> &item, const float4 var, const uint32_t srcLane)
+float4 __shfl_down(sycl::nd_item<2> &item, const float4 var, const uint32_t srcLane)
 {
   float4 output;
   auto sg = item.get_sub_group();
-  output.x() = shift_group_left(sg, var.x(), srcLane);
-  output.y() = shift_group_left(sg, var.y(), srcLane);
-  output.z() = shift_group_left(sg, var.z(), srcLane);
-  output.w() = shift_group_left(sg, var.w(), srcLane);
+  output.x() = sycl::shift_group_left(sg, var.x(), srcLane);
+  output.y() = sycl::shift_group_left(sg, var.y(), srcLane);
+  output.z() = sycl::shift_group_left(sg, var.z(), srcLane);
+  output.w() = sycl::shift_group_left(sg, var.w(), srcLane);
   return output;
 }
 
 inline
-void reduce(nd_item<2> &item, float4& value) {
+void reduce(sycl::nd_item<2> &item, float4& value) {
   value += __shfl_down(item, value, 16);
   value += __shfl_down(item, value, 8);
   value += __shfl_down(item, value, 4);
@@ -113,7 +100,7 @@ float distance(const float4& avg, const uchar3& color) {
   return sycl::sqrt(x * x + y * y + z * z) / 441.6729559f; // L2-Norm / sqrt(255^2 * 3)
 }
 
-void kernelGuidance(nd_item<2> &item,
+void kernelGuidance(sycl::nd_item<2> &item,
                     const uchar3* __restrict input,
                     uchar3* __restrict patches, const Params p)
 {
@@ -145,7 +132,7 @@ void kernelGuidance(nd_item<2> &item,
 }
 
 inline
-float4 calcAverage(nd_item<2> &item, const Params& p, 
+float4 calcAverage(sycl::nd_item<2> &item, const Params& p, 
                    const uchar3* __restrict patches) {
   const float corner = 1.0;
   const float edge   = 2.0;
@@ -192,7 +179,7 @@ float4 calcAverage(nd_item<2> &item, const Params& p,
   return avg;
 }
 
-void kernelDownsampling(nd_item<2> &item,
+void kernelDownsampling(sycl::nd_item<2> &item,
                         const uchar3* __restrict input,
                         const uchar3* __restrict patches,
                         const Params p,
@@ -241,37 +228,36 @@ void run(const Params& p, const uchar3* hInput, uchar3* hOutput) {
   const size_t sGuidance  = p.oWidth * p.oHeight;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<uchar3, 1> dInput (hInput, sInput);
-  buffer<uchar3, 1> dOutput (hOutput, sOutput);
-  buffer<uchar3, 1> dGuidance (sGuidance);
+  uchar3 *dInput = sycl::malloc_device<uchar3>(sInput, q);
+  q.memcpy(dInput, hInput, sizeof(uchar3) * sInput);
 
-  range<2> lws (1, THREADS);
-  range<2> gws (p.oHeight, (uint32_t)std::ceil(p.oWidth / (float)TSIZE) * THREADS);
+  uchar3 *dOutput = sycl::malloc_device<uchar3>(sOutput, q);
+
+  uchar3 *dGuidance = sycl::malloc_device<uchar3>(sGuidance, q);
+
+  sycl::range<2> lws (1, THREADS);
+  sycl::range<2> gws (p.oHeight, (uint32_t)std::ceil(p.oWidth / (float)TSIZE) * THREADS);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (uint32_t i = 0; i < p.repeat; i++) {
-    q.submit([&] (handler &cgh) {
-      auto in = dInput.get_access<sycl_read>(cgh);
-      auto patch = dGuidance.get_access<sycl_write>(cgh);
-      cgh.parallel_for<class guidance>(nd_range<2>(gws, lws), [=] (nd_item<2> item) [[intel::reqd_sub_group_size(32)]] {
-        kernelGuidance (item, in.get_pointer(), patch.get_pointer(), p);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class guidance>(sycl::nd_range<2>(gws, lws),
+        [=] (sycl::nd_item<2> item) [[intel::reqd_sub_group_size(32)]] {
+        kernelGuidance (item, dInput, dGuidance, p);
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto in = dInput.get_access<sycl_read>(cgh);
-      auto patch = dGuidance.get_access<sycl_read>(cgh);
-      auto out = dOutput.get_access<sycl_discard_write>(cgh);
-      cgh.parallel_for<class downsample>(nd_range<2>(gws, lws), [=] (nd_item<2> item) [[intel::reqd_sub_group_size(32)]] {
-        kernelDownsampling (item, in.get_pointer(), patch.get_pointer(), p, out.get_pointer());
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class downsample>(sycl::nd_range<2>(gws, lws),
+        [=] (sycl::nd_item<2> item) [[intel::reqd_sub_group_size(32)]] {
+        kernelDownsampling (item, dInput, dGuidance, p, dOutput);
       });
     });
   }
@@ -280,4 +266,10 @@ void run(const Params& p, const uchar3* hInput, uchar3* hOutput) {
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / p.repeat);
+  
+  q.memcpy(hOutput, dOutput, sizeof(uchar3) * sOutput).wait();
+
+  sycl::free(dInput, q);
+  sycl::free(dOutput, q);
+  sycl::free(dGuidance, q);
 }

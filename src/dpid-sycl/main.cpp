@@ -7,21 +7,11 @@
 #include <cstdlib>
 #include <cmath>
 #include <cstdint>
-#include "common.h"
+#include "shared.h"
 
 //-------------------------------------------------------------------
 // SHARED
 //-------------------------------------------------------------------
-struct Params {
-  uint32_t oWidth;
-  uint32_t oHeight;
-  uint32_t iWidth;
-  uint32_t iHeight;
-     float pWidth;
-     float pHeight;
-     float lambda;
-  uint32_t repeat;
-};
 
 double LCG_random_double(uint64_t * seed)
 {
@@ -38,7 +28,9 @@ void run(const Params& i, const uchar3* hInput, uchar3* hOutput);
 int main(int argc, char** argv) {
   // generate a random image for testing
   if(argc != 5) {
-    printf("Usage: %s <width> <height> <lambda> <repeat>\n", argv[0]);
+    printf("Usage: %s <output image width> <output image height> ", argv[0]);
+    // explore the influence of lambda 
+    printf("<lambda> <repeat>\n");
     exit(1);
   }
 
