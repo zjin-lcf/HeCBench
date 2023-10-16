@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <chrono>
-#include <cuda.h>
+#include "shared.h"
 
 #define THREADS 128
 #define WSIZE 32
@@ -15,20 +15,6 @@
 #define PX (blockIdx.x * TSIZE + (TX / WSIZE))
 #define PY blockIdx.y
 #define WTHREAD  (TX % WSIZE)
-
-//-------------------------------------------------------------------
-// SHARED
-//-------------------------------------------------------------------
-struct Params {
-  uint32_t oWidth;
-  uint32_t oHeight;
-  uint32_t iWidth;
-  uint32_t iHeight;
-     float pWidth;
-     float pHeight;
-     float lambda;
-  uint32_t repeat;
-};
 
 __device__ __forceinline__
 void normalize(float4& var) {
