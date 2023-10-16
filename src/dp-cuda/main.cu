@@ -54,12 +54,12 @@ int main(int argc, char **argv)
   // set and log Global and Local work size dimensions
   int szLocalWorkSize = 256;
   // rounded up to the nearest multiple of the LocalWorkSize
-  int szGlobalWorkSize = shrRoundUp((int)szLocalWorkSize, iNumElements);  
+  int szGlobalWorkSize = shrRoundUp(szLocalWorkSize, iNumElements);  
 
-  const size_t src_size = szGlobalWorkSize * 4;
+  const int src_size = szGlobalWorkSize * 4;
   const size_t src_size_bytes = src_size * sizeof(float);
 
-  const size_t dst_size = szGlobalWorkSize;
+  const int dst_size = szGlobalWorkSize;
   const size_t dst_size_bytes = dst_size * sizeof(float);
 
   // Allocate and initialize host arrays
@@ -83,8 +83,8 @@ int main(int argc, char **argv)
   cudaMalloc((void**)&d_dst, dst_size_bytes);
 
   printf("Global Work Size \t\t= %d\nLocal Work Size \t\t= %d\n# of Work Groups \t\t= %d\n\n", 
-      szGlobalWorkSize, szLocalWorkSize, (szGlobalWorkSize % szLocalWorkSize + szGlobalWorkSize/szLocalWorkSize)); 
-  dim3 grid (szGlobalWorkSize % szLocalWorkSize + szGlobalWorkSize/szLocalWorkSize); 
+         szGlobalWorkSize, szLocalWorkSize, szGlobalWorkSize/szLocalWorkSize); 
+  dim3 grid (szGlobalWorkSize/szLocalWorkSize); 
   dim3 block (szLocalWorkSize);
 
   cudaDeviceSynchronize();
