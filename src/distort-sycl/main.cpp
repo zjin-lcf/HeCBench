@@ -37,7 +37,7 @@ int main(int argc, char **argv)
   prop.xscale = (prop.width - prop.xshift - xshift_2) / prop.width;
   prop.yscale = (prop.height - prop.yshift - yshift_2) / prop.height;
 
-  const size_t imageSize = height * width;
+  const int imageSize = height * width;
   const size_t imageSize_bytes = imageSize * sizeof(sycl::uchar3);
 
   sycl::uchar3* h_src = (sycl::uchar3*) malloc (imageSize_bytes);
@@ -45,7 +45,7 @@ int main(int argc, char **argv)
   sycl::uchar3* r_dst = (sycl::uchar3*) malloc (imageSize_bytes);
 
   srand(123);
-  for (size_t i = 0; i < imageSize; i++) {
+  for (int i = 0; i < imageSize; i++) {
     h_src[i] = {rand() % 256, rand() % 256, rand() % 256};
   }
 
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
   // verify
   int ex = 0, ey = 0, ez = 0;
   reference(h_src, r_dst, &prop);
-  for (size_t i = 0; i < imageSize; i++) {
+  for (int i = 0; i < imageSize; i++) {
     ex = std::max(abs(h_dst[i].x() - r_dst[i].x()), ex);
     ey = std::max(abs(h_dst[i].y() - r_dst[i].y()), ey);
     ez = std::max(abs(h_dst[i].z() - r_dst[i].z()), ez);
