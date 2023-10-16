@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
   int w = atoi(argv[2]);
   int repeat = atoi(argv[3]);
 
-  size_t img_size = h * w;
+  int img_size = h * w;
   size_t img_size_bytes = sizeof(float) * img_size;
 
   float *input_img = (float*) malloc (img_size_bytes);
@@ -181,7 +181,7 @@ int main(int argc, char* argv[])
   std::default_random_engine rng (123);
   std::normal_distribution<float> norm_dist(0.f, 1.f);
 
-  for (size_t i = 0; i < img_size; i++) {
+  for (int i = 0; i < img_size; i++) {
     input_img[i] = norm_dist(rng);
   }
 
@@ -214,7 +214,7 @@ int main(int argc, char* argv[])
   }
 
   double checksum = 0;
-  for (size_t i = 0; i < img_size; i++) {
+  for (int i = 0; i < img_size; i++) {
     checksum += output_img[i];
   }
 
