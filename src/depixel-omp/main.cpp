@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
   int height = atoi(argv[2]);
   int repeat = atoi(argv[3]);
 
-  size_t size = (size_t)width * height;
+  int size = width * height;
   size_t size_output_bytes = size * sizeof(uint);
   size_t size_image_bytes = size * sizeof(float3);
 
@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
   {
     for (int n = 0; n < repeat; n++) {
 
-      for (size_t i = 0; i < size; i++) {
+      for (int i = 0; i < size; i++) {
         img[i].x = dis(gen);
         img[i].y = dis(gen);
         img[i].z = dis(gen);
@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
       total_time += time.count();
 
       float lsum = 0;
-      for (size_t i = 0; i < size; i++)
+      for (int i = 0; i < size; i++)
         lsum += (out[i] & 0xff) / 256.f + 
                ((out[i] >> 8) & 0xff) / 256.f + 
                ((out[i] >> 16) & 0xff) / 256.f + 
