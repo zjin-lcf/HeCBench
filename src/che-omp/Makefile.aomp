@@ -9,6 +9,7 @@ DEBUG     = no
 DEVICE    = gpu
 ARCH      = gfx906
 OPENCV    = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -63,6 +64,6 @@ clean:
 	rm -rf $(program) $(obj) out
 
 run: $(program)
-	rm -rf out;
+	$(LAUNCHER) rm -rf out;
 	mkdir out
 	./$(program) 1000

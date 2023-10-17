@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 SM        = cc70
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -59,4 +60,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 134217728 1000
+	$(LAUNCHER) ./$(program) 134217728 1000

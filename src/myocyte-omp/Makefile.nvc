@@ -3,6 +3,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 SM        = cc70
+LAUNCHER  =
 
 
 # Standard flags
@@ -75,7 +76,7 @@ endif
 		-O3
 
 run: myocyte.out
-	./myocyte.out -time 100
+	$(LAUNCHER) ./myocyte.out -time 100
 
 clean:
 	rm -rf	*.o *.out \

@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 ARCH      = gfx906
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -63,4 +64,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 10 5 33554432
+	$(LAUNCHER) ./$(program) 10 5 33554432

@@ -9,6 +9,7 @@ DEBUG     = no
 OUTPUT    = no
 DEVICE    = gpu
 ARCH      = gfx906
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -83,5 +84,5 @@ clean:
 	rm -rf $(program) *.o
 
 run: $(program)
-	./$(program) 10 10
+	$(LAUNCHER) ./$(program) 10 10
 

@@ -3,6 +3,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 SM        = cc70
+LAUNCHER  =
 
 
 # Standard flags
@@ -102,7 +103,7 @@ heartwall:	./main.o \
 			-o ./util/timer/timer.o 
 
 run: heartwall
-	./heartwall 104
+	$(LAUNCHER) ./heartwall 104
 
 clean:
 	rm	-rf *.o heartwall \

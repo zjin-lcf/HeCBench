@@ -3,6 +3,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 SM        = cc70
+LAUNCHER  =
 
 # Standard flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++11 -Wall
@@ -68,4 +69,4 @@ clean:
 	rm -f ./*.o srad *.pgm ./util/graphics/*.o ./util/timer/*.o
 
 run: srad
-	./srad 1000 0.5 502 458
+	$(LAUNCHER) ./srad 1000 0.5 502 458
