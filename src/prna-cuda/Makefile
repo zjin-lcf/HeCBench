@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -67,4 +68,4 @@ test: $(program)
 	./$(program) ./test.seq
 
 run: $(program)
-	./$(program) ./HIV1-NL43.seq
+	$(LAUNCHER) ./$(program) ./HIV1-NL43.seq

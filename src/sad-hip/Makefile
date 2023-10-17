@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -52,4 +53,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../sad-cuda/coins.bmp ../sad-cuda/coin.bmp 100
+	$(LAUNCHER) ./$(program) ../sad-cuda/coins.bmp ../sad-cuda/coin.bmp 100

@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -55,5 +56,5 @@ test: $(program)
 	./$(program)
 
 run: $(program)
-	./$(program) -runs 100
+	$(LAUNCHER) ./$(program) -runs 100
 

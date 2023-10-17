@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -73,6 +74,6 @@ clean:
 	rm -rf $(program) $(obj) out
 
 run: $(program)
-	rm -rf out;
+	$(LAUNCHER) rm -rf out;
 	mkdir out
 	./$(program) 1000

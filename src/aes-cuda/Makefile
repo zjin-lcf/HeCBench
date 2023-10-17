@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -55,6 +56,6 @@ clean:
 
 # reuse the image
 run: $(program)
-	./$(program) 100 0 ../urng-sycl/URNG_Input.bmp
+	$(LAUNCHER) ./$(program) 100 0 ../urng-sycl/URNG_Input.bmp
 	./$(program) 100 1 ../urng-sycl/URNG_Input.bmp
 

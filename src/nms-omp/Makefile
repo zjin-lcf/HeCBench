@@ -8,6 +8,7 @@ OPTIMIZE    = yes
 DEBUG       = no
 DEVICE      = gpu
 BYTE_ATOMIC = no
+LAUNCHER    =
 
 #===============================================================================
 # Program name & source code list
@@ -63,4 +64,4 @@ clean:
 	rm -rf $(program) $(obj) output.txt
 
 run: $(program)
-	./$(program) ../nms-cuda/detections.txt output.txt 1000
+	$(LAUNCHER) ./$(program) ../nms-cuda/detections.txt output.txt 1000

@@ -7,6 +7,7 @@ CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 GPU       = yes
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -68,4 +69,4 @@ clean:
 	rm -rf $(program) $(obj) *binvox*
 
 run: $(program)
-	./$(program) -s 256 -f ../voxelizer-cuda/xyzrgb_statuette.ply
+	$(LAUNCHER) ./$(program) -s 256 -f ../voxelizer-cuda/xyzrgb_statuette.ply

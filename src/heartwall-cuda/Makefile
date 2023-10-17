@@ -3,6 +3,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
 DUMP      = yes
+LAUNCHER  =
 
 
 # Standard flags
@@ -96,7 +97,7 @@ heartwall:	./main.o \
 		-o ./util/timer/timer.o 
 
 run: heartwall
-	./heartwall 104
+	$(LAUNCHER) ./heartwall 104
 
 clean:
 	rm	-rf *.o heartwall \

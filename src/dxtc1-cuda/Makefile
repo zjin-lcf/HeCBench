@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -60,5 +61,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../dxtc1-sycl/data/lena_std.ppm \
+	$(LAUNCHER) ./$(program) ../dxtc1-sycl/data/lena_std.ppm \
                      ../dxtc1-sycl/data/lena_ref.dds 100

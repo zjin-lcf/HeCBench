@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -94,4 +95,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../permutate-cuda/test_data/truerand_1bit.bin
+	$(LAUNCHER) ./$(program) ../permutate-cuda/test_data/truerand_1bit.bin

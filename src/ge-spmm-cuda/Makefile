@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -52,5 +53,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ~/oneAPI-DirectProgramming/ge-spmm-cuda/amazon0302/amazon0302.mtx 8 1000
+	$(LAUNCHER) ./$(program) ~/oneAPI-DirectProgramming/ge-spmm-cuda/amazon0302/amazon0302.mtx 8 1000
 	#./$(program) data/snap/amazon0302/amazon0302.mtx 8 1000

@@ -1,6 +1,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 # Standard flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++11 -Wall
@@ -37,6 +38,6 @@ clean:
 	rm -f *.o *~ kmeans *.linkinfo
 
 run: kmeans
-	./kmeans -r -n 5 -m 15 -l 10 -o -i ../data/kmeans/kdd_cup
+	$(LAUNCHER) ./kmeans -r -n 5 -m 15 -l 10 -o -i ../data/kmeans/kdd_cup
 
 

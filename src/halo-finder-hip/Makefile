@@ -162,4 +162,4 @@ clean:
 	rm -rf hip
 
 run: progs
-	./hip/ForceTreeTest 0.5 0.1 10000 0.1 10 N 12 rcb
+	$(LAUNCHER) ./hip/ForceTreeTest 0.5 0.1 10000 0.1 10 N 12 rcb

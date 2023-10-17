@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -73,4 +74,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../ge-spmm-cuda/data/snap/amazon0302/amazon0302.mtx 8 1000
+	$(LAUNCHER) ./$(program) ../ge-spmm-cuda/data/snap/amazon0302/amazon0302.mtx 8 1000

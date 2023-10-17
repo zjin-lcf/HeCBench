@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -55,4 +56,4 @@ clean:
 	rm -rf $(program) $(obj) output*
 
 run: $(program)
-	./$(program) datasets/128x128x128/input/128x128x128.bin output_128
+	$(LAUNCHER) ./$(program) datasets/128x128x128/input/128x128x128.bin output_128

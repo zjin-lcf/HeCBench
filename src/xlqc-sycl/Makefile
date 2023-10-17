@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 GSL_INC   =-I/path/to/gsl/include
 GSL_LIB   =-L/path/to/gsl/lib -lgsl -lgslcblas 
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -87,5 +88,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) sp
+	$(LAUNCHER) ./$(program) sp
 	./$(program) dp

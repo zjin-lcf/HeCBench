@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -59,6 +60,6 @@ clean:
 	rm -rf $(program) $(obj) out
 
 run: $(program)
-	rm -rf out;
+	$(LAUNCHER) rm -rf out;
 	mkdir out
 	./$(program) 1000

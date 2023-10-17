@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -52,4 +53,4 @@ clean:
 	rm -rf $(program) $(obj) *.txt
 
 run: $(program)
-	./$(program) ../recursiveGaussian-cuda/StoneRGB.ppm 1000
+	$(LAUNCHER) ./$(program) ../recursiveGaussian-cuda/StoneRGB.ppm 1000

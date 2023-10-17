@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -71,4 +72,4 @@ test: $(program)
 	./$(program) ../prna-cuda/test.seq
 
 run: $(program)
-	./$(program) ../prna-cuda/HIV1-NL43.seq
+	$(LAUNCHER) ./$(program) ../prna-cuda/HIV1-NL43.seq

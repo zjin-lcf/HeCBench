@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -52,5 +53,5 @@ clean:
 	rm -rf $(program) $(obj) *.bmp
 
 run: $(program)
-	./$(program) Broadway_tower.jpg 100 -u 
+	$(LAUNCHER) ./$(program) Broadway_tower.jpg 100 -u 
 	#./$(program) Broadway_tower.jpg 100 -a

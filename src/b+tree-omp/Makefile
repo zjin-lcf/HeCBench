@@ -2,6 +2,7 @@ CC        = icpc
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 
 # Standard flags
@@ -97,7 +98,7 @@ main.o:	./common.h \
 # ======================================================================================================================================================150
 #
 run: b+tree.out
-	./b+tree.out file ../data/b+tree/mil.txt command ../data/b+tree/command.txt
+	$(LAUNCHER) ./b+tree.out file ../data/b+tree/mil.txt command ../data/b+tree/command.txt
 
 # ========================================================================================================================================================================================================200
 #	DELETE

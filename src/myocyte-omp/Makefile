@@ -2,6 +2,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 # Standard flags
 #CFLAGS := $(EXTRA_CFLAGS) -std=c++11 -Wall
@@ -81,7 +82,7 @@ endif
 		-O3
 
 run: myocyte.out
-	./myocyte.out -time 100
+	$(LAUNCHER) ./myocyte.out -time 100
 
 clean:
 	rm -rf	*.o *.out \

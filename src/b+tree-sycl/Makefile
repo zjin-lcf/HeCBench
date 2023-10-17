@@ -8,6 +8,7 @@ CC        = compute++
 else
 CC        = clang++
 endif
+LAUNCHER=
 
 OPTIMIZE  = yes
 DEBUG     = no
@@ -126,7 +127,7 @@ main.o:	./b+tree.h ./main.c
 		-O3
 
 run: b+tree.out
-	./b+tree.out file ../data/b+tree/mil.txt command ../data/b+tree/command.txt
+	$(LAUNCHER) ./b+tree.out file ../data/b+tree/mil.txt command ../data/b+tree/command.txt
 
 clean:
 	rm -f	*.o *.out \

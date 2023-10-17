@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -79,7 +80,7 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) Inputs/input_256x256.params Obstacles/obstacles_256x256.dat
+	$(LAUNCHER) ./$(program) Inputs/input_256x256.params Obstacles/obstacles_256x256.dat
 
 check: $(REF_FINAL_STATE_FILE)  $(FINAL_STATE_FILE)
 	python check/check.py --ref-av-vels-file=$(REF_AV_VELS_FILE) \

@@ -6,6 +6,7 @@
 CC          = hipcc
 OPTIMIZE    = yes
 DEBUG       = no
+LAUNCHER    =
 
 #===============================================================================
 # Program name & source code list
@@ -55,4 +56,4 @@ clean:
 	rm -f *.o srad *pgm
 
 run: $(program)
-	./$(program) 1000 0.5 502 458
+	$(LAUNCHER) ./$(program) 1000 0.5 502 458

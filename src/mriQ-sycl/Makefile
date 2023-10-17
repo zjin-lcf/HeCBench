@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -76,4 +77,4 @@ clean:
 	rm -rf $(program) $(obj) output*
 
 run: $(program)
-	./$(program) ../mriQ-cuda/datasets/128x128x128/input/128x128x128.bin output_128
+	$(LAUNCHER) ./$(program) ../mriQ-cuda/datasets/128x128x128/input/128x128x128.bin output_128

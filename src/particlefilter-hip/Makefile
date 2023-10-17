@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -57,4 +58,4 @@ clean:
 	rm -rf $(program) $(obj) output.txt
 
 run: $(program)
-	./main -x 128 -y 128 -z 10 -np 400000
+	$(LAUNCHER) ./main -x 128 -y 128 -z 10 -np 400000

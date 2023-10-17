@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -66,4 +67,4 @@ clean:
 	rm -rf ../mcmd-cuda/dataset/*.dat
 
 run: $(program)
-	cd ../mcmd-cuda/dataset && ../../mcmd-omp/$(program) mcmd.inp && cd ../../mcmd-omp
+	$(LAUNCHER) cd ../mcmd-cuda/dataset && ../../mcmd-omp/$(program) mcmd.inp && cd ../../mcmd-omp

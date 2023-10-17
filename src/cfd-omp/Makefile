@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 DUMP      = yes
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -65,7 +66,7 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../data/cfd/fvcorr.domn.097K 
+	$(LAUNCHER) ./$(program) ../data/cfd/fvcorr.domn.097K 
 	#./$(program) ../data/cfd/fvcorr.domn.193K   
 	#./$(program) ../data/cfd/missile.domn.0.2M  
 

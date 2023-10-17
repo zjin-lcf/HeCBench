@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
 DP        = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -62,4 +63,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -f input/vectors.csv -g 512
+	$(LAUNCHER) ./$(program) -f input/vectors.csv -g 512

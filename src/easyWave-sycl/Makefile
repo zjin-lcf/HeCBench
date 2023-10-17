@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -81,7 +82,7 @@ clean:
 	rm -rf $(program) $(obj) eWave.2D.*
 
 run: $(program)
-	./$(program) -grid ../easyWave-omp/data/grids/e2Asean.grd \
+	$(LAUNCHER) ./$(program) -grid ../easyWave-omp/data/grids/e2Asean.grd \
                      -source ../easyWave-omp/data/faults/BengkuluSept2007.flt \
                      -time 120 
 

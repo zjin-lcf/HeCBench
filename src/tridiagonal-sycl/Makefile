@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -90,6 +91,6 @@ clean:
 	rm -rf $(program) $(obj) *.dat *.timing *.txt *.csv
 
 run: $(program)
-	./$(program) -num_systems=524288
+	$(LAUNCHER) ./$(program) -num_systems=524288
 	./$(program) --lmem -num_systems=524288
 	./$(program) --vec4 -num_systems=524288 

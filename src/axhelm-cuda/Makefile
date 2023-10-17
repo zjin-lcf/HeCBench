@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -60,5 +61,5 @@ clean:
 
 # run one- and three-dimensional kernels
 run: $(program)
-	./$(program) 1 8000 100
+	$(LAUNCHER) ./$(program) 1 8000 100
 	./$(program) 3 8000 100

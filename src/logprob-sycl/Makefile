@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 WAVEFRONT = 32
 SYCL_REDUCE = no   # invoke sycl::reduce_over_group()
+LAUNCHER    =
 
 GPU       = yes
 CUDA      = no
@@ -83,4 +84,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100 128 60000 100
+	$(LAUNCHER) ./$(program) 100 128 60000 100

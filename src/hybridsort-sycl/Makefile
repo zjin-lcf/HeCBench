@@ -8,6 +8,7 @@ CC        = compute++
 else
 CC        = clang++
 endif
+LAUNCHER=
 
 OPTIMIZE  = yes
 DEBUG     = no
@@ -102,7 +103,7 @@ mergesort.o: mergesort.c mergesort.h kernel_mergeSortPass.sycl
 	$(CC) $(CFLAGS) -o mergesort.o -c mergesort.c 
 
 run: hybridsort
-	./hybridsort r
+	$(LAUNCHER) ./hybridsort r
 
 clean:
 	rm -f  *.o hybridsort

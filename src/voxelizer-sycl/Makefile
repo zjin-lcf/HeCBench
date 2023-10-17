@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 SYCL      = yes
 GPU       = yes
@@ -83,4 +84,4 @@ clean:
 	rm -rf $(program) $(obj) *binvox*
 
 run: $(program)
-	./$(program) -s 256 -f ../voxelizer-cuda/xyzrgb_statuette.ply
+	$(LAUNCHER) ./$(program) -s 256 -f ../voxelizer-cuda/xyzrgb_statuette.ply
