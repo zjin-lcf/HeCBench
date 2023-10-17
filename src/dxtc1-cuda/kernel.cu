@@ -196,7 +196,7 @@ float4 roundAndExpand(float4 v, ushort * w)
 ////////////////////////////////////////////////////////////////////////////////
 __device__
 float evalPermutation( const float4* colors, uint permutation, ushort* start, ushort* end, float4 color_sum,
-                       float* alphaTable4, int* prods4, float weight)
+                       const float* alphaTable4, const int* prods4, float weight)
 {
     float4 alphax_sum = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
     int akku = 0;
@@ -274,8 +274,8 @@ float evalPermutation3(const float4 * colors, uint permutation, ushort * start, 
 __device__
 uint4 evalAllPermutations(const float4 * colors,  const unsigned int * permutations,			 
 			  float *errors, float4 color_sum,  uint * s_permutations, 
-                          float* alphaTable4, int* prods4,
-                          float* alphaTable3, int* prods3)
+                          const float* alphaTable4, const int* prods4,
+                          const float* alphaTable3, const int* prods3)
 {
     const int idx = threadIdx.x;
 

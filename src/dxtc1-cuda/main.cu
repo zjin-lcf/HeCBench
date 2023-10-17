@@ -29,13 +29,13 @@
 #define NUM_THREADS     64      // Number of threads per work group.
 
 __global__
-void compress (const uint* permutations, 
-               const uint* image, 
-               uint2* result, 
-               float* alphaTable4, 
-               int* prods4,
-               float* alphaTable3,
-               int* prods3,
+void compress (const uint*__restrict__ permutations,
+               const uint*__restrict__ image,
+                     uint2*__restrict__ result,
+               const float*__restrict__ alphaTable4,
+               const int*__restrict__ prods4,
+               const float*__restrict__ alphaTable3,
+               const int*__restrict__ prods3,
                int groupOffset)
 {
   __shared__ float4 colors[16];

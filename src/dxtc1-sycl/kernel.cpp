@@ -159,7 +159,7 @@ sycl::float4 roundAndExpand(sycl::float4 v, unsigned short * w)
 ////////////////////////////////////////////////////////////////////////////////
 float evalPermutation(sycl::local_ptr<const sycl::float4> colors, unsigned int permutation, 
                       unsigned short* start, unsigned short* end, sycl::float4 color_sum,
-                      sycl::global_ptr<float> alphaTable4, sycl::global_ptr<int> prods4, float weight)
+                      sycl::global_ptr<const float> alphaTable4, sycl::global_ptr<const int> prods4, float weight)
 {
     sycl::float4 alphax_sum = {0.0f, 0.0f, 0.0f, 0.0f};
     int akku = 0;
@@ -239,8 +239,8 @@ sycl::uint4 evalAllPermutations(sycl::nd_item<1> &item, sycl::local_ptr<const sy
                                 sycl::global_ptr<const unsigned int> permutations,			 
                                 sycl::local_ptr<float> errors, sycl::float4 color_sum, 
                                 sycl::local_ptr<unsigned int> s_permutations, 
-                                sycl::global_ptr<float> alphaTable4, sycl::global_ptr<int> prods4,
-                                sycl::global_ptr<float> alphaTable3, sycl::global_ptr<int> prods3)
+                                sycl::global_ptr<const float> alphaTable4, sycl::global_ptr<const int> prods4,
+                                sycl::global_ptr<const float> alphaTable3, sycl::global_ptr<const int> prods3)
 {
     const int idx = item.get_local_id(0);
 
