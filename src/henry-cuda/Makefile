@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -54,5 +55,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) IRMOF-1.cssr 1000
+	$(LAUNCHER) ./$(program) IRMOF-1.cssr 1000
 

@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
 DMND_PATH = ../diamond-sycl
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -132,5 +133,5 @@ test: $(program)
 	./$(program) blastx -q $(DMND_PATH)/short.fastq.gz -d $(DMND_PATH)/ARDB.dmnd -o short_cur.m8 --tmpdir /dev/shm -p1
 
 run: $(program)
-	./$(program) blastx -q $(DMND_PATH)/long.fastq.gz -d $(DMND_PATH)/ARDB.dmnd -o long_cur.m8 --tmpdir /dev/shm -p1
+	$(LAUNCHER) ./$(program) blastx -q $(DMND_PATH)/long.fastq.gz -d $(DMND_PATH)/ARDB.dmnd -o long_cur.m8 --tmpdir /dev/shm -p1
 

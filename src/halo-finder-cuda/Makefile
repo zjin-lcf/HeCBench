@@ -164,4 +164,4 @@ clean:
 	rm -rf cuda
 
 run: progs
-	./cuda/ForceTreeTest 0.5 0.1 10000 0.1 10 N 12 rcb
+	$(LAUNCHER) ./cuda/ForceTreeTest 0.5 0.1 10000 0.1 10 N 12 rcb

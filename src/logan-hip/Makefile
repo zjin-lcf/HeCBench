@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -66,4 +67,4 @@ demo: $(program)
 	./$(program) ../logan-cuda/inputs/example.txt 17 21 1
 
 run: $(program)
-	./$(program) ../logan-cuda/inputs/100k.txt 17 100 1
+	$(LAUNCHER) ./$(program) ../logan-cuda/inputs/100k.txt 17 100 1

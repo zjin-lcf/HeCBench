@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -54,5 +55,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -g data/social-large-800k.txt -n 800000 -k 3 -d float
+	$(LAUNCHER) ./$(program) -g data/social-large-800k.txt -n 800000 -k 3 -d float
 

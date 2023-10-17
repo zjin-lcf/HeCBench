@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -53,5 +54,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --dimx=192 --dimy=184 --timesteps=90
+	$(LAUNCHER) ./$(program) --dimx=192 --dimy=184 --timesteps=90
 

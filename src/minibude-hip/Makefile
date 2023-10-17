@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -53,4 +54,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --deck ../minibude-sycl/data/bm1  --wgsize 256 --iterations 100
+	$(LAUNCHER) ./$(program) --deck ../minibude-sycl/data/bm1  --wgsize 256 --iterations 100

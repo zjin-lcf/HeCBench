@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -53,4 +54,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../ss-sycl/StringSearch_Input.txt clEnqueueNDRangeKernel 20000
+	$(LAUNCHER) ./$(program) ../ss-sycl/StringSearch_Input.txt clEnqueueNDRangeKernel 20000

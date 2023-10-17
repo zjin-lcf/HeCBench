@@ -7,6 +7,7 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 MAX_GPU   = 4 
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -75,4 +76,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 1000
+	$(LAUNCHER) ./$(program) 1000

@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -51,4 +52,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) TEM27623/TEM27623_M.mtx 100 0
+	$(LAUNCHER) ./$(program) TEM27623/TEM27623_M.mtx 100 0

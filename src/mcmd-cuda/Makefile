@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -60,4 +61,4 @@ clean:
 	rm -rf dataset/*.dat
 
 run: $(program)
-	cd dataset && ../$(program) mcmd.inp && cd ..
+	$(LAUNCHER) cd dataset && ../$(program) mcmd.inp && cd ..

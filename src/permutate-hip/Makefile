@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -71,4 +72,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../permutate-cuda/test_data/truerand_1bit.bin
+	$(LAUNCHER) ./$(program) ../permutate-cuda/test_data/truerand_1bit.bin

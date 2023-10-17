@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 SP        = yes
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -59,5 +60,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 3 1000
+	$(LAUNCHER) ./$(program) 3 1000
 

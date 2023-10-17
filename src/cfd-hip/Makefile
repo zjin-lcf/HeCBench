@@ -7,6 +7,7 @@ CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
 DUMP      = yes
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -57,5 +58,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../data/cfd/fvcorr.domn.097K
+	$(LAUNCHER) ./$(program) ../data/cfd/fvcorr.domn.097K
 

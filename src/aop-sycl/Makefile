@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -76,4 +77,4 @@ test: $(program)
 	./$(program)
 
 run: $(program)
-	./$(program) -runs 100
+	$(LAUNCHER) ./$(program) -runs 100

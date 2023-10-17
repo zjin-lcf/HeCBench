@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -59,5 +60,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../henry-cuda/IRMOF-1.cssr 1000
+	$(LAUNCHER) ./$(program) ../henry-cuda/IRMOF-1.cssr 1000
 

@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -86,4 +87,4 @@ test: $(program)
 	./$(program) ../frna-cuda/RD0260.seq rd0260.out
 
 run: $(program)
-	./$(program) ../prna-cuda/HIV1-NL43.seq  hiv1-nl43.out
+	$(LAUNCHER) ./$(program) ../prna-cuda/HIV1-NL43.seq  hiv1-nl43.out

@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -73,5 +74,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../floydwarshall2-cuda/CollegeMsg.egr 1000
+	$(LAUNCHER) ./$(program) ../floydwarshall2-cuda/CollegeMsg.egr 1000
 	#./$(program) ../floydwarshall2-cuda/soc-sign-bitcoin-alpha.egr 1000

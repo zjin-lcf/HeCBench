@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -59,4 +60,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../medianfilter-sycl/data/SierrasRGB.ppm 1000
+	$(LAUNCHER) ./$(program) ../medianfilter-sycl/data/SierrasRGB.ppm 1000

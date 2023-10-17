@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
 VERIFY    = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -65,4 +66,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) data/dirty_4096.img data/psf_4096.img 1000
+	$(LAUNCHER) ./$(program) data/dirty_4096.img data/psf_4096.img 1000

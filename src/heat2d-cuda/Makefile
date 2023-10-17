@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -56,4 +57,4 @@ data.txt: mkinit.py
 	python2 mkinit.py 4096 8192 data.txt
 
 run: $(program) data.txt
-	./$(program) 4096 8192 1000 data.txt
+	$(LAUNCHER) ./$(program) 4096 8192 1000 data.txt

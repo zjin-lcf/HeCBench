@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -54,6 +55,6 @@ clean:
 	rm -rf $(program) $(obj) out
 
 run: $(program)
-	rm -rf out;
+	$(LAUNCHER) rm -rf out;
 	mkdir out
 	./$(program) 1000

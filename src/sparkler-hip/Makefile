@@ -10,6 +10,7 @@ CC        = hipcc
 LD        = $(MPI_ROOT)/bin/mpiCC
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -57,4 +58,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(MPI_ROOT)/bin/mpirun -n 4 ./$(program) --num_vector 4000 --num_field 90000 --num_iterations 10
+	$(LAUNCHER) $(MPI_ROOT)/bin/mpirun -n 4 ./$(program) --num_vector 4000 --num_field 90000 --num_iterations 10

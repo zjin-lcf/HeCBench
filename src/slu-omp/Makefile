@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = yes
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -91,4 +92,4 @@ test: $(program)
 	./$(program) -i $(SLU_PATH)/nicslu/test/add32.mtx
 
 run: $(program)
-	./$(program) -i $(SLU_PATH)/nicslu/demo/ASIC_100k.mtx
+	$(LAUNCHER) ./$(program) -i $(SLU_PATH)/nicslu/demo/ASIC_100k.mtx

@@ -8,6 +8,7 @@ CC        = compute++
 else
 CC        = clang++
 endif
+LAUNCHER=
 
 OPTIMIZE  = yes
 DEBUG     = no
@@ -89,4 +90,4 @@ clean:
 	rm -rf $(program) $(obj) *.out
 
 run: $(program)
-	./$(program) 512 2 200 ../data/hotspot/temp_512 ../data/hotspot/power_512 output_512.out
+	$(LAUNCHER) ./$(program) 512 2 200 ../data/hotspot/temp_512 ../data/hotspot/power_512 output_512.out

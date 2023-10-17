@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -73,5 +74,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../seam-carving-cuda/Broadway_tower.jpg 100 -u 
+	$(LAUNCHER) ./$(program) ../seam-carving-cuda/Broadway_tower.jpg 100 -u 
 	#./$(program) ../seam-carving-cuda/Broadway_tower.jpg 100 -a

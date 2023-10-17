@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -74,4 +75,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --deck ./data/bm1  --wgsize 256 --iterations 100
+	$(LAUNCHER) ./$(program) --deck ./data/bm1  --wgsize 256 --iterations 100

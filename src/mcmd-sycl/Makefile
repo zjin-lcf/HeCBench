@@ -7,6 +7,7 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = no
+LAUNCHER  =
 
 # if GPU = no, then -DSYCL has not effect
 GPU       = yes
@@ -82,4 +83,4 @@ clean:
 	rm -rf ../mcmd-cuda/dataset/*.dat
 
 run: $(program)
-	cd ../mcmd-cuda/dataset && ../../mcmd-sycl/$(program) mcmd.inp && cd ../../mcmd-sycl
+	$(LAUNCHER) cd ../mcmd-cuda/dataset && ../../mcmd-sycl/$(program) mcmd.inp && cd ../../mcmd-sycl

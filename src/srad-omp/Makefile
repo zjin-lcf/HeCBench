@@ -2,6 +2,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 
 # Standard flags
@@ -69,4 +70,4 @@ clean:
 	rm -f ./*.o srad *.pgm ./util/graphics/*.o ./util/timer/*.o
 
 run: srad
-	./srad 1000 0.5 502 458
+	$(LAUNCHER) ./srad 1000 0.5 502 458

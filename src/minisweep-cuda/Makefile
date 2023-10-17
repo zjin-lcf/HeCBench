@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -53,5 +54,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --niterations 100
+	$(LAUNCHER) ./$(program) --niterations 100
 	./$(program) --niterations 1 --ncell_x 32 --ncell_y 32 --ncell_z 64 --ne 64 --na 32 --nblock_z 64

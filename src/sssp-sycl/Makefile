@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -74,4 +75,4 @@ clean:
 
 # 120 work-groups, 1 CPU thread, 10 warm-up runs, and 100 timed run
 run: $(program)
-	./$(program) -g 120 -t 1 -w 10 -r 100
+	$(LAUNCHER) ./$(program) -g 120 -t 1 -w 10 -r 100

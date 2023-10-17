@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -52,4 +53,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) newblue7.kraftwerk70.3d.80.20.82.m8.gr
+	$(LAUNCHER) ./$(program) newblue7.kraftwerk70.3d.80.20.82.m8.gr

@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -59,4 +60,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../dxtc1-sycl/data/lena_std.ppm ../dxtc1-sycl/data/lena_ref.dds 100
+	$(LAUNCHER) ./$(program) ../dxtc1-sycl/data/lena_std.ppm ../dxtc1-sycl/data/lena_ref.dds 100

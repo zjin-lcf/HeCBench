@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -83,4 +84,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../sw4ck-cuda/sw4ck.in 100
+	$(LAUNCHER) ./$(program) ../sw4ck-cuda/sw4ck.in 100

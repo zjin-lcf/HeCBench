@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 POINTS    = 97178
 DATAPARS  = -d ../tpacf-cuda/data/small/Datapnts.1 -p $(POINTS)
@@ -64,4 +65,4 @@ clean:
 	rm -rf $(program) $(obj) $(OUTFILE)
 
 run: $(program)
-	./$(program) $(DATAPARS) $(RANDPARS) $(ANALPARS) -o $(OUTFILE)
+	$(LAUNCHER) ./$(program) $(DATAPARS) $(RANDPARS) $(ANALPARS) -o $(OUTFILE)

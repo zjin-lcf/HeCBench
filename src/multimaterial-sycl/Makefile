@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -74,7 +75,7 @@ clean:
 	rm -rf $(program)
 
 run: $(program)
-	./multimat_FL 2000 2000
+	$(LAUNCHER) ./multimat_FL 2000 2000
 	./multimat_F 2000 2000
 	./multimat 2000 2000
 	./multimat_FL 2000 2000 0.3 0.05 0.05

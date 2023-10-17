@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -85,4 +86,4 @@ clean:
 	rm -rf $(program) $(obj) output.nrrd
 
 run: $(program)
-	./$(program) -s 512
+	$(LAUNCHER) ./$(program) -s 512

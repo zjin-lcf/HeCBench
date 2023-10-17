@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+LAUNCHER  =
 
 
 #===============================================================================
@@ -69,4 +70,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -q -n 100 -s 1
+	$(LAUNCHER) ./$(program) -q -n 100 -s 1

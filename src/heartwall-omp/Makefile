@@ -3,6 +3,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DUMP      = yes
 DEVICE    = gpu
+LAUNCHER  =
 
 
 
@@ -103,7 +104,7 @@ heartwall:	./main.o \
 			-o ./util/timer/timer.o 
 
 run: heartwall
-	./heartwall 104
+	$(LAUNCHER) ./heartwall 104
 
 clean:
 	rm	-rf *.o heartwall \

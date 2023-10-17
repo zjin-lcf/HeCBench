@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -75,5 +76,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	ulimit -s unlimited	
+	$(LAUNCHER) ulimit -s unlimited	
 	./$(program) ../cc-cuda/delaunay_n24.egr 100

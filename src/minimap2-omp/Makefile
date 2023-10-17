@@ -7,6 +7,7 @@ CC        = icpx
 OPTIMIZE  = no
 DEBUG     = yes
 DEVICE    = gpu
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -64,4 +65,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) ../minimap2-sycl/in-1k.txt kernel-out.txt
+	$(LAUNCHER) ./$(program) ../minimap2-sycl/in-1k.txt kernel-out.txt

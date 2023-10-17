@@ -2,6 +2,7 @@ CC          = hipcc
 OPTIMIZE    = yes
 DUMP        = yes
 DEBUG       = no
+LAUNCHER    =
 
 
 # Standard flags
@@ -95,7 +96,7 @@ heartwall:	./main.o \
 		-o ./util/timer/timer.o 
 
 run: heartwall
-	./heartwall 104
+	$(LAUNCHER) ./heartwall 104
 
 clean:
 	rm	-rf *.o heartwall \

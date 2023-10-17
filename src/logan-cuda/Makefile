@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -68,4 +69,4 @@ demo: $(program)
 	./$(program) inputs/example.txt 17 21 1
 
 run: $(program)
-	./$(program) inputs/100k.txt 17 100 1
+	$(LAUNCHER) ./$(program) inputs/100k.txt 17 100 1

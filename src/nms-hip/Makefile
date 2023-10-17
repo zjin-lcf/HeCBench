@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -52,4 +53,4 @@ clean:
 	rm -rf $(program) $(obj) output.txt
 
 run: $(program)
-	./$(program) ../nms-cuda/detections.txt output.txt 1000
+	$(LAUNCHER) ./$(program) ../nms-cuda/detections.txt output.txt 1000

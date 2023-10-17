@@ -8,6 +8,7 @@ CC        = compute++
 else
 CC        = clang++
 endif
+LAUNCHER=
 
 OPTIMIZE  = yes
 DEBUG     = no
@@ -99,4 +100,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -r -n 5 -m 15 -l 10 -o -i ../data/kmeans/kdd_cup
+	$(LAUNCHER) ./$(program) -r -n 5 -m 15 -l 10 -o -i ../data/kmeans/kdd_cup

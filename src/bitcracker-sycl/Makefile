@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -73,6 +74,6 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) -f ../bitcracker-cuda/hash_pass/img_win8_user_hash.txt \
+	$(LAUNCHER) ./$(program) -f ../bitcracker-cuda/hash_pass/img_win8_user_hash.txt \
                      -d ../bitcracker-cuda/hash_pass/user_passwords_60000.txt \
                      -b 60000

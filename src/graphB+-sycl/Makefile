@@ -7,6 +7,7 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 VERIFY    = no
+LAUNCHER  =
 
 GPU       = yes
 CUDA      = no
@@ -78,4 +79,4 @@ clean:
 	rm -rf $(program) $(obj) output
 
 run: $(program)
-	./$(program) ../graphB+-cuda/graph.csv 10000 output
+	$(LAUNCHER) ./$(program) ../graphB+-cuda/graph.csv 10000 output

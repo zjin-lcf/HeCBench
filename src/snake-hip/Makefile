@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -52,4 +53,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 100 ../snake-cuda/Datasets/ERR240727_1_E2_30000Pairs.txt 30000 1000
+	$(LAUNCHER) ./$(program) 100 ../snake-cuda/Datasets/ERR240727_1_E2_30000Pairs.txt 30000 1000

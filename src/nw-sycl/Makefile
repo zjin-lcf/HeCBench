@@ -8,6 +8,7 @@ CC        = compute++
 else
 CC        = clang++
 endif
+LAUNCHER=
 
 OPTIMIZE  = yes
 DEBUG     = no
@@ -94,4 +95,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 16384 10
+	$(LAUNCHER) ./$(program) 16384 10
