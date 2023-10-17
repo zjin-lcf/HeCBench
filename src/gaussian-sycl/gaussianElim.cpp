@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
     printf("The result of matrix m is after forwardsub: \n");
     PrintMat(m, size, size, size);
     PrintMat(m_host, size, size, size);
-    printf("The final solution is: \n");
+    printf("The solution is: \n");
     PrintAry(finalVec,size);
   }
 
