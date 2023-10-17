@@ -9,6 +9,7 @@ DEBUG     = no
 DUMP      = no
 DEVICE    = gpu
 ARCH      = gfx906
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -67,7 +68,7 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) 7 15 256 100 &> log
+	$(LAUNCHER) ./$(program) 7 15 256 100 &> log
 	./$(program) 7 15 256 100 &> log2
 	diff log log2
 

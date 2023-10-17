@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 ARCH      = gfx906
+LAUNCHER  =
 
 
 #===============================================================================
@@ -80,5 +81,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	./$(program) --Verbose
+	$(LAUNCHER) ./$(program) --Verbose
 	#./$(program) --SaveOutput

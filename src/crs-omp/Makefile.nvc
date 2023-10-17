@@ -9,6 +9,7 @@ DEBUG     = no
 OUTPUT    = no
 DEVICE    = gpu
 SM        = cc70
+LAUNCHER  =
 
 #===============================================================================
 # Program name & source code list
@@ -80,6 +81,6 @@ clean:
 	rm -rf $(program) *.o
 
 run: $(program)
-	./$(program) 10 10
+	$(LAUNCHER) ./$(program) 10 10
 
 
