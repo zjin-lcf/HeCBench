@@ -72,4 +72,4 @@ clean:
 
 run: build
 	$(LAUNCHER) ./vj-cpu Face.pgm info.txt class.txt Output-cpu.pgm
-	./vj-gpu Face.pgm info.txt class.txt Output-gpu.pgm
+	$(LAUNCHER) ./vj-gpu Face.pgm info.txt class.txt Output-gpu.pgm
