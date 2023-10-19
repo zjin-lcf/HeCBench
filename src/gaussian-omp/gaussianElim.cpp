@@ -11,7 +11,7 @@ long long get_time() {
 }
 
 // create both matrix and right hand side, Ke Wang 2013/08/12 11:51:06
-void create_matrix(float *m, int size){
+void init_matrix(float *m, int size){
   int i,j;
   float lamda = -0.01;
   float coe[2*size-1];
@@ -66,8 +66,7 @@ int main(int argc, char *argv[]) {
   int quiet=0,timing=0;
 
   // parse command line
-  if (parseCommandline(argc, argv, filename,
-        &quiet, &timing, &size)) {
+  if (parseCommandline(argc, argv, filename, &quiet, &timing, &size)) {
     printUsage();
     return 0;
   }
@@ -88,7 +87,7 @@ int main(int argc, char *argv[]) {
   else
   {
     a = (float *) malloc(size * size * sizeof(float));
-    create_matrix(a, size);
+    init_matrix(a, size);
 
     b = (float *) malloc(size * sizeof(float));
     for (int i =0; i< size; i++)
@@ -223,7 +222,7 @@ int parseCommandline(int argc, char *argv[], char* filename,
         case 's': // matrix size
           i++;
           *size = atoi(argv[i]);
-          printf("Create matrix internally, size = %d \n", *size);
+          printf("Create a square matrix (%d x %d) internally\n", *size, *size);
           break;
         case 'f': // file name
           i++;
