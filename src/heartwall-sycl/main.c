@@ -26,7 +26,7 @@ kernel_gpu_wrapper(params_common common,
 int 
 main(int argc, char* argv []) {
 
-  printf("WG size of kernel = %d \n", NUMBER_THREADS);
+  printf("Workgroup size of kernel = %d \n", NUMBER_THREADS);
 
   // time
   long long time0;
