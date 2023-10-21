@@ -53,5 +53,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) ~/oneAPI-DirectProgramming/ge-spmm-cuda/amazon0302/amazon0302.mtx 8 1000
-	#./$(program) data/snap/amazon0302/amazon0302.mtx 8 1000
+	$(LAUNCHER) ./$(program) data/snap/amazon0302/amazon0302.mtx 8 1000
