@@ -13,18 +13,6 @@ inline float hd (const float2 ap, const float2 bp)
        + (ap.y - bp.y) * (ap.y - bp.y);
 }
 
-__device__ __forceinline__
-void atomic_max(float *address, float val)
-{
-  unsigned int ret = __float_as_uint(*address);
-  while(val > __uint_as_float(ret))
-  {
-    unsigned int old = ret;
-    if((ret = atomicCAS((unsigned int *)address, old, __float_as_uint(val))) == old)
-      break;
-  }
-}
-
 __global__
 void computeDistance(const float2* __restrict__ Apoints,
                      const float2* __restrict__ Bpoints,
@@ -42,7 +30,7 @@ void computeDistance(const float2* __restrict__ Apoints,
     d = std::min(t, d);
   }
   
-  atomic_max(distance, d);
+  atomicMax(distance, d);
 }
 
 int main(int argc, char* argv[]) {
