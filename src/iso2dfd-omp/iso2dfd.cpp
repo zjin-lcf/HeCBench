@@ -4,12 +4,12 @@
 // SPDX-License-Identifier: MIT
 // =============================================================
 
-// ISO2DFD: HIP Port of the 2D-Finite-Difference-Wave Propagation, 
+// ISO2DFD: the 2D-Finite-Difference-Wave Propagation, 
 //
 // ISO2DFD is a finite difference stencil kernel for solving the 2D acoustic
 // isotropic wave equation. Kernels in this sample are implemented as 2nd order
-// in space, 2nd order in time scheme without boundary conditions. Using HIP,
-// the sample will explicitly run on the GPU as well as CPU to
+// in space, 2nd order in time scheme without boundary conditions.
+// The sample will explicitly run on the GPU as well as CPU to
 // calculate a result.  If successful, the output will include GPU device name.
 //
 // A complete online tutorial for this code sample can be found at :
