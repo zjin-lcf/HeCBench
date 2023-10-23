@@ -54,4 +54,4 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) 0 100000
-	./$(program) 1 100000
+	$(LAUNCHER) ./$(program) 1 100000
