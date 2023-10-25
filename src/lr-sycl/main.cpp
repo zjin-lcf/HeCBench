@@ -92,10 +92,8 @@ int main(int argc, char* argv[]) {
 
   write_results(&results, "a");
 
-  if (argc == 1 || strcmp(argv[1], "-no_print") > 0) {
-    printf("\n> TEMPERATURE REGRESSION (%d)\n\n", TEMP_SIZE);
-    print_results(&results);
-  }
+  printf("\n> TEMPERATURE REGRESSION (%d)\n\n", TEMP_SIZE);
+  print_results(&results);
 
   return 0;
 }
