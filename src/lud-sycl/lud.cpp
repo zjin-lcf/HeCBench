@@ -49,9 +49,6 @@ int main ( int argc, char *argv[] )
       case 's':
         matrix_dim = atoi(optarg);
         printf("Generate input matrix internally, size =%d\n", matrix_dim);
-        // fprintf(stderr, "Currently not supported, use -i instead\n");
-        // fprintf(stderr, "Usage: %s [-v] [-s matrix_size|-i input_file]\n", argv[0]);
-        // exit(EXIT_FAILURE);
         break;
       case '?':
         fprintf(stderr, "invalid option\n");
