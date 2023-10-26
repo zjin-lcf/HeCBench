@@ -828,7 +828,7 @@ Early results are shown [here](results/README.md)
   Memory allocation and deallocation samples (https://github.com/ROCm-Developer-Tools/HIP/)
 
 ### mandelbrot (sycl)
-  The Mandelbrot set in the HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
+  Calculations of the Mandelbrot set (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming)
 
 ### marchingCubes (cuda)
   A practical isosurfacing algorithm for large data on many-core architectures (https://github.com/LRLVEC/MarchingCubes)
