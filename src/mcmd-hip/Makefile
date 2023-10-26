@@ -60,4 +60,4 @@ clean:
 	rm -rf ../mcmd-cuda/dataset/*.dat
 
 run: $(program)
-	$(LAUNCHER) cd ../mcmd-cuda/dataset && ../../mcmd-hip/$(program) mcmd.inp && cd ../../mcmd-hip
+	cd ../mcmd-cuda/dataset && $(LAUNCHER) ../../mcmd-hip/$(program) mcmd.inp && cd ../../mcmd-hip
