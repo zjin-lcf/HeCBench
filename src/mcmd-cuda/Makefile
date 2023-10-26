@@ -61,4 +61,4 @@ clean:
 	rm -rf dataset/*.dat
 
 run: $(program)
-	$(LAUNCHER) cd dataset && ../$(program) mcmd.inp && cd ..
+	cd dataset && $(LAUNCHER) ../$(program) mcmd.inp && cd ..

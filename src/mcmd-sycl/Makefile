@@ -83,4 +83,4 @@ clean:
 	rm -rf ../mcmd-cuda/dataset/*.dat
 
 run: $(program)
-	$(LAUNCHER) cd ../mcmd-cuda/dataset && ../../mcmd-sycl/$(program) mcmd.inp && cd ../../mcmd-sycl
+	cd ../mcmd-cuda/dataset && $(LAUNCHER) ../../mcmd-sycl/$(program) mcmd.inp && cd ../../mcmd-sycl
