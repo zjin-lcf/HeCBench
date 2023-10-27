@@ -2,8 +2,7 @@
 #include "grid.h"
 #include "constants.h"
 
-struct grid_t init_grid(llint nx, llint ny, llint nz, llint tsx, llint tsy,
-                        llint ngpu)
+struct grid_t init_grid(llint nx, llint ny, llint nz, llint tsx, llint tsy)
 {
     struct grid_t grid;
     grid.nx = nx; grid.ny = ny; grid.nz = nz;
@@ -49,9 +48,6 @@ struct grid_t init_grid(llint nx, llint ny, llint nz, llint tsx, llint tsy,
     grid.tsy = tsy;
     grid.ntx = nx/tsx;
     grid.nty = ny/tsy;
-
-    // For multi-gpu targets
-    grid.ngpu = ngpu;
 
     printf("ndamp = %lld %lld %lld\n", grid.ndampx, grid.ndampy, grid.ndampz);
     return grid;
