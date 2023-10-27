@@ -11,7 +11,7 @@ float michalewicz(const float *xValues, const int dim) {
   for (int i = 0; i < dim; ++i) {
       float a = sycl::sin(xValues[i]);
       float b = sycl::sin(((i + 1) * xValues[i] * xValues[i]) / (float)M_PI);
-      float c = sycl::pow(b, 20.f);
+      float c = sycl::pow(b, 20.f); // m = 10
       result += a * c;
   }
   return -1.0f * result;
@@ -49,6 +49,7 @@ int main(int argc, char* argv[])
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
   
+  // dimensions
   const int dims[] = {2, 5, 10}; 
 
   for (int d = 0; d < 3; d++) {

@@ -22,10 +22,10 @@ __device__ __forceinline__
 float michalewicz(const float *xValues, const int dim) {
   float result = 0;
   for (int i = 0; i < dim; ++i) {
-      float a = sinf(xValues[i]);
-      float b = sinf(((i + 1) * xValues[i] * xValues[i]) / (float)M_PI);
-      float c = powf(b, 20);
-      result += a * c;
+    float a = sinf(xValues[i]);
+    float b = sinf(((i + 1) * xValues[i] * xValues[i]) / (float)M_PI);
+    float c = powf(b, 20); // m = 10
+    result += a * c;
   }
   return -1.0f * result;
 }
@@ -65,6 +65,7 @@ int main(int argc, char* argv[])
   std::mt19937 gen(19937);
   std::uniform_real_distribution<float> dis(0.0, 4.0);
   
+  // dimensions
   const int dims[] = {2, 5, 10}; 
 
   for (int d = 0; d < 3; d++) {
