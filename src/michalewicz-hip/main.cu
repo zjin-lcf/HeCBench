@@ -6,25 +6,12 @@
 #include <hip/hip_runtime.h>
 
 __device__ __forceinline__
-float atomic_min(float *addr, float value)
-{
-  unsigned ret = __float_as_uint(*addr);
-  while(value < __uint_as_float(ret))
-  {
-    unsigned old = ret;
-    if((ret = atomicCAS((unsigned *)addr, old, __float_as_uint(value))) == old)
-      break;
-  }
-  return __uint_as_float(ret);
-}
-
-__device__ __forceinline__
 float michalewicz(const float *xValues, const int dim) {
   float result = 0;
   for (int i = 0; i < dim; ++i) {
       float a = sinf(xValues[i]);
       float b = sinf(((i + 1) * xValues[i] * xValues[i]) / (float)M_PI);
-      float c = powf(b, 20);
+      float c = powf(b, 20); // m = 10
       result += a * c;
   }
   return -1.0f * result;
@@ -35,7 +22,7 @@ __global__ void eval (const float *values, float *minima,
 {
   size_t n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n < nVectors) {
-    atomic_min(minima, michalewicz(values + n * dim, dim));
+    atomicMin(minima, michalewicz(values + n * dim, dim));
   }
 }
 
@@ -65,6 +52,7 @@ int main(int argc, char* argv[])
   std::mt19937 gen(19937);
   std::uniform_real_distribution<float> dis(0.0, 4.0);
   
+  // dimensions
   const int dims[] = {2, 5, 10}; 
 
   for (int d = 0; d < 3; d++) {
