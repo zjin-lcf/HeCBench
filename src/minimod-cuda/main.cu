@@ -68,8 +68,6 @@ int main(int argc, char *argv[])
   llint nx = 100, ny = 100, nz = 100;
   /* Task size (supported targets only) */
   llint tsx = 10, tsy = 10;
-  /* Number of GPUs (supported targets only) */
-  llint ngpus = 1;
   uint nsteps = 1;
   uint niters = 1;
   bool disable_warm_up_iter = true;
@@ -109,11 +107,6 @@ int main(int argc, char *argv[])
       finalio = true;
       printf("writing final wavefile is enabled\n");
     }
-    else if (strcmp(argv[i],"--ngpus") == 0) {
-      ++i;
-      ngpus = strtoll(argv[i],NULL,10);
-      printf("ngpus = %lld\n", ngpus);
-    }
   }
 
   double total_kernel_time = 0.0;
@@ -122,7 +115,7 @@ int main(int argc, char *argv[])
 
   for (uint iiter = 0; iiter < (disable_warm_up_iter ? niters : niters+1); iiter++) {
 
-    const struct grid_t grid = init_grid(nx,ny,nz,tsx,tsy,ngpus);
+    const struct grid_t grid = init_grid(nx,ny,nz,tsx,tsy);
 
     printf("grid = %lld %lld %lld\n", grid.nx, grid.ny, grid.nz);
 

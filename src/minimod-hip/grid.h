@@ -15,13 +15,9 @@ struct grid_t {
     llint lx, ly, lz;
     // These parameters are used only for tasks
     llint ntx, nty, tsx, tsy;
-
-    // Used for multi-gpu targets
-    llint ngpu;
 };
 
-struct grid_t init_grid(llint nx, llint ny, llint nz, llint tsx, llint tsy,
-                        llint ngpu);
+struct grid_t init_grid(llint nx, llint ny, llint nz, llint tsx, llint tsy);
 
 // Allocate or release a grid on GPU
 float * allocateDeviceGrid (struct grid_t grid);
