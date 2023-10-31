@@ -127,6 +127,7 @@ void init(sycl::nd_item<1> &item,
 }
 
 void computeMIS(
+    const int repeat,
     const int nodes,
     const int edges,
     const int* const __restrict nidx,
@@ -155,7 +156,8 @@ void computeMIS(
   q.wait();
 
   auto start = std::chrono::high_resolution_clock::now();
-  for (int n = 0; n < 100; n++) {
+
+  for (int n = 0; n < repeat; n++) {
     q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class k1>(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
@@ -175,7 +177,7 @@ void computeMIS(
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
-  float runtime = (float)elapsed_seconds.count() / 100;
+  float runtime = (float)elapsed_seconds.count() / repeat;
   printf("compute time: %.6f s\n", runtime);
   printf("throughput: %.6f Mnodes/s\n", nodes * 0.000001 / runtime);
   printf("throughput: %.6f Medges/s\n", edges * 0.000001 / runtime);
@@ -191,19 +193,24 @@ int main(int argc, char* argv[])
   printf("ECL-MIS v1.3 (%s)\n", __FILE__);
   printf("Copyright 2017-2020 Texas State University\n");
 
-  if (argc != 2) {fprintf(stderr, "USAGE: %s input_file_name\n\n", argv[0]);  exit(-1);}
+  if (argc != 3) {
+    fprintf(stderr, "USAGE: %s <input_file_name> <repeat>\n\n", argv[0]);
+    exit(-1);
+  }
 
   ECLgraph g = readECLgraph(argv[1]);
   printf("configuration: %d nodes and %d edges (%s)\n", g.nodes, g.edges, argv[1]);
   printf("average degree: %.2f edges per node\n", 1.0 * g.edges / g.nodes);
 
   stattype* nstatus = (stattype*)malloc(g.nodes * sizeof(nstatus[0]));
-  if (nstatus == NULL)
+
+  if (nstatus == NULL) {
     fprintf(stderr, "ERROR: could not allocate nstatus\n\n");
-
+  }
   else {
+    const int repeat = atoi(argv[2]);
 
-    computeMIS(g.nodes, g.edges, g.nindex, g.nlist, nstatus);
+    computeMIS(repeat, g.nodes, g.edges, g.nindex, g.nlist, nstatus);
 
     /* result verification code */
 
