@@ -35,7 +35,6 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
@@ -60,5 +59,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) ../mis-cuda/internet.egr
-
+	$(LAUNCHER) ./$(program) ../mis-cuda/internet.egr 100
