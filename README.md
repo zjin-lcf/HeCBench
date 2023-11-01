@@ -969,7 +969,7 @@ Early results are shown [here](results/README.md)
   Computing non-bonded pair interactions (https://manual.gromacs.org/current/doxygen/html-full/page_nbnxm.xhtml)
 
 ### nbody (opencl)
-  Nbody simulation (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/DPC%2B%2B/N-BodyMethods/Nbody)
+  Nbody simulation (https://github.com/oneapi-src/oneAPI-samples/tree/master/DirectProgramming/C%2B%2BSYCL/N-BodyMethods/Nbody)
 
 ### ne (cuda)
   Normal estimation in 3D (https://github.com/PointCloudLibrary/pcl)
