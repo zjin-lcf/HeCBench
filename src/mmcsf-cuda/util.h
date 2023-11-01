@@ -1304,7 +1304,7 @@ inline void print_help_and_exit() {
       -R rank/feature : set the rank (default 32)\n\
       -m mode : set the mode of MTTKRP (default 0)\n\
       -w warp per slice: set number of WARPs assign to per slice  (default 4)\n\
-      -i output file name: e.g., ../dataset/delicious.tns \n\
+      -i input file name: e.g., ../dataset/delicious.tns \n\
       -o output file name: optional dump\n");
 
   exit(1);
