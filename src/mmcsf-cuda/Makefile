@@ -60,7 +60,7 @@ output.tns: generate_tensor.py
 	python generate_tensor.py output.tns 2%4096 2%4096 2%4096 2%512
 
 test: toy.tns $(program)
-	./$(program) -i toy.tns -m 0 -R 32 -f 128 -w 1
+	$(LAUNCHER) ./$(program) -i toy.tns -m 0 -R 32 -f 128 -w 1
   
 run: output.tns $(program)
 	$(LAUNCHER) ./$(program) -i output.tns -m 0 -R 32 -f 128 -w 4
