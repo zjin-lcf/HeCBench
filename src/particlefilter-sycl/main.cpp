@@ -534,7 +534,7 @@ int particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, i
 
 int main(int argc, char * argv[]) {
 
-  const char* usage = "float.out -x <dimX> -y <dimY> -z <Nfr> -np <Nparticles>";
+  const char* usage = "./main -x <dimX> -y <dimY> -z <Nfr> -np <Nparticles>";
   //check number of arguments
   if (argc != 9) {
     printf("%s\n", usage);
