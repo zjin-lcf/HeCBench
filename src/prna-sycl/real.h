@@ -36,7 +36,7 @@ typedef long double real_t;
 #endif
 
 #ifdef __CUDACC__
-#include "common.h"
+#include <sycl/sycl.hpp>
 #define LOG   sycl::log
 #define EXP   sycl::exp
 #define LOG1P sycl::log1p
