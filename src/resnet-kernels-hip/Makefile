@@ -14,14 +14,13 @@ LAUNCHER  =
 
 program = main
 
-source = main.c util.c \
+source = main.cu util.cu \
          Kernel256_winograd.cu \
          Kernel128_winograd.cu \
          Kernel256_one.cu \
          Kernel128_one.cu
 
-obj = main.o util.o Kernel256_winograd.o Kernel128_winograd.o \
-      Kernel256_one.o Kernel128_one.o
+obj = $(source:.cu=.o)
 
 
 #===============================================================================
@@ -54,16 +53,13 @@ $(program): $(obj)
 %.o: %.cu
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.c
-	$(CC) -x hip $(CFLAGS) -c $< -o $@
-
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
 	$(LAUNCHER) ./$(program) 0 100
-	./$(program) 1 100
-	./$(program) 2 100
-	./$(program) 3 100
-	./$(program) 4 100
-	./$(program) 5 100
+	$(LAUNCHER) ./$(program) 1 100
+	$(LAUNCHER) ./$(program) 2 100
+	$(LAUNCHER) ./$(program) 3 100
+	$(LAUNCHER) ./$(program) 4 100
+	$(LAUNCHER) ./$(program) 5 100
