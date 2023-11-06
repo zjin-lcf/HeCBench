@@ -23,7 +23,7 @@
 #endif
 
 #include "simpleMultiDevice.h"
--
+
 // Data configuration
 #ifndef MAX_GPU_COUNT 
   #define MAX_GPU_COUNT 8
