@@ -1023,7 +1023,7 @@ Early results are shown [here](results/README.md)
   PageRank (https://github.com/Sable/Ostrich/tree/master/map-reduce/page-rank)
 
 ### particle-diffusion (sycl)
-  Particle diffusion in the HPCKit code samples (https://github.com/intel/HPCKit-code-samples/)
+  Particle diffusion in the HPCKit code samples (https://www.intel.com/content/www/us/en/developer/articles/code-sample/oneapi-dpcpp-compiler-example-particle-diffusion.html)
 
 ### particlefilter (opencl)
   Particle Filter in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
