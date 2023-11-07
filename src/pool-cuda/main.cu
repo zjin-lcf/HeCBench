@@ -185,12 +185,13 @@ int main(int argc, char* argv[])
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
+  for (int i = 0; i < repeat; i++) {
     KernelPool2DGrad<AvgPoolGrad<float>, float><<<grid, threads, 0, 0>>>(
         nthreads, input_data, output_data, output_grad_data, input_channels,
         input_height, input_width, output_height, output_width, ksize_height,
         ksize_width, stride_height, stride_width, padding_height, padding_width,
         pool_process, exclusive, input_grad_data, channel_last);
+  }
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
