@@ -304,7 +304,7 @@ int main(int argc, char* argv[]) {
     numRuns = 1;
   }
   else {
-    printf("Usage: ./%s <seqLength> <numLayers> <hiddenSize> <miniBatch> <repeat>\n", argv[0]);
+    printf("Usage: %s <seqLength> <numLayers> <hiddenSize> <miniBatch> <repeat>\n", argv[0]);
     return 1;      
   }
 
