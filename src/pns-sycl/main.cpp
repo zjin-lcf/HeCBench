@@ -65,10 +65,10 @@ int main(int argc, char** argv)
 {
   if (argc<4)
     {
-      printf("Usage: petri n s t\n"
-	     "n: the place-transition grid is 2nX2n\n"
-	     "s: the maximum steps in a trajectory\n"
-	     "t: number of trajectories\n");
+      printf("Usage: %s N S T\n", argv[0]);
+      printf("N: the place-transition grid is 2nX2n\n"
+             "S: the maximum steps in a trajectory\n"
+             "T: number of trajectories\n");
       return -1;
     }
 

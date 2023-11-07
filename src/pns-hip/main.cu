@@ -50,7 +50,7 @@ T(r+3,c-1)-> P(r+3,c) -> T(r+3,c)->
 #include "rand_gen.cu"
 #include "petri_kernel.cu"
 
-static int N, s, t, N2, NSQUARE2;
+static int N, S, T, NSQUARE2;
 uint32 host_mt[MERS_N];
 
 
@@ -75,29 +75,28 @@ int main(int argc, char** argv)
 {
   if (argc<4) 
     {
-      printf("Usage: petri n s t\n"
-	     "n: the place-transition grid is 2nX2n\n"
-	     "s: the maximum steps in a trajectory\n"
-	     "t: number of trajectories\n");
+      printf("Usage: %s N S T\n", argv[0]);
+      printf("N: the place-transition grid is 2nX2n\n"
+             "S: the maximum steps in a trajectory\n"
+             "T: number of trajectories\n");
       return -1;
     }
 
   N = atoi(argv[1]);
   if (N<1)
     return -1;
-  s = atoi(argv[2]);
-  if (s<1)
+  S = atoi(argv[2]);
+  if (S<1)
     return -1;
 
-  t = atoi(argv[3]);
-  if (t<1)
+  T = atoi(argv[3]);
+  if (T<1)
     return -1;
 
-  N2 = N+N;
-  NSQUARE2 = N*N2;
+  NSQUARE2 = N*(N+N);
   
-  h_vars = (float*)malloc(t*sizeof(float));
-  h_maxs = (int*)malloc(t*sizeof(int));
+  h_vars = (float*)malloc(T*sizeof(float));
+  h_maxs = (int*)malloc(T*sizeof(int));
   
   // compute the simulation on the GPU
   long long ktime = 0;
@@ -116,7 +115,7 @@ int main(int argc, char** argv)
   free(h_vars);
   free(h_maxs);
     
-  printf("petri N=%d s=%d t=%d\n", N, s, t);
+  printf("petri N=%d s=%d T=%d\n", N, S, T);
   printf("mean_vars: %f    var_vars: %f\n", results[0], results[1]);
   printf("mean_maxs: %f    var_maxs: %f\n", results[2], results[3]);
 
@@ -130,17 +129,17 @@ void compute_statistics()
   float sum_max = 0;
   float sum_max_vars = 0;
   int i;
-  for (i=0; i<t; i++) 
+  for (i=0; i<T; i++)
     {
       sum += h_vars[i];
       sum_vars += h_vars[i]*h_vars[i];
       sum_max += h_maxs[i];
       sum_max_vars += h_maxs[i]*h_maxs[i];
     }
-  results[0] = sum/t;
-  results[1] = sum_vars/t - results[0]*results[0];
-  results[2] = sum_max/t;
-  results[3] = sum_max_vars/t - results[2]*results[2];
+  results[0] = sum/T;
+  results[1] = sum_vars/T - results[0]*results[0];
+  results[2] = sum_max/T;
+  results[3] = sum_max_vars/T - results[2]*results[2];
 }
 
 void PetrinetOnDevice(long long &time)
@@ -170,14 +169,13 @@ void PetrinetOnDevice(long long &time)
   p_hmaxs = h_maxs;
   p_hvars = h_vars;
 
-  // Launch the device computation threads!
-  for (i = 0; i<t-block_num; i+=block_num) 
+  for (i = 0; i < T-block_num; i += block_num)
   {
     hipDeviceSynchronize();
     auto start = get_time();
 
     PetrinetKernel<<<grid, threads>>>
-      (g_places, g_vars, g_maxs, N, s, 5489*(i+1));
+      (g_places, g_vars, g_maxs, N, S, 5489*(i+1));
 
     hipDeviceSynchronize();
     auto end = get_time();
@@ -190,21 +188,21 @@ void PetrinetOnDevice(long long &time)
     p_hvars += block_num;
   }
 
-  dim3 grid1(t-i);
+  dim3 grid1(T-i);
 
   hipDeviceSynchronize();
   auto start = get_time();
 
   PetrinetKernel<<<grid1, threads>>>
-    (g_places, g_vars, g_maxs, N, s, 5489*(i+1));
+    (g_places, g_vars, g_maxs, N, S, 5489*(i+1));
 
   hipDeviceSynchronize();
   auto end = get_time();
   time += end - start;
 
   // Read result from the device
-  CopyFromDeviceMemory(p_hmaxs, g_maxs, (t-i)*sizeof(int));
-  CopyFromDeviceMemory(p_hvars, g_vars, (t-i)*sizeof(float));
+  CopyFromDeviceMemory(p_hmaxs, g_maxs, (T-i)*sizeof(int));
+  CopyFromDeviceMemory(p_hvars, g_vars, (T-i)*sizeof(float));
 
   // Free device matrices
   FreeDeviceMemory(g_places);
