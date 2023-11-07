@@ -75,7 +75,6 @@ int main(int argc, char* argv[]) {
     out_scalar_vect3.push_back(Projectile());
   }
 
-  // Call the DpcppParallel with the required inputs and outputs
   GpuParallel(input_vect1, out_parallel_vect2, repeat);
       
 #ifdef DEBUG
