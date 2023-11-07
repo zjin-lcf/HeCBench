@@ -27,10 +27,10 @@ __global__ void CalculateRange(const Projectile *obj, Projectile *pObj) {
   if (i >= num_elements) return;
   float proj_angle = obj[i].getangle();
   float proj_vel = obj[i].getvelocity();
-  float sin_value = sin(proj_angle * kPIValue / 180.0f);
-  float cos_value = cos(proj_angle * kPIValue / 180.0f);
-  float total_time = fabs((2 * proj_vel * sin_value)) / kGValue;
-  float max_range =  fabs(proj_vel * total_time * cos_value);
+  float sin_value = sinf(proj_angle * kPIValue / 180.0f);
+  float cos_value = cosf(proj_angle * kPIValue / 180.0f);
+  float total_time = fabsf((2 * proj_vel * sin_value)) / kGValue;
+  float max_range =  fabsf(proj_vel * total_time * cos_value);
   float max_height = (proj_vel * proj_vel * sin_value * sin_value) / 2.0f *
                      kGValue;  // h = v^2 * sin^2theta/2g
 
@@ -89,7 +89,6 @@ int main(int argc, char* argv[]) {
     out_scalar_vect3.push_back(Projectile());
   }
 
-  // Call the DpcppParallel with the required inputs and outputs
   GpuParallel(input_vect1, out_parallel_vect2, repeat);
       
 #ifdef DEBUG

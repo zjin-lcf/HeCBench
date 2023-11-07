@@ -37,7 +37,6 @@ void GpuParallel(sycl::queue& q,
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    // Submit Command group function object to the queue
     q.submit([&](sycl::handler& h) {
       h.parallel_for<class projectile>(
         sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
@@ -45,7 +44,6 @@ void GpuParallel(sycl::queue& q,
         if (i >= num_elements) return;
         float proj_angle = bufin_vect[i].getangle();
         float proj_vel = bufin_vect[i].getvelocity();
-        // for trignometric functions use sycl::sin/cos
         float sin_value = sycl::sin(proj_angle * kPIValue / 180.0f);
         float cos_value = sycl::cos(proj_angle * kPIValue / 180.0f);
         float total_time = sycl::fabs((2 * proj_vel * sin_value)) / kGValue;
@@ -95,7 +93,6 @@ int main(int argc, char* argv[]) {
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  // Call the DpcppParallel with the required inputs and outputs
   GpuParallel(q, input_vect1, out_parallel_vect2, repeat);
       
 #ifdef DEBUG
