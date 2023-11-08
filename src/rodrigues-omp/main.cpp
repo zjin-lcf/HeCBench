@@ -88,7 +88,11 @@ int main(int argc, char* argv[])
   const int n = atoi(argv[1]);
   const int repeat = atoi(argv[2]);
     
-  float3 w = {-0.33f, -0.66, 0.66};
+  // axis of rotation
+  const float wx = -0.3, wy = -0.6, wz = 0.15;
+  const float norm = 1.f / sqrtf(wx*wx + wy*wy + wz*wz);
+  const float3 w = {wx*norm, wy*norm, wz*norm};
+
   float angle = 0.5f;
 
   float3 *h = (float3*) malloc (sizeof(float3) * n);
@@ -103,9 +107,6 @@ int main(int argc, char* argv[])
     h[i] = {a/d, b/d, c/d};
     h2[i] = {a/d, b/d, c/d, 0.f};
   }
-
-  float3 *d;
-  float4 *d2;
 
   #pragma omp target data map(to: h[0:n], h2[0:n])
   {
