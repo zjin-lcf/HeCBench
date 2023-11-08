@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
   // save device result
   int test[len];
 
-  // save expected results after performing preverse operations even/odd times
+  // save expected results after performing reverse operations even/odd times
   int error = 0;
   int gold_odd[len];
   int gold_even[len];
