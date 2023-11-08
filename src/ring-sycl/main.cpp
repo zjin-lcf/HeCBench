@@ -67,8 +67,11 @@ int main(int argc, char* argv[])
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Total circular exchange time (length = %ld): %f (us)\n",
-           len, time * 1e-3f / repeat);
+    auto time_us = time * 1e-3f / repeat;
+    printf("----------------------------------------------------------------\n");
+    printf("Copy length = %ld\n", len);
+    printf("Average total exchange time: %f (us)\n", time_us);
+    printf("Average exchange time per device: %f (us)\n", time_us / num_devices);
 
     // Copy back data and check for correctness
     queues[0].memcpy(host_ptr.data(), device_ptr[0], data_size_bytes).wait();

@@ -61,13 +61,15 @@ int main(int argc, char* argv[])
         int *dst = device_ptr[ ( i+1 ) % num_devices ];
         hipMemcpy(dst, src, data_size_bytes, hipMemcpyDefault);
       }
-      hipDeviceSynchronize(); // wait for memory copies to finish 
     }
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Total circular exchange time (length = %ld): %f (us)\n",
-           len, time * 1e-3f / repeat);
+    auto time_us = time * 1e-3f / repeat;
+    printf("----------------------------------------------------------------\n");
+    printf("Copy length = %ld\n", len);
+    printf("Average total exchange time: %f (us)\n", time_us);
+    printf("Average exchange time per device: %f (us)\n", time_us / num_devices);
 
     // Copy back data and check for correctness
     hipMemcpy(host_ptr.data(), device_ptr[0], data_size_bytes, hipMemcpyDefault);
