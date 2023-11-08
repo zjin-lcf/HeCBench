@@ -54,6 +54,6 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) -float -keysonly -n=536870912
-	./$(program) -float -n=536870912
-	./$(program) -keysonly -n=536870912
-	./$(program) -n=536870912
+	$(LAUNCHER) ./$(program) -float -n=536870912
+	$(LAUNCHER) ./$(program) -keysonly -n=536870912
+	$(LAUNCHER) ./$(program) -n=536870912
