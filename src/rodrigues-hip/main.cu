@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <chrono>
 #include <hip/hip_runtime.h>
 
@@ -74,7 +75,11 @@ int main(int argc, char* argv[])
   const int n = atoi(argv[1]);
   const int repeat = atoi(argv[2]);
     
-  float3 w = make_float3(-0.33f, -0.66, 0.66);
+  // axis of rotation
+  const float wx = -0.3, wy = -0.6, wz = 0.15;
+  const float norm = 1.f / sqrtf(wx*wx + wy*wy + wz*wz);
+  const float3 w = make_float3(wx*norm, wy*norm, wz*norm);
+
   float angle = 0.5f;
 
   float3 *h = (float3*) malloc (sizeof(float3) * n);
