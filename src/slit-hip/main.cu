@@ -72,13 +72,15 @@ double fft2(hipDoubleComplex *inData, hipDoubleComplex *outData,
 int main(int argc, char** argv){
 
   if (argc != 3) {
-    printf("Usage: %s <dimension> <repeat>\n", argv[0]);
+    printf("Usage: %s <the transform size in the x and y dimensions> <repeat>\n",
+           argv[0]);
     return 1;
   }
   const int N = atoi(argv[1]);
   const int repeat = atoi(argv[2]);
 
-  printf("Running FFT for %d x %d = %d = 2 ^ %d data points...\n", N, N, N*N, (int)(log(N*N)/log(2)));
+  printf("Running FFT for %d x %d = %d = 2 ^ %d data points...\n",
+         N, N, N*N, (int)(log(N*N)/log(2)));
 
   // Complex data input
   hipDoubleComplex * inputData = (hipDoubleComplex *)malloc(N * N * sizeof(hipDoubleComplex));
