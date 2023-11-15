@@ -147,7 +147,8 @@ __global__ void transpose_shfl(float* out, const float* in) {
 
 int main(int argc, char* argv[]) {
   if (argc != 3) {
-    std::cerr << "Usage: " << argv[0] << " <repeat> <repeat for matrix transpose>\n";
+    std::cerr << "Usage: " << argv[0]
+              << " <repeat for broadcast> <repeat for matrix transpose>\n";
     return 1;
   }
   const int repeat = atoi(argv[1]);
