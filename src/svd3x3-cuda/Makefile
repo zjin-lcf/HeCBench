@@ -56,7 +56,4 @@ clean:
 
 # dataset is available at https://github.com/kuiwuchn/3x3_SVD_CUDA/blob/master/svd3x3/svd3x3/Dataset_1M.txt
 run: $(program)
-	$(LAUNCHER) ./$(program) Dataset_1M.txt 100
-	./$(program) Dataset_1M.txt 300
-	./$(program) Dataset_1M.txt 600
-	./$(program) Dataset_1M.txt 900
+	$(LAUNCHER) ./$(program) Dataset_1M.txt 1000
