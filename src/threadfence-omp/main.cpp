@@ -110,16 +110,14 @@ int main(int argc, char** argv) {
   bool ok = true;
   double time = 0.0;
 
-  #pragma omp target data map (to: h_array[0:N], \
-                                 h_count[0:1]) \
+  for (int i = 0; i < N; i++) h_array[i] = -1.f;
+  
+  #pragma omp target data map (to: h_array[0:N], h_count[0:1]) \
                           map (alloc: h_result[0:grids])
   {
     for (int n = 0; n < repeat; n++) {
   
-      for (int i = 0; i < N; i++)
-        h_array[i] = -1.f;
-  
-      #pragma omp target update to (h_array[0:N])
+      //#pragma omp target update to (h_array[0:N])
   
       auto start = std::chrono::steady_clock::now();
 

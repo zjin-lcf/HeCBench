@@ -107,10 +107,9 @@ int main(int argc, char** argv) {
   bool ok = true;
   double time = 0.0;
 
-  for (int n = 0; n < repeat; n++) {
+  for (int i = 0; i < N; i++) h_array[i] = -1.f;
 
-    for (int i = 0; i < N; i++)
-      h_array[i] = -1.f;
+  for (int n = 0; n < repeat; n++) {
 
     hipMemcpy(d_array, h_array, N * sizeof(float), hipMemcpyHostToDevice);
 
