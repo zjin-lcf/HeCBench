@@ -35,9 +35,11 @@ void verify(double *input, double *output) {
 }
 
 int main(int argv, char **argc) {
-  if (argv > 1) {
-    repeat = atoi(argc[1]);
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
   }
+  repeat = atoi(argv[1]);
 
   double *input = new double[data_size]();
   double *output = new double[data_size]();
