@@ -71,5 +71,5 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) -num_systems=524288
-	./$(program) --lmem -num_systems=524288
-	./$(program) --vec4 -num_systems=524288 
+	$(LAUNCHER) ./$(program) --lmem -num_systems=524288
+	$(LAUNCHER) ./$(program) --vec4 -num_systems=524288 
