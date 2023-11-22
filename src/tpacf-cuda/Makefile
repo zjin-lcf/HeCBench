@@ -13,7 +13,7 @@ POINTS    = 97178
 DATAPARS  = -d ./data/small/Datapnts.1 -p $(POINTS)
 RANDPARS  = -r ./data/small/Randompnts -n 100 -q $(POINTS)
 ANALPARS  = -b 5 -l 1 -u 10000 -a -j 10
-OUTFILE   = ./small_results_test_g200.dat
+OUTFILE   = ./small_results_test.dat
 
 #===============================================================================
 # Program name & source code list
