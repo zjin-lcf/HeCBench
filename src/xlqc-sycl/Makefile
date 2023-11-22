@@ -89,4 +89,4 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) sp
-	./$(program) dp
+	$(LAUNCHER) ./$(program) dp
