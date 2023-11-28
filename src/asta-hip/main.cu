@@ -189,7 +189,7 @@ struct Params {
 
   void usage() {
     fprintf(stderr,
-        "\nUsage:  ./trns [options]"
+        "\nUsage:  ./main [options]"
         "\n"
         "\nGeneral options:"
         "\n    -h        help"
