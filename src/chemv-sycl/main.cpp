@@ -139,9 +139,7 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
         kernel0(d_AT, d_X, d_Y, alpha_im, alpha_re, beta_im, beta_re, item);
       });
     });
-  }
 
-  for (int n = 0; n < REPEAT; n++) {
     q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class k1>(
         sycl::nd_range<1>(k1_gws, k1_lws), [=] (sycl::nd_item<1> item) {
