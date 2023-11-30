@@ -411,7 +411,7 @@ Early results are shown [here](results/README.md)
   Memory copies using direct, zero, and managed memory accesses
 
 ### crc64 (openmp)
-  64-bit cyclic-redundancy check (https://xgitlab.cels.anl.gov/hfinkel/hpcrc64/-/wikis/home)
+  64-bit cyclic-redundancy check (https://trac.alcf.anl.gov/projects/hpcrc64/)
 
 ### cross (cuda)
   Cross product of two 2D tensors (https://pytorch.org/)
