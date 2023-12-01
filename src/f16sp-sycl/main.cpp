@@ -15,7 +15,7 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 
-#define NUM_OF_BLOCKS 1024
+#define NUM_OF_BLOCKS (1024 * 16)
 #define NUM_OF_THREADS 128
 
 inline
@@ -26,15 +26,15 @@ void reduceInShared_native(sycl::half2 *const v, sycl::nd_item<1> &item)
   item.barrier(sycl::access::fence_space::local_space);
   if(lid<32) v[lid] = v[lid] + v[lid+32];
   item.barrier(sycl::access::fence_space::local_space);
-  if(lid<32) v[lid] = v[lid] + v[lid+16];
+  if(lid<16) v[lid] = v[lid] + v[lid+16];
   item.barrier(sycl::access::fence_space::local_space);
-  if(lid<32) v[lid] = v[lid] + v[lid+8];
+  if(lid<8) v[lid] = v[lid] + v[lid+8];
   item.barrier(sycl::access::fence_space::local_space);
-  if(lid<32) v[lid] = v[lid] + v[lid+4];
+  if(lid<4) v[lid] = v[lid] + v[lid+4];
   item.barrier(sycl::access::fence_space::local_space);
-  if(lid<32) v[lid] = v[lid] + v[lid+2];
+  if(lid<2) v[lid] = v[lid] + v[lid+2];
   item.barrier(sycl::access::fence_space::local_space);
-  if(lid<32) v[lid] = v[lid] + v[lid+1];
+  if(lid<1) v[lid] = v[lid] + v[lid+1];
   item.barrier(sycl::access::fence_space::local_space);
 }
 
@@ -43,7 +43,7 @@ void scalarProductKernel_native(const sycl::half2 *a,
                                 float *results, 
                                       sycl::half2 *shArray,
                                 const size_t size,
-                                sycl::nd_item<1> item)
+                                sycl::nd_item<1> &item)
 {
   int lid = item.get_local_id(0);
   int gid = item.get_group(0); 
@@ -75,8 +75,8 @@ void generateInput(sycl::half2 *a, size_t size)
   for (size_t i = 0; i < size; ++i)
   {
     sycl::half2 temp;
-    temp.x() = static_cast<float>(rand() % 4);
-    temp.y() = static_cast<float>(rand() % 2);
+    temp.x() = -1;
+    temp.y() = -1;
     a[i] = temp;
   }
 }
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
   }
   const int repeat = atoi(argv[1]);
 
-  const size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
+  const size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS;
   const size_t size_bytes = size * sizeof(sycl::half2);
   const size_t result_bytes = NUM_OF_BLOCKS*sizeof(float);
 
@@ -113,6 +113,14 @@ int main(int argc, char *argv[])
   generateInput(b, size);
   sycl::half2 *d_b = sycl::malloc_device<sycl::half2>(size, q);
   q.memcpy(d_b, b, size_bytes);
+
+  float result_ref = 0.f;
+  for (size_t i = 0; i < size; i++)
+  {
+    result_ref += (float)a[i].x() * (float)b[i].x() +
+                  (float)a[i].y() * (float)b[i].y();
+  }
+  //printf("Result reference: %f\n", result_ref);
 
   sycl::range<1> gws (NUM_OF_BLOCKS * NUM_OF_THREADS);
   sycl::range<1> lws (NUM_OF_THREADS);
@@ -163,12 +171,10 @@ int main(int argc, char *argv[])
   {
     result_native += r[i];
   }
-  printf("Result native operators\t: %f \n", result_native);
+  printf("Result (native operators)\t: %f \n", result_native);
 
-  float result_reference = 5241674.f;
-
-  printf("fp16ScalarProduct %s\n", (fabs(result_reference - result_native) < 0.00001) ? 
-         "PASS" : "FAIL");
+  bool ok = fabsf(result_native - result_ref) < 0.00001f;
+  printf("fp16ScalarProduct %s\n", ok ?  "PASS" : "FAIL");
 
   sycl::free(d_a, q);
   sycl::free(d_b, q);
