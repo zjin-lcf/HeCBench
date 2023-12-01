@@ -29,7 +29,7 @@ sycl::half2 half_max(const sycl::half2 a, const sycl::half2 b) {
   const unsigned sign = (*reinterpret_cast<const unsigned*>(&sub)) & 0x80008000u;
   const unsigned sw = 0x00003210 | (((sign >> 21) | (sign >> 13)) * 0x11);
   const unsigned int res = __byte_perm(*reinterpret_cast<const unsigned*>(&a), 
-      *reinterpret_cast<const unsigned*>(&b), sw);
+                                       *reinterpret_cast<const unsigned*>(&b), sw);
   return *reinterpret_cast<const sycl::half2*>(&res);
 }
 
@@ -38,7 +38,7 @@ sycl::half half_max(const sycl::half a, const sycl::half b) {
   const unsigned sign = (*reinterpret_cast<const short*>(&sub)) & 0x8000u;
   const unsigned sw = 0x00000010 | ((sign >> 13) * 0x11);
   const unsigned short res = __byte_perm(*reinterpret_cast<const short*>(&a), 
-      *reinterpret_cast<const short*>(&b), sw);
+                                         *reinterpret_cast<const short*>(&b), sw);
   return *reinterpret_cast<const sycl::half*>(&res);
 }
 
