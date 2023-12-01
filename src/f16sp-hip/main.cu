@@ -15,7 +15,7 @@
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
 
-#define NUM_OF_BLOCKS 1024
+#define NUM_OF_BLOCKS (1024 * 16)
 #define NUM_OF_THREADS 128
 
 __forceinline__ __device__ 
@@ -26,15 +26,15 @@ void reduceInShared_intrinsics(half2 * const v)
   __syncthreads();
   if(lid<32) v[lid] = __hadd2( v[lid], v[lid+32]);
   __syncthreads();
-  if(lid<32) v[lid] = __hadd2( v[lid], v[lid+16]);
+  if(lid<16) v[lid] = __hadd2( v[lid], v[lid+16]);
   __syncthreads();
-  if(lid<32) v[lid] = __hadd2( v[lid], v[lid+8]);
+  if(lid<8) v[lid] = __hadd2( v[lid], v[lid+8]);
   __syncthreads();
-  if(lid<32) v[lid] = __hadd2( v[lid], v[lid+4]);
+  if(lid<4) v[lid] = __hadd2( v[lid], v[lid+4]);
   __syncthreads();
-  if(lid<32) v[lid] = __hadd2( v[lid], v[lid+2]);
+  if(lid<2) v[lid] = __hadd2( v[lid], v[lid+2]);
   __syncthreads();
-  if(lid<32) v[lid] = __hadd2( v[lid], v[lid+1]);
+  if(lid<1) v[lid] = __hadd2( v[lid], v[lid+1]);
   __syncthreads();
 }
 
@@ -46,15 +46,15 @@ void reduceInShared_native(half2 * const v)
   __syncthreads();
   if(lid<32) v[lid] = v[lid] + v[lid+32];
   __syncthreads();
-  if(lid<32) v[lid] = v[lid] + v[lid+16];
+  if(lid<16) v[lid] = v[lid] + v[lid+16];
   __syncthreads();
-  if(lid<32) v[lid] = v[lid] + v[lid+8];
+  if(lid<8) v[lid] = v[lid] + v[lid+8];
   __syncthreads();
-  if(lid<32) v[lid] = v[lid] + v[lid+4];
+  if(lid<4) v[lid] = v[lid] + v[lid+4];
   __syncthreads();
-  if(lid<32) v[lid] = v[lid] + v[lid+2];
+  if(lid<2) v[lid] = v[lid] + v[lid+2];
   __syncthreads();
-  if(lid<32) v[lid] = v[lid] + v[lid+1];
+  if(lid<1) v[lid] = v[lid] + v[lid+1];
   __syncthreads();
 }
 
@@ -122,8 +122,8 @@ void generateInput(half2 * a, size_t size)
   for (size_t i = 0; i < size; ++i)
   {
     half2 temp;
-    temp.x = static_cast<float>(rand() % 4);
-    temp.y = static_cast<float>(rand() % 2);
+    temp.x = -1;
+    temp.y = -1;
     a[i] = temp;
   }
 }
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
   }
   const int repeat = atoi(argv[1]);
 
-  const size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS*16;
+  const size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS;
   const size_t size_bytes = size * sizeof(half2);
   const size_t result_bytes = NUM_OF_BLOCKS*sizeof(float);
 
@@ -161,6 +161,14 @@ int main(int argc, char *argv[])
   generateInput(b, size);
   hipMemcpy(d_b, b, size_bytes, hipMemcpyHostToDevice);
 
+  float result_ref = 0.f;
+  for (size_t i = 0; i < size; i++)
+  {
+    result_ref += (float)a[i].x * (float)b[i].x +
+                  (float)a[i].y * (float)b[i].y;
+  }
+  //printf("Result reference: %f\n", result_ref);
+
   // warmup
   for (int i = 0; i < repeat; i++)
     scalarProductKernel_intrinsics<<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
@@ -183,7 +191,7 @@ int main(int argc, char *argv[])
   {
     result_intrinsics += r[i];
   }
-  printf("Result intrinsics\t: %f \n", result_intrinsics);
+  printf("Result (intrinsics)\t: %f \n", result_intrinsics);
 
   // warmup
   for (int i = 0; i < repeat; i++)
@@ -207,10 +215,11 @@ int main(int argc, char *argv[])
   {
     result_native += r[i];
   }
-  printf("Result native operators\t: %f \n", result_native);
+  printf("Result (native operators)\t: %f \n", result_native);
 
-  printf("fp16ScalarProduct %s\n", (fabs(result_intrinsics - result_native) < 0.00001) ? 
-         "PASS" : "FAIL");
+  bool ok = fabsf(result_intrinsics - result_ref) < 0.00001f &&
+            fabsf(result_native - result_ref) < 0.00001f;
+  printf("fp16ScalarProduct %s\n", ok ?  "PASS" : "FAIL");
 
   hipFree(d_a);
   hipFree(d_b);
