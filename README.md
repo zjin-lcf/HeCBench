@@ -570,7 +570,7 @@ Early results are shown [here](results/README.md)
   Compute the discrete Frechet distance between two curves specified by discrete ordered points in n-dimensional space (https://github.com/mp4096/discrete-frechet-distance)
 
 ### fresnel (c)
-  Fresnel integral (http://www.mymathlib.com/functions/fresnel_sin_cos_integrals.html)
+  Fresnel integral
 
 ### frna (cuda)
   Accelerate the fill step in predicting the lowest free energy structure and a set of suboptimal structures (http://rna.urmc.rochester.edu/Text/Fold-cuda.html)
