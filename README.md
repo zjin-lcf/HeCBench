@@ -672,7 +672,7 @@ Early results are shown [here](results/README.md)
   A Portable and Scalable Solver-Framework for the Hierarchical Equations of Motion (https://github.com/noma/hexciton_benchmark)
   
 ### histogram (cuda)
-  Histogram (http://github.com/NVlabs/cub/tree/master/experimental)
+  Histogram (http://github.com/NVlabs/cub/tree/master)
 
 ### hmm (opencl)
   Hidden markov model (http://developer.download.nvidia.com/compute/DevZone/OpenCL/Projects/oclHiddenMarkovModel.tar.gz)
