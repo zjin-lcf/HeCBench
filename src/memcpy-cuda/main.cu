@@ -1,6 +1,7 @@
 #include <iostream>
-#include <cstdlib>
 #include <chrono>
+#include <cmath>
+#include <cstdlib>
 #include <cuda.h>
 
 #define NUM_SIZE 16
@@ -30,6 +31,7 @@ int main(int argc, char* argv[]) {
   cudaError_t err;
 
   setup(size);
+
   for (int i = 0; i < NUM_SIZE; i++) {
     int* A = (int*)malloc(size[i]);
     if (A == nullptr) {
@@ -37,6 +39,7 @@ int main(int argc, char* argv[]) {
       return -1;
     }	
     valSet(A, 1, size[i]);
+
 
     err = cudaMalloc((void**)&d_A, size[i]);
     if (err != cudaSuccess) {
@@ -59,9 +62,9 @@ int main(int argc, char* argv[]) {
     cudaDeviceSynchronize();
 
     auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    std::cout << "Copy " << size[i] << " btyes from host to device takes " 
-              << (time * 1e-3f) / repeat <<  " us" << std::endl;
+    auto timeH2D = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Copy " << size[i] << " bytes from host to device takes "
+              << (timeH2D * 1e-3f) / repeat <<  " us" << std::endl;
 
     // warmup
     for (int j = 0; j < repeat; j++) {
@@ -77,12 +80,15 @@ int main(int argc, char* argv[]) {
     cudaDeviceSynchronize();
 
     end = std::chrono::steady_clock::now();
-    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    std::cout << "Copy " << size[i] << " btyes from device to host takes " 
-              << (time * 1e-3f) / repeat <<  " us" << std::endl;
+    auto timeD2H = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Copy " << size[i] << " bytes from device to host takes "
+              << (timeD2H * 1e-3f) / repeat <<  " us" << std::endl;
 
     cudaFree(d_A);
     free(A);
+    std::cout << "Timing gap in nanoseconds per byte: "
+              << (float)std::abs(timeH2D - timeD2H) / (repeat * size[i]);
+    std::cout << std::endl << std::endl;
   }
   return 0;
 }
