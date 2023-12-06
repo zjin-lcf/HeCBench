@@ -882,7 +882,7 @@ Early results are shown [here](results/README.md)
   Merkle tree construction using rescue prime hash (https://github.com/itzmeanjan/ff-gpu)
   
 ### memcpy (cuda)
-  A benchmark for memory copy from a host to a device
+  A benchmark for memory copy between a host and a device
 
 ### memtest (cuda)
   Selected memory tests (https://github.com/ComputationalRadiationPhysics/cuda_memtest)
