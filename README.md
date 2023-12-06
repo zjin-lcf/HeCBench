@@ -1177,7 +1177,7 @@ Early results are shown [here](results/README.md)
   Dynamic parallel skew algorithm for suffix array on GPU (https://github.com/gmzang/Parallel-Suffix-Array-on-GPU)
 
 ### sad (cuda)
-  Naive template matching with SAD (https://github.com/gholomia/CTMC)
+  Naive template matching with SAD
 
 ### sampling (cuda)
   Shapley sampling values explanation method (https://github.com/rapidsai/cuml)
