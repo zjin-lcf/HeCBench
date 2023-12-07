@@ -1207,7 +1207,7 @@ Early results are shown [here](results/README.md)
   Batched dense matrix - dense matrix multiplication into sparse matrix (https://docs.nvidia.com/cuda/cusparse/index.html#cusparsesddmm)
 
 ### secp256k1 (cuda)
-  Part of BIP39 solver (https://github.com/johncantrell97/bip39-solver-gpu)
+  Part of BIP39 solver
 
 ### seam-carving (cuda)
   Seam carving (https://github.com/pauty/CUDA_seam_carving)
