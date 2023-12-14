@@ -36,10 +36,8 @@ int main(int argc, char** argv)
     return 1;
   }
   const char* image_path = argv[1];
-  assert(image_path != NULL);
 
   const char* reference_image_path = argv[2];
-  assert(reference_image_path != NULL);
 
   const int numIterations = atoi(argv[3]);
 
@@ -51,9 +49,13 @@ int main(int argc, char** argv)
   const int prods3[4] = {0x040000, 0x000400, 0x040101, 0x010401};
 
   // load image 
-  shrLoadPPM4ub(image_path, (unsigned char **)&h_img, &width, &height);
-  assert(h_img != NULL);
-  printf("Loaded '%s', %d x %d pixels\n\n", image_path, width, height);
+  if (!shrLoadPPM4ub(image_path, (unsigned char **)&h_img, &width, &height)) {
+    printf("Error, unable to open source image file <%s>\n", image_path);
+
+    exit(EXIT_FAILURE);
+  }
+
+  printf("Image Loaded '%s', %d x %d pixels\n\n", image_path, width, height);
 
   // Convert linear image to block linear. 
   const unsigned int memSize = width * height;
@@ -113,8 +115,7 @@ int main(int argc, char** argv)
   int blocks = ((width + 3) / 4) * ((height + 3) / 4); // rounds up by 1 block in each dim if %4 != 0
 
   // Restrict the numbers of blocks to launch on low end GPUs to avoid kernel timeout
-  unsigned int compute_units = 24;
-  int blocksPerLaunch = MIN(blocks, 768 * (int)compute_units);
+  int blocksPerLaunch = MIN(blocks, 768 * 24);
 
   // set work-item dimensions
   size_t szGlobalWorkSize = blocksPerLaunch * NUM_THREADS;
@@ -183,7 +184,7 @@ int main(int argc, char** argv)
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / numIterations);
+  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / numIterations);
 
   q.memcpy(h_result, (uint*)d_result, compressedSize).wait();
 

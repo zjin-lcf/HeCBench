@@ -3,11 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvc++
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-SM        = cc70
 LAUNCHER  =
 
 #===============================================================================
@@ -43,7 +42,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
   CFLAGS +=-qopenmp
 endif
@@ -67,4 +66,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) ../dxtc1-sycl/data/lena_std.ppm ../dxtc1-sycl/data/lena_ref.dds 100
+	$(LAUNCHER) ./$(program) ../dxtc2-sycl/data/lena_std.ppm ../dxtc2-sycl/data/lena_ref.dds 100
+	$(LAUNCHER) ./$(program) ../dxtc2-sycl/data/teapot512_std.ppm ../dxtc2-sycl/data/teapot512_ref.dds 100

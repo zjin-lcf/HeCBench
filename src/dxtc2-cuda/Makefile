@@ -3,17 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 LAUNCHER  =
-
-GPU       = yes
-CUDA      = no
-CUDA_ARCH = sm_70
-HIP       = no
-HIP_ARCH  = gfx908
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -21,45 +15,32 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 program = main
 
-source = main.cpp shrUtils.cpp block.cpp 
+source = main.cu shrUtils.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 
 
-ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
-endif
-
-ifeq ($(HIP), yes)
-  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
-endif
-
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS  += -g -DDEBUG
-  LDFLAGS += -g
+  CFLAGS += -g
+  LDFLAGS  += -g
 endif
+
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(GPU),yes)
-  CFLAGS +=-DUSE_GPU
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -67,17 +48,15 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-block.o: block.cpp block.h 
+main.o : main.cu permutations.h dds.h helper_math.h shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o : main.cpp kernel.cpp shrUtils.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-shrUtils.o : shrUtils.cpp shrUtils.h 
+shrUtils.o : shrUtils.cu shrUtils.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) data/lena_std.ppm data/lena_ref.dds 100
+	$(LAUNCHER) ./$(program) ../dxtc2-sycl/data/lena_std.ppm ../dxtc2-sycl/data/lena_ref.dds 100
+	$(LAUNCHER) ./$(program) ../dxtc2-sycl/data/teapot512_std.ppm ../dxtc2-sycl/data/teapot512_ref.dds 100

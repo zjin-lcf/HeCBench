@@ -34,7 +34,8 @@ sycl::float4 firstEigenVector( sycl::local_ptr<float> matrix )
     return v;
 }
 
-void colorSums(sycl::nd_item<1> &item, sycl::local_ptr<const sycl::float4> colors, sycl::local_ptr<sycl::float4> sums)
+void colorSums(sycl::nd_item<1> &item, sycl::local_ptr<const sycl::float4> colors,
+               sycl::local_ptr<sycl::float4> sums)
 {
     const int idx = item.get_local_id(0);
 
@@ -45,12 +46,13 @@ void colorSums(sycl::nd_item<1> &item, sycl::local_ptr<const sycl::float4> color
     sums[idx] += sums[idx^1];
 }
 
-sycl::float4 bestFitLine(sycl::nd_item<1> &item, sycl::local_ptr<const sycl::float4> colors, sycl::float4 color_sum, sycl::local_ptr<float> covariance)
+sycl::float4 bestFitLine(sycl::nd_item<1> &item, sycl::local_ptr<const sycl::float4> colors,
+                         sycl::float4 color_sum, sycl::local_ptr<float> covariance)
 {
     // Compute covariance matrix of the given colors.
     const int idx = item.get_local_id(0);
 
-    sycl::float4 diff = colors[idx] - color_sum * (sycl::float4)(0.0625f); // * 1.0f / 16.0f
+    sycl::float4 diff = colors[idx] - color_sum * (sycl::float4)(1.0f / 16.0f);
 
     covariance[6 * idx + 0] = diff.x() * diff.x();    // 0, 6, 12, 2, 8, 14, 4, 10, 0
     covariance[6 * idx + 1] = diff.x() * diff.y();
@@ -105,8 +107,10 @@ void sortColors(sycl::nd_item<1> &item, sycl::local_ptr<const float> values, syc
 ////////////////////////////////////////////////////////////////////////////////
 // Load color block to shared mem
 ////////////////////////////////////////////////////////////////////////////////
-void loadColorBlock(sycl::nd_item<1> &item, sycl::global_ptr<const unsigned int> image, sycl::local_ptr<sycl::float4> colors, 
-                    sycl::local_ptr<sycl::float4> sums, sycl::local_ptr<int> xrefs, sycl::local_ptr<float> temp, int groupOffset)
+void loadColorBlock(sycl::nd_item<1> &item, sycl::global_ptr<const unsigned int> image,
+                    sycl::local_ptr<sycl::float4> colors, 
+                    sycl::local_ptr<sycl::float4> sums, sycl::local_ptr<int> xrefs,
+                    sycl::local_ptr<float> temp, int groupOffset)
 {
     const int bid = item.get_group(0) + groupOffset;
     const int idx = item.get_local_id(0);
@@ -118,9 +122,9 @@ void loadColorBlock(sycl::nd_item<1> &item, sycl::global_ptr<const unsigned int>
         // Read color and copy to shared mem.
         unsigned int c = image[(bid) * 16 + idx];
     
-        colors[idx].x() = ((c >> 0) & 0xFF) * 0.003921568627f;    // * (1.0f / 255.0f);
-        colors[idx].y() = ((c >> 8) & 0xFF) * 0.003921568627f;    // * (1.0f / 255.0f);
-        colors[idx].z() = ((c >> 16) & 0xFF) * 0.003921568627f;   //* (1.0f / 255.0f);
+        colors[idx].x() = ((c >> 0) & 0xFF) * (1.0f / 255.0f);
+        colors[idx].y() = ((c >> 8) & 0xFF) * (1.0f / 255.0f);
+        colors[idx].z() = ((c >> 16) & 0xFF) * (1.0f / 255.0f);
 
         // No need to synchronize, 16 < warp size.	
 
@@ -159,7 +163,8 @@ sycl::float4 roundAndExpand(sycl::float4 v, unsigned short * w)
 ////////////////////////////////////////////////////////////////////////////////
 float evalPermutation(sycl::local_ptr<const sycl::float4> colors, unsigned int permutation, 
                       unsigned short* start, unsigned short* end, sycl::float4 color_sum,
-                      sycl::global_ptr<const float> alphaTable4, sycl::global_ptr<const int> prods4, float weight)
+                      sycl::global_ptr<const float> alphaTable4,
+                      sycl::global_ptr<const int> prods4, float weight)
 {
     sycl::float4 alphax_sum = {0.0f, 0.0f, 0.0f, 0.0f};
     int akku = 0;
@@ -317,69 +322,37 @@ sycl::uint4 evalAllPermutations(sycl::nd_item<1> &item, sycl::local_ptr<const sy
 ////////////////////////////////////////////////////////////////////////////////
 // Find index with minimum error
 ////////////////////////////////////////////////////////////////////////////////
-int findMinError(sycl::nd_item<1> &item, sycl::local_ptr<float> errors, sycl::local_ptr<int> indices)
+int findMinError(sycl::nd_item<1> &item, sycl::local_ptr<float> errors,
+                 sycl::local_ptr<int> indices)
 {
     const int idx = item.get_local_id(0);
 
     indices[idx] = idx;
 
-    #pragma unroll
-    for(int d = NUM_THREADS/2; d > 32; d >>= 1)
-    {
-        item.barrier(sycl::access::fence_space::local_space);
-        
-        if (idx < d)
-        {
-            float err0 = errors[idx];
-            float err1 = errors[idx + d];
-            
-            if (err1 < err0) {
-                errors[idx] = err1;
-                indices[idx] = indices[idx + d];
-            }
-        }
-    }
-
     item.barrier(sycl::access::fence_space::local_space);
 
-    // unroll last 6 iterations
-    if (idx < 32)
-    {
-        if (errors[idx + 32] < errors[idx]) {
-            errors[idx] = errors[idx + 32];
-            indices[idx] = indices[idx + 32];
-        }
-        if (errors[idx + 16] < errors[idx]) {
-            errors[idx] = errors[idx + 16];
-            indices[idx] = indices[idx + 16];
-        }
-        if (errors[idx + 8] < errors[idx]) {
-            errors[idx] = errors[idx + 8];
-            indices[idx] = indices[idx + 8];
-        }
-        if (errors[idx + 4] < errors[idx]) {
-            errors[idx] = errors[idx + 4];
-            indices[idx] = indices[idx + 4];
-        }
-        if (errors[idx + 2] < errors[idx]) {
-            errors[idx] = errors[idx + 2];
-            indices[idx] = indices[idx + 2];
-        }
-        if (errors[idx + 1] < errors[idx]) {
-            errors[idx] = errors[idx + 1];
-            indices[idx] = indices[idx + 1];
-        }
+    for (int d = NUM_THREADS / 2; d > 0; d >>= 1) {
+      float err0 = errors[idx];
+      float err1 = (idx + d) < NUM_THREADS ? errors[idx + d] : FLT_MAX;
+      int index1 = (idx + d) < NUM_THREADS ? indices[idx + d] : 0;
+
+      item.barrier(sycl::access::fence_space::local_space);
+
+      if (err1 < err0) {
+        errors[idx] = err1;
+        indices[idx] = index1;
+      }
+
+      item.barrier(sycl::access::fence_space::local_space);
     }
-
-    item.barrier(sycl::access::fence_space::local_space);
-
     return indices[0];
 }
 
 
 //Save DXT block
 void saveBlockDXT1(sycl::nd_item<1> &item, unsigned int start, unsigned int end, 
-                   unsigned int permutation, sycl::local_ptr<int> xrefs, sycl::global_ptr<sycl::uint2> result, int groupOffset)
+                   unsigned int permutation, sycl::local_ptr<int> xrefs,
+                   sycl::global_ptr<sycl::uint2> result, int groupOffset)
 {
     const int bid = item.get_group(0) + groupOffset;
 

@@ -3,10 +3,11 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
+ARCH      = gfx906
 LAUNCHER  =
 
 #===============================================================================
@@ -42,9 +43,12 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS += -target x86_64-pc-linux-gnu \
+          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
+          -Xopenmp-target=amdgcn-amd-amdhsa \
+          -march=$(ARCH)
 else
-  CFLAGS +=-qopenmp
+  CFLAGS +=-fopenmp
 endif
 #===============================================================================
 # Targets to Build
@@ -66,5 +70,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) ../dxtc1-sycl/data/lena_std.ppm ../dxtc1-sycl/data/lena_ref.dds 100
-
+	$(LAUNCHER) ./$(program) ../dxtc2-sycl/data/lena_std.ppm ../dxtc2-sycl/data/lena_ref.dds 100
+	$(LAUNCHER) ./$(program) ../dxtc2-sycl/data/teapot512_std.ppm ../dxtc2-sycl/data/teapot512_ref.dds 100
