@@ -31,7 +31,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, bitcracker, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxt1, filter, fpc, histogram, minmax, mpc, mtf, rle, sc, scan, scan2, scan3, segment-reduce
+    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fpc, histogram, minmax, mpc, mtf, rle, sc, scan, scan2, scan3, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3
@@ -485,8 +485,8 @@ Early results are shown [here](results/README.md)
 ### dslash (sycl)
   A Lattice QCD Dslash operator proxy application derived from MILC (https://gitlab.com/NERSC/nersc-proxies/milc-dslash)
 
-### dxtc1 (opencl)
-  DXT1 compression (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+### dxtc2 (opencl)
+  A lossy texture compression (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
 ### dwconv (cuda)
   Depth-wise convolution (https://pytorch.org/)
