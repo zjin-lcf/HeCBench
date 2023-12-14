@@ -90,8 +90,9 @@ float4 bestFitLine( const float4 * colors, float4 color_sum,  float* covariance)
     // Compute covariance matrix of the given colors.
     const int idx = omp_get_thread_num();
 
+    // 1.0f / 16.0f
     float4 s = {0.0625f, 0.0625f, 0.0625f, 0.0625f};
-    float4 diff = colors[idx] - color_sum * s; // * 1.0f / 16.0f
+    float4 diff = colors[idx] - color_sum * s;
 
     covariance[6 * idx + 0] = diff.x * diff.x;    // 0, 6, 12, 2, 8, 14, 4, 10, 0
     covariance[6 * idx + 1] = diff.x * diff.y;
@@ -158,9 +159,9 @@ void loadColorBlock( const uint * image,  float4 * colors,  float4 * sums,  int 
         // Read color and copy to shared mem.
         uint c = image[(bid) * 16 + idx];
     
-        colors[idx].x = ((c >> 0) & 0xFF) * 0.003921568627f;    // * (1.0f / 255.0f);
-        colors[idx].y = ((c >> 8) & 0xFF) * 0.003921568627f;    // * (1.0f / 255.0f);
-        colors[idx].z = ((c >> 16) & 0xFF) * 0.003921568627f;   //* (1.0f / 255.0f);
+        colors[idx].x = ((c >> 0) & 0xFF) * (1.0f / 255.0f);
+        colors[idx].y = ((c >> 8) & 0xFF) * (1.0f / 255.0f);
+        colors[idx].z = ((c >> 16) & 0xFF) * (1.0f / 255.0f);
 
         // No need to synchronize, 16 < warp size.	
 
@@ -358,55 +359,22 @@ int findMinError( float * errors,  int * indices)
 
     indices[idx] = idx;
 
-    #pragma unroll
-    for(int d = NUM_THREADS/2; d > 32; d >>= 1)
-    {
-        #pragma omp barrier
-        
-        if (idx < d)
-        {
-            float err0 = errors[idx];
-            float err1 = errors[idx + d];
-            
-            if (err1 < err0) {
-                errors[idx] = err1;
-                indices[idx] = indices[idx + d];
-            }
-        }
-    }
-
     #pragma omp barrier
 
-    // unroll last 6 iterations
-    if (idx < 32)
-    {
-        if (errors[idx + 32] < errors[idx]) {
-            errors[idx] = errors[idx + 32];
-            indices[idx] = indices[idx + 32];
-        }
-        if (errors[idx + 16] < errors[idx]) {
-            errors[idx] = errors[idx + 16];
-            indices[idx] = indices[idx + 16];
-        }
-        if (errors[idx + 8] < errors[idx]) {
-            errors[idx] = errors[idx + 8];
-            indices[idx] = indices[idx + 8];
-        }
-        if (errors[idx + 4] < errors[idx]) {
-            errors[idx] = errors[idx + 4];
-            indices[idx] = indices[idx + 4];
-        }
-        if (errors[idx + 2] < errors[idx]) {
-            errors[idx] = errors[idx + 2];
-            indices[idx] = indices[idx + 2];
-        }
-        if (errors[idx + 1] < errors[idx]) {
-            errors[idx] = errors[idx + 1];
-            indices[idx] = indices[idx + 1];
-        }
-    }
+    for (int d = NUM_THREADS / 2; d > 0; d >>= 1) {
+      float err0 = errors[idx];
+      float err1 = (idx + d) < NUM_THREADS ? errors[idx + d] : FLT_MAX;
+      int index1 = (idx + d) < NUM_THREADS ? indices[idx + d] : 0;
 
-    #pragma omp barrier
+      #pragma omp barrier
+
+      if (err1 < err0) {
+        errors[idx] = err1;
+        indices[idx] = index1;
+      }
+
+      #pragma omp barrier
+    }
 
     return indices[0];
 }

@@ -3,11 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
-ARCH      = gfx906
 LAUNCHER  =
 
 #===============================================================================
@@ -16,16 +14,16 @@ LAUNCHER  =
 
 program = main
 
-source = main.cpp shrUtils.cpp block.cpp 
+source = main.cu shrUtils.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -DUSE_GPU -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -36,20 +34,11 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS += -target x86_64-pc-linux-gnu \
-          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
-          -Xopenmp-target=amdgcn-amd-amdhsa \
-          -march=$(ARCH)
-else
-  CFLAGS +=-fopenmp
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -57,17 +46,15 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-block.o: block.cpp block.h 
+main.o : main.cu permutations.h dds.h shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o : main.cpp kernel.cpp shrUtils.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-shrUtils.o : shrUtils.cpp shrUtils.h 
+shrUtils.o : shrUtils.cu shrUtils.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) ../dxtc1-sycl/data/lena_std.ppm ../dxtc1-sycl/data/lena_ref.dds 100
+	$(LAUNCHER) ./$(program) ../dxtc2-sycl/data/lena_std.ppm ../dxtc2-sycl/data/lena_ref.dds 100
+	$(LAUNCHER) ./$(program) ../dxtc2-sycl/data/teapot512_std.ppm ../dxtc2-sycl/data/teapot512_ref.dds 100
