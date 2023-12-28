@@ -26,7 +26,7 @@ obj = $(source:.cu=.o)
 CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../gemmEx-cuda
 
 # Linker Flags
-LDFLAGS = -L /opt/rocm/hipblas/lib -lhipblas
+LDFLAGS = -lhipblas
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
