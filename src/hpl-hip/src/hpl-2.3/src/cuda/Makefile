@@ -106,7 +106,7 @@ DEFINES = -DMPI -g
 #DEFINES += -DGOTO
 
 %.o: %.cpp
-	mpicc -O0 -c -fPIC $(DEFINES) $*.cpp -o $*.o -I/opt/rocm/include -D__HIP_PLATFORM_AMD__
+	mpicc -O3 -c -fPIC $(DEFINES) $*.cpp -o $*.o -I/opt/rocm/include -D__HIP_PLATFORM_AMD__
 
 libdgemm.so.1.0.1: $(OBJS)
 
