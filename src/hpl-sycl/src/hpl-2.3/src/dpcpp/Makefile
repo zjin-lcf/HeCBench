@@ -109,11 +109,11 @@ dpcpp_dgemm.o : dpcpp_dgemm.cpp
 
 %.o: %.cpp
 ifeq ($(USE_NVIDIA_BACKEND),ON)
-	clang++ -O2 -fsycl -fsycl-targets=nvptx64-nvidia-cuda -c -fPIC $(DEFINES) $*.cpp -o $*.o -DUSE_CUBLAS
+	clang++ -O3 -fsycl -fsycl-targets=nvptx64-nvidia-cuda -c -fPIC $(DEFINES) $*.cpp -o $*.o -DUSE_CUBLAS
 else ifeq ($(USE_AMD_BACKEND),ON)
-	clang++ -O2 -fsycl -fsycl-targets=amd_gpu_gfx90a -c -fPIC $(DEFINES) $*.cpp -o $*.o -DUSE_HIPBLAS -D__HIP_PLATFORM_AMD__  
+	clang++ -O3 -fsycl -fsycl-targets=amd_gpu_gfx90a -c -fPIC $(DEFINES) $*.cpp -o $*.o -DUSE_HIPBLAS -D__HIP_PLATFORM_AMD__  
 else
-	icpx -fsycl -O2 -c -fPIC $(DEFINES) $*.cpp -o $*.o 
+	icpx -fsycl -O3 -c -fPIC $(DEFINES) $*.cpp -o $*.o 
 endif	
 
 libdgemm.so.1.0.1: $(OBJS)
