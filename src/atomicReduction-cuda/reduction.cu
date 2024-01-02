@@ -80,19 +80,19 @@ __global__ void atomic_reduction_v16(int *in, int* out, int arrayLength) {
 
 int main(int argc, char** argv)
 {
-  unsigned int arrayLength = 52428800;
-  unsigned int threads=256;
-  if(argc == 3) {
+  int arrayLength = 52428800;
+  int threads=256;
+  int N = 32;
+
+  if (argc == 4) {
     arrayLength=atoi(argv[1]);
     threads=atoi(argv[2]);
+    N=atoi(argv[3]);
   }
-
-  // launch the kernel N iterations 
-  int N = 32;
 
   std::cout << "Array size: " << arrayLength*sizeof(int)/1024.0/1024.0 << " MB"<<std::endl;
   std::cout << "Thread block size: " << threads << std::endl;
-  std::cout << "Repeat the kernel execution  " << N << " times" << std::endl;
+  std::cout << "Repeat the kernel execution: " << N << " times" << std::endl;
 
   int* array=(int*)malloc(arrayLength*sizeof(int));
   int checksum =0;
@@ -119,7 +119,7 @@ int main(int argc, char** argv)
   cudaMemcpy(in,array,arrayLength*sizeof(int),cudaMemcpyHostToDevice);
   cudaDeviceSynchronize();
 
-  int blocks=std::min((arrayLength+threads-1)/threads,2048u);
+  int blocks=std::min((arrayLength+threads-1)/threads,2048);
 
   // warmup
   for(int i=0;i<N;i++) {
