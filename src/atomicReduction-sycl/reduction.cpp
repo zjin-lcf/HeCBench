@@ -41,19 +41,19 @@ inline int atomicAdd(int& val, const int delta)
 
 int main(int argc, char** argv)
 {
-  unsigned int arrayLength = 52428800;
-  unsigned int threads=256;
-  if(argc == 3) {
-      arrayLength=atoi(argv[1]);
-      threads=atoi(argv[2]);
-  }
-
-  // launch the kernel N iterations 
+  int arrayLength = 52428800;
+  int threads=256;
   int N = 32;
+
+  if (argc == 4) {
+    arrayLength=atoi(argv[1]);
+    threads=atoi(argv[2]);
+    N=atoi(argv[3]);
+  }
 
   std::cout << "Array size: " << arrayLength*sizeof(int)/1024.0/1024.0 << " MB"<<std::endl;
   std::cout << "Thread block size: " << threads << std::endl;
-  std::cout << "Repeat the kernel execution  " << N << " times" << std::endl;
+  std::cout << "Repeat the kernel execution: " << N << " times" << std::endl;
 
   const size_t size_bytes = arrayLength * sizeof(int);
 
@@ -83,7 +83,7 @@ int main(int argc, char** argv)
 
   int *d_out = sycl::malloc_device<int>(1, q);
 
-  int blocks=std::min((arrayLength+threads-1)/threads,2048u);
+  int blocks=std::min((arrayLength+threads-1)/threads,2048);
   size_t global_work_size = blocks * threads;
 
   // warmup 

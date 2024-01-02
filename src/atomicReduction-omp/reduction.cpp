@@ -32,19 +32,19 @@ THE SOFTWARE.
 
 int main(int argc, char** argv)
 {
-  unsigned int arrayLength = 52428800;
-  unsigned int threads=256;
-  if(argc == 3) {
+  int arrayLength = 52428800;
+  int threads=256;
+  int N = 32;
+
+  if (argc == 4) {
     arrayLength=atoi(argv[1]);
     threads=atoi(argv[2]);
+    N=atoi(argv[3]);
   }
-
-  // launch the kernel N iterations 
-  int N = 32;
 
   std::cout << "Array size: " << arrayLength*sizeof(int)/1024.0/1024.0 << " MB"<<std::endl;
   std::cout << "Thread block size: " << threads << std::endl;
-  std::cout << "Repeat the kernel execution  " << N << " times" << std::endl;
+  std::cout << "Repeat the kernel execution: " << N << " times" << std::endl;
 
   int* array=(int*)malloc(arrayLength*sizeof(int));
   int checksum =0;
@@ -60,7 +60,7 @@ int main(int argc, char** argv)
 
   #pragma omp target data map(to: array[0:arrayLength]) map(alloc: sum)
   {
-    int blocks=std::min((arrayLength+threads-1)/threads,2048u);
+    int blocks=std::min((arrayLength+threads-1)/threads,2048);
     // warmup
     for(int n=0;n<N;n++) {
       sum = 0;
