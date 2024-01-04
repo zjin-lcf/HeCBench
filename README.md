@@ -58,7 +58,7 @@ Each benchmark falls into a single category. While such classification is not ac
     mt, permutate, qrg, rng-wallace, sobol, urng
 
 ### Search
-    bfs, bsearch, b+tree, grep, keogh, s8n, ss, tsp
+    bfs, bsearch, b+tree, grep, keogh, s8n, ss, sss, tsp
 
 ### Signal processing
     extrema, fft, lombscargle, sosfil, zmddft
@@ -1325,6 +1325,9 @@ Early results are shown [here](results/README.md)
 
 ### ssim (cuda)
   Compute structual similarity index measure (https://github.com/VIDILabs/instantvnr)
+
+### sss (cuda)
+  Stochastic shotgun search for Dirichlet process mixtures of Gaussian graphical models (https://github.com/mukherjeec/DPmixGGM/)
 
 ### sssp (opencl)
   The single-source shortest path (https://github.com/chai-benchmarks/chai)
