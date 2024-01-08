@@ -17,9 +17,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
-void SimpleKernel(nd_item<1> &item, const float *src, float *dst)
+void SimpleKernel(sycl::nd_item<1> &item, const float *src, float *dst)
 {
   // Just a dummy kernel, doing enough for us to verify that everything
   // worked
@@ -44,13 +44,8 @@ int main(int argc, char **argv)
   }
 
   printf("Checking for multiple GPUs...\n");
-  std::vector<device> Devs;
-  // look through all platforms (https://github.com/intel/llvm/issues/6749)
-  for (const auto &p: platform::get_platforms()) {
-    // if it is a cuda "platform" then add the device to the list
-    if (p.get_backend() == backend::cuda)
-      Devs.push_back(p.get_devices()[0]);
-  }
+
+  auto Devs = sycl::platform(sycl::gpu_selector_v).get_devices(sycl::info::device_type::gpu);
 
   int gpu_n = Devs.size();
   printf("There are %d GPUs\n", gpu_n);
@@ -63,7 +58,7 @@ int main(int argc, char **argv)
   }
 
   bool can_access_peer;
-  int p2pCapableGPUs[2] = {-1, -1}; // We take only 1 pair of P2P capable GPUs
+  int p2pCapableGPUs[2] = {-1, -1}; // We take only a pair of P2P capable GPUs
 
   for (int i = 0; i < gpu_n; i++)
   {
@@ -74,10 +69,10 @@ int main(int argc, char **argv)
         continue;
       }
       can_access_peer = Devs[i].ext_oneapi_can_access_peer(Devs[j], 
-          ext::oneapi::peer_access::access_supported);
+          sycl::ext::oneapi::peer_access::access_supported);
       printf("> Peer access from %s (GPU%d) -> %s (GPU%d) : %s\n", 
-             Devs[i].get_info<info::device::name>().c_str(), i,
-             Devs[j].get_info<info::device::name>().c_str(), j,
+             Devs[i].get_info<sycl::info::device::name>().c_str(), i,
+             Devs[j].get_info<sycl::info::device::name>().c_str(), j,
              can_access_peer ? "Yes" : "No");
       if (can_access_peer && p2pCapableGPUs[0] == -1)
       {
@@ -95,7 +90,7 @@ int main(int argc, char **argv)
   }
   
   // Use first pair of p2p capable GPUs detected.
-  int gpuid[2]; // we want to find the first two GPU's that can support P2P
+  int gpuid[2]; // Find the first two GPU's that can support P2P
   gpuid[0] = p2pCapableGPUs[0];
   gpuid[1] = p2pCapableGPUs[1];
 
@@ -104,9 +99,9 @@ int main(int argc, char **argv)
   Devs[gpuid[0]].ext_oneapi_enable_peer_access(Devs[gpuid[1]]);
   Devs[gpuid[1]].ext_oneapi_enable_peer_access(Devs[gpuid[0]]);
 
-  // create queues as desired
-  auto q0 = queue{Devs[gpuid[0]], property::queue::in_order()};
-  auto q1 = queue{Devs[gpuid[1]], property::queue::in_order()};
+  // Create queues as desired
+  auto q0 = sycl::queue{Devs[gpuid[0]], sycl::property::queue::in_order()};
+  auto q1 = sycl::queue{Devs[gpuid[1]], sycl::property::queue::in_order()};
 
   // Allocate buffers
   const size_t buf_size = 1024 * 1024 * 16 * sizeof(float);
@@ -114,11 +109,11 @@ int main(int argc, char **argv)
          int(buf_size / 1024 / 1024), gpuid[0], gpuid[1]);
 
   // GPU0
-  float *g0 = (float*) malloc_device(buf_size, q0);
-  float *h0 = (float*) malloc_host(buf_size, q0);
+  float *g0 = (float*) sycl::malloc_device(buf_size, q0);
+  float *h0 = (float*) sycl::malloc_host(buf_size, q0);
 
   // GPU1
-  float *g1 = (float*) malloc_device(buf_size, q1);
+  float *g1 = (float*) sycl::malloc_device(buf_size, q1);
 
   q0.wait();
   q1.wait();
@@ -155,16 +150,16 @@ int main(int argc, char **argv)
   q0.memcpy(g0, h0, buf_size).wait();
 
   // Kernel launch configuration
-  range<1> lws(256);
-  range<1> gws(buf_len / 256 * 256);
+  sycl::range<1> lws(256);
+  sycl::range<1> gws(buf_len);
 
   // Run kernel on GPU 1, reading input from the GPU 0 buffer, writing
   // output to the GPU 1 buffer
   printf("Run kernel on GPU%d, taking source data from GPU%d and writing to GPU%d...\n",
          gpuid[1], gpuid[0], gpuid[1]);
 
-  q1.submit([&] (handler &cgh) {
-    cgh.parallel_for<class k1>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q1.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class k1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       SimpleKernel(item, g0, g1);
     });
   }).wait();
@@ -174,8 +169,8 @@ int main(int argc, char **argv)
   printf("Run kernel on GPU%d, taking source data from GPU%d and writing to GPU%d...\n",
          gpuid[0], gpuid[1], gpuid[0]);
 
-  q0.submit([&] (handler &cgh) {
-    cgh.parallel_for<class k2>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q0.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class k2>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       SimpleKernel(item, g1, g0);
     });
   }).wait();
@@ -209,9 +204,9 @@ int main(int argc, char **argv)
 
   // Cleanup and shutdown
   printf("Shutting down...\n");
-  free(g0, q0);
-  free(h0, q0);
-  free(g1, q1);
+  sycl::free(g0, q0);
+  sycl::free(h0, q0);
+  sycl::free(g1, q1);
 
   if (error_count != 0)
   {
