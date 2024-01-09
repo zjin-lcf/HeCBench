@@ -36,7 +36,7 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl
 #LDFLAGS = -L/path/to/oneMKL/lib -lonemkl_rng_curand
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif

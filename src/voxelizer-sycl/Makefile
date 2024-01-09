@@ -45,7 +45,7 @@ LDFLAGS = $(Trimesh_PATH)/lib.Linux64/libtrimesh.a \
           $(Trimesh_PATH)/lib.Linux64/libgluit.a
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda-sycldevice \
+  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
