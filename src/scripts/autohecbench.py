@@ -51,7 +51,7 @@ class Benchmark:
         if self.verbose:
             out = subprocess.PIPE
 
-        proc = subprocess.run(["make"] + self.MAKE_ARGS, cwd=self.path, stdout=out, stderr=subprocess.STDOUT, encoding="ascii")
+        proc = subprocess.run(["make"] + self.MAKE_ARGS, cwd=self.path, stdout=out, stderr=subprocess.STDOUT, encoding="utf-8")
         try:
             proc.check_returncode()
         except subprocess.CalledProcessError as e:
@@ -65,7 +65,7 @@ class Benchmark:
 
     def run(self):
         cmd = ["./" + self.binary] + self.args
-        proc = subprocess.run(cmd, cwd=self.path, stdout=subprocess.PIPE, encoding="ascii")
+        proc = subprocess.run(cmd, cwd=self.path, stdout=subprocess.PIPE, encoding="utf-8")
         out = proc.stdout
         if self.verbose:
             print(" ".join(cmd))
