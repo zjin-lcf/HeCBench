@@ -9,6 +9,7 @@ void verify(const T* ref_out, const T* out, size_t n)
 {
   int error = memcmp(ref_out, out, n * sizeof(T));
   printf("%s\n", error ? "FAIL" : "PASS");
+  if (error) exit(1);
 }
 
 // bank conflict aware optimization
@@ -100,7 +101,7 @@ void runTest (const size_t n, const int repeat, bool timing = false)
              sizeof(T), (time * 1e-3f) / repeat);
     }
     #pragma omp target update from (out[0:nelems])
-    if (!timing) verify(ref_out, out, nelems);
+    verify(ref_out, out, nelems);
 
     // bcao
     start = std::chrono::steady_clock::now();
@@ -171,7 +172,7 @@ void runTest (const size_t n, const int repeat, bool timing = false)
     }
  
     #pragma omp target update from (out[0:nelems])
-    if (!timing) verify(ref_out, out, nelems);
+    verify(ref_out, out, nelems);
   }
 }
 

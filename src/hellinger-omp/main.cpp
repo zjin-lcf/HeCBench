@@ -95,13 +95,14 @@ int main(int argc, char** argv)
     std::cout << "Average kernel execution time " << (time * 1e-9f) / repeat << " (s)\n";
   }
 
+  bool ok = true;
 #ifdef VERIFY
-  VerifyResult(a_host, b_host, c_host, c_back);
+  ok = VerifyResult(a_host, b_host, c_host, c_back);
 #endif
 
   delete[] a_host;
   delete[] b_host;
   delete[] c_host;
   delete[] c_back;
-  return 0;
+  return ok ? 0 : 1;
 }

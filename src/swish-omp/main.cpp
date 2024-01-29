@@ -90,6 +90,7 @@ void eval_swish (const int N, const int repeat) {
   free(h_dY);
   free(r_dX);
   free(r_Y);
+  if (!ok) exit(1);
 }
 
 int main(int argc, char* argv[])

@@ -188,4 +188,5 @@ int main(int argc, char** argv)
   std::cout << (error ? "FAIL" : "PASS")  << std::endl;
   free(reference);
   free(source);
+  return error ? 1 : 0;
 }

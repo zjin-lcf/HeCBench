@@ -109,6 +109,7 @@ void mixbenchGPU(long size, int repeat) {
 
   free(cd);
   printf("%s\n", ok ? "PASS" : "FAIL");
+  if (!ok) exit(1);
 }
 
 

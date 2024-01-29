@@ -106,7 +106,7 @@ int main(int argc, const char **argv)
   else
     printf("FAIL\n");
 
-  return 0;
+  return passed ? 0 : 1;
 }
 
 void makeRandomUintVector(uint *a, uint numElements, uint keybits)

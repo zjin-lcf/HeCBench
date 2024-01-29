@@ -132,11 +132,11 @@ int main(int argc, char* argv[])
   printf("Verifying the kernel results with the problem size (16 cube)\n");
   printf("------------------------------------------------------------\n");
 
+  bool ok = true;
   while (l <= 1e5f) {
     hipLaunchKernelGGL(matern_kernel, grids, blocks, 0, 0, ntargets_small, l, d_sources, d_targets, d_weights, d_result);
     matern_kernel_reference(nsources, ntargets_small, l, sources, targets, weights, result_ref);
     hipMemcpy(result, d_result, ntargets_small * sizeof(float), hipMemcpyDeviceToHost);
-    bool ok = true;
     for (int i = 0; i < ntargets_small; i++) {
       if (fabsf(result[i] - result_ref[i]) > 1e-3f) {
         printf("@%d actual=%f expected=%f\n", i, result[i] , result_ref[i]);
@@ -185,5 +185,6 @@ int main(int argc, char* argv[])
   free(targets);
   free(result);
   free(result_ref);
-  return 0;
+
+  return ok ? 0 : 1;
 }

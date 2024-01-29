@@ -208,5 +208,5 @@ int main(int argc, const char * const argv[])
   hipFree(Dev_ReadSeq);
   hipFree(Dev_RefSeq);
   hipFree(Dev_Results);
-  return 0;
+  return error ? 1 : 0;
 }

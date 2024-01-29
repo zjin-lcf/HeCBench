@@ -66,5 +66,5 @@ int main(int argc, char* argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "Average time of word count: " << time * 1e-9f / repeat << " (s)\n";
 
-  return 0;
+  return ok ? 0 : 1;
 }

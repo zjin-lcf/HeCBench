@@ -430,5 +430,8 @@ void mask_seqs(Sequence_set &seqs, const Masking &masking, bool hard_mask)
     }
     p += seqs.length(i);
   }
-  if (error == 0) printf("Success\n");
+  if (error == 0)
+    printf("Success\n");
+  else
+    printf("Failure\n");
 }

@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
   // verify
   q.memcpy(r, d_r, size_bytes).wait();
 
-  ok = true;
+  bool ok2 = true;
   for (size_t i = 0; i < size; ++i)
   {
     sycl::float2 fa = a[i].convert<float, sycl::rounding_mode::automatic>();
@@ -191,12 +191,12 @@ int main(int argc, char *argv[])
     float x = fmaxf(fa.x(), fb.x());
     float y = fmaxf(fa.y(), fb.y());
     if (fabsf(fr.x() - x) > 1e-3 || fabsf(fr.y() - y) > 1e-3) {
-      ok = false;
+      ok2 = false;
       break;
     }
   }
 
-  printf("fp16_hmax %s\n", ok ?  "PASS" : "FAIL");
+  printf("fp16_hmax %s\n", ok2 ?  "PASS" : "FAIL");
 
   sycl::free(d_a, q);
   sycl::free(d_b, q);
@@ -205,5 +205,5 @@ int main(int argc, char *argv[])
   free(b);
   free(r);
 
-  return EXIT_SUCCESS;
+  return (ok && ok2) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

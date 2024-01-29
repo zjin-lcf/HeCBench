@@ -112,5 +112,5 @@ int main(int argc, char* argv[])
   free(input);
   free(result);
   free(result_h);
-  return 0;
+  return ok ? 0 : 1;
 }

@@ -145,6 +145,7 @@ int main(int argc, char* argv[])
   for (int i = 0; i < target_size; i++) 
     targets[i] = rand() / (float)RAND_MAX;
 
+  bool ok = true;
   #pragma omp target data map(to: sources[0:source_size],\
                                   weights[0:weight_size],\
                                   targets[0:target_size]) \
@@ -163,7 +164,6 @@ int main(int argc, char* argv[])
 
       matern_kernel2(ntargets_small, l, sources, targets, weights, result);
 
-      bool ok = true;
       for (int i = 0; i < ntargets_small; i++) {
         if (fabsf(result[i] - result_ref[i]) > 1e-3f) {
           printf("@%d actual=%f expected=%f\n", i, result[i] , result_ref[i]);
@@ -206,5 +206,5 @@ int main(int argc, char* argv[])
   free(targets);
   free(result);
   free(result_ref);
-  return 0;
+  return ok ? 0 : 1;
 }

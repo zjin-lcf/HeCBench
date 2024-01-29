@@ -132,9 +132,7 @@ class Mandel {
       std::cout << "Fail verification - diff larger than tolerance"<< std::endl;
       throw std::runtime_error("Verification failure");
     }
-#if _DEBUG
     std::cout << "Pass verification" << std::endl;
-#endif
   }
 };
 

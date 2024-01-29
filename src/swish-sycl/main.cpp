@@ -130,6 +130,7 @@ void eval_swish (const int N, const int repeat) {
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
+  if (!ok) exit(1);
 
   sycl::free(d_X, q);
   sycl::free(d_Y, q);

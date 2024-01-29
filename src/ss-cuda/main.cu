@@ -223,7 +223,8 @@ int main(int argc, char* argv[])
     cudaMemcpy(resultCount, resultCountBuf, workGroupCount * sizeof(uint), cudaMemcpyDeviceToHost);
     cudaMemcpy(result, resultBuf, (textLength - subStrLength + 1) * sizeof(uint), cudaMemcpyDeviceToHost);
 
-    verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
+    if (verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults))
+      return 1;
   }
 
   if(subStrLength > 1) 
@@ -251,7 +252,8 @@ int main(int argc, char* argv[])
     cudaMemcpy(resultCount, resultCountBuf, workGroupCount * sizeof(uint), cudaMemcpyDeviceToHost);
     cudaMemcpy(result, resultBuf, (textLength - subStrLength + 1) * sizeof(uint), cudaMemcpyDeviceToHost);
 
-    verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
+    if (verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults))
+      return 1;
   }
 
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);

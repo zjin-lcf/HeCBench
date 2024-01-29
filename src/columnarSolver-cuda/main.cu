@@ -140,5 +140,5 @@ int main(int argc, char* argv[]) {
   cudaFree(devStates);
   delete[] decrypted;
   delete[] scoreHistory;
-  return 0;
+  return pass ? 0 : 1;
 }

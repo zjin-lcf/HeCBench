@@ -163,9 +163,9 @@ int main(int argc, char* argv[]) {
     if (!ok) break;
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
- 
+
   free(input);
   free(output);
   free(output_ref);
-  return 0;
+  return ok ? 0 : 1;
 }

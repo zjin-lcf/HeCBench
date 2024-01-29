@@ -342,5 +342,5 @@ int main(int argc, char** argv){
   hipFree(passed_verification_device);
   hipFree(sum_device);
 
-  return 0;  
+  return passed_verification ? 0 : 1;
 }

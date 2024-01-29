@@ -211,13 +211,14 @@ template <typename scalar_t> void nonzero(int nrows, int ncols, int repeat) {
 
   free(h_in);
 
+  printf("%s\n", ok ? "PASS" : "FAIL");
+  if (!ok) exit(1);
+
   printf("Average time for sum reduction: %lf (us)\n",
          sum_time * 1e-3 / repeat);
 
   printf("Average time for write index operations: %lf (us)\n",
          idx_time * 1e-3 / repeat);
-
-  printf("%s\n", ok ? "PASS" : "FAIL");
 }
 
 int main(int argc, char* argv[])

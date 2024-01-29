@@ -31,10 +31,15 @@ void verify(double *input, double *output) {
       break;
     }
   }
-  if (!error) printf("PASS\n");
+  if (!error)
+    printf("PASS\n");
+  else {
+    printf("FAIL\n");
+    exit(1);
+  }
 }
 
-int main(int argv, char **argc) {
+int main(int argc, char **argv) {
   if (argc != 2) {
     printf("Usage: %s <repeat>\n", argv[0]);
     return 1;

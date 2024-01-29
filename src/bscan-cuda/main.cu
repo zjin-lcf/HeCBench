@@ -161,6 +161,9 @@ void bscan (const int repeat)
     printf("Average execution time: %f (us)\n", (time * 1e-3f) / repeat);
     printf("Billion elements per second: %f\n\n",
             grid_size * N * repeat / time);
+  } else {
+    printf("verification failed\n");
+    exit(1);
   }
 
   cudaFree(d_in);

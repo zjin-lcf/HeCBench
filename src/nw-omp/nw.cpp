@@ -75,7 +75,7 @@ void usage(int argc, char **argv)
 }
 
 int main(int argc, char **argv){
-
+  int err = 0;
   printf("WG size of kernel = %d \n", BLOCK_SIZE);
 
   int max_rows_t, max_cols_t, penalty_t;
@@ -306,7 +306,7 @@ int main(int argc, char **argv){
 
   // verify
   nw_host(h_input_itemsets, reference, max_cols, penalty);
-  int err = memcmp(input_itemsets, h_input_itemsets, max_cols * max_rows * sizeof(int));
+  err = memcmp(input_itemsets, h_input_itemsets, max_cols * max_rows * sizeof(int));
   printf("%s\n", err ? "FAIL" : "PASS");
 
 #ifdef TRACEBACK
@@ -375,6 +375,6 @@ int main(int argc, char **argv){
   free(reference);
   free(input_itemsets);
   free(h_input_itemsets);
-  return 0;
+  return err ? 1 : 0;
 }
 

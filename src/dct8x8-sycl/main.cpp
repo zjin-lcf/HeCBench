@@ -26,7 +26,7 @@ void DCT8x8(
     int dir
 );
 
-void Verify(const float* h_OutputGPU, 
+int Verify(const float* h_OutputGPU, 
                   float* h_OutputCPU, 
             const float* h_Input, 
             const unsigned int stride,
@@ -46,10 +46,13 @@ void Verify(const float* h_OutputGPU,
     }
   L2norm = std::sqrt(delta / sum);
   printf("Relative L2 norm: %.3e\n\n", L2norm);
-  if (L2norm < 1E-6) 
-    printf("PASS\n"); 
-  else
+  if (L2norm < 1E-6) {
+    printf("PASS\n");
+    return 0;
+  } else {
     printf("FAIL\n");
+    return 1;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -111,7 +114,8 @@ int main(int argc, char **argv)
 
   q.memcpy(h_OutputGPU, d_Output, sizeof(float) * imageH * stride).wait();
 
-  Verify(h_OutputGPU, h_OutputCPU, h_Input, stride, imageH, imageW, dir);
+  if (Verify(h_OutputGPU, h_OutputCPU, h_Input, stride, imageH, imageW, dir) != 0)
+    exit(1);
 
   printf("Performing Inverse DCT8x8 of %u x %u image on the device\n\n", imageH, imageW);
 
@@ -136,7 +140,8 @@ int main(int argc, char **argv)
 
   q.memcpy(h_OutputGPU, d_Output, sizeof(float) * imageH * stride).wait();
 
-  Verify(h_OutputGPU, h_OutputCPU, h_Input, stride, imageH, imageW, dir);
+  if (Verify(h_OutputGPU, h_OutputCPU, h_Input, stride, imageH, imageW, dir) != 0)
+    exit(1);
 
   free(h_OutputGPU);
   free(h_OutputCPU);

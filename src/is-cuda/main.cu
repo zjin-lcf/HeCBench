@@ -356,5 +356,5 @@ int main(int argc, char** argv){
   cudaFree(passed_verification_device);
   cudaFree(sum_device);
 
-  return 0;  
+  return passed_verification ? 0 : 1;
 }

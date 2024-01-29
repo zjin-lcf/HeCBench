@@ -135,9 +135,13 @@ int main(int argc, char **argv) {
   
     printf("Average kernel execution time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
     status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-    if (status != 0) printf("FAIL\n");
-    else printf("PASS\n");
-  
+    if (status != 0) {
+    printf("FAIL\n");
+    exit(1);
+    } else {
+      printf("PASS\n");
+    }
+
     elapsedTime = 0; 
     for (int n = 0; n < iterations; n++) {
       /* shared memory GPU kernel */
@@ -212,8 +216,12 @@ int main(int argc, char **argv) {
   
     printf("Average kernel execution time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
     status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-    if (status != 0) printf("FAIL\n");
-    else printf("PASS\n");
+    if (status != 0) {
+    printf("FAIL\n");
+    exit(1);
+    } else {
+      printf("PASS\n");
+    }
   }
 
   free(cpu_distance);

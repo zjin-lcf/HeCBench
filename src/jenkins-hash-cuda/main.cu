@@ -315,5 +315,5 @@ int main(int argc, char** argv) {
   free(initvals);
   free(out);
 
-  return 0;
+  return error ? 1 : 0;
 }

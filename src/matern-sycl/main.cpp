@@ -133,6 +133,7 @@ int main(int argc, char* argv[])
   printf("Verifying the kernel results with the problem size (16 cube)\n");
   printf("------------------------------------------------------------\n");
 
+  bool ok = true;
   while (l <= 1e5f) {
     auto e = q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<float, 1> l_result (sycl::range<1>(SX*SY), cgh);
@@ -151,7 +152,6 @@ int main(int argc, char* argv[])
 
     q.memcpy(result, d_result, ntargets_small * sizeof(float), e).wait();
 
-    bool ok = true;
     for (int i = 0; i < ntargets_small; i++) {
       if (fabsf(result[i] - result_ref[i]) > 1e-3f) {
         printf("@%d actual=%f expected=%f\n", i, result[i] , result_ref[i]);
@@ -222,5 +222,5 @@ int main(int argc, char* argv[])
   free(targets);
   free(result);
   free(result_ref);
-  return 0;
+  return ok ? 0 : 1;
 }

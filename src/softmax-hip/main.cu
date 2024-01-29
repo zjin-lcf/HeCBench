@@ -103,5 +103,5 @@ int main(int argc, char* argv[]) {
   free(output_gpu);
   hipFree(d_input);
   hipFree(d_output);
-  return 0;
+  return ok ? 0 : 1;
 }

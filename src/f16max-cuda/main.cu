@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
   cudaMemcpy(r, d_r, size_bytes, cudaMemcpyDeviceToHost);
 
   // verify
-  ok = true;
+  bool ok2 = true;
   for (size_t i = 0; i < size; ++i)
   {
     float2 fa = __half22float2(a[i]);
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
     float x = fmaxf(fa.x, fb.x);
     float y = fmaxf(fa.y, fb.y);
     if (fabsf(fr.x - x) > 1e-3 || fabsf(fr.y - y) > 1e-3) {
-      ok = false;
+      ok2 = false;
       break;
     }
   }
@@ -162,5 +162,5 @@ int main(int argc, char *argv[])
   free(b);
   free(r);
 
-  return EXIT_SUCCESS;
+  return (ok && ok2) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

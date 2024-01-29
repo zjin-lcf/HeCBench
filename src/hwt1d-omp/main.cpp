@@ -240,5 +240,5 @@ int main(int argc, char * argv[])
   else
     std::cout << "FAIL" << std::endl;
 
-  return 0;
+  return ok ? 0 : 1;
 }

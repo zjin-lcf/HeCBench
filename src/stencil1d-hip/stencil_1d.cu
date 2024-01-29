@@ -117,5 +117,5 @@ int main(int argc, char* argv[]) {
   free(b); 
   hipFree(d_a); 
   hipFree(d_b); 
-  return 0;
+  return ok ? 0 : 1;
 }

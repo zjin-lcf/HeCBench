@@ -95,5 +95,5 @@ int main(int argc, char* argv[]) {
   
   free(h_Apoints);
   free(h_Bpoints);
-  return 0;
+  return error ? 1 : 0;
 }
