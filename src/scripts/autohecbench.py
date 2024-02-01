@@ -159,13 +159,27 @@ def main():
     t_compiled = time.time()
 
     outfile = sys.stdout
+    recorded_benchmarks = set()
     if args.output:
-        outfile = open(args.output, 'w')
+        if os.path.isfile(args.output):
+            outfile = open(args.output, 'r+t')
+            for line in outfile:
+                bench, *rest = line.split(',')
+                recorded_benchmarks.add(bench)
+            outfile.seek(0, 2) # seek to end of the file.
+        else:
+            outfile = open(args.output, 'w+t')
 
-    for b in benches:
+    filtered_benches = [b for b in benches if b.name not in recorded_benchmarks]
+    num_filtered_benches = len(benches) - len(filtered_benches)
+    if num_filtered_benches:
+        print(f"Filtered out {num_filtered_benches} benchmarks."
+              " Results already exists in the output file.", flush=True)
+    benches = filtered_benches
+
+    for i, b in enumerate(benches, 1):
         try:
-            if args.verbose:
-                print("running: {}".format(b.name))
+            print(f"running {i}/{len(benches)}: {b.name}", flush=True)
 
             if args.warmup:
                 b.run()
