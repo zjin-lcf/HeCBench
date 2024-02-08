@@ -55,7 +55,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3 -ffast-math
+  CFLAGS += -O3 -ffast-math -Xclang -fdenormal-fp-math-f32=preserve-sign
 endif
 
 ifeq ($(GPU),yes)
