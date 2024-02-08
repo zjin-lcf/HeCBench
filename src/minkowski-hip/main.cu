@@ -21,14 +21,14 @@ constexpr int P = m_size / 2;
 
 #include "verify.cpp"
 
-__global__ 
+template <int m, int n, int k>
+__global__
 void minkowski(
   const float *__restrict__ a,
   const float *__restrict__ b,
         float *__restrict__ c,
   const float p,
-  const float one_over_p,
-  const int m, const int n, const int k)
+  const float one_over_p)
 {
   int col = blockIdx.x * blockDim.x + threadIdx.x;
   int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -101,8 +101,10 @@ int main(int argc, char* argv[]) {
 
     auto start = std::chrono::steady_clock::now();
 
+    auto kernel = minkowski<M, N, P>;
     for (int i = 0; i < repeat; i++)
-      hipLaunchKernelGGL(minkowski, dimGrid, dimBlock, 0, 0, a_device, b_device, c_device, p, one_over_p, M, N, P);
+      hipLaunchKernelGGL(kernel, dimGrid, dimBlock, 0, 0, a_device,
+                         b_device, c_device, p, one_over_p);
 
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();

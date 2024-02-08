@@ -97,9 +97,9 @@ int main(int argc, char* argv[]) {
             //float sum = sycl::native::powr(sycl::fabs(A[row * N] - B[col]), p);
             #pragma unroll (4)
             for (int i = 0; i < N; i++) {
-              sum += sycl::native::powr(sycl::fabs(a[row * N + i] - b[i * P + col]), p);
+              sum += sycl::pow(sycl::fabs(a[row * N + i] - b[i * P + col]), p);
             }
-            c[row * P + col] = sycl::native::powr(sum, one_over_p);
+            c[row * P + col] = sycl::pow(sum, one_over_p);
           }
         });
       });
