@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <chrono>
 #include <math.h>
 #include <cuda.h>
+#include <chrono>
+#include <random>
 #include "reference.h"
 
 template <typename T, typename G>
@@ -26,7 +27,7 @@ void adam (
   const size_t totThreads = gridDim.x*blockDim.x;
 
   for (size_t j = i; j < vector_size; j += totThreads) {
-    for (int t = 0; t < time_step; t++) {
+    for (int t = 1; t <= time_step; t++) {
       T scaled_grad = g[j]/grad_scale;
       m[j] = b1*m[j] + (1.f-b1)*scaled_grad;
       v[j] = b2*v[j] + (1.f-b2)*scaled_grad*scaled_grad;
@@ -62,12 +63,13 @@ int main(int argc, char* argv[])
   float *p = (float*) malloc (size_bytes);
   float *r = (float*) malloc (size_bytes);
 
-  srand(123);
+  std::mt19937 gen(19937);
+  std::uniform_real_distribution<float> dist(0, 1);
   for (int i = 0; i < vector_size; i++) {
-    m[i] = rand() / (float)RAND_MAX;
-    v[i] = rand() / (float)RAND_MAX;
-    g[i] = rand() / (float)RAND_MAX;
-    r[i] = p[i] = rand() / (float)RAND_MAX;
+    m[i] = dist(gen);
+    v[i] = dist(gen);
+    g[i] = dist(gen);
+    r[i] = p[i] = dist(gen);
   }
 
   float *d_m, *d_v, *d_g, *d_p;
@@ -140,13 +142,17 @@ int main(int argc, char* argv[])
     decay);
 
   bool ok = true; 
+  double cr = 0, cp = 0;
   for (int i = 0; i < vector_size; i++) {
-    if (r[i] - p[i] > 1e-3f) {
+    if (fabsf(r[i] - p[i]) > 1e-3f) {
       ok = false;
       break;
     }
+    cr += r[i]; cp += p[i];
   }
+
   printf("%s\n", ok ? "PASS" : "FAIL");
+  printf("Checksum: %lf %lf\n", cr / vector_size, cp / vector_size);
 
   free(p);
   free(m);
