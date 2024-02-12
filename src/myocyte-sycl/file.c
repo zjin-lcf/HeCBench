@@ -29,7 +29,7 @@ void write(
 
   fid = fopen(filename, "w");
   if( fid == NULL ){
-    printf( "The file was not created/opened for writing\n" );
+    printf( "ERROR: The file %s was not opened for reading\n", filename );
     return;
   }
 
@@ -89,7 +89,7 @@ void read(
 
   fid = fopen(filename, "r");
   if( fid == NULL ){
-    printf( "The file was not opened for reading\n" );
+    printf( "ERROR: The file %s was not opened for reading\n", filename );
     return;
   }
 
