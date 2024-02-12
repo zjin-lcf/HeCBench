@@ -68,14 +68,15 @@ int main(int argc, char* argv[]) {
   hipMalloc((void**)&d_output, sizeof(float) * numElem);
   hipMemcpy(d_input, input, sizeof(float) * numElem, hipMemcpyHostToDevice);
 
-  dim3 global_work_size ((numSlice+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
-  dim3 local_work_size (BLOCK_SIZE);
+  dim3 thread_block_count((numSlice + BLOCK_SIZE - 1) / BLOCK_SIZE);
+  dim3 threads_per_block(BLOCK_SIZE);
 
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    hipLaunchKernelGGL(softMax, global_work_size, local_work_size, 0, 0, numSlice, sliceSize, d_input, d_output);
+    hipLaunchKernelGGL(softMax, thread_block_count, threads_per_block, 0, 0,
+                       numSlice, sliceSize, d_input, d_output);
   }
 
   hipDeviceSynchronize();
