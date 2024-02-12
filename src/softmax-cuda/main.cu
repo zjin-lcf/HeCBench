@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
   cudaMalloc((void**)&d_output, sizeof(float) * numElem);
   cudaMemcpy(d_input, input, sizeof(float) * numElem, cudaMemcpyHostToDevice);
 
-  dim3 global_work_size ((numSlice+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+  dim3 global_work_size ((numSlice+BLOCK_SIZE-1)/BLOCK_SIZE);
   dim3 local_work_size (BLOCK_SIZE);
 
   cudaDeviceSynchronize();
@@ -104,4 +104,3 @@ int main(int argc, char* argv[]) {
   cudaFree(d_output);
   return 0;
 }
-

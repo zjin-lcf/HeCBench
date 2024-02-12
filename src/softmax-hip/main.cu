@@ -9,7 +9,7 @@
 void softMax_cpu(const int numSlice, const int sliceSize, const float* src, float* dest) {
   for (int i = 0; i < numSlice; i++) {
     float max_ = src[i * sliceSize];
-    for (int j = 0; j < sliceSize; j++) {
+    for (int j = 1; j < sliceSize; j++) {
       max_ = (max_ < src[i * sliceSize + j]) ? src[i * sliceSize + j] : max_;
     }
     float sum = 0;
@@ -31,7 +31,7 @@ void softMax (const int numSlice, const int sliceSize,
   unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= numSlice) return;
   float max_ = src[i * sliceSize];
-  for (int j = 0; j < sliceSize; j++) {
+  for (int j = 1; j < sliceSize; j++) {
     max_ = max(max_, src[i * sliceSize + j]);
   }
   float sum = 0;
@@ -68,14 +68,15 @@ int main(int argc, char* argv[]) {
   hipMalloc((void**)&d_output, sizeof(float) * numElem);
   hipMemcpy(d_input, input, sizeof(float) * numElem, hipMemcpyHostToDevice);
 
-  dim3 global_work_size ((numSlice+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+  dim3 global_work_size ((numSlice+BLOCK_SIZE-1)/BLOCK_SIZE);
   dim3 local_work_size (BLOCK_SIZE);
 
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    hipLaunchKernelGGL(softMax, global_work_size, local_work_size, 0, 0, numSlice, sliceSize, d_input, d_output);
+    hipLaunchKernelGGL(softMax, global_work_size, local_work_size, 0, 0,
+                       numSlice, sliceSize, d_input, d_output);
   }
 
   hipDeviceSynchronize();
@@ -104,4 +105,3 @@ int main(int argc, char* argv[]) {
   hipFree(d_output);
   return 0;
 }
-
