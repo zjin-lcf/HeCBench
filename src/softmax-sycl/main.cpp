@@ -9,7 +9,7 @@
 void softMax_cpu(const int numSlice, const int sliceSize, const float* src, float* dest) {
   for (int i = 0; i < numSlice; i++) {
     float max_ = src[i * sliceSize];
-    for (int j = 0; j < sliceSize; j++) {
+    for (int j = 1; j < sliceSize; j++) {
       max_ = (max_ < src[i * sliceSize + j]) ? src[i * sliceSize + j] : max_;
     }
     float sum = 0;
@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
         int i = item.get_global_id(0); 
         if (i >= numSlice) return;
         float max_ = d_input[i * sliceSize];
-        for (int j = 0; j < sliceSize; j++) {
+        for (int j = 1; j < sliceSize; j++) {
           max_ = sycl::max(max_, d_input[i * sliceSize + j]);
         }
         float sum = 0;

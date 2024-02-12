@@ -9,7 +9,7 @@
 void softMax_cpu(const int numSlice, const int sliceSize, const float* src, float* dest) {
   for (int i = 0; i < numSlice; i++) {
     float max_ = src[i * sliceSize];
-    for (int j = 0; j < sliceSize; j++) {
+    for (int j = 1; j < sliceSize; j++) {
       max_ = (max_ < src[i * sliceSize + j]) ? src[i * sliceSize + j] : max_;
     }
     float sum = 0;
@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
       #pragma omp target teams distribute parallel for simd thread_limit(BLOCK_SIZE)
       for (int i = 0; i < numSlice; i++) {
         float max_ = input[i * sliceSize];
-        for (int j = 0; j < sliceSize; j++) {
+        for (int j = 1; j < sliceSize; j++) {
           max_ = (max_ < input[i * sliceSize + j]) ? input[i * sliceSize + j] : max_;
         }
         float sum = 0;
