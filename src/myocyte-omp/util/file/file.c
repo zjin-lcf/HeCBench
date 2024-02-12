@@ -24,7 +24,7 @@ void write_file(
 
   fid = fopen(filename, "w");
   if( fid == NULL ){
-    printf( "ERROR: the file was not created/opened for writing\n" );
+    printf( "ERROR: The file %s was not created/opened for writing\n", filename );
     fflush(0);
     return;
   }
@@ -82,7 +82,7 @@ void read_file(
 
   fid = fopen(filename, "r");
   if( fid == NULL ){
-    printf( "ERROR: the file was not opened for reading\n" );
+    printf( "ERROR: The file %s was not opened for reading\n", filename );
     fflush(0);
     return;
   }
