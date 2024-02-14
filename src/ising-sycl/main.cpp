@@ -170,7 +170,7 @@ int main(int argc, char **argv) {
   long long ny = 5120;
   float alpha = 0.1f;
   int nwarmup = 100;
-  int niters = 100;
+  int niters = 1000;
   unsigned long long seed = 1234ULL;
 
   while (1) {
