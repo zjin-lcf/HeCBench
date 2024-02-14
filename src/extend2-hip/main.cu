@@ -258,12 +258,12 @@ float extend2(struct extend2_dat *d)
       zdrop, 
       h0);
 
-  hipMemcpy(&qle, d_qle, 4, hipMemcpyDeviceToHost);
-  hipMemcpy(&tle, d_tle, 4, hipMemcpyDeviceToHost);
-  hipMemcpy(&gtle, d_gtle, 4, hipMemcpyDeviceToHost);
-  hipMemcpy(&max_off, d_max_off, 4, hipMemcpyDeviceToHost);
-  hipMemcpy(&gscore, d_gscore, 4, hipMemcpyDeviceToHost);
-  hipMemcpy(&score, d_score, 4, hipMemcpyDeviceToHost);
+  hipMemcpyAsync(&qle, d_qle, 4, hipMemcpyDeviceToHost, 0);
+  hipMemcpyAsync(&tle, d_tle, 4, hipMemcpyDeviceToHost, 0);
+  hipMemcpyAsync(&gtle, d_gtle, 4, hipMemcpyDeviceToHost, 0);
+  hipMemcpyAsync(&max_off, d_max_off, 4, hipMemcpyDeviceToHost, 0);
+  hipMemcpyAsync(&gscore, d_gscore, 4, hipMemcpyDeviceToHost, 0);
+  hipMemcpyAsync(&score, d_score, 4, hipMemcpyDeviceToHost, 0);
 
   hipFree(d_query);
   hipFree(d_target);

@@ -258,12 +258,12 @@ float extend2(struct extend2_dat *d)
       zdrop, 
       h0);
 
-  cudaMemcpy(&qle, d_qle, 4, cudaMemcpyDeviceToHost);
-  cudaMemcpy(&tle, d_tle, 4, cudaMemcpyDeviceToHost);
-  cudaMemcpy(&gtle, d_gtle, 4, cudaMemcpyDeviceToHost);
-  cudaMemcpy(&max_off, d_max_off, 4, cudaMemcpyDeviceToHost);
-  cudaMemcpy(&gscore, d_gscore, 4, cudaMemcpyDeviceToHost);
-  cudaMemcpy(&score, d_score, 4, cudaMemcpyDeviceToHost);
+  cudaMemcpyAsync(&qle, d_qle, 4, cudaMemcpyDeviceToHost, 0);
+  cudaMemcpyAsync(&tle, d_tle, 4, cudaMemcpyDeviceToHost, 0);
+  cudaMemcpyAsync(&gtle, d_gtle, 4, cudaMemcpyDeviceToHost, 0);
+  cudaMemcpyAsync(&max_off, d_max_off, 4, cudaMemcpyDeviceToHost, 0);
+  cudaMemcpyAsync(&gscore, d_gscore, 4, cudaMemcpyDeviceToHost, 0);
+  cudaMemcpyAsync(&score, d_score, 4, cudaMemcpyDeviceToHost, 0);
 
   cudaFree(d_query);
   cudaFree(d_target);
