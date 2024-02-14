@@ -334,15 +334,15 @@ void iDFT2D1gpu(thrust::complex<float>* din, thrust::complex<float>* dout, int n
     thrust::complex<float> sum, twiddle;
     angle = 2.0f * PI * fdividef((float)i, (float)num_cols);
     sum = 0.0f;
-    for (int k = 0; k < num_cols; ++k) {
+    for (int k = 0; k < num_cols/2+1; ++k) {
         // sincosf(angle * k, &sinf, &cosf);
         // twiddle = thrust::complex<float>(cosf, sinf);
         TWIDDLE();
-        if (k < (num_cols/2+1)) {
-            sum = sum + din[j * (num_cols/2+1) + k] * twiddle;
-        } else {
-            sum = sum + thrust::conj(din[((num_rows-j)%num_rows) * (num_cols/2+1) + ((num_cols-k)%num_cols)]) * twiddle;
-        }
+        sum += din[j * (num_cols/2+1) + k] * twiddle;
+    }
+    for (int k = num_cols/2+1; k < num_cols; ++k) {
+        TWIDDLE();
+        sum += thrust::conj(din[((num_rows-j)%num_rows) * (num_cols/2+1) + ((num_cols-k)%num_cols)]) * twiddle;
     }
 
     dout[i * num_rows + j] = sum;
