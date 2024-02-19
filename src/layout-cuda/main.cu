@@ -35,10 +35,10 @@ struct ApplesOnTrees
   int trees[TREE_NUM];
 };
 
+template <int treeSize>
 __global__
 void AoSKernel(const AppleTree *__restrict__ trees, 
-               int *__restrict__ outBuf,
-               int treeSize)
+               int *__restrict__ outBuf)
 {
   uint gid = blockIdx.x * blockDim.x + threadIdx.x;
   uint res = 0;
@@ -49,10 +49,10 @@ void AoSKernel(const AppleTree *__restrict__ trees,
   outBuf[gid] = res;
 }
 
+template <int treeSize>
 __global__
 void SoAKernel(const ApplesOnTrees *__restrict__ applesOnTrees,
-               int *__restrict__ outBuf,
-               int treeSize)
+               int *__restrict__ outBuf)
 {
   uint gid = blockIdx.x * blockDim.x + threadIdx.x;
   uint res = 0;
@@ -129,7 +129,7 @@ int main(int argc, char * argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iterations; i++)
-    AoSKernel<<<grid, block>>>((AppleTree*)inputBuffer, outputBuffer, treeSize);
+    AoSKernel<treeSize><<<grid, block>>>((AppleTree*)inputBuffer, outputBuffer);
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
@@ -164,7 +164,7 @@ int main(int argc, char * argv[])
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iterations; i++)
-    SoAKernel<<<grid, block>>>((ApplesOnTrees*)inputBuffer, outputBuffer, treeSize);
+    SoAKernel<treeSize><<<grid, block>>>((ApplesOnTrees*)inputBuffer, outputBuffer);
 
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
