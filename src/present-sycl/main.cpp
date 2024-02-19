@@ -587,11 +587,6 @@ int main(int argc, char **argv) {
   }
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-  if (h_checksum != d_checksum)
-    printf("FAIL\n");
-  else
-    printf("PASS\n");
-
   free(h_plain);
   free(h_key);
   free(h_cipher);
@@ -603,4 +598,10 @@ int main(int argc, char **argv) {
   sycl::free(d_sbox_pmt_2, q);
   sycl::free(d_sbox_pmt_1, q);
   sycl::free(d_sbox_pmt_0, q);
+
+  if (h_checksum != d_checksum) {
+    printf("FAIL\n");
+    exit(1);
+  } else
+    printf("PASS\n");
 }

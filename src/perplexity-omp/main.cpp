@@ -135,6 +135,6 @@ int main(int argc, char* argv[]) {
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
-  
-  return 0;
+
+  return ok ? 0 : 1;
 }

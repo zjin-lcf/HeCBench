@@ -36,8 +36,10 @@ void compare_results(const datatype *cpu_results, const datatype *gpu_results, c
   }
   if (passed)
     std::cout << "Passed" << std::endl;
-  else
+  else {
     std::cout << "Failed" << std::endl;
+    exit(1);
+  }
   return ;
 }
 

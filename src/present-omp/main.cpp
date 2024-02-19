@@ -546,5 +546,7 @@ int main(int argc, char** argv) {
   free(h_key);
   free(h_cipher);
   free(ciphers);
+
+  return h_checksum != d_checksum;
 }
 

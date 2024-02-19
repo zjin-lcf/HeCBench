@@ -19,8 +19,6 @@ double gettime() {
   return t.tv_sec+t.tv_usec*1e-6;
 }
 
-static int do_verify = 0;
-
 static struct option long_options[] = {
   /* name, has_arg, flag, val */
   {"input", 1, NULL, 'i'},
@@ -38,6 +36,7 @@ int main ( int argc, char *argv[] )
   const char *input_file = NULL;
   float *m, *mm;
   stopwatch sw;
+  int do_verify = 1;
 
   while ((opt = getopt_long(argc, argv, "::vs:i:", 
           long_options, &option_index)) != -1 ) {

@@ -259,5 +259,5 @@ int main(int argc, char *argv[]) {
   cudaFree(image_d);
   cudaFree(a_d);
 
-  return 0;
+  return ok ? 0 : 1;
 }

@@ -120,6 +120,6 @@ int main(int argc, char * argv[])
     std::cout << "PASS" << std::endl;
   else
     std::cout << "FAIL" << std::endl;
-  
-  return 0;
+
+  return ok ? 0 : 1;
 }

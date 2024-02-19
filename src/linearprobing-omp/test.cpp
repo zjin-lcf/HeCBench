@@ -19,7 +19,7 @@ void test_correctness(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> de
     KeyValue* node = &kvs[i];
     if (unique_keys.find(node->key) != unique_keys.end())
     {
-      printf("Duplicate key found in GPU hash table at slot %d\n", i);
+      printf("FAIL: Duplicate key found in GPU hash table at slot %d\n", i);
       exit(-1);
     }
     unique_keys.insert(node->key);

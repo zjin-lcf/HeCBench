@@ -259,5 +259,5 @@ int main(int argc, char *argv[]) {
   hipFree(image_d);
   hipFree(a_d);
 
-  return 0;
+  return ok ? 0 : 1;
 }

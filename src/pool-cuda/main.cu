@@ -225,5 +225,5 @@ int main(int argc, char* argv[])
   cudaFree(input_grad_data);
   cudaFree(output_data);
   cudaFree(output_grad_data);
-  return 0;
+  return ok ? 0 : 1;
 }

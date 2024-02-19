@@ -242,5 +242,5 @@ int main(int argc, char* argv[])
   sycl::free(d_input_grad, q);
   sycl::free(d_output, q);
   sycl::free(d_output_grad, q);
-  return 0;
+  return ok ? 0 : 1;
 }

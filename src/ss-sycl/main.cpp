@@ -295,7 +295,8 @@ int main(int argc, char* argv[])
     q.memcpy(result, resultBuf, (textLength - subStrLength + 1) * sizeof(uint));
     q.wait();
 
-    verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults);
+    if (verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults))
+      return 1;
   }
 
   /*
@@ -468,7 +469,8 @@ int main(int argc, char* argv[])
     q.memcpy(result, resultBuf, (textLength - subStrLength + 1) * sizeof(uint));
     q.wait();
 
-    verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults);
+    if (verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults))
+      return 1;
   }
 
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);

@@ -586,4 +586,6 @@ int main(int argc, char** argv) {
   cudaFree(d_sbox_pmt_2);
   cudaFree(d_sbox_pmt_1);
   cudaFree(d_sbox_pmt_0);
+
+  return h_checksum != d_checksum;
 }

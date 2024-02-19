@@ -202,12 +202,12 @@ int main(int argc, char* argv[])
   printf("configuration: %d nodes and %d edges (%s)\n", g.nodes, g.edges, argv[1]);
   printf("average degree: %.2f edges per node\n", 1.0 * g.edges / g.nodes);
 
+  bool err = false;
   stattype* nstatus = (stattype*)malloc(g.nodes * sizeof(nstatus[0]));
-
   if (nstatus == NULL) {
     fprintf(stderr, "ERROR: could not allocate nstatus\n\n");
-  }
-  else {
+    err = true;
+  } else {
     const int repeat = atoi(argv[2]);
 
     computeMIS(repeat, g.nodes, g.edges, g.nindex, g.nlist, nstatus);
@@ -217,12 +217,14 @@ int main(int argc, char* argv[])
     for (int v = 0; v < g.nodes; v++) {
       if ((nstatus[v] != in) && (nstatus[v] != out)) {
         fprintf(stderr, "ERROR: found unprocessed node in graph\n\n");
+        err = true;
         break;
       }
       if (nstatus[v] == in) {
         for (int i = g.nindex[v]; i < g.nindex[v + 1]; i++) {
           if (nstatus[g.nlist[i]] == in) {
             fprintf(stderr, "ERROR: found adjacent nodes in MIS\n\n");
+            err = true;
             break;
           }
         }
@@ -235,6 +237,7 @@ int main(int argc, char* argv[])
         }
         if (flag == 0) {
           fprintf(stderr, "ERROR: set is not maximal\n\n");
+          err = true;
           break;
         }
       }
@@ -243,5 +246,5 @@ int main(int argc, char* argv[])
 
   freeECLgraph(g);
   if (nstatus != NULL) free(nstatus);
-  return 0;
+  return err ? 1 : 0;
 }

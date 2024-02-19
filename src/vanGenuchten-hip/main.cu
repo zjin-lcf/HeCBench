@@ -140,5 +140,5 @@ int main(int argc, char* argv[])
   delete(theta_ref);
   delete(K_ref);
 
-  return 0;
+  return ok ? 0 : 1;
 }

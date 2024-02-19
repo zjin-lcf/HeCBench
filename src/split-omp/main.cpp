@@ -194,5 +194,5 @@ int main(int argc, char** argv) {
   free(keys);
   free(out);
 
-  return 0;
+  return check ? 0 : 1;
 }

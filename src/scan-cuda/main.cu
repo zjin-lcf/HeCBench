@@ -9,6 +9,7 @@ void verify(const T* cpu_out, const T* gpu_out, int n)
 {
   int error = memcmp(cpu_out, gpu_out, n * sizeof(T));
   printf("%s\n", error ? "FAIL" : "PASS");
+  if (error) exit(1);
 }
 
 // bank conflict aware optimization
@@ -170,7 +171,7 @@ void runTest (const size_t n, const int repeat, bool timing = false)
            sizeof(T), (time * 1e-3f) / repeat);
   }
   cudaMemcpy(gpu_out, d_out, bytes, cudaMemcpyDeviceToHost);
-  if (!timing) verify(cpu_out, gpu_out, nelems);
+  verify(cpu_out, gpu_out, nelems);
 
   // bcao
   start = std::chrono::steady_clock::now();
@@ -188,7 +189,7 @@ void runTest (const size_t n, const int repeat, bool timing = false)
     printf("Reduce the time by %.1f%%\n", (time - bcao_time) * 1.0 / time * 100);
   }
   cudaMemcpy(gpu_out, d_out, bytes, cudaMemcpyDeviceToHost);
-  if (!timing) verify(cpu_out, gpu_out, nelems);
+  verify(cpu_out, gpu_out, nelems);
 
   cudaFree(d_in);
   cudaFree(d_out);

@@ -290,7 +290,9 @@ int main(int argc, char * argv[])
   scanLargeArraysCPUReference(verificationOutput, inputBuffer, length);
 
   // compare the results and see if they match
-  if (compare<float>(outputBuffer, verificationOutput, length, (float)0.001))
+  bool ok =
+      compare<float>(outputBuffer, verificationOutput, length, (float)0.001);
+  if (ok)
     std::cout << "PASS" << std::endl;
   else
     std::cout << "FAIL" << std::endl;
@@ -302,5 +304,5 @@ int main(int argc, char * argv[])
   free(blockSumBufferSizeOffset);
   free(outputBuffer);
   free(outputBufferSizeOffset);
-  return 0;
+  return ok ? 0 : 1;
 }

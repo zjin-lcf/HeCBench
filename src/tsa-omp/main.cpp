@@ -112,6 +112,7 @@ void tsa(int width, int height, int repeat) {
   delete[] d_imag[1];
   delete[] h_real;
   delete[] h_imag;
+  if (!ok) exit(1);
 }
 
 int main(int argc, char** argv) {

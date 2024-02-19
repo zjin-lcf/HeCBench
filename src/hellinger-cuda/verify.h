@@ -8,7 +8,7 @@ bool ValueSame(FP a, FP b) {
   return FABS(a - b) < std::numeric_limits<FP>::epsilon();
 }
 
-void VerifyResult(FP (*a_host)[N], FP (*b_host)[P], 
+bool VerifyResult(FP (*a_host)[N], FP (*b_host)[P], 
                   FP (*c_host)[P], FP (*c_back)[P]) {
   // Check that the results are correct by comparing with host computing.
   int i, j, k;
@@ -55,8 +55,10 @@ void VerifyResult(FP (*a_host)[N], FP (*b_host)[P],
 
   if (!mismatch_found) {
     std::cout << "PASS\n";
+    return true;
   } else {
     std::cout << "FAIL\n";
+    return false;
   }
 }
 #endif

@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
   free(m_host);
   free(b_host);
   free(finalVec_host);
-  return 0;
+  return ok ? 0 : 1;
 }
 
 /*------------------------------------------------------

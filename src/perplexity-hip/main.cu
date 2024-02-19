@@ -163,5 +163,5 @@ int main(int argc, char* argv[]) {
   
   hipFree(d_distance);
   hipFree(d_data);
-  return 0;
+  return ok ? 0 : 1;
 }

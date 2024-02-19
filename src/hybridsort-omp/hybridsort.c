@@ -178,7 +178,7 @@ int main(int argc, char** argv)
   free(nullElements);
   free(origOffsets);
 
-  return 0;
+  return (count == 0) ? 0 : 1;
 }
 
 

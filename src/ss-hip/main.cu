@@ -49,7 +49,7 @@ int verify(uint* resultCount, uint workGroupCount,
   // compare the results and see if they match
   bool pass = (count == cpuResults.size());
   pass = pass && std::equal (result, result+count, cpuResults.begin());
-  if(pass)
+  if (pass)
   {
     std::cout << "Passed!\n" << std::endl;
     return 0;
@@ -223,7 +223,8 @@ int main(int argc, char* argv[])
     hipMemcpy(resultCount, resultCountBuf, workGroupCount * sizeof(uint), hipMemcpyDeviceToHost);
     hipMemcpy(result, resultBuf, (textLength - subStrLength + 1) * sizeof(uint), hipMemcpyDeviceToHost);
 
-    verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
+    if (verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults))
+      return 1;
   }
 
   if(subStrLength > 1) 
@@ -251,7 +252,8 @@ int main(int argc, char* argv[])
     hipMemcpy(resultCount, resultCountBuf, workGroupCount * sizeof(uint), hipMemcpyDeviceToHost);
     hipMemcpy(result, resultBuf, (textLength - subStrLength + 1) * sizeof(uint), hipMemcpyDeviceToHost);
 
-    verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
+    if (verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults))
+      return -1;
   }
 
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);

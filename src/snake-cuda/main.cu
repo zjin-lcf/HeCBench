@@ -208,5 +208,5 @@ int main(int argc, const char * const argv[])
   cudaFree(Dev_ReadSeq);
   cudaFree(Dev_RefSeq);
   cudaFree(Dev_Results);
-  return 0;
+  return error ? 1 : 0;
 }

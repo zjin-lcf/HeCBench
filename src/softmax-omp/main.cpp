@@ -85,5 +85,5 @@ int main(int argc, char* argv[]) {
   free(input);
   free(output_cpu);
   free(output_gpu);
-  return 0;
+  return ok ? 0 : 1;
 }

@@ -225,5 +225,5 @@ int main(int argc, char* argv[])
   hipFree(input_grad_data);
   hipFree(output_data);
   hipFree(output_grad_data);
-  return 0;
+  return ok ? 0 : 1;
 }

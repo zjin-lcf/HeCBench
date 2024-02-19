@@ -120,6 +120,7 @@ void eval(const int64_t nframe,
     ok = false;
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
+  if (!ok) exit(1);
 }
 
 template <typename scalar_t, typename index_t>

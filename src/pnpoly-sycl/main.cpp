@@ -204,5 +204,5 @@ int main(int argc, char* argv[]) {
   free(point);
   free(bitmap_ref);
   free(bitmap_opt);
-  return 0;
+  return error ? 1 : 0;
 }

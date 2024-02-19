@@ -99,7 +99,8 @@ int main(int argc, char * argv[])
   scanLargeArraysCPUReference(verificationOutput, input, length);
 
   // compare the results and see if they match
-  if (compare<float>(output, verificationOutput, length, (float)0.001))
+  bool ok = compare<float>(output, verificationOutput, length, (float)0.001);
+  if (ok)
     std::cout << "PASS" << std::endl;
   else
     std::cout << "FAIL" << std::endl;
@@ -107,5 +108,5 @@ int main(int argc, char * argv[])
   free(input);
   free(output);
   free(verificationOutput);
-  return 0;
+  return ok ? 0 : 1;
 }

@@ -47,8 +47,10 @@ void Verify(const float* h_OutputGPU,
   printf("Relative L2 norm: %.3e\n\n", L2norm);
   if (L2norm < 1E-6) 
     printf("PASS\n"); 
-  else
+  else {
     printf("FAIL\n");
+    exit(1);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

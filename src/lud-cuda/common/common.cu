@@ -123,12 +123,17 @@ lud_verify(float *m, float *lu, int matrix_dim){
   /*   printf("\n"); */
   /* } */
 
+  unsigned errs = 0;
   for (i=0; i<matrix_dim; i++){
       for (j=0; j<matrix_dim; j++){
-          if ( fabs(m[i*matrix_dim+j]-tmp[i*matrix_dim+j]) > 0.0001)
-            printf("dismatch at (%d, %d): (o)%f (n)%f\n", i, j, m[i*matrix_dim+j], tmp[i*matrix_dim+j]);
+          if (fabs(m[i*matrix_dim+j]-tmp[i*matrix_dim+j]) > 0.0001) {
+            if (errs < 32)
+              printf("dismatch at (%d, %d): (o)%f (n)%f\n", i, j, m[i*matrix_dim+j], tmp[i*matrix_dim+j]);
+            ++errs;
+          }
       }
   }
+  if (errs > 0) exit(1);
   free(tmp);
 }
 

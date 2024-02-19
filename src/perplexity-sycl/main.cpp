@@ -160,6 +160,6 @@ int main(int argc, char* argv[]) {
 
   sycl::free(d_distance, q);
   sycl::free(d_data, q);
-  return 0;
+  return ok ? 0 : 1;
 }
 

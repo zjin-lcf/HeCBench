@@ -241,5 +241,5 @@ int main(int argc, char** argv)
   hipFree(dev_out);
   hipFree(dev_length);
   hipFree(key_length);
-  return 0;
+  return error ? 1 : 0;
 }

@@ -178,5 +178,5 @@ int main(int argc, char *argv[])
   free(smax);
   free(sbest);
   free(oldmax);
-  return 0;
+  return ok ? 0 : 1;
 }

@@ -196,6 +196,7 @@ int main(int argc, char* argv[])
   const uint maxSearchLength = searchLenPerWG;
 
   double time = 0.0;
+  unsigned errors = 0;
 
 #pragma omp target data map(to: pattern[0:subStrLength], \
                                 text[0:textLength]) \
@@ -281,7 +282,8 @@ int main(int argc, char* argv[])
     #pragma omp target update from (resultCount[0:workGroupCount])
     #pragma omp target update from (result[0:textLength - subStrLength + 1])
 
-    verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
+    if(verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults))
+      errors++;
   }
 
   /*
@@ -453,7 +455,8 @@ int main(int argc, char* argv[])
     #pragma omp target update from (resultCount[0:workGroupCount])
     #pragma omp target update from (result[0:textLength - subStrLength + 1])
 
-    verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults); 
+    if (verify(resultCount, workGroupCount, result, searchLenPerWG, cpuResults))
+      errors++;
   }
 
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / iterations);
@@ -462,5 +465,5 @@ int main(int argc, char* argv[])
   free(text);
   free(result);
   free(resultCount);
-  return 0;
+  return errors ? 1 : 0;
 }

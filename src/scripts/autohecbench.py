@@ -70,6 +70,13 @@ class Benchmark:
         if self.verbose:
             print(" ".join(cmd))
             print(out)
+
+        try:
+            proc.check_returncode()
+        except subprocess.CalledProcessError as e:
+            print(f'{self.path}: Benchmark returned error code {e.returncode}.')
+            raise(e)
+
         res = re.findall(self.res_regex, out)
         if not res:
             raise Exception(self.path + ":\nno regex match for " + self.res_regex + " in\n" + out)

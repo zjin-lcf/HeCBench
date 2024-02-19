@@ -305,6 +305,8 @@ int main(int argc, char** argv) {
   LossNLL_BWD<__half, __half>(repeat);
 
   printf("%s\n", (errors == 0) ? "PASS" : "FAIL");
+  if (errors)
+    exit(1);
 
   printf("=========== Data type is FP32 ==========\n");
 
@@ -312,6 +314,8 @@ int main(int argc, char** argv) {
   LossNLL_BWD<float, float>(repeat);
 
   printf("%s\n", (errors == 0) ? "PASS" : "FAIL");
+  if (errors)
+    exit(1);
 
   printf("=========== Data type is FP64 ==========\n");
 
@@ -319,6 +323,8 @@ int main(int argc, char** argv) {
   LossNLL_BWD<double, double>(repeat);
 
   printf("%s\n", (errors == 0) ? "PASS" : "FAIL");
+  if (errors)
+    exit(1);
 
   return 0;
 }

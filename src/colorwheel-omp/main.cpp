@@ -130,6 +130,7 @@ int main(int argc, char **argv)
        if (e > max_error) max_error = e;
     }
     printf("Maximum error between host and device results: %d\n", max_error);
+    exit(1);
   }
   else {
     printf("%s\n", "PASS");

@@ -17,7 +17,6 @@ double gettime() {
   return t.tv_sec+t.tv_usec*1e-6;
 }
 
-static int do_verify = 0;
 
 static struct option long_options[] = {
   /* name, has_arg, flag, val */
@@ -32,6 +31,7 @@ int main ( int argc, char *argv[] )
   printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
   int matrix_dim = 32; /* default matrix_dim */
   int opt, option_index=0;
+  int do_verify = 1;
   func_ret_t ret;
   const char *input_file = NULL;
   float *m, *mm;

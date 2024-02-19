@@ -324,6 +324,7 @@ int test(uint arraySize, unsigned int  NUM_ITERATIONS,
 {
   double totalTime, quickSortTime, stdSortTime;
   double beginClock, endClock;
+  uint num_failures = 0;
 
   printf("\n\n\n--------------------------------------------------------------------\n");
   printf("Allocating array size of %d (data type: %s)\n", arraySize, type_name.c_str());
@@ -371,9 +372,8 @@ int test(uint arraySize, unsigned int  NUM_ITERATIONS,
     }
     std::cout << std::boolalpha << correct << std::endl;
     if (!correct) {
-      char y;
       std::cout << "num_discrepancies: " << num_discrepancies << std::endl;
-      std::cin >> y;
+      num_failures++;
     }
   }
 #endif
@@ -386,7 +386,6 @@ int test(uint arraySize, unsigned int  NUM_ITERATIONS,
   std::vector<double> times;
   times.resize(NUM_ITERATIONS);
   double AverageTime = 0.0;
-  uint num_failures = 0;
   for(uint k = 0; k < NUM_ITERATIONS; k++) {
     std::copy(original.begin(), original.end(), pArray);
     std::vector<uint> seqs;
@@ -421,6 +420,7 @@ int test(uint arraySize, unsigned int  NUM_ITERATIONS,
 #endif
   }
   std::cout << " Number of failures: " << num_failures << " out of " << NUM_ITERATIONS << std::endl;
+  if (num_failures) exit(1);
   AverageTime = AverageTime/NUM_ITERATIONS;
   std::cout << "Average Time: " << AverageTime * 1000 << " ms" << std::endl;
   double stdDev = 0.0, minTime = 1000000.0, maxTime = 0.0;

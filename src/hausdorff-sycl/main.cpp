@@ -136,5 +136,5 @@ int main(int argc, char* argv[]) {
   sycl::free(d_distance, q);
   sycl::free(d_Apoints, q);
   sycl::free(d_Bpoints, q);
-  return 0;
+  return error ? 1 : 0;
 }

@@ -207,5 +207,5 @@ int main(int argc, char *argv[])
   sycl::free(d_smax, q);
   sycl::free(d_sbest, q);
   sycl::free(d_oldmax, q);
-  return 0;
+  return ok ? 0 : 1;
 }
