@@ -43,14 +43,7 @@
 
 #define BLOCK_SIZE 256
 
-void ParallelBitonicSort(int input[], int n) {
-
-  // Create queue on implementation-chosen default device.
-#ifdef USE_GPU
-  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
-#else
-  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
-#endif
+void ParallelBitonicSort(int input[], int n, sycl::queue &q) {
 
   // n: the exponent used to set the array size. Array size = power(2, n)
   int size = pow(2, n);
@@ -220,10 +213,17 @@ int main(int argc, char *argv[]) {
     data_gpu[i] = data_cpu[i] = rand() % 1000;
   }
 
+  // Create queue on implementation-chosen default device.
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
+
   std::cout << "Bitonic sort (parallel)..\n";
   auto start = std::chrono::steady_clock::now();
 
-  ParallelBitonicSort(data_gpu, n);
+  ParallelBitonicSort(data_gpu, n, q);
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
