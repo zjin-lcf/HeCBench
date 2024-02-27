@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../fft-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -33,7 +33,6 @@ ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -47,7 +46,8 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu fft1D_512.h ifft1D_512.h Makefile
+%.o: %.cu ../fft-cuda/fft1D_512.h ../fft-cuda/ifft1D_512.h \
+          ../fft-cuda/reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -55,4 +55,3 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) 3 100
-

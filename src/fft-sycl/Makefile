@@ -75,4 +75,3 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) 3 100
-

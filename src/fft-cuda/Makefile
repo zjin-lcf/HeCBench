@@ -48,7 +48,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu fft1D_512.h ifft1D_512.h Makefile
+%.o: %.cu fft1D_512.h ifft1D_512.h reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
