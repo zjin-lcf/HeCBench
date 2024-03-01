@@ -10,24 +10,18 @@
 // for all members of float4 to be consumed UNROLL has to be 4. Don't change!
 const int UNROLL = 4;
 
-template <typename scalar_t,
-          typename accscalar_t,
-          typename IndexType>
-void
-fused_dropout_kernel(
-  const scalar_t *__restrict a,
-        scalar_t *__restrict b,
-         uint8_t *__restrict c,
-  IndexType totalElements,
-  accscalar_t p,
-  std::pair<uint64_t, uint64_t> seeds,
-  sycl::nd_item<1> &item) 
+template <typename scalar_t, typename accscalar_t, typename IndexType,
+          typename mask_t>
+void fused_dropout_kernel(const scalar_t *__restrict__ a,
+                          scalar_t *__restrict__ b, mask_t *__restrict__ c,
+                          IndexType totalElements, accscalar_t p,
+                          std::pair<uint64_t, uint64_t> seeds,
+                          const sycl::nd_item<1> &item)
 {
-  int blockDim = item.get_local_range(0);
-  int gridDim = item.get_group_range(0);
-
-  accscalar_t pinv = accscalar_t(1)/p;
+  accscalar_t scale = accscalar_t(1)/p;
   IndexType idx = item.get_global_id(0);
+  IndexType blockDim = item.get_local_range(0);
+  IndexType gridDim = item.get_group_range(0);
 
   oneapi::mkl::rng::device::philox4x32x10<4> engine (
       seeds.first, {seeds.second, idx * 4});
@@ -35,8 +29,7 @@ fused_dropout_kernel(
   IndexType rounded_size = ((totalElements - 1) / (blockDim * gridDim * UNROLL) + 1) *
                            blockDim * gridDim * UNROLL;
 
-  for (IndexType linearIndex = idx;
-       linearIndex < rounded_size;
+  for (IndexType linearIndex = idx; linearIndex < rounded_size;
        linearIndex += gridDim * blockDim * UNROLL) {
 
     oneapi::mkl::rng::device::uniform<float> distr;
@@ -47,6 +40,8 @@ fused_dropout_kernel(
     rand.y() = rand.y() < p;
     rand.z() = rand.z() < p;
     rand.w() = rand.w() < p;
+
+    #pragma unroll
     for (int ii = 0; ii < UNROLL; ii++) {
       IndexType li = linearIndex + blockDim * gridDim * ii;
       if (li < totalElements) {
@@ -55,15 +50,87 @@ fused_dropout_kernel(
       }
     }
 
+    #pragma unroll
     for (int ii = 0; ii < UNROLL; ii++) {
       IndexType li = linearIndex + blockDim * gridDim * ii;
       if (li < totalElements) {
         const IndexType bOffset = li;
-        b[bOffset] = src[ii] * (&rand.x())[ii] * pinv;
-        c[bOffset] = (uint8_t)(&rand.x())[ii];
+        b[bOffset] = src[ii] * (&rand.x())[ii] * scale;
+        c[bOffset] = (mask_t)(&rand.x())[ii];
       }
     }
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
+  }
+}
+
+// aligned vector generates vectorized load/store
+template<typename scalar_t, int vec_size>
+struct alignas(sizeof(scalar_t) * vec_size) aligned_vector {
+  scalar_t val[vec_size];
+};
+
+template <typename scalar_t, typename accscalar_t, typename IndexType,
+          typename mask_t, int VEC>
+void fused_dropout_kernel_vec(const scalar_t *__restrict__ a,
+                              scalar_t *__restrict__ b, mask_t *__restrict__ c,
+                              IndexType totalElements, accscalar_t p,
+                              std::pair<uint64_t, uint64_t> seeds,
+                              const sycl::nd_item<1> &item)
+{
+  using LoadT = aligned_vector<scalar_t, VEC>;
+  using MaskLoadT = aligned_vector<mask_t, VEC>;
+
+  // Helps align the total number of times curand_uniform4 is called by each thread for the same totalElements
+  bool gridxvec_loop_state = 0;
+
+  accscalar_t scale = accscalar_t(1)/p;
+  IndexType idx = item.get_global_id(0);
+  IndexType blockDim = item.get_local_range(0);
+  IndexType gridDim = item.get_group_range(0);
+
+  oneapi::mkl::rng::device::philox4x32x10<4> engine (
+      seeds.first, {seeds.second, idx * 4});
+
+  // Note: Vectorized loads means we'll stride each thread by an additional VEC factor, as we'll load VEC elements at a time
+  for (IndexType linearIndex = idx * VEC; linearIndex < totalElements;
+       linearIndex += gridDim * blockDim * VEC) {
+
+    scalar_t src[VEC];
+    LoadT *value = reinterpret_cast<LoadT*>(&src);
+
+    sycl::float4 rand;
+    if ((VEC == 4) || (gridxvec_loop_state == 0)) {
+      oneapi::mkl::rng::device::uniform<float> distr;
+      rand = oneapi::mkl::rng::device::generate(distr, engine);
+    } else {
+      // sets up the last two values we generated last iteration to be used this iteration.
+      rand.x() = rand.z();
+      rand.y() = rand.w();
+      gridxvec_loop_state ^= 1;
+    }
+    rand.x() = rand.x() < p;
+    rand.y() = rand.y() < p;
+    if (VEC == 4) {
+      rand.z() = rand.z() < p;
+      rand.w() = rand.w() < p;
+    }
+
+    *value = *reinterpret_cast<const LoadT*>(&a[linearIndex]);
+
+    scalar_t r[VEC];
+    mask_t mask[VEC];
+
+    // Perform the actual computation
+    #pragma unroll
+    for (int ii = 0; ii < VEC; ii++) {
+      r[ii] = src[ii] * (&rand.x())[ii] * scale;
+      mask[ii] = (mask_t)(&rand.x())[ii];
+    }
+    // Vectorized writes for both mask & result
+    *(reinterpret_cast<LoadT*>(&b[linearIndex])) = *reinterpret_cast<LoadT*>(&r[0]);
+    *(reinterpret_cast<MaskLoadT*>(&c[linearIndex])) = *reinterpret_cast<MaskLoadT*>(&mask[0]);
+
+    item.barrier(sycl::access::fence_space::local_space);
   }
 }
 
@@ -77,6 +144,11 @@ int main(int argc, char *argv[]) {
   const int repeat = atoi(argv[2]);
 
   const int64_t block_size = 256;
+
+  sycl::range<1> dim_block(block_size);
+  sycl::range<1> grid_vec1(512);
+  sycl::range<1> grid_vec2(grid_vec1[0] / 2);
+  sycl::range<1> grid_vec4(grid_vec1[0] / 4);
 
   std::pair<uint64_t, uint64_t> rng_engine_inputs;
   rng_engine_inputs.first =  12345678;
@@ -101,50 +173,59 @@ int main(int argc, char *argv[]) {
 #endif
 
   float *d_self_info = (float *)sycl::malloc_device(self_size, q);
-  q.memcpy(d_self_info, self_info, self_size);
+  q.memcpy(d_self_info, self_info, self_size).wait();
 
   float *d_ret_info = (float *)sycl::malloc_device(ret_size, q);
 
   uint8_t *d_mask_info = (uint8_t *)sycl::malloc_device(mask_size, q);
 
-  sycl::range<1> lws (block_size);
-  sycl::range<1> gws (256 * block_size);
-
-  double total_time = 0.0;
-
+  auto start = std::chrono::steady_clock::now();
   for (int p = 1; p <= repeat; p++) {
     float pa = (float)p / repeat;
-
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
-
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        fused_dropout_kernel<float, float, unsigned int>(
-          d_self_info, d_ret_info, d_mask_info, nelem, pa, rng_engine_inputs, item);
-      });
-    }).wait();
-
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    total_time += time;
-
-#ifdef DEBUG
-    q.memcpy(ret_info, d_ret_info, ret_size);
-    q.memcpy(mask_info, d_mask_info, mask_size);
-    q.wait();
-
-    double ret_sum = 0.0;
-    int64_t mask_sum = 0;
-    for (int64_t i = 0; i < nelem; i++) {
-      ret_sum += ret_info[i];
-      mask_sum += mask_info[i];
-    }
-    printf("p=%2d ret_sum=%lf mask_sum=%ld\n", p, ret_sum, mask_sum);
-#endif
+    q.parallel_for(
+        sycl::nd_range<1>(grid_vec1 * dim_block, dim_block),
+        [=](sycl::nd_item<1> item) {
+          fused_dropout_kernel<float, float, unsigned int, uint8_t>(
+              d_self_info, d_ret_info, d_mask_info, nelem, pa,
+              rng_engine_inputs, item);
+        });
   }
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (VEC1) %lf (s)\n", time * 1e-9f);
+ 
+  start = std::chrono::steady_clock::now();
+  for (int p = 1; p <= repeat; p++) {
+    float pa = (float)p / repeat;
+    q.parallel_for(
+        sycl::nd_range<1>(grid_vec2 * dim_block, dim_block),
+        [=](sycl::nd_item<1> item) {
+          fused_dropout_kernel_vec<float, float, unsigned int, uint8_t, 2>(
+              d_self_info, d_ret_info, d_mask_info, nelem, pa,
+              rng_engine_inputs, item);
+        });
+  }
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (VEC2) %lf (s)\n", time * 1e-9f);
 
-  printf("Total kernel execution time %lf (s)\n", total_time * 1e-9f);
+  start = std::chrono::steady_clock::now();
+  for (int p = 1; p <= repeat; p++) {
+    float pa = (float)p / repeat;
+    q.parallel_for(
+        sycl::nd_range<1>(grid_vec4 * dim_block, dim_block),
+        [=](sycl::nd_item<1> item) {
+          fused_dropout_kernel_vec<float, float, unsigned int, uint8_t, 4>(
+              d_self_info, d_ret_info, d_mask_info, nelem, pa,
+              rng_engine_inputs, item);
+        });
+  }
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total kernel execution time (VEC4) %lf (s)\n", time * 1e-9f);
 
   sycl::free(d_self_info, q);
   sycl::free(d_ret_info, q);
