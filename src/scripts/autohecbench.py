@@ -11,6 +11,7 @@ class Benchmark:
     def __init__(self, args, name, res_regex, run_args = [], binary = "main", invert = False):
         if name.endswith('sycl'):
             self.MAKE_ARGS = ['GCC_TOOLCHAIN="{}"'.format(args.gcc_toolchain)]
+            self.MAKE_ARGS = ['CC="{}"'.format(args.compiler_name)]
             if args.sycl_type == 'cuda':
                 self.MAKE_ARGS.append('CUDA=yes')
                 self.MAKE_ARGS.append('CUDA_ARCH=sm_{}'.format(args.nvidia_sm))
@@ -92,13 +93,15 @@ def main():
     parser.add_argument('--warmup', '-w', type=bool, default=True,
                         help='Run a warmup iteration')
     parser.add_argument('--sycl-type', '-s', choices=['cuda', 'hip', 'opencl'], default='cuda',
-                        help='Type of SYCL device to use')
+                        help='Type of SYCL device to use (default is cuda)')
     parser.add_argument('--nvidia-sm', type=int, default=60,
-                        help='NVIDIA SM version')
+                        help='NVIDIA SM version (default is 60)')
     parser.add_argument('--amd-arch', default='gfx908',
-                        help='AMD Architecture')
+                        help='AMD Architecture (default is gfx908)')
+    parser.add_argument('--compiler-name', default='clang++',
+                        help='Name of a SYCL compiler (default is clang++)')
     parser.add_argument('--gcc-toolchain', default='',
-                        help='GCC toolchain location')
+                        help='GCC toolchain location (e.g. /path/to/gcc/x86_64/gcc-9.1.0)')
     parser.add_argument('--extra-compile-flags', '-e', default='',
                         help='Additional compilation flags (inserted before the predefined CFLAGS)')
     parser.add_argument('--clean', '-c', action='store_true',
@@ -197,7 +200,7 @@ def main():
         outfile.close()
 
     t_done = time.time()
-    print("compilation took {} s, runnning took {} s.".format(t_compiled-t0, t_done-t_compiled))
+    print("compilation took {} s, running took {} s.".format(t_compiled-t0, t_done-t_compiled))
 
 if __name__ == "__main__":
     main()
