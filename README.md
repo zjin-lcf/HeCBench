@@ -124,13 +124,19 @@ Each benchmark falls into a single category. While such classification is not ac
     ./autohecbench.py backprop-sycl --verbose
     ```
 
+    To run a single benchmark using the Intel oneAPI Toolkit on an Intel GPU:
+
+    ```
+    ./autohecbench.py backprop-sycl --sycl-type opencl --compiler-name icpx --verbose
+    ```
+
     By default it will run a warmup iteration before running each benchmark,
     and it is possible to run the benchmarks multiple times with `-r`:
     ```
     ./autohecbench.py backprop-sycl -r 20 -o mandel.csv
     ```
 
-    And it also has options to pick the SM version or HIP architecture and a
+    And it also has options to pick the CUDA SM version or HIP architecture and a
     few other parameters.
 
 # Dataset
@@ -546,7 +552,7 @@ Early results are shown [here](results/README.md)
   Filtering by a predicate (https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/)
 
 ### fft (opencl)
-  FFT in the SHOC benchmark suite(https://github.com/vetter/shoc/)
+  Fast Fourier transform in the SHOC benchmark suite(https://github.com/vetter/shoc/)
 
 ### flame (cuda)
   Fractal flame (http://gpugems.hwu-server2.crhc.illinois.edu/)
@@ -1104,7 +1110,7 @@ Early results are shown [here](results/README.md)
   Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
 
 ### qtclustering (opencl)
-  quality threshold clustering (https://github.com/vetter/shoc/)
+  Quality threshold clustering (https://github.com/vetter/shoc/)
 
 ### quicksort (sycl)
   Quicksort (https://software.intel.com/content/www/us/en/develop/download/code-for-the-parallel-universe-article-gpu-quicksort-from-opencl-to-data-parallel-c.html)
@@ -1468,7 +1474,7 @@ Early results are shown [here](results/README.md)
 Authored and maintained by Zheming Jin (https://github.com/zjin-lcf) 
 
 ## Acknowledgement
-Abhishek Bagusetty, Andrey Alekseenko, Anton Gorshkov, Beau Johnston, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, David Sanchez, Douglas Franz, Edson Borin, Gabriell Araujo, Georgi Mirazchiyski, Henry Gabb, Hugh Delaney, Ian Karlin, Istvan Reguly, Jack Kirk, Jason Lau, Jeff Hammond, Jenny Chen, Jeongnim Kim, Jianxin Qiu, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Junchao Zhang, Kali Uday Balleda, Kinman Lei, Luke Drummond, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Franusich, Mike Giles, Mikhail Dvorskiy, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pavel Samolysov, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Steffen Larsen, Rafal Bielski, Robert Harrison, Robin Kobus, Rod Burns, Rodrigo Vimieiro, Romanov Vlad, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Timmie Smith, Tobias Baumann, Usman Roshan, Wayne Joubert, Ye Luo, Yongbin Gu, Zhe Chen
+Abhishek Bagusetty, Andrey Alekseenko, Anton Gorshkov, Beau Johnston, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, David Oro, David Sanchez, Douglas Franz, Edson Borin, Gabriell Araujo, Georgi Mirazchiyski, Henry Linjamäki, Henry Gabb, Hugh Delaney, Ian Karlin, Istvan Reguly, Jack Kirk, Jason Lau, Jeff Hammond, Jenny Chen, Jeongnim Kim, Jianxin Qiu, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Junchao Zhang, Kali Uday Balleda, Kinman Lei, Luke Drummond, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Franusich, Mike Giles, Mikhail Dvorskiy, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pavel Samolysov, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Steffen Larsen, Rafal Bielski, Robert Harrison, Robin Kobus, Rod Burns, Rodrigo Vimieiro, Romanov Vlad, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Timmie Smith, Tobias Baumann, Usman Roshan, Wayne Joubert, Ye Luo, Yongbin Gu, Zhe Chen
 
 Codeplay<sup>®</sup> and Intel<sup>®</sup> for their contributions to the oneAPI ecosystem   
 
