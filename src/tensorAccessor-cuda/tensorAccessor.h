@@ -1,3 +1,5 @@
+#pragma once
+
 #include <array>
 #include <algorithm>
 #include <cassert>
@@ -240,4 +242,3 @@ public:
 
 template <typename T, size_t N, template <typename U> class PtrTraits = DefaultPtrTraits>
 using PackedTensorAccessor64 = GenericPackedTensorAccessor<T, N, PtrTraits, int64_t>;
-
