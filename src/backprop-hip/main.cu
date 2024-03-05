@@ -64,7 +64,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
     }
   }
 
-  printf("Performing GPU computation\n");
+  printf("Performing device offload\n");
 
   double offload_start = get_time();
 
