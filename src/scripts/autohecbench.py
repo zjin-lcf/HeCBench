@@ -21,6 +21,10 @@ class Benchmark:
             elif args.sycl_type == 'opencl':
                 self.MAKE_ARGS.append('CUDA=no')
                 self.MAKE_ARGS.append('HIP=no')
+            elif args.sycl_type == 'cpu':
+                self.MAKE_ARGS.append('CUDA=no')
+                self.MAKE_ARGS.append('HIP=no')
+                self.MAKE_ARGS.append('GPU=no')
         elif name.endswith('cuda'):
             self.MAKE_ARGS = ['CUDA_ARCH=sm_{}'.format(args.nvidia_sm)]
         else:
@@ -94,7 +98,7 @@ def main():
                         help='Repeat benchmark run')
     parser.add_argument('--warmup', '-w', type=bool, default=True,
                         help='Run a warmup iteration')
-    parser.add_argument('--sycl-type', '-s', choices=['cuda', 'hip', 'opencl'], default='cuda',
+    parser.add_argument('--sycl-type', '-s', choices=['cuda', 'hip', 'opencl', 'cpu'], default='cuda',
                         help='Type of SYCL device to use (default is cuda)')
     parser.add_argument('--nvidia-sm', type=int, default=60,
                         help='NVIDIA SM version (default is 60)')
