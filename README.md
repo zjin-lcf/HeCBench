@@ -130,6 +130,12 @@ Each benchmark falls into a single category. While such classification is not ac
     ./autohecbench.py backprop-sycl --sycl-type opencl --compiler-name icpx --verbose
     ```
 
+    To run a single benchmark using the Intel oneAPI Toolkit on a CPU:
+
+    ```
+    ./autohecbench.py backprop-sycl --sycl-type cpu --compiler-name icpx --verbose
+    ```
+
     By default it will run a warmup iteration before running each benchmark,
     and it is possible to run the benchmarks multiple times with `-r`:
     ```
