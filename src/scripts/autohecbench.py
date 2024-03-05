@@ -64,6 +64,14 @@ class Benchmark:
             print(f'Failed compilation in {self.path}.\n{e}')
             if e.stderr:
                 print(e.stderr, file=sys.stderr)
+
+            print("-----------------------------------------------------------------------------------------")
+            print("Description of the compilation error:")
+            cause = subprocess.run(["make"] + self.MAKE_ARGS, cwd=self.path,
+                                   check=False, capture_output=True, encoding="utf-8")
+            print(cause.stdout)
+            print(cause.stderr)
+            print("-----------------------------------------------------------------------------------------")
             raise(e)
 
         if self.verbose:
@@ -113,7 +121,7 @@ def main():
     parser.add_argument('--clean', '-c', action='store_true',
                         help='Clean the builds')
     parser.add_argument('--verbose', '-v', action='store_true',
-                        help='Clean the builds')
+                        help='Verbose outputs from the builds')
     parser.add_argument('--bench-dir', '-b',
                         help='Benchmark directory')
     parser.add_argument('--bench-data', '-d',
