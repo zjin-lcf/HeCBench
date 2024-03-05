@@ -11,7 +11,7 @@ class Benchmark:
     def __init__(self, args, name, res_regex, run_args = [], binary = "main", invert = False):
         if name.endswith('sycl'):
             self.MAKE_ARGS = ['GCC_TOOLCHAIN="{}"'.format(args.gcc_toolchain)]
-            self.MAKE_ARGS = ['CC="{}"'.format(args.compiler_name)]
+            self.MAKE_ARGS.append('CC={}'.format(args.compiler_name))
             if args.sycl_type == 'cuda':
                 self.MAKE_ARGS.append('CUDA=yes')
                 self.MAKE_ARGS.append('CUDA_ARCH=sm_{}'.format(args.nvidia_sm))
