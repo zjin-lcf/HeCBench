@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 
   srand(123);
   for (int i = 0; i < imageSize; i++) {
-    h_src[i] = {rand() % 256, rand() % 256, rand() % 256};
+    h_src[i] = {static_cast<unsigned char>(rand() % 256), static_cast<unsigned char>(rand() % 256), static_cast<unsigned char>(rand() % 256)};
   }
 
   #pragma omp target data map (to: h_src[0:imageSize], h_prop[0:1]) \

@@ -201,7 +201,7 @@ double solution(const double t, const double x, const double y, const double alp
 
 // Computes the L2-norm of the computed grid and the MMS known solution
 // The known solution is the same as the boundary function.
-double l2norm(const int n, const double * restrict u, const int nsteps, const double dt,
+double l2norm(const int n, const double * u, const int nsteps, const double dt,
               const double alpha, const double dx, const double length) {
 
   // Final (real) time simulated

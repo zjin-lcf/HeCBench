@@ -53,7 +53,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../sad-cuda/bitmap_image.hpp
+%.o: %.cpp ../sad-cuda/bitmap_image.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

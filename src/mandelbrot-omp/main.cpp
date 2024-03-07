@@ -36,9 +36,9 @@ void Execute() {
 
   // Report the results
   std::cout << std::setw(20) << "serial time: " << serial_time.count() << "s\n";
-  cout << std::setw(20) << "Average parallel time: "
+  std::cout << std::setw(20) << "Average parallel time: "
                         << (parallel_time / repetitions).count() * 1e3 << " ms\n";
-  cout << std::setw(20) << "Average kernel execution time: "
+  std::cout << std::setw(20) << "Average kernel execution time: "
                         << kernel_time / repetitions * 1e3 << " ms\n";
 
   // Validating
