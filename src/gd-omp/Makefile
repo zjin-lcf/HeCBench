@@ -24,7 +24,7 @@ obj = main.o utils.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../gd-sycl
 
 # Linker Flags
 LDFLAGS = 

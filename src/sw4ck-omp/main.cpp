@@ -165,7 +165,7 @@ int main(int argc, char* argv[]) {
             alpha_ptr, mua_ptr, lambda_ptr, met_ptr, jac_ptr,
             uacc_ptr, onesided_ptr, cof_ptr, sg_str, nkg, op);
 
-        auto end = std::chrono::steady_clock::now();
+        auto end = std::chrono::high_resolution_clock::now();
         time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       }
 

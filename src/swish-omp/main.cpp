@@ -3,7 +3,6 @@
 #include <math.h>
 #include <chrono>
 #include <random>
-#include <cuda.h>
 #include "reference.h"
 
 #define GPU_THREADS 256

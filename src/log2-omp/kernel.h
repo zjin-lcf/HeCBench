@@ -79,7 +79,6 @@ void log2_approx (
       }
 
       auto end = std::chrono::high_resolution_clock::now(); 
-      auto end = std::chrono::high_resolution_clock::now(); 
       auto etime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       std::cout << "\nIterative approximation with " << precision[i] <<" bits of precision\n";
       std::cout << "Average kernel execution time " << etime * 1e-3 / repeat << " (us)\n";
