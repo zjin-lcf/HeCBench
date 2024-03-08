@@ -48,7 +48,7 @@ endif
 ifeq ($(DEVICE),gpu)
   CFLAGS +=-cxx=icpc -qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
-  CFLAGS +=-cxx=icpc 
+  CFLAGS +=--cxx=icpc 
 endif
 #===============================================================================
 # Targets to Build

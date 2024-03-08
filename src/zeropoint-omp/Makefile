@@ -53,7 +53,7 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cpp ../zeropoint-cuda/reference.h
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -I ../zeropoint-cuda -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
