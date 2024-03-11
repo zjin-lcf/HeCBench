@@ -207,6 +207,7 @@ int main(int argc, char *argv[]) {
     data_gpu[i] = data_cpu[i] = rand() % 1000;
   }
 
+  hipInit(0);
   std::cout << "Bitonic sort (parallel)..\n";
   auto start = std::chrono::steady_clock::now();
 
