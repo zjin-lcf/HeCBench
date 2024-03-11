@@ -19,9 +19,11 @@
 #include <random>
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include <cuda_bf16.h>
 #include "kernels.h"
 
-template<typename T>
+// V: version
+template<typename T, int V>
 void invokeAddBiasResidualLayerNorm(
           T*     out,
     const T*     input,
@@ -35,7 +37,7 @@ void invokeAddBiasResidualLayerNorm(
   dim3 grid(m);
   dim3 block(std::min(n, 256));
 
-  if (m >= 512 && (n == 768 || n == 1024)) {
+  if (V == 2) { // assume n % 8 == 0
     addBiasResidualPostLayerNormV2<T><<<grid, n / 8>>>(out, input, bias, gamma, beta, layernorm_eps, n);
   }
   else {
@@ -55,16 +57,20 @@ void invokeAddBiasResidualLayerNorm(
   }
 }
 
-template<typename T>
+template<typename T, int V>
 void layer(int repeat) {
-
-  std::mt19937 gen (19937);
-  std::uniform_real_distribution<float> dis(0.f, 1.f);
 
   const int m = 4096;  // batch size
 
-  // n-dimensional data
-  for (int n = 512; n <= 4096; n = n * 2) {
+  int dim[] = {256, 512, 768, 1024, 2048, 4096, 8192};
+
+  for (int i = 0; i < 7; i++) {
+
+    std::mt19937 gen (19937);
+    std::uniform_real_distribution<float> dis(0.f, 1.f);
+
+    // n-dimensional data
+    const int n = dim[i]; 
     const int input_size = m * n;
     const int output_size = m * n;
     const int input_size_bytes = input_size * sizeof(T);
@@ -109,14 +115,8 @@ void layer(int repeat) {
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      invokeAddBiasResidualLayerNorm(d_output,
-                                     d_input,
-                                     d_bias,
-                                     d_gamma,
-                                     d_beta,
-                                     layernorm_eps,
-                                     m,
-                                     n);
+      invokeAddBiasResidualLayerNorm<T, V>
+          (d_output, d_input, d_bias, d_gamma, d_beta, layernorm_eps, m, n);
     }
     cudaDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
@@ -154,7 +154,14 @@ int main(int argc, char* argv[])
   }
 
   const int repeat = atoi(argv[1]);
-  layer<half>(repeat);
+  printf("---------------- float16 (version 1) -------------\n");
+  layer<half, 1>(repeat);
+  printf("---------------- float16 (version 2) -------------\n");
+  layer<half, 2>(repeat);
 
+  printf("---------------- bfloat16 (version 1) -------------\n");
+  layer<__nv_bfloat16, 1>(repeat);
+  printf("---------------- bfloat16 (version 2) -------------\n");
+  layer<__nv_bfloat16, 2>(repeat);
   return 0;
 }

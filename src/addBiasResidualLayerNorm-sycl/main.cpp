@@ -20,7 +20,7 @@
 #include <sycl/sycl.hpp>
 #include "kernels.h"
 
-template<typename T>
+template<typename T, int V>
 void invokeAddBiasResidualLayerNorm(
     sycl::queue &q,
           T*     out,
@@ -32,7 +32,7 @@ void invokeAddBiasResidualLayerNorm(
     int          m,
     int          n)
 {
-  if (m >= 512 && (n == 768 || n == 1024)) {
+  if (V == 2) {
 
     sycl::range<1> gws (m * n / 8);
     sycl::range<1> lws (n / 8);
@@ -103,20 +103,25 @@ void invokeAddBiasResidualLayerNorm(
   }
 }
 
-template <typename T> void layer(int repeat) {
+template<typename T, int V>
+void layer(int repeat) {
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  std::mt19937 gen (19937);
-  std::uniform_real_distribution<float> dis(0.f, 1.f);
-
   const int m = 4096;  // batch size
 
-  // n-dimensional data
-  for (int n = 512; n <= 4096; n = n * 2) {
+  int dim[] = {256, 512, 768, 1024, 2048, 4096, 8192};
+
+  for (int i = 0; i < 7; i++) {
+
+    std::mt19937 gen (19937);
+    std::uniform_real_distribution<float> dis(0.f, 1.f);
+
+    // n-dimensional data
+    const int n = dim[i]; 
     const int input_size = m * n;
     const int output_size = m * n;
     const int input_size_bytes = input_size * sizeof(T);
@@ -161,15 +166,8 @@ template <typename T> void layer(int repeat) {
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      invokeAddBiasResidualLayerNorm(q,
-                                     d_output,
-                                     d_input,
-                                     d_bias,
-                                     d_gamma,
-                                     d_beta,
-                                     layernorm_eps,
-                                     m,
-                                     n);
+      invokeAddBiasResidualLayerNorm<T, V>(
+        q, d_output, d_input, d_bias, d_gamma, d_beta, layernorm_eps, m, n);
     }
     q.wait();
     auto end = std::chrono::steady_clock::now();
@@ -207,7 +205,15 @@ int main(int argc, char* argv[])
   }
 
   const int repeat = atoi(argv[1]);
-  layer<sycl::half>(repeat);
+  printf("---------------- float16 (version 1) -------------\n");
+  layer<sycl::half, 1>(repeat);
+  printf("---------------- float16 (version 2) -------------\n");
+  layer<sycl::half, 2>(repeat);
+
+  printf("---------------- bfloat16 (version 1) -------------\n");
+  layer<sycl::ext::oneapi::bfloat16, 1>(repeat);
+  printf("---------------- bfloat16 (version 2) -------------\n");
+  layer<sycl::ext::oneapi::bfloat16, 2>(repeat);
 
   return 0;
 }
