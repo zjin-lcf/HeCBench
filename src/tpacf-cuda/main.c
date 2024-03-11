@@ -22,17 +22,15 @@
  THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE SOFTWARE.
  */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 #include <sys/time.h>
 #include "args.h"
+#include "kernel.h"
 
 #define TDIFF(ts, te) (te.tv_sec - ts.tv_sec + (te.tv_usec - ts.tv_usec) * 1e-6)
 
 #define d2r M_PI/180.0
-#define NUMBINS 32
 
 double *init_bins(int bins_per_dec, float min_angle, float max_angle, int angle_units, int *nbins);
 void calculatejkSizes(int njk, int ndPoints, int** jkSizes);

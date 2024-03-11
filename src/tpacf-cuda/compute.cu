@@ -25,6 +25,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 #ifndef _GPU_COMPUTE_H_
 #define _GPU_COMPUTE_H_
 
+#include "kernel.h"
 #include "ACF_kernel.cu"
 #include "histogram_kernel.cu"
 #include "model_io.cu"

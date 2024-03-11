@@ -54,7 +54,7 @@ SOFTWARE.
 //         (Note: 63 is to prevent overrun in the 1 byte counters.)
 // MEMPERBLOCK: Shared memory used to store per-thread sub-histograms.
 // HISTOSIZE: Size of a histogram.
-#define   NUMBINS       32
+//#define   NUMBINS       32
 #define   NUMTHREADS    128
 #define   MAXNUMBLOCKS  16384
 #define   MAXBLOCKSEND  32

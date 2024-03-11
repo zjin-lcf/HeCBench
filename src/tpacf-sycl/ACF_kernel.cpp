@@ -38,9 +38,6 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 #define LOG2_GRID_SIZE 14
 
-#include "model_io.cpp"
-#include "histogram_kernel.cpp"
-
 // Similar to ACF kernel, but takes advantage of symmetry to cut computations down by half.
 // Obviously, due to symmetry, it needs only one input set.
 void ACFKernelSymm(cartesian g_idata1, unsigned int*__restrict g_odata,
