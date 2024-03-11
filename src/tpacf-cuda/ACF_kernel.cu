@@ -38,9 +38,6 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 #define LOG2_GRID_SIZE 14
 
-#include "model_io.cu"
-#include "histogram_kernel.cu"
-
 __device__ __constant__ double binbounds[NUMBINS-1];
 
 // Similar to ACF kernel, but takes advantage of symmetry to cut computations down by half.

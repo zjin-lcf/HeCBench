@@ -29,6 +29,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 #include <sycl/sycl.hpp>
 using double3 = sycl::double3;
 
+#include "kernel.h"
 #include "ACF_kernel.cpp"
 #include "histogram_kernel.cpp"
 #include "model_io.cpp"

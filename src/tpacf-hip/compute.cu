@@ -27,6 +27,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 #include <hip/hip_runtime.h>
 #include <sys/time.h>
+#include "kernel.h"
 #include "ACF_kernel.cu"
 #include "histogram_kernel.cu"
 #include "model_io.cu"

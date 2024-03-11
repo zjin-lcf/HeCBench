@@ -25,19 +25,9 @@
 #ifndef MODEL_IO_CU
 #define MODEL_IO_CU
 
-#include <stdio.h>
-#include <math.h>
-
 #define d2r M_PI/180.0 
 #define r2d 180.0/M_PI
 #define r2am 60.0*180.0/M_PI
-
-struct cartesian {
-  double *x;
-  double *y;
-  double *z;
-  int *jk;
-};
 
 int readdatafile(char *fname, cartesian data, int npoints)
 {

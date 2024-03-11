@@ -52,10 +52,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.c args.h Makefile
+%.o: %.c args.h kernel.h Makefile
 	$(CC) -x cu $(CFLAGS) -c $< -o $@
 
-compute.o: compute.cu model_io.cu ACF_kernel.cu histogram_kernel.cu args.h Makefile
+compute.o: compute.cu model_io.cu ACF_kernel.cu histogram_kernel.cu args.h \
+           kernel.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
