@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-//#ifdef __NVPTX__
-//  #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
-//  using namespace sycl::ext::oneapi::experimental::cuda;
-//#else
+#ifdef __NVPTX__
+  #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
+  using namespace sycl::ext::oneapi::experimental::cuda;
+#else
   #define ldg(a) (*(a))
-//#endif
+#endif
 
 template <typename T> inline T floatToType2(float a);
 
@@ -27,6 +27,11 @@ template <typename T> inline T floatToType2(float a);
 // and populates both halves of half2 with converted value.
 template <> inline sycl::half2 floatToType2(float a) {
   return sycl::float2{a, a}.convert<sycl::half, sycl::rounding_mode::rte>();
+}
+
+template <>
+inline sycl::marray<sycl::ext::oneapi::bfloat16, 2> floatToType2(float a) {
+  return sycl::marray<sycl::ext::oneapi::bfloat16, 2>(a, a);
 }
 
 template <typename T> inline T float2ToType2(sycl::float2 a) {
@@ -39,6 +44,12 @@ template <> inline sycl::half2 float2ToType2(sycl::float2 a) {
   return a.convert<sycl::half, sycl::rounding_mode::rte>();
 }
 
+template <>
+inline sycl::marray<sycl::ext::oneapi::bfloat16, 2>
+float2ToType2(sycl::float2 a) {
+  return sycl::marray<sycl::ext::oneapi::bfloat16, 2>(a[0], a[1]);
+}
+
 template <typename T> inline sycl::float2 type2ToFloat2(T a) {
   return a;
 }
@@ -47,13 +58,22 @@ template <> inline sycl::float2 type2ToFloat2(sycl::half2 a) {
   return a.convert<float, sycl::rounding_mode::automatic>();
 }
 
+template <>
+inline sycl::float2
+type2ToFloat2(sycl::marray<sycl::ext::oneapi::bfloat16, 2> a) {
+  return sycl::float2(a[0], a[1]);
+}
+
 // Convert between a vector type and a scalar type
 template <typename T>
 struct TypeConverter {
   using Type = sycl::half2;
 }; // keep for generality
 
-template <> struct TypeConverter<sycl::half2> { using Type = sycl::half; };
+template <>
+struct TypeConverter<sycl::ext::oneapi::bfloat16> {
+  using Type = sycl::marray<sycl::ext::oneapi::bfloat16, 2>;
+};
 
 template <> struct TypeConverter<sycl::half> { using Type = sycl::half2; };
 
@@ -152,7 +172,7 @@ void addBiasResidualPostLayerNormV2(
     sum                = add(sum, local_out_half2[i]);
   }
 
-  mean = blockReduceSum<float>((float)(sum.x() + sum.y()), item, shared);
+  mean = blockReduceSum<float>((float)(sum[0] + sum[1]), item, shared);
   if (lid == 0) {
     s_mean = mean / n;
   }
@@ -163,8 +183,8 @@ void addBiasResidualPostLayerNormV2(
 #pragma unroll
   for (int i = 0; i < ite; i++) {
     local_out_half2[i] = sub(local_out_half2[i], s_mean_2);
-    float v1 = (float)local_out_half2[i].x();
-    float v2 = (float)local_out_half2[i].y();
+    float v1 = (float)local_out_half2[i][0];
+    float v2 = (float)local_out_half2[i][1];
     var += v1 * v1 + v2 * v2;
   }
 
@@ -273,8 +293,8 @@ void generalAddBiasResidualPostLayerNorm(
     int id = bid * n / 2 + idx;
     T2 tmp = add(add(out_ptr[id], input_ptr[id]), ldg(&bias_ptr[idx]));
     sycl::float2 local_out_fp2 = type2ToFloat2(tmp);
-    local_out += local_out_fp2.x();
-    local_out += local_out_fp2.y();
+    local_out += local_out_fp2[0];
+    local_out += local_out_fp2[1];
     // save tmp to out_ptr to save some recomputation
     out_ptr[id] = tmp;
   }
@@ -288,8 +308,8 @@ void generalAddBiasResidualPostLayerNorm(
   for (int idx = lid; idx < n / 2; idx += dim) {
     int id = bid * n / 2 + idx;
     sycl::float2 local_out_fp2 = type2ToFloat2(out_ptr[id]);
-    variance += (local_out_fp2.x() - s_mean) * (local_out_fp2.x() - s_mean);
-    variance += (local_out_fp2.y() - s_mean) * (local_out_fp2.y() - s_mean);
+    variance += (local_out_fp2[0] - s_mean) * (local_out_fp2[0] - s_mean);
+    variance += (local_out_fp2[1] - s_mean) * (local_out_fp2[1] - s_mean);
   }
 
   variance = blockReduceSum<float>(variance, item, shared);
@@ -303,10 +323,10 @@ void generalAddBiasResidualPostLayerNorm(
     sycl::float2 local_out_fp2 = type2ToFloat2(out_ptr[id]);
     sycl::float2 gamma_val = type2ToFloat2(ldg(&gamma_ptr[idx]));
     sycl::float2 beta_val = type2ToFloat2(ldg(&beta_ptr[idx]));
-    local_out_fp2.x() =
-        (local_out_fp2.x() - s_mean) * s_variance * gamma_val.x() + beta_val.x();
-    local_out_fp2.y() =
-        (local_out_fp2.y() - s_mean) * s_variance * gamma_val.y() + beta_val.y();
+    local_out_fp2[0] =
+        (local_out_fp2[0] - s_mean) * s_variance * gamma_val[0] + beta_val[0];
+    local_out_fp2[1] =
+        (local_out_fp2[1] - s_mean) * s_variance * gamma_val[1] + beta_val[1];
     out_ptr[id] = float2ToType2<T2>(local_out_fp2);
   }
 }

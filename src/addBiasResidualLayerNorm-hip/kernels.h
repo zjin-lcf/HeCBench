@@ -18,7 +18,7 @@ template<typename T>
 inline __host__ __device__ float typeToFloat(T a);
 
 template<>
-inline __host__ __device__ float typeToFloat(__nv_bfloat16 a) {
+inline __host__ __device__ float typeToFloat(__hip_bfloat16 a) {
   return __bfloat162float(a);
 }
 
@@ -36,7 +36,7 @@ inline __host__ __device__ half floatToType(float a) {
 }
 
 template<>
-inline __host__ __device__ __nv_bfloat16 floatToType(float a) {
+inline __host__ __device__ __hip_bfloat16 floatToType(float a) {
   return __float2bfloat16(a);
 }
 
@@ -51,8 +51,10 @@ inline __device__ half2 floatToType2(float a) {
 }
 
 template<>
-inline __device__ __nv_bfloat162 floatToType2(float a) {
-  return __float2bfloat162_rn(a);
+inline __device__ __hip_bfloat162 floatToType2(float a) {
+  //return __float2bfloat162_rn(a);
+  float2 t = make_float2(a, a);
+  return __float22bfloat162_rn(t);
 }
 
 template<typename T>
@@ -68,7 +70,7 @@ inline __device__ half2 float2ToType2(float2 a) {
 }
 
 template<>
-inline __device__ __nv_bfloat162 float2ToType2(float2 a) {
+inline __device__ __hip_bfloat162 float2ToType2(float2 a) {
   return __float22bfloat162_rn(a);
 }
 
@@ -83,7 +85,7 @@ inline __device__ float2 type2ToFloat2(half2 a) {
 }
 
 template<>
-inline __device__ float2 type2ToFloat2(__nv_bfloat162 a) {
+inline __device__ float2 type2ToFloat2(__hip_bfloat162 a) {
   return __bfloat1622float2(a);
 }
 
@@ -92,7 +94,7 @@ template<typename T>
 struct TypeConverter {using Type = half2;}; // keep for generality
 
 template<>
-struct TypeConverter<__nv_bfloat16> {using Type = __nv_bfloat162;};
+struct TypeConverter<__hip_bfloat16> {using Type = __hip_bfloat162;};
 
 // general add
 template<typename T>
@@ -111,12 +113,12 @@ inline __device__ half2 add(half2 a, half2 b) {
 }
 
 template<>
-inline __device__ __nv_bfloat16 add(__nv_bfloat16 a, __nv_bfloat16 b) {
+inline __device__ __hip_bfloat16 add(__hip_bfloat16 a, __hip_bfloat16 b) {
   return __hadd(a, b);
 }
 
 template<>
-inline __device__ __nv_bfloat162 add(__nv_bfloat162 a, __nv_bfloat162 b) {
+inline __device__ __hip_bfloat162 add(__hip_bfloat162 a, __hip_bfloat162 b) {
   return __hadd2(a, b);
 }
 
@@ -126,12 +128,12 @@ inline __device__ T add(T a, T b, T c) {
 }
 
 template<>
-inline __device__ __nv_bfloat162 add(__nv_bfloat162 a, __nv_bfloat162 b, __nv_bfloat162 c) {
+inline __device__ __hip_bfloat162 add(__hip_bfloat162 a, __hip_bfloat162 b, __hip_bfloat162 c) {
   return add(add(a, b), c);
 }
 
 template<>
-inline __device__ __nv_bfloat16 add(__nv_bfloat16 a, __nv_bfloat16 b, __nv_bfloat16 c) {
+inline __device__ __hip_bfloat16 add(__hip_bfloat16 a, __hip_bfloat16 b, __hip_bfloat16 c) {
   return add(add(a, b), c);
 }
 
@@ -147,7 +149,7 @@ inline __device__ half2 sub(half2 a, half2 b) {
 }
 
 template<>
-inline __device__ __nv_bfloat162 sub(__nv_bfloat162 a, __nv_bfloat162 b) {
+inline __device__ __hip_bfloat162 sub(__hip_bfloat162 a, __hip_bfloat162 b) {
   return __hsub2(a, b);
 }
 
@@ -163,7 +165,7 @@ inline __device__ half2 fma(half2 a, half2 b, half2 c, half2 d) {
 }
 
 template<>
-inline __device__ __nv_bfloat162 fma(__nv_bfloat162 a, __nv_bfloat162 b, __nv_bfloat162 c, __nv_bfloat162 d) {
+inline __device__ __hip_bfloat162 fma(__hip_bfloat162 a, __hip_bfloat162 b, __hip_bfloat162 c, __hip_bfloat162 d) {
     return __hadd2(__hmul2(__hmul2(a, b), c), d);
 }
 
@@ -173,7 +175,7 @@ __inline__ __device__ T warpReduceSum(T val)
 {
 #pragma unroll
     for (int mask = 16; mask > 0; mask >>= 1)
-        val = add(val, __shfl_xor_sync(0xFFFFFFFF, val, mask, 32));
+        val = add(val, __shfl_xor(val, mask, 32));
     return val;
 }
 

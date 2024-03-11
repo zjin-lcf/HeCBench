@@ -19,9 +19,10 @@
 #include <random>
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
+#include <hip/hip_bf16.h>
 #include "kernels.h"
 
-template<typename T>
+template<typename T, int V>
 void invokeAddBiasResidualLayerNorm(
           T*     out,
     const T*     input,
@@ -35,7 +36,7 @@ void invokeAddBiasResidualLayerNorm(
   dim3 grid(m);
   dim3 block(std::min(n, 256));
 
-  if (m >= 512 && (n == 768 || n == 1024)) {
+  if (V == 2) { // assume n % 8 == 0
     addBiasResidualPostLayerNormV2<T><<<grid, n / 8>>>(out, input, bias, gamma, beta, layernorm_eps, n);
   }
   else {
@@ -55,16 +56,20 @@ void invokeAddBiasResidualLayerNorm(
   }
 }
 
-template<typename T>
+template<typename T, int V>
 void layer(int repeat) {
-
-  std::mt19937 gen (19937);
-  std::uniform_real_distribution<float> dis(0.f, 1.f);
 
   const int m = 4096;  // batch size
 
-  // n-dimensional data
-  for (int n = 512; n <= 4096; n = n * 2) {
+  int dim[] = {256, 512, 768, 1024, 2048, 4096, 8192};
+
+  for (int i = 0; i < 7; i++) {
+
+    std::mt19937 gen (19937);
+    std::uniform_real_distribution<float> dis(0.f, 1.f);
+
+    // n-dimensional data
+    const int n = dim[i]; 
     const int input_size = m * n;
     const int output_size = m * n;
     const int input_size_bytes = input_size * sizeof(T);
@@ -80,12 +85,12 @@ void layer(int repeat) {
     T *h_beta = (T*) malloc (beta_size_bytes);
 
     for (int i = 0; i < input_size; i++) {
-      h_input[i] = (T) dis(gen);
+      h_input[i] = floatToType<T>(dis(gen));
     }
     for (int i = 0; i < n; i++) {
-      h_bias[i] = (T) dis(gen);
-      h_gamma[i] = (T) dis(gen);
-      h_beta[i] = (T) dis(gen);
+      h_bias[i] = floatToType<T>(dis(gen));
+      h_gamma[i] = floatToType<T>(dis(gen));
+      h_beta[i] = floatToType<T>(dis(gen));
     }
 
     float layernorm_eps = 1e-6;
@@ -94,7 +99,7 @@ void layer(int repeat) {
     hipMemcpy(d_input, h_input, input_size_bytes, hipMemcpyHostToDevice);
 
     hipMalloc((void**)&d_output,  output_size_bytes);
-    hipMemset(d_output, 0, output_size_bytes);
+    hipMemset(d_output,  0, output_size_bytes); // need to reset output
 
     hipMalloc((void**)&d_bias,  bias_size_bytes);
     hipMemcpy(d_bias, h_bias, bias_size_bytes, hipMemcpyHostToDevice);
@@ -109,14 +114,8 @@ void layer(int repeat) {
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      invokeAddBiasResidualLayerNorm(d_output,
-                                     d_input,
-                                     d_bias,
-                                     d_gamma,
-                                     d_beta,
-                                     layernorm_eps,
-                                     m,
-                                     n);
+      invokeAddBiasResidualLayerNorm<T, V>
+          (d_output, d_input, d_bias, d_gamma, d_beta, layernorm_eps, m, n);
     }
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
@@ -128,7 +127,7 @@ void layer(int repeat) {
 
     float s = 0;
     for (int i = 0; i < output_size; i++)
-      s += float(h_output[i]);
+      s += typeToFloat(h_output[i]);
 
     printf("Checksum = %f\n", s / (n * n));
     
@@ -154,8 +153,14 @@ int main(int argc, char* argv[])
   }
 
   const int repeat = atoi(argv[1]);
-  layer<half>(repeat);
+  printf("---------------- float16 (version 1) -------------\n");
+  layer<half, 1>(repeat);
+  printf("---------------- float16 (version 2) -------------\n");
+  layer<half, 2>(repeat);
 
+  printf("---------------- bfloat16 (version 1) -------------\n");
+  layer<__hip_bfloat16, 1>(repeat);
+  printf("---------------- bfloat16 (version 2) -------------\n");
+  layer<__hip_bfloat16, 2>(repeat);
   return 0;
 }
-
