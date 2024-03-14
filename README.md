@@ -46,7 +46,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, floydwarshall2, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, collision, concurrentKernels, conversion, copy, dispatch, graphExecution, ert, interleave, intrinsics-cast, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamUM, tensorAccessor, threadfence, vote, wordcount, zerocopy 
+    aligned-types, asta, blockAccess, collision, concurrentKernels, conversion, copy, dispatch, graphExecution, ert, interleave, intrinsics-cast, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamUM, tensorAccessor, threadfence, warpexchange, vote, wordcount, zerocopy 
 
 ### Machine learning  
     accuracy, adam, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, fused-softmax, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, rotary, sampling, scel, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
@@ -289,6 +289,9 @@ Early results are shown [here](results/README.md)
 
 ### black-scholes (cuda)
   The Black-Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
+
+### blockAccess (cuda)
+  Block access from the CUB's collective primitives (https://github.com/NVIDIA/cub)
 
 ### bm3d (cuda)
   Block-matching and 3D filtering method for image denoising (https://github.com/DawyD/bm3d-gpu)
@@ -1439,6 +1442,9 @@ Early results are shown [here](results/README.md)
 
 ### vote (cuda)
   Demonstrate the usage of the vote intrinsics (https://github.com/NVIDIA/cuda-samples/)
+
+### warpexchange (cuda)
+  Rearrange data partitioned across a warp (https://github.com/NVIDIA/cub)
 
 ### warpsort (cuda)
   Sort small numbers (https://github.com/facebookarchive/fbcuda)
