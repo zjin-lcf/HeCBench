@@ -36,19 +36,19 @@ void kernel(const float * __restrict__ A,
   typedef BlockLoad<float, TH, NUM> LoadFloat;
   typedef BlockStore<unsigned char, TH, NUM> StoreChar;
 
-  sycl::multi_ptr<typename LoadFloat::TempStorage, sycl::access::address_space::local_space> p1 =
-      sycl::ext::oneapi::group_local_memory_for_overwrite<typename LoadFloat::TempStorage>(item.get_group());
-  typename LoadFloat::TempStorage loadf = *p1;
+  sycl::multi_ptr<typename LoadFloat::TempStorage[1], sycl::access::address_space::local_space> p1 =
+      sycl::ext::oneapi::group_local_memory_for_overwrite<typename LoadFloat::TempStorage[1]>(item.get_group());
+  typename LoadFloat::TempStorage *loadf = *p1;
 
-  sycl::multi_ptr<typename StoreChar::TempStorage, sycl::access::address_space::local_space> p2 =
-      sycl::ext::oneapi::group_local_memory_for_overwrite<typename StoreChar::TempStorage>(item.get_group());
-  typename StoreChar::TempStorage storec = *p2;
+  sycl::multi_ptr<typename StoreChar::TempStorage[1], sycl::access::address_space::local_space> p2 =
+      sycl::ext::oneapi::group_local_memory_for_overwrite<typename StoreChar::TempStorage[1]>(item.get_group());
+  typename StoreChar::TempStorage *storec = *p2;
 
   for (unsigned int i = base_idx; i < n_full; i += item.get_group_range(2)*NUM_BLOCK)
   {
       unsigned int valid_items = n - i > NUM_BLOCK ? NUM_BLOCK : n - i;
 
-      LoadFloat(loadf, item).Load(&(A[i]), vals, valid_items);
+      LoadFloat(*loadf, item).Load(&(A[i]), vals, valid_items);
 
       //item.barrier(sycl::access::fence_space::local_space);
 
@@ -56,7 +56,7 @@ void kernel(const float * __restrict__ A,
       for(int j = 0; j < NUM; j++)
           qvals[j] = (int)vals[j];
 
-      StoreChar(storec, item).Store(&(out[i]), qvals, valid_items);
+      StoreChar(*storec, item).Store(&(out[i]), qvals, valid_items);
   }
 }
 
