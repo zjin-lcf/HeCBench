@@ -30,13 +30,13 @@ void k(const int *d, int *o, const int n, const sycl::nd_item<3> &item)
       sycl::ext::oneapi::group_local_memory_for_overwrite<typename WarpExchangeT::TempStorage[warps_per_block]>(item.get_group());
   typename WarpExchangeT::TempStorage *temp_storage = *p1;
 
-  sycl::multi_ptr<typename LoadInteger::TempStorage, sycl::access::address_space::local_space> p2 =
-      sycl::ext::oneapi::group_local_memory_for_overwrite<typename LoadInteger::TempStorage>(item.get_group());
-  typename LoadInteger::TempStorage loadi = *p2;
+  sycl::multi_ptr<typename LoadInteger::TempStorage[1], sycl::access::address_space::local_space> p2 =
+      sycl::ext::oneapi::group_local_memory_for_overwrite<typename LoadInteger::TempStorage[1]>(item.get_group());
+  typename LoadInteger::TempStorage *loadi = *p2;
 
-  sycl::multi_ptr<typename StoreInteger::TempStorage, sycl::access::address_space::local_space> p3 =
-      sycl::ext::oneapi::group_local_memory_for_overwrite<typename StoreInteger::TempStorage>(item.get_group());
-  typename StoreInteger::TempStorage storei = *p3;
+  sycl::multi_ptr<typename StoreInteger::TempStorage[1], sycl::access::address_space::local_space> p3 =
+      sycl::ext::oneapi::group_local_memory_for_overwrite<typename StoreInteger::TempStorage[1]>(item.get_group());
+  typename StoreInteger::TempStorage *storei = *p3;
 
   // Obtain a segment of consecutive items that are blocked across threads
   int thread_data[items_per_thread];
@@ -45,12 +45,12 @@ void k(const int *d, int *o, const int n, const sycl::nd_item<3> &item)
   const int base_idx = (bid * NUM_BLOCK);
   for (unsigned int i = base_idx; i < n_full; i += dim*NUM_BLOCK) {
     unsigned int valid_items = n - i > NUM_BLOCK ? NUM_BLOCK : n - i;
-    LoadInteger(loadi, item).Load(&(d[i]), thread_data, valid_items);
+    LoadInteger(*loadi, item).Load(&(d[i]), thread_data, valid_items);
 
     // Collectively exchange data into a striped arrangement across threads
     WarpExchangeT(temp_storage[warp_id], item).BlockedToStriped(thread_data, thread_data, item);
 
-    StoreInteger(storei, item).Store(&(o[i]), thread_data, valid_items);
+    StoreInteger(*storei, item).Store(&(o[i]), thread_data, valid_items);
   }
 }
 
