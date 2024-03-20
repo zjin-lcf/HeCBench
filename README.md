@@ -46,7 +46,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, floydwarshall2, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, blockAccess, collision, concurrentKernels, conversion, copy, dispatch, graphExecution, ert, interleave, intrinsics-cast, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamUM, tensorAccessor, threadfence, warpexchange, vote, wordcount, zerocopy 
+    aligned-types, asta, blockAccess, blockexchange, collision, concurrentKernels, conversion, copy, dispatch, graphExecution, ert, interleave, intrinsics-cast, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamUM, tensorAccessor, threadfence, warpexchange, vote, wordcount, zerocopy 
 
 ### Machine learning  
     accuracy, adam, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, fused-softmax, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, rotary, sampling, scel, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
@@ -292,6 +292,9 @@ Early results are shown [here](results/README.md)
 
 ### blockAccess (cuda)
   Block access from the CUB's collective primitives (https://github.com/NVIDIA/cub)
+
+### blockexchange (cuda)
+  Rearrange data partitioned across a thread block (https://github.com/NVIDIA/cub)
 
 ### bm3d (cuda)
   Block-matching and 3D filtering method for image denoising (https://github.com/DawyD/bm3d-gpu)
