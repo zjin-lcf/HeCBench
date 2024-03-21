@@ -5,9 +5,17 @@
 #include <sycl/sycl.hpp>
 
 template<typename T>
-void verify(const T* cpu_out, const T* gpu_out, size_t n)
+void verify(const T* cpu_out, const T* gpu_out, int64_t n)
 {
   int error = memcmp(cpu_out, gpu_out, n * sizeof(T));
+  if (error) {
+    for (int64_t i = 0; i < n; i++) {
+      if (cpu_out[i] != gpu_out[i]) {
+        printf("@%zu: %lf != %lf\n", i, (double)cpu_out[i], (double)gpu_out[i]);
+        break;
+      }
+    }
+  }
   printf("%s\n", error ? "FAIL" : "PASS");
 }
 
@@ -26,124 +34,130 @@ template<typename T, int N>
 void scan_bcao (
         sycl::nd_item<1> &item,
         T *temp,
+  const int64_t nblocks,
         T *__restrict g_odata,
   const T *__restrict g_idata)
 {
-  int bid = item.get_group(0);
-  g_idata += bid * N;
-  g_odata += bid * N;
-
-  int thid = item.get_local_id(0);
-  int a = thid;
-  int b = a + (N/2);
-  int oa = OFFSET(a);
-  int ob = OFFSET(b);
-
-  temp[a + oa] = g_idata[a];
-  temp[b + ob] = g_idata[b];
-
-  int offset = 1;
-  for (int d = N >> 1; d > 0; d >>= 1)
+  for (int64_t bid = item.get_group(0); bid < nblocks; bid += item.get_group_range(0))
   {
-    __syncthreads();
-    if (thid < d)
-    {
-      int ai = offset*(2*thid+1)-1;
-      int bi = offset*(2*thid+2)-1;
-      ai += OFFSET(ai);
-      bi += OFFSET(bi);
-      temp[bi] += temp[ai];
-    }
-    offset *= 2;
-  }
+    auto gi = g_idata + bid * N;
+    auto go = g_odata + bid * N;
 
-  if (thid == 0) temp[N-1+OFFSET(N-1)] = 0; // clear the last elem
-  for (int d = 1; d < N; d *= 2) // traverse down
-  {
-    offset >>= 1;
-    __syncthreads();
-    if (thid < d)
-    {
-      int ai = offset*(2*thid+1)-1;
-      int bi = offset*(2*thid+2)-1;
-      ai += OFFSET(ai);
-      bi += OFFSET(bi);
-      T t = temp[ai];
-      temp[ai] = temp[bi];
-      temp[bi] += t;
-    }
-  }
-  __syncthreads(); // required
+    int thid = item.get_local_id(0);
+    int a = thid;
+    int b = a + (N/2);
+    int oa = OFFSET(a);
+    int ob = OFFSET(b);
 
-  g_odata[a] = temp[a + oa];
-  g_odata[b] = temp[b + ob];
+    temp[a + oa] = gi[a];
+    temp[b + ob] = gi[b];
+
+    int offset = 1;
+    for (int d = N >> 1; d > 0; d >>= 1)
+    {
+      __syncthreads();
+      if (thid < d)
+      {
+        int ai = offset*(2*thid+1)-1;
+        int bi = offset*(2*thid+2)-1;
+        ai += OFFSET(ai);
+        bi += OFFSET(bi);
+        temp[bi] += temp[ai];
+      }
+      offset *= 2;
+    }
+
+    if (thid == 0) temp[N-1+OFFSET(N-1)] = 0; // clear the last elem
+    for (int d = 1; d < N; d *= 2) // traverse down
+    {
+      offset >>= 1;
+      __syncthreads();
+      if (thid < d)
+      {
+        int ai = offset*(2*thid+1)-1;
+        int bi = offset*(2*thid+2)-1;
+        ai += OFFSET(ai);
+        bi += OFFSET(bi);
+        T t = temp[ai];
+        temp[ai] = temp[bi];
+        temp[bi] += t;
+      }
+    }
+    __syncthreads(); // required
+
+    go[a] = temp[a + oa];
+    go[b] = temp[b + ob];
+  }
 }
 
 template<typename T, int N>
 void scan (
         sycl::nd_item<1> &item,
         T *temp,
+  const int64_t nblocks,
         T *__restrict g_odata,
   const T *__restrict g_idata)
 {
-  int bid = item.get_group(0);
-  g_idata += bid * N;
-  g_odata += bid * N;
-
-  int thid = item.get_local_id(0);
-  int offset = 1;
-  temp[2*thid]   = g_idata[2*thid];
-  temp[2*thid+1] = g_idata[2*thid+1];
-  for (int d = N >> 1; d > 0; d >>= 1)
+  for (int64_t bid = item.get_group(0); bid < nblocks; bid += item.get_group_range(0))
   {
-    __syncthreads();
-    if (thid < d)
-    {
-      int ai = offset*(2*thid+1)-1;
-      int bi = offset*(2*thid+2)-1;
-      temp[bi] += temp[ai];
-    }
-    offset *= 2;
-  }
+    auto gi = g_idata + bid * N;
+    auto go = g_odata + bid * N;
 
-  if (thid == 0) temp[N-1] = 0; // clear the last elem
-  for (int d = 1; d < N; d *= 2) // traverse down
-  {
-    offset >>= 1;
-    __syncthreads();
-    if (thid < d)
+    int thid = item.get_local_id(0);
+    int offset = 1;
+    temp[2*thid]   = gi[2*thid];
+    temp[2*thid+1] = gi[2*thid+1];
+    for (int d = N >> 1; d > 0; d >>= 1)
     {
-      int ai = offset*(2*thid+1)-1;
-      int bi = offset*(2*thid+2)-1;
-      float t = temp[ai];
-      temp[ai] = temp[bi];
-      temp[bi] += t;
+      __syncthreads();
+      if (thid < d)
+      {
+        int ai = offset*(2*thid+1)-1;
+        int bi = offset*(2*thid+2)-1;
+        temp[bi] += temp[ai];
+      }
+      offset *= 2;
     }
+
+    if (thid == 0) temp[N-1] = 0; // clear the last elem
+    for (int d = 1; d < N; d *= 2) // traverse down
+    {
+      offset >>= 1;
+      __syncthreads();
+      if (thid < d)
+      {
+        int ai = offset*(2*thid+1)-1;
+        int bi = offset*(2*thid+2)-1;
+        float t = temp[ai];
+        temp[ai] = temp[bi];
+        temp[bi] += t;
+      }
+    }
+    go[2*thid] = temp[2*thid];
+    go[2*thid+1] = temp[2*thid+1];
   }
-  g_odata[2*thid] = temp[2*thid];
-  g_odata[2*thid+1] = temp[2*thid+1];
 }
 
 
 template <typename T, int N>
-void runTest (sycl::queue &q, const size_t n, const int repeat, bool timing = false)
+void runTest (sycl::queue &q, const int64_t n, const int repeat, bool timing = false)
 {
-  const size_t num_blocks = (n + N - 1) / N;
+  int64_t num_blocks = (n + N - 1) / N;
 
-  const size_t nelems = num_blocks * N; // actual total number of elements
+  int64_t nelems = num_blocks * N; // actual total number of elements
 
-  size_t bytes = nelems * sizeof(T);
+  int64_t bytes = nelems * sizeof(T);
 
   T *in = (T*) malloc (bytes);
   T *cpu_out = (T*) malloc (bytes);
   T *gpu_out = (T*) malloc (bytes);
 
   srand(123);
-  for (size_t n = 0; n < nelems; n++) in[n] = rand() % 5 + 1;
+  for (int64_t n = 0; n < nelems; n++) in[n] = rand() % 5 + 1;
 
   T *t_in = in;
   T *t_out = cpu_out;
-  for (size_t n = 0; n < num_blocks; n++) {
+  for (int64_t n = 0; n < num_blocks; n++) {
     t_out[0] = 0;
     for (int i = 1; i < N; i++)
       t_out[i] = t_out[i-1] + t_in[i-1];
@@ -156,7 +170,9 @@ void runTest (sycl::queue &q, const size_t n, const int repeat, bool timing = fa
 
   T *d_out = sycl::malloc_device<T>(nelems, q);
 
-  sycl::range<1> gws (num_blocks * N/2);
+  int cu = q.get_device().get_info<sycl::info::device::max_compute_units>();
+  
+  sycl::range<1> gws (16 * cu * N/2);
   sycl::range<1> lws (N/2);
 
   q.wait();
@@ -166,7 +182,7 @@ void runTest (sycl::queue &q, const size_t n, const int repeat, bool timing = fa
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<T, 1> temp (sycl::range<1>(N), cgh);
       cgh.parallel_for<class base<T, N>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        scan<T, N>(item, temp.get_pointer(), d_out, d_in);
+        scan<T, N>(item, temp.get_pointer(), num_blocks, d_out, d_in);
       });
     });
   }
@@ -188,7 +204,7 @@ void runTest (sycl::queue &q, const size_t n, const int repeat, bool timing = fa
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<T, 1> temp (sycl::range<1>(N*2), cgh);
       cgh.parallel_for<class opt<T, N>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        scan_bcao<T, N>(item, temp.get_pointer(), d_out, d_in);
+        scan_bcao<T, N>(item, temp.get_pointer(), num_blocks, d_out, d_in);
       });
     });
   }
@@ -212,7 +228,7 @@ void runTest (sycl::queue &q, const size_t n, const int repeat, bool timing = fa
 }
 
 template<int N>
-void run (sycl::queue &q, const int n, const int repeat) {
+void run (sycl::queue &q, const int64_t n, const int repeat) {
   for (int i = 0; i < 2; i++) {
     bool report_timing = i > 0;
     printf("\nThe number of elements to scan in a thread block: %d\n", N);
@@ -229,7 +245,7 @@ int main(int argc, char* argv[])
     printf("Usage: %s <number of elements> <repeat>\n", argv[0]);
     return 1;
   }
-  const int n = atoi(argv[1]);
+  const int64_t n = atol(argv[1]);
   const int repeat = atoi(argv[2]);
 
 #ifdef USE_GPU

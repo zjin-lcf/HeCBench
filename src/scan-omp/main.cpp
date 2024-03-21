@@ -5,9 +5,17 @@
 #include <omp.h>
 
 template<typename T>
-void verify(const T* ref_out, const T* out, size_t n)
+void verify(const T* ref_out, const T* out, int64_t n)
 {
   int error = memcmp(ref_out, out, n * sizeof(T));
+  if (error) {
+    for (int64_t i = 0; i < n; i++) {
+      if (ref_out[i] != out[i]) {
+        printf("@%zu: %lf != %lf\n", i, (double)ref_out[i], (double)out[i]);
+        break;
+      }
+    }
+  }
   printf("%s\n", error ? "FAIL" : "PASS");
 }
 
@@ -16,24 +24,24 @@ void verify(const T* ref_out, const T* out, size_t n)
 #define OFFSET(n) ((n) >> LOG_MEM_BANKS)
 
 template<typename T, int N>
-void runTest (const size_t n, const int repeat, bool timing = false) 
+void runTest (const int64_t n, const int repeat, bool timing = false) 
 {
-  const size_t num_blocks = (n + N - 1) / N;
+  int64_t num_blocks = (n + N - 1) / N;
 
-  const size_t nelems = num_blocks * N; // actual total number of elements
+  int64_t nelems = num_blocks * N; // actual total number of elements
 
-  size_t bytes = nelems * sizeof(T);
+  int64_t bytes = nelems * sizeof(T);
 
   T *in = (T*) malloc (bytes);
   T *out = (T*) malloc (bytes);
   T *ref_out = (T*) malloc (bytes);
 
   srand(123);
-  for (size_t n = 0; n < nelems; n++) in[n] = rand() % 5 + 1;
+  for (int64_t n = 0; n < nelems; n++) in[n] = rand() % 5 + 1;
 
   T *t_in = in;
   T *t_out = ref_out;
-  for (size_t n = 0; n < num_blocks; n++) { 
+  for (int64_t n = 0; n < num_blocks; n++) { 
     t_out[0] = 0;
     for (int i = 1; i < N; i++) 
       t_out[i] = t_out[i-1] + t_in[i-1];
@@ -51,44 +59,46 @@ void runTest (const size_t n, const int repeat, bool timing = false)
         T temp[N];
         #pragma omp parallel 
         {
-          int bid = omp_get_team_num();
-          T *t_in  = in + bid * N;
-          T *t_out = out + bid * N;
-
-          int thid = omp_get_thread_num();
-          int offset = 1;
-
-          temp[2*thid]   = t_in[2*thid];
-          temp[2*thid+1] = t_in[2*thid+1];
-
-          for (int d = N >> 1; d > 0; d >>= 1) 
+          for (int64_t bid = omp_get_team_num(); bid < num_blocks; bid += omp_get_num_teams()) 
           {
-            #pragma omp barrier
-            if (thid < d) 
-            {
-              int ai = offset*(2*thid+1)-1;
-              int bi = offset*(2*thid+2)-1;
-              temp[bi] += temp[ai];
-            }
-            offset *= 2;
-          }
+            T *t_in  = in + bid * N;
+            T *t_out = out + bid * N;
 
-          if (thid == 0) temp[N-1] = 0; // clear the last elem
-          for (int d = 1; d < N; d *= 2) // traverse down
-          {
-            offset >>= 1;     
-            #pragma omp barrier
-            if (thid < d)
+            int thid = omp_get_thread_num();
+            int offset = 1;
+
+            temp[2*thid]   = t_in[2*thid];
+            temp[2*thid+1] = t_in[2*thid+1];
+
+            for (int d = N >> 1; d > 0; d >>= 1) 
             {
-              int ai = offset*(2*thid+1)-1;
-              int bi = offset*(2*thid+2)-1;
-              float t = temp[ai];
-              temp[ai] = temp[bi];
-              temp[bi] += t;
+              #pragma omp barrier
+              if (thid < d) 
+              {
+                int ai = offset*(2*thid+1)-1;
+                int bi = offset*(2*thid+2)-1;
+                temp[bi] += temp[ai];
+              }
+              offset *= 2;
             }
-          }
-          t_out[2*thid] = temp[2*thid];
-          t_out[2*thid+1] = temp[2*thid+1];
+
+            if (thid == 0) temp[N-1] = 0; // clear the last elem
+            for (int d = 1; d < N; d *= 2) // traverse down
+            {
+              offset >>= 1;     
+              #pragma omp barrier
+              if (thid < d)
+              {
+                int ai = offset*(2*thid+1)-1;
+                int bi = offset*(2*thid+2)-1;
+                float t = temp[ai];
+                temp[ai] = temp[bi];
+                temp[bi] += t;
+              }
+            }
+            t_out[2*thid] = temp[2*thid];
+            t_out[2*thid+1] = temp[2*thid+1];
+	  }
 	}
       }
     }
@@ -110,54 +120,56 @@ void runTest (const size_t n, const int repeat, bool timing = false)
         T temp[2*N];
         #pragma omp parallel 
         {
-          int bid = omp_get_team_num();
-          T *t_in  = in + bid * N;
-          T *t_out = out + bid * N;
-
-          int thid = omp_get_thread_num();
-          int a = thid;
-          int b = a + (N/2);
-          int oa = OFFSET(a);
-          int ob = OFFSET(b);
-
-          temp[a + oa] = t_in[a];
-          temp[b + ob] = t_in[b];
-
-          int offset = 1;
-          for (int d = N >> 1; d > 0; d >>= 1) 
+          for (int64_t bid = omp_get_team_num(); bid < num_blocks; bid += omp_get_num_teams()) 
           {
-            #pragma omp barrier
-            if (thid < d) 
-            {
-              int ai = offset*(2*thid+1)-1;
-              int bi = offset*(2*thid+2)-1;
-              ai += OFFSET(ai);
-              bi += OFFSET(bi);
-              temp[bi] += temp[ai];
-            }
-            offset *= 2;
-          }
+            T *t_in  = in + bid * N;
+            T *t_out = out + bid * N;
 
-          if (thid == 0) temp[N-1+OFFSET(N-1)] = 0; // clear the last elem
-          for (int d = 1; d < N; d *= 2) // traverse down
-          {
-            offset >>= 1;     
-            #pragma omp barrier      
-            if (thid < d)
-            {
-              int ai = offset*(2*thid+1)-1;
-              int bi = offset*(2*thid+2)-1;
-              ai += OFFSET(ai);
-              bi += OFFSET(bi);
-              T t = temp[ai];
-              temp[ai] = temp[bi];
-              temp[bi] += t;
-            }
-          }
-          #pragma omp barrier // required
+            int thid = omp_get_thread_num();
+            int a = thid;
+            int b = a + (N/2);
+            int oa = OFFSET(a);
+            int ob = OFFSET(b);
 
-          t_out[a] = temp[a + oa];
-          t_out[b] = temp[b + ob];
+            temp[a + oa] = t_in[a];
+            temp[b + ob] = t_in[b];
+
+            int offset = 1;
+            for (int d = N >> 1; d > 0; d >>= 1) 
+            {
+              #pragma omp barrier
+              if (thid < d) 
+              {
+                int ai = offset*(2*thid+1)-1;
+                int bi = offset*(2*thid+2)-1;
+                ai += OFFSET(ai);
+                bi += OFFSET(bi);
+                temp[bi] += temp[ai];
+              }
+              offset *= 2;
+            }
+
+            if (thid == 0) temp[N-1+OFFSET(N-1)] = 0; // clear the last elem
+            for (int d = 1; d < N; d *= 2) // traverse down
+            {
+              offset >>= 1;     
+              #pragma omp barrier      
+              if (thid < d)
+              {
+                int ai = offset*(2*thid+1)-1;
+                int bi = offset*(2*thid+2)-1;
+                ai += OFFSET(ai);
+                bi += OFFSET(bi);
+                T t = temp[ai];
+                temp[ai] = temp[bi];
+                temp[bi] += t;
+              }
+            }
+            #pragma omp barrier // required
+
+            t_out[a] = temp[a + oa];
+            t_out[b] = temp[b + ob];
+          }
         }
       }
     }
