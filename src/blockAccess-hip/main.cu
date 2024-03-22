@@ -12,8 +12,8 @@
 __global__ void reference (const float * __restrict__ A,
                            unsigned char *out, const unsigned int n)
 {
-  unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < n) {
+  for (unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+       idx < n; idx += gridDim.x * blockDim.x) {
     out[idx] = int(A[idx]);
   }
 }
@@ -23,7 +23,6 @@ __global__ void kernel (const float * __restrict__ A,
                         unsigned char *out, const unsigned int n)
 {
   const int bid = blockIdx.x;
-  const int n_full = (NUM_BLOCK*(n/NUM_BLOCK)) + (n % NUM_BLOCK == 0 ? 0 : NUM_BLOCK);
   const int base_idx = (bid * NUM_BLOCK);
 
   float vals[NUM];
@@ -35,13 +34,11 @@ __global__ void kernel (const float * __restrict__ A,
   __shared__ typename LoadFloat::TempStorage loadf;
   __shared__ typename StoreChar::TempStorage storec;
 
-  for (unsigned int i = base_idx; i < n_full; i += gridDim.x*NUM_BLOCK)
+  for (unsigned int i = base_idx; i < n; i += gridDim.x*NUM_BLOCK)
   {
       unsigned int valid_items = n - i > NUM_BLOCK ? NUM_BLOCK : n - i;
 
       LoadFloat(loadf).Load(&(A[i]), vals, valid_items);
-
-      //__syncthreads();
 
       #pragma unroll
       for(int j = 0; j < NUM; j++)
@@ -85,7 +82,9 @@ int main(int argc, char* argv[])
   
   const int block_size = 256;
 
-  dim3 grid ((n+block_size-1)/block_size);
+  hipDeviceProp_t prop;
+  hipGetDeviceProperties(&prop, 0);
+  dim3 grid (16 * prop.multiProcessorCount);
   dim3 block (block_size);
 
   hipDeviceSynchronize();

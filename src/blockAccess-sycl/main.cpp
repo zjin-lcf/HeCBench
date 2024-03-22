@@ -15,8 +15,8 @@ void reference (const float * __restrict__ A,
                 unsigned char *out, const unsigned int n,
                 const sycl::nd_item<3> &item)
 {
-  unsigned int idx = item.get_global_id(2);
-  if (idx < n) {
+  for (unsigned int idx = item.get_global_id(2);
+       idx < n; idx += item.get_local_range(2) * item.get_group_range(2)) {
     out[idx] = int(A[idx]);
   }
 }
@@ -27,7 +27,6 @@ void kernel(const float * __restrict__ A,
             const sycl::nd_item<3> &item)
 {
   const int bid = item.get_group(2);
-  const int n_full = (NUM_BLOCK*(n/NUM_BLOCK)) + (n % NUM_BLOCK == 0 ? 0 : NUM_BLOCK);
   const int base_idx = (bid * NUM_BLOCK);
 
   float vals[NUM];
@@ -44,13 +43,11 @@ void kernel(const float * __restrict__ A,
       sycl::ext::oneapi::group_local_memory_for_overwrite<typename StoreChar::TempStorage[1]>(item.get_group());
   typename StoreChar::TempStorage *storec = *p2;
 
-  for (unsigned int i = base_idx; i < n_full; i += item.get_group_range(2)*NUM_BLOCK)
+  for (unsigned int i = base_idx; i < n; i += item.get_group_range(2)*NUM_BLOCK)
   {
       unsigned int valid_items = n - i > NUM_BLOCK ? NUM_BLOCK : n - i;
 
       LoadFloat(*loadf, item).Load(&(A[i]), vals, valid_items);
-
-      //item.barrier(sycl::access::fence_space::local_space);
 
       #pragma unroll
       for(int j = 0; j < NUM; j++)
@@ -100,8 +97,9 @@ int main(int argc, char* argv[])
 
   const int block_size = 256;
 
-  sycl::range<3> grid(1, 1, (n + block_size - 1) / block_size);
-  sycl::range<3> block(1, 1, block_size);
+  int cu = q.get_device().get_info<sycl::info::device::max_compute_units>();
+  sycl::range<3> gws (1, 1, 16 * cu * block_size);
+  sycl::range<3> lws (1, 1, block_size);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
@@ -109,7 +107,7 @@ int main(int argc, char* argv[])
   for (int i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler &cgh) {
       cgh.parallel_for(
-          sycl::nd_range<3>(grid * block, block),
+          sycl::nd_range<3>(gws, lws),
           [=](sycl::nd_item<3> item) {
             reference(d_A, d_out, n, item);
           });
@@ -125,7 +123,7 @@ int main(int argc, char* argv[])
   for (int i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler &cgh) {
       cgh.parallel_for(
-          sycl::nd_range<3>(grid * block, block),
+          sycl::nd_range<3>(gws, lws),
           [=](sycl::nd_item<3> item) {
             kernel<block_size, block_size * NUM>(
                 d_A, d_out, n, item);
