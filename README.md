@@ -1351,7 +1351,7 @@ Early results are shown [here](results/README.md)
   String search (https://github.com/OpenCL/AMD_APP_samples)
 
 ### ssim (cuda)
-  Compute structual similarity index measure (https://github.com/VIDILabs/instantvnr)
+  Compute structural similarity index measure (https://github.com/VIDILabs/instantvnr)
 
 ### sss (cuda)
   Stochastic shotgun search for Dirichlet process mixtures of Gaussian graphical models (https://github.com/mukherjeec/DPmixGGM/)
