@@ -48,6 +48,7 @@
  */
 #include <stdio.h>            // printf
 #include <stdlib.h>           // EXIT_FAILURE
+#include <algorithm>
 #include <chrono>
 #include <cuda_runtime_api.h> // cudaMalloc, cudaMemcpy, etc.
 #include <cusparse.h>         // cusparseSparseToDense
@@ -208,6 +209,15 @@ int main(int argc, char *argv[])
       goto print_error;
     }
   }
+
+  // https://docs.nvidia.com/cuda/cusparse/index.html
+  // The routine does not guarantee the column indices to be sorted
+  std::sort(h_csr_columns, h_csr_columns + nnz);
+  std::sort(h_csr_values, h_csr_values + nnz);
+
+  std::sort(h_csr_columns_result, h_csr_columns_result + nnz);
+  std::sort(h_csr_values_result, h_csr_values_result + nnz);
+
   for (int64_t i = 0; i < nnz; i++) {
     if (h_csr_columns[i] != h_csr_columns_result[i]) {
       printf("colidx: @%ld %ld != %ld\n", i, h_csr_columns[i], h_csr_columns_result[i]);
