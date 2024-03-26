@@ -2,6 +2,7 @@
 #include <cuda.h>
 #include <thrust/scan.h>
 #include <thrust/device_vector.h>
+#include <cub/cub.cuh>
 #include "scan.h"
 
 /*
@@ -51,6 +52,13 @@ int main(int argc, char * argv[])
   // random initialisation of input
   fillRandom<float>(input, length, 1, 0, 255);
 
+  // verification
+  float* verificationOutput = (float*)malloc(sizeBytes);
+  memset(verificationOutput, 0, sizeBytes);
+
+  // reference implementation
+  scanLargeArraysCPUReference(verificationOutput, input, length);
+
   // Create input buffer on device
   float* inputBuffer;
   cudaMalloc((void**)&inputBuffer, sizeBytes);
@@ -83,21 +91,49 @@ int main(int argc, char * argv[])
 
   cudaMemcpy(output, outputBuffer, sizeBytes, cudaMemcpyDeviceToHost);
 
-  cudaFree(inputBuffer);
-  cudaFree(outputBuffer);
+  // compare the results and see if they match
+  if (compare<float>(output, verificationOutput, length, (float)0.001))
+    std::cout << "PASS" << std::endl;
+  else
+    std::cout << "FAIL" << std::endl;
 
-  // verification
-  float* verificationOutput = (float*)malloc(sizeBytes);
-  memset(verificationOutput, 0, sizeBytes);
+  // include the overhead of allocating temporary device storage
+  start = std::chrono::steady_clock::now();
 
-  // reference implementation
-  scanLargeArraysCPUReference(verificationOutput, input, length);
+  for(int n = 0; n < iterations; n++)
+  {
+    // Determine temporary device storage requirements
+    void     *d_temp_storage = nullptr;
+    size_t   temp_storage_bytes = 0;
+    cub::DeviceScan::ExclusiveScan(
+      d_temp_storage, temp_storage_bytes,
+      inputBuffer, outputBuffer, cub::Sum(), 0.f, length);
+    
+    // Allocate temporary storage
+    cudaMalloc(&d_temp_storage, temp_storage_bytes);
+    
+    cub::DeviceScan::ExclusiveScan(
+      d_temp_storage, temp_storage_bytes,
+      inputBuffer, outputBuffer, cub::Sum(), 0.f, length);
+
+    cudaFree(d_temp_storage);
+  }
+
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  std::cout << "Average execution time of CUDA CUB exclusive scan: "
+            << time * 1e-3f / iterations << " (us)\n";
+
+  cudaMemcpy(output, outputBuffer, sizeBytes, cudaMemcpyDeviceToHost);
 
   // compare the results and see if they match
   if (compare<float>(output, verificationOutput, length, (float)0.001))
     std::cout << "PASS" << std::endl;
   else
     std::cout << "FAIL" << std::endl;
+
+  cudaFree(inputBuffer);
+  cudaFree(outputBuffer);
 
   free(input);
   free(output);

@@ -1237,7 +1237,7 @@ Early results are shown [here](results/README.md)
   Scan a large array (https://github.com/OpenCL/AMD_APP_samples)
 
 ### scan3 (cuda)
-  Scan a large array using vendors' library (https://github.com/OpenCL/AMD_APP_samples)
+  Scan a large array using vendors' libraries (https://github.com/NVIDIA/cub)
 
 ### scel (cuda)
   Sigmoid cross-entropy with logits (https://pytorch.org/)
