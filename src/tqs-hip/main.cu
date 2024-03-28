@@ -207,9 +207,9 @@ int main(int argc, char **argv) {
             host_insert_tasks(h_task_queues, h_data_queues, h_task_pool, h_data_pool, &n_written_tasks, p.queue_size,
                               n_consumed_tasks, p.n_gpu_threads);
 
-            hipMemcpy(d_task_queues, h_task_queues, p.queue_size * sizeof(task_t), hipMemcpyHostToDevice);
-            hipMemcpy(d_data_queues, h_data_queues, p.queue_size * p.n_gpu_threads * sizeof(int), hipMemcpyHostToDevice);
-            hipMemcpy(d_consumed, h_consumed, sizeof(int), hipMemcpyHostToDevice);
+            hipMemcpyAsync(d_task_queues, h_task_queues, p.queue_size * sizeof(task_t), hipMemcpyHostToDevice);
+            hipMemcpyAsync(d_data_queues, h_data_queues, p.queue_size * p.n_gpu_threads * sizeof(int), hipMemcpyHostToDevice);
+            hipMemcpyAsync(d_consumed, h_consumed, sizeof(int), hipMemcpyHostToDevice);
 
             // Kernel launch
             call_TaskQueue_gpu(p.n_gpu_blocks, p.n_gpu_threads, d_task_queues, d_data_queues, d_consumed, 
