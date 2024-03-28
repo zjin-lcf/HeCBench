@@ -334,7 +334,7 @@ int main(int argc, char *argv[])
   int opt;
 
   /* parse command line */
-  while ((opt = getopt(argc, argv, "i:dh")) != -1)
+  while ((opt = getopt(argc, argv, "i:h")) != -1)
   {
     switch (opt)
     {
@@ -343,7 +343,7 @@ int main(int argc, char *argv[])
       break;
 
     case 'h': /* help */
-      printf(" Usage for compression and decompression: ./gpulz -i {inputfile}\n");
+      printf(" Usage for compression and decompression: ./main -i {inputfile}\n");
       return 0;
     }
   }
