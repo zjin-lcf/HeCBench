@@ -28,7 +28,14 @@ class MaxPoolGrad {
 
 #include "reference.h"
 
-template <typename PoolProcess, typename T>
+template <typename PoolProcess, typename T,
+          int ksize_height,
+          int ksize_width,
+          int stride_height,
+          int stride_width,
+          int padding_height,
+          int padding_width,
+          bool exclusive>
 __global__ void KernelPool2DGrad(
     const int nthreads,
     const T*__restrict__ input_data,
@@ -39,14 +46,7 @@ __global__ void KernelPool2DGrad(
     const int input_width,
     const int output_height,
     const int output_width,
-    const int ksize_height,
-    const int ksize_width,
-    const int stride_height,
-    const int stride_width,
-    const int padding_height,
-    const int padding_width,
     PoolProcess pool_process,
-    bool exclusive,
     T*__restrict__ input_grad,
     bool channel_last = false)
 {
@@ -186,11 +186,12 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    KernelPool2DGrad<AvgPoolGrad<float>, float><<<grid, threads, 0, 0>>>(
+    KernelPool2DGrad<AvgPoolGrad<float>, float, ksize_height, ksize_width,
+                     stride_height, stride_width, padding_height, padding_width,
+                     exclusive><<<grid, threads, 0, 0>>>(
         nthreads, input_data, output_data, output_grad_data, input_channels,
-        input_height, input_width, output_height, output_width, ksize_height,
-        ksize_width, stride_height, stride_width, padding_height, padding_width,
-        pool_process, exclusive, input_grad_data, channel_last);
+        input_height, input_width, output_height, output_width, pool_process,
+        input_grad_data, channel_last);
   }
 
   hipDeviceSynchronize();
