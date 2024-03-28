@@ -28,7 +28,7 @@ __global__
 void softMax (const int numSlice, const int sliceSize,
               const float* src, float* dest)
 {
-  unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= numSlice) return;
   float max_ = src[i * sliceSize];
   for (int j = 0; j < sliceSize; j++) {
