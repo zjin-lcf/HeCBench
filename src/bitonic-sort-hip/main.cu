@@ -208,19 +208,13 @@ int main(int argc, char *argv[]) {
   }
 
   std::cout << "Bitonic sort (parallel)..\n";
-  auto start = std::chrono::steady_clock::now();
-
   ParallelBitonicSort(data_gpu, n);
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  std::cout << "Total execution time " << (time * 1e-9f) << " (s)\n";
 
   std::cout << "Bitonic sort (serial)..\n";
   BitonicSort(data_cpu, n);
 
   // Verify
-  bool unequal = memcmp(data_gpu, data_cpu, size_bytes);
+  int unequal = memcmp(data_gpu, data_cpu, size_bytes);
   std::cout << (unequal ? "FAIL" : "PASS") << std::endl;
 
   // Clean CPU memory.
