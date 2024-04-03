@@ -199,6 +199,7 @@ private:
     unsigned int warp_id;
     unsigned int warp_offset;
 
+    const sycl::nd_item<3> &item;
 
     /******************************************************************************
      * Utility methods
@@ -226,8 +227,7 @@ private:
             [ITEMS_PER_THREAD], ///< [out] Items to exchange, converting between
                                 ///< <em>blocked</em> and <em>striped</em>
                                 ///< arrangements.
-        Int2Type<false>, /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<false>) /*time_slicing*/
     {
         #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
@@ -264,8 +264,7 @@ private:
             [ITEMS_PER_THREAD], ///< [out] Items to exchange, converting between
                                 ///< <em>blocked</em> and <em>striped</em>
                                 ///< arrangements.
-        Int2Type<true>,  /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<true>)  /*time_slicing*/
     {
         InputT temp_items[ITEMS_PER_THREAD];
 
@@ -333,8 +332,7 @@ private:
             [ITEMS_PER_THREAD], ///< [out] Items to exchange, converting between
                                 ///< <em>blocked</em> and <em>striped</em>
                                 ///< arrangements.
-        Int2Type<false>, /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<false>) /*time_slicing*/
     {
         #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
@@ -370,8 +368,7 @@ private:
             [ITEMS_PER_THREAD], ///< [out] Items to exchange, converting between
                                 ///< <em>blocked</em> and <em>striped</em>
                                 ///< arrangements.
-        Int2Type<true>, /*time_slicing*/
-        const sycl::nd_item<3> &item) 
+        Int2Type<true>) /*time_slicing*/
     {
         if (warp_id == 0)
         {
@@ -439,8 +436,7 @@ private:
             [ITEMS_PER_THREAD], ///< [out] Items to exchange, converting between
                                 ///< <em>blocked</em> and <em>striped</em>
                                 ///< arrangements.
-        Int2Type<false>, /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<false>) /*time_slicing*/
     {
         #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
@@ -478,8 +474,7 @@ private:
             [ITEMS_PER_THREAD], ///< [out] Items to exchange, converting between
                                 ///< <em>blocked</em> and <em>striped</em>
                                 ///< arrangements.
-        Int2Type<true>, /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<true>) /*time_slicing*/
     {
         // Warp time-slicing
         InputT temp_items[ITEMS_PER_THREAD];
@@ -548,8 +543,7 @@ private:
             [ITEMS_PER_THREAD], ///< [out] Items to exchange, converting between
                                 ///< <em>blocked</em> and <em>striped</em>
                                 ///< arrangements.
-        Int2Type<false>, /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<false>) /*time_slicing*/
     {
         #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
@@ -587,8 +581,7 @@ private:
             [ITEMS_PER_THREAD], ///< [out] Items to exchange, converting between
                                 ///< <em>blocked</em> and <em>striped</em>
                                 ///< arrangements.
-        Int2Type<true>, /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<true>) /*time_slicing*/
     {
         #pragma unroll
         for (unsigned int SLICE = 0; SLICE < TIME_SLICES; ++SLICE)
@@ -636,8 +629,7 @@ private:
                                 ///< arrangements.
         OffsetT (
             &ranks)[ITEMS_PER_THREAD], ///< [in] Corresponding scatter ranks
-        Int2Type<false>, /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<false>) /*time_slicing*/
     {
         #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
@@ -674,8 +666,7 @@ private:
                                 ///< <em>blocked</em> and <em>striped</em>
                                 ///< arrangements.
         OffsetT ranks[ITEMS_PER_THREAD], ///< [in] Corresponding scatter ranks
-        Int2Type<true>, /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<true>) /*time_slicing*/
     {
         InputT temp_items[ITEMS_PER_THREAD];
 
@@ -737,8 +728,7 @@ private:
                                 ///< arrangements.
         OffsetT (
             &ranks)[ITEMS_PER_THREAD], ///< [in] Corresponding scatter ranks
-        Int2Type<false>, /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<false>) /*time_slicing*/
     {
         #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
@@ -777,8 +767,7 @@ private:
                                 ///< arrangements.
         OffsetT (
             &ranks)[ITEMS_PER_THREAD], ///< [in] Corresponding scatter ranks
-        Int2Type<true>, /*time_slicing*/
-        const sycl::nd_item<3> &item)
+        Int2Type<true>) /*time_slicing*/
     {
         InputT temp_items[ITEMS_PER_THREAD];
 
@@ -847,7 +836,8 @@ public:
           linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z, item)),
           lane_id(LaneId(item)),
           warp_id((WARPS == 1) ? 0 : linear_tid / WARP_THREADS),
-          warp_offset(warp_id * WARP_TIME_SLICED_ITEMS)
+          warp_offset(warp_id * WARP_TIME_SLICED_ITEMS),
+          item(item)
     {}
 
 
@@ -862,7 +852,8 @@ public:
           linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z, item)),
           lane_id(LaneId(item)),
           warp_id((WARPS == 1) ? 0 : linear_tid / WARP_THREADS),
-          warp_offset(warp_id * WARP_TIME_SLICED_ITEMS)
+          warp_offset(warp_id * WARP_TIME_SLICED_ITEMS),
+          item(item)
     {}
 
 
@@ -916,10 +907,9 @@ public:
                                              ///< <em>striped</em> and
                                              ///< <em>blocked</em> arrangements.
         OutputT (&output_items)
-            [ITEMS_PER_THREAD], ///< [out] Items from exchange, converting
+            [ITEMS_PER_THREAD]) ///< [out] Items from exchange, converting
                                 ///< between <em>striped</em> and
                                 ///< <em>blocked</em> arrangements.
-        const sycl::nd_item<3> &item)
     {
         StripedToBlocked(input_items, output_items, Int2Type<WARP_TIME_SLICING>(), item);
     }
@@ -972,12 +962,11 @@ public:
                                              ///< converting between
                                              ///< <em>striped</em> and
                                              ///< <em>blocked</em> arrangements.
-        OutputT (&output_items) [ITEMS_PER_THREAD], ///< [out] Items from exchange, converting
+        OutputT (&output_items) [ITEMS_PER_THREAD]) ///< [out] Items from exchange, converting
                                 ///< between <em>striped</em> and
                                 ///< <em>blocked</em> arrangements.
-        const sycl::nd_item<3> &item)
     {
-        BlockedToStriped(input_items, output_items, Int2Type<WARP_TIME_SLICING>(), item);
+        BlockedToStriped(input_items, output_items, Int2Type<WARP_TIME_SLICING>());
     }
 
 
@@ -1028,12 +1017,11 @@ public:
                                              ///< <em>striped</em> and
                                              ///< <em>blocked</em> arrangements.
         OutputT (&output_items)
-            [ITEMS_PER_THREAD], ///< [out] Items from exchange, converting
+            [ITEMS_PER_THREAD]) ///< [out] Items from exchange, converting
                                 ///< between <em>striped</em> and
                                 ///< <em>blocked</em> arrangements.
-        const sycl::nd_item<3> &item)
     {
-        WarpStripedToBlocked(input_items, output_items, Int2Type<WARP_TIME_SLICING>(), item);
+        WarpStripedToBlocked(input_items, output_items, Int2Type<WARP_TIME_SLICING>());
     }
 
 
@@ -1087,12 +1075,11 @@ public:
                                              ///< <em>striped</em> and
                                              ///< <em>blocked</em> arrangements.
         OutputT (&output_items)
-            [ITEMS_PER_THREAD], ///< [out] Items from exchange, converting
+            [ITEMS_PER_THREAD]) ///< [out] Items from exchange, converting
                                 ///< between <em>striped</em> and
                                 ///< <em>blocked</em> arrangements.
-        const sycl::nd_item<3> &item)
     {
-        BlockedToWarpStriped(input_items, output_items, Int2Type<WARP_TIME_SLICING>(), item);
+        BlockedToWarpStriped(input_items, output_items, Int2Type<WARP_TIME_SLICING>());
     }
 
 
@@ -1124,10 +1111,9 @@ public:
                                 ///< between <em>striped</em> and
                                 ///< <em>blocked</em> arrangements.
         OffsetT (
-            &ranks)[ITEMS_PER_THREAD], ///< [in] Corresponding scatter ranks
-        const sycl::nd_item<3> &item)
+            &ranks)[ITEMS_PER_THREAD]) ///< [in] Corresponding scatter ranks
     {
-        ScatterToBlocked(input_items, output_items, ranks, Int2Type<WARP_TIME_SLICING>(), item);
+        ScatterToBlocked(input_items, output_items, ranks, Int2Type<WARP_TIME_SLICING>());
     }
 
 
@@ -1152,10 +1138,9 @@ public:
                                 ///< between <em>striped</em> and
                                 ///< <em>blocked</em> arrangements.
         OffsetT (
-            &ranks)[ITEMS_PER_THREAD], ///< [in] Corresponding scatter ranks
-        const sycl::nd_item<3> &item)
+            &ranks)[ITEMS_PER_THREAD]) ///< [in] Corresponding scatter ranks
     {
-        ScatterToStriped(input_items, output_items, ranks, Int2Type<WARP_TIME_SLICING>(), item);
+        ScatterToStriped(input_items, output_items, ranks, Int2Type<WARP_TIME_SLICING>());
     }
 
 
@@ -1179,8 +1164,7 @@ public:
             [ITEMS_PER_THREAD], ///< [out] Items from exchange, converting
                                 ///< between <em>striped</em> and
                                 ///< <em>blocked</em> arrangements.
-        OffsetT (&ranks)[ITEMS_PER_THREAD],
-        const sycl::nd_item<3> &item) ///< [in] Corresponding scatter ranks
+        OffsetT (&ranks)[ITEMS_PER_THREAD]) ///< [in] Corresponding scatter ranks
     {
         #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
@@ -1227,8 +1211,7 @@ public:
                                 ///< <em>blocked</em> arrangements.
         OffsetT (
             &ranks)[ITEMS_PER_THREAD], ///< [in] Corresponding scatter ranks
-        ValidFlag (&is_valid)[ITEMS_PER_THREAD],
-        const sycl::nd_item<3> &item) ///< [in] Corresponding flag denoting item validity
+        ValidFlag (&is_valid)[ITEMS_PER_THREAD]) ///< [in] Corresponding flag denoting item validity
     {
         #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
