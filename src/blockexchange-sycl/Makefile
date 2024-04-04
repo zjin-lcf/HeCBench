@@ -31,8 +31,7 @@ obj = $(source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../blockAccess-sycl \
-          -I../warpexchange-sycl -fsycl \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+          -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 # Linker Flags
 LDFLAGS = 
@@ -71,7 +70,6 @@ $(program): $(obj)
 %.o: %.cpp ../blockAccess-sycl/block_load.h \
            ../blockAccess-sycl/block_store.h \
            ../blockAccess-sycl/utils.h \
-           ../warpexchange-sycl/warp_exchange.h \
            block_exchange.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
