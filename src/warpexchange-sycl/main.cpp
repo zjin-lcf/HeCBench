@@ -48,7 +48,7 @@ void k(const int *d, int *o, const int n, const sycl::nd_item<3> &item)
     LoadInteger(*loadi, item).Load(&(d[i]), thread_data, valid_items);
 
     // Collectively exchange data into a striped arrangement across threads
-    WarpExchangeT(temp_storage[warp_id], item).BlockedToStriped(thread_data, thread_data, item);
+    WarpExchangeT(temp_storage[warp_id], item).BlockedToStriped(thread_data, thread_data);
 
     StoreInteger(*storei, item).Store(&(o[i]), thread_data, valid_items);
   }

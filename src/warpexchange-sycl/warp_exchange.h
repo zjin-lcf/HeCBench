@@ -186,6 +186,7 @@ class WarpExchange
   const unsigned int lane_id;
   const unsigned int warp_id;
   const unsigned int member_mask;
+  const sycl::nd_item<3> &it;
 
 public:
 
@@ -209,7 +210,8 @@ public:
         lane_id(IS_ARCH_WARP ? LaneId(item)
                              : (LaneId(item) % LOGICAL_WARP_THREADS)),
         warp_id(IS_ARCH_WARP ? 0 : (LaneId(item) / LOGICAL_WARP_THREADS)),
-        member_mask(WarpMask<LOGICAL_WARP_THREADS>(warp_id))
+        member_mask(WarpMask<LOGICAL_WARP_THREADS>(warp_id)),
+        it(item)
   {
 
   }
@@ -273,15 +275,14 @@ public:
   template <typename OutputT>
   inline void
   BlockedToStriped(const InputT (&input_items)[ITEMS_PER_THREAD],
-                   OutputT (&output_items)[ITEMS_PER_THREAD],
-                   const sycl::nd_item<3> &item)
+                   OutputT (&output_items)[ITEMS_PER_THREAD])
   {
     for (int item = 0; item < ITEMS_PER_THREAD; item++)
     {
       const int idx = ITEMS_PER_THREAD * lane_id + item;
       temp_storage.items_shared[idx] = input_items[item];
     }
-    WARP_SYNC(member_mask, item);
+    WARP_SYNC(member_mask, it);
 
     for (int item = 0; item < ITEMS_PER_THREAD; item++)
     {
@@ -341,15 +342,14 @@ public:
   template <typename OutputT>
   inline void
   StripedToBlocked(const InputT (&input_items)[ITEMS_PER_THREAD],
-                   OutputT (&output_items)[ITEMS_PER_THREAD],
-                   const sycl::nd_item<3> &item)
+                   OutputT (&output_items)[ITEMS_PER_THREAD])
   {
     for (int item = 0; item < ITEMS_PER_THREAD; item++)
     {
       const int idx = LOGICAL_WARP_THREADS * item + lane_id;
       temp_storage.items_shared[idx] = input_items[item];
     }
-    WARP_SYNC(member_mask, item);
+    WARP_SYNC(member_mask, it);
 
     for (int item = 0; item < ITEMS_PER_THREAD; item++)
     {
@@ -476,33 +476,32 @@ public:
   inline void
   ScatterToStriped(const InputT (&input_items)[ITEMS_PER_THREAD],
                    OutputT (&output_items)[ITEMS_PER_THREAD],
-                   OffsetT (&ranks)[ITEMS_PER_THREAD],
-                   const sycl::nd_item<3> &item)
+                   OffsetT (&ranks)[ITEMS_PER_THREAD])
   {
     #pragma unroll
-    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
+    for (int item = 0; item < ITEMS_PER_THREAD; item++)
     {
       if (INSERT_PADDING)
       {
-        ranks[ITEM] = SHR_ADD(ranks[ITEM], LOG_SMEM_BANKS, ranks[ITEM]);
+        ranks[item] = SHR_ADD(ranks[item], LOG_SMEM_BANKS, ranks[item]);
       }
 
-      temp_storage.items_shared[ranks[ITEM]] = input_items[ITEM];
+      temp_storage.items_shared[ranks[item]] = input_items[item];
     }
 
-    WARP_SYNC(member_mask, item);
+    WARP_SYNC(member_mask, it);
 
-#pragma unroll
-    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
+    #pragma unroll
+    for (int item = 0; item < ITEMS_PER_THREAD; item++)
     {
-      int item_offset = (ITEM * LOGICAL_WARP_THREADS) + lane_id;
+      int item_offset = (item * LOGICAL_WARP_THREADS) + lane_id;
 
       if (INSERT_PADDING)
       {
         item_offset = SHR_ADD(item_offset, LOG_SMEM_BANKS, item_offset);
       }
 
-      output_items[ITEM] = temp_storage.items_shared[item_offset];
+      output_items[item] = temp_storage.items_shared[item_offset];
     }
   }
 };
