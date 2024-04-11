@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
         d->offsets = new unsigned int[d->cardinality];
 
         // calculate offsets
-        thrust::exclusive_scan(thrust::host, d->sizes, d->sizes + d->cardinality, d->offsets, 0);
+        thrust::exclusive_scan(d->sizes, d->sizes + d->cardinality, d->offsets, 0);
 
         std::vector<tile> tiles = splitToTiles(d->cardinality, partition);
         std::vector<tile_pair> runs = findTilePairs(d->cardinality, partition);
