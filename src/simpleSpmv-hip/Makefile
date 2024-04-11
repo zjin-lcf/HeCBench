@@ -26,7 +26,7 @@ obj = main.o kernels.o utils.o
 CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../simpleSpmv-cuda
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS = -lhipsparse
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
