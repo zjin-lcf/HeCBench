@@ -1,4 +1,4 @@
-NVCC_BIN=/auto/software/nvidia/x86_64/cuda-11.0/bin
+NVCC_BIN=nvcc
 
 # the path may be adjusted for each platform
 #MPI_INCLUDE=/usr/lib/x86_64-linux-gnu/openmpi/include
@@ -13,20 +13,20 @@ HACC_PLATFORM=cuda
 HACC_OBJDIR=${HACC_PLATFORM}
 
 HACC_CFLAGS=${OPT} ${OMP} ${NVCC_FLAGS}
-HACC_CC=${NVCC_BIN}/nvcc -x c
+HACC_CC=nvcc -x c
 
 HACC_CXXFLAGS=${OPT} ${OMP} ${NVCC_FLAGS}
-HACC_CXX=${NVCC_BIN}/nvcc
+HACC_CXX=nvcc
 
 HACC_LDFLAGS=-lm -lrt
 
 HACC_NUM_CUDA_DEV="1"
 HACC_MPI_CFLAGS=${OPT} ${OMP} ${NVCC_FLAGS}
-HACC_MPI_CC=${NVCC_BIN}/nvcc -x c
+HACC_MPI_CC=nvcc -x c
 
 HACC_MPI_CXXFLAGS=${OPT} ${OMP} ${NVCC_FLAGS}
-HACC_MPI_CXX=${NVCC_BIN}/nvcc
-HACC_MPI_LD=${NVCC_BIN}/nvcc
+HACC_MPI_CXX=nvcc
+HACC_MPI_LD=nvcc
 
 HACC_MPI_LDFLAGS=-lm -lrt
 
