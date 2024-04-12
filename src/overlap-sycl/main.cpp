@@ -49,7 +49,7 @@ int *d_data_in[STREAM_COUNT];
 int *h_data_out[STREAM_COUNT];
 int *d_data_out[STREAM_COUNT];
 
-sycl::queue q[STREAM_COUNT + 1];
+sycl::queue q[STREAM_COUNT];
 
 int N = 1 << 22;
 int nreps = 10;  // number of times each experiment is repeated
@@ -75,14 +75,14 @@ int main(int argc, char *argv[]) {
 #ifdef USE_GPU
   sycl::queue q0 (sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::queue q0 (sycl::device_selector_v, sycl::property::queue::in_order());
+  sycl::queue q0 (sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
   for (int i = 0; i < STREAM_COUNT; ++i) {
 #ifdef USE_GPU
     q[i] = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    q[i] = sycl::queue(sycl::device_selector_v, sycl::property::queue::in_order());
+    q[i] = sycl::queue(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
     h_data_in[i] = sycl::malloc_host<int>(N, q0);
