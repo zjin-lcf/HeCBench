@@ -308,9 +308,11 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  if (device_prop.major < 6)
-  {
-    printf("%s: requires a minimum CUDA compute 6.0 capability, waiving testing.\n", argv[0]);
+  // https://github.com/ROCm/HIP/issues/3244
+  int pcieAtomic = 0;
+  hipDeviceGetAttribute(&pcieAtomic, hipDeviceAttributeHostNativeAtomicSupported, 0);
+  if (!pcieAtomic) {
+    fprintf(stderr, "Device doesn't support pcie atomic, Skipped\n");
     exit(1);
   }
 
