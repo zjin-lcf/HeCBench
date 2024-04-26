@@ -46,7 +46,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, floydwarshall2, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, blockAccess, blockexchange, collision, concurrentKernels, conversion, copy, dispatch, graphExecution, ert, interleave, intrinsics-cast, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamOrderedAllocation, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy 
+    aligned-types, asta, blockAccess, blockexchange, collision, concurrentKernels, conversion, copy, dispatch, graphExecution, ert, interleave, intrinsics-cast, kernelLaunch, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamOrderedAllocation, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy 
 
 ### Machine learning  
     accuracy, adam, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, fused-softmax, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, rotary, sampling, scel, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
@@ -766,6 +766,9 @@ Early results are shown [here](results/README.md)
 
 ### keogh (cuda)
   Keogh's lower bound (https://github.com/gravitino/cudadtw)
+
+### kernelLaunch (hip)
+  Kernel launch with small, medium and large kernel arguments (https://github.com/ROCm/hip-tests)
 
 ### kmc (cuda)
   Kernel matrix compute (https://github.com/MKLab-ITI/CUDA)
