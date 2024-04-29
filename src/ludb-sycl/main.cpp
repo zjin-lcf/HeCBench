@@ -26,16 +26,16 @@
  */
 
 /*
- * This example demonstrates how to use the cuBLAS library API
+ * This example demonstrates how to use the oneMKL library API
  * for lower-upper (LU) decomposition of a matrix. LU decomposition
  * factors a matrix as the product of upper triangular matrix and
  * lower trianglular matrix.
  *
  * https://en.wikipedia.org/wiki/LU_decomposition
  *
- * This sample uses 10000 matrices of size 4x4 and performs
+ * This sample uses 10000 matrices of size NxN and performs
  * LU decomposition of them using batched decomposition API
- * of cuBLAS library. To test the correctness of upper and lower
+ * of oneMKL library. To test the correctness of upper and lower
  * matrices generated, they are multiplied and compared with the
  * original input matrix.
  *
