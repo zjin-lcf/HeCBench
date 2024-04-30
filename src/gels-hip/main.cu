@@ -90,8 +90,11 @@ int run_gels_batch_example(const int repeat) {
   for (int i = 0; i < batch_size; i++) ptrB_array[i] = B_dev + (i * stride_b);
 
   data_t **ptrA_array_dev, **ptrB_array_dev;
+  int *info_dev;
   hipMalloc((void**)&ptrA_array_dev, batch_size * sizeof(data_t*));
   hipMalloc((void**)&ptrB_array_dev, batch_size * sizeof(data_t*));
+  hipMalloc((void**)&info_dev, batch_size * sizeof(int));
+
   hipMemcpy(ptrA_array_dev, ptrA_array, batch_size * sizeof(data_t*), hipMemcpyHostToDevice);
   hipMemcpy(ptrB_array_dev, ptrB_array, batch_size * sizeof(data_t*), hipMemcpyHostToDevice);
   int info;
@@ -106,22 +109,22 @@ int run_gels_batch_example(const int repeat) {
 
     if constexpr (std::is_same_v<data_t, float>)
       status = hipblasSgelsBatched(h, HIPBLAS_OP_N, m, n, nrhs, ptrA_array_dev, lda,
-                                   ptrB_array_dev, ldb, &info, NULL, batch_size);
+                                   ptrB_array_dev, ldb, &info, info_dev, batch_size);
     else if constexpr (std::is_same_v<data_t, double>)
       status = hipblasDgelsBatched(h, HIPBLAS_OP_N, m, n, nrhs, ptrA_array_dev, lda,
-                                   ptrB_array_dev, ldb, &info, NULL, batch_size);
+                                   ptrB_array_dev, ldb, &info, info_dev, batch_size);
     else if constexpr (std::is_same_v<data_t, std::complex<float>>)
       status = hipblasCgelsBatched_v2(h, HIPBLAS_OP_N, m, n, nrhs,
                                       reinterpret_cast<hipComplex *const *>(ptrA_array_dev),
                                       lda,
                                       reinterpret_cast<hipComplex *const *>(ptrB_array_dev),
-                                      ldb, &info, NULL, batch_size);
+                                      ldb, &info, info_dev, batch_size);
     else if constexpr (std::is_same_v<data_t, std::complex<double>>)
       status = hipblasZgelsBatched_v2(h, HIPBLAS_OP_N, m, n, nrhs,
                                       reinterpret_cast<hipDoubleComplex *const *>(ptrA_array_dev),
                                       lda,
                                       reinterpret_cast<hipDoubleComplex *const *>(ptrB_array_dev),
-                                      ldb, &info, NULL, batch_size);
+                                      ldb, &info, info_dev, batch_size);
 
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
@@ -166,6 +169,7 @@ int run_gels_batch_example(const int repeat) {
   hipFree(B_dev);
   hipFree(ptrA_array_dev);
   hipFree(ptrB_array_dev);
+  hipFree(info_dev);
   status = hipblasDestroy(h);
   if (status != HIPBLAS_STATUS_SUCCESS) {
     printf("> ERROR: hipBLAS uninitialization failed..\n");
