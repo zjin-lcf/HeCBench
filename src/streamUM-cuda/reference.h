@@ -34,7 +34,7 @@ void check(std::vector<Task<T> > &TaskList) {
     auto tl = TaskList[i];
     if (tl.size >= 100) {
       T *ref_result = (T*) malloc (tl.size * sizeof(T));
-      ref_gemv(tl.size, tl.size, 1.0, tl.data, tl.vector, 0.0, ref_result);
+      ref_gemv(tl.size, tl.size, (T)1.0, tl.data, tl.vector, (T)0.0, ref_result);
       for (size_t j = 0; j < tl.size; j++) {
         if (fabs(tl.result[j] - ref_result[j]) > 1e-3) {
           ok = false;
