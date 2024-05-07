@@ -71,7 +71,7 @@ const int WMMA_N = 16;
 const int WMMA_K = 16;
 
 // Device warp size
-const uint32_t WAVE_SIZE = 32;
+const uint32_t WAVE_SIZE = 64;
 
 // Thread block
 // : T_BLOCK_X must be multiple of WAVE_SIZE.
