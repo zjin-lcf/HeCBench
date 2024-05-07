@@ -23,11 +23,11 @@
 *       where op() is defined by one of mkl::transpose::{nontrans,trans,conjtrans}
 *
 *
-*       The supported floating point data types for gemm matrix data are:
+*       The supported fping point data types for gemm matrix data are:
 *           half
-*           float
+*           fp
 *           double
-*           std::complex<float>
+*           std::complex<fp>
 *           std::complex<double>
 *
 *
@@ -53,8 +53,8 @@ template <typename T>
 void print_2x2_matrix_values(T M, int ldM, std::string M_name)
 {
   std::cout << std::endl;
-  std::cout << "\t\t\t" << M_name << " = [ " << M[0*ldM + 0] << ", " << M[1*ldM + 0]         << ", ...\n";
-  std::cout << "\t\t\t    [ "                << M[0*ldM + 1] << ", " << M[1*ldM + 1] << ", ...\n";
+  std::cout << "\t\t\t" << M_name << " = [ " << (float)M[0*ldM + 0] << ", " << (float)M[1*ldM + 0]         << ", ...\n";
+  std::cout << "\t\t\t    [ "                << (float)M[0*ldM + 1] << ", " << (float)M[1*ldM + 1] << ", ...\n";
   std::cout << "\t\t\t    [ "                << "...\n";
   std::cout << std::endl;
 }
@@ -66,7 +66,7 @@ template <typename fp> void rand_matrix(fp *M, int n_row, int n_col)
 {
   for (int i = 0; i < n_row; i++)
     for (int j = 0; j < n_col; j++)
-      M[i * n_col + j] = rand() % 5;
+      M[i * n_col + j] = rand() % 2;
 }
 
 //
@@ -79,7 +79,7 @@ template <typename fp> void rand_matrix(fp *M, int n_row, int n_col)
 // is performed and finally the results are post processed.
 //
 template <typename fp>
-void run_gemm_example(int repeat) {
+void run_gemm_example(MKL_INT m, MKL_INT k, MKL_INT n, int repeat) {
 
   //
   // Initialize data for Gemm
@@ -90,19 +90,18 @@ void run_gemm_example(int repeat) {
   oneapi::mkl::transpose transA = oneapi::mkl::transpose::nontrans;
   oneapi::mkl::transpose transB = oneapi::mkl::transpose::nontrans;
 
-  // matrix data sizes
-  MKL_INT m = 79;
-  MKL_INT n = 83;
-  MKL_INT k = 91;
-
   // set scalar fp values
   fp alpha = fp(2.0);
   fp beta  = fp(0.5);
 
+  const size_t A_size = sizeof(fp) * m * k;
+  const size_t B_size = sizeof(fp) * k * n;
+  const size_t C_size = sizeof(fp) * m * n;
+
   // prepare matrix data
-  fp* a = (float *)mkl_malloc((m * k) * sizeof(float), 64);
-  fp* b = (float *)mkl_malloc((k * n) * sizeof(float), 64);
-  fp* c = (float *)mkl_malloc((m * n) * sizeof(float), 64);
+  fp* a = (fp *)mkl_malloc(A_size, 64);
+  fp* b = (fp *)mkl_malloc(B_size, 64);
+  fp* c = (fp *)mkl_malloc(C_size, 64);
 
   srand(2);
   rand_matrix(a, m, k);
@@ -119,8 +118,8 @@ void run_gemm_example(int repeat) {
   fp *d_a = sycl::malloc_device<fp>(m*k, q);
   fp *d_b = sycl::malloc_device<fp>(k*n, q);
   fp *d_c = sycl::malloc_device<fp>(m*n, q);
-  q.memcpy(d_a, a, sizeof(fp) * m * k);
-  q.memcpy(d_b, b, sizeof(fp) * k * n);
+  q.memcpy(d_a, a, A_size);
+  q.memcpy(d_b, b, B_size);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
@@ -136,10 +135,9 @@ void run_gemm_example(int repeat) {
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average sgemm execution time: %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average GEMM execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-
-  q.memcpy(c, d_c, sizeof(fp) * m * n).wait();
+  q.memcpy(c, d_c, C_size).wait();
 
   sycl::free(d_a, q);
   sycl::free(d_b, q);
@@ -169,13 +167,20 @@ void run_gemm_example(int repeat) {
 // Main entry point for example.
 //
 int main (int argc, char ** argv) {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <m> <k> <n> <repeat>\n", argv[0]);
     return 1;
   }
-  const int repeat = atoi(argv[1]);
+  const int m = atoi(argv[1]);
+  const int k = atoi(argv[2]);
+  const int n = atoi(argv[3]);
+  const int repeat = atoi(argv[4]);
 
-  std::cout << "\tRunning with single precision real data type:" << std::endl;
-  run_gemm_example<float>(repeat);
+  std::cout << "\tRunning with half precision data type:" << std::endl;
+  run_gemm_example<sycl::half>(m, k, n, repeat);
+
+  std::cout << "\tRunning with single precision data type:" << std::endl;
+  run_gemm_example<float>(m, k, n, repeat);
+
   return 0;
 }

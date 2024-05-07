@@ -2,8 +2,6 @@
 # User Options
 #===============================================================================
 
-HIPBLAS_ROOT=/opt/rocm/hipblas
-
 # Compiler can be set below, or via environment variable
 CC        = hipcc
 OPTIMIZE  = yes
@@ -14,7 +12,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = sgemm
+program = main
 
 source = gemm.cu
 
@@ -25,17 +23,17 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I$(HIPBLAS_ROOT)/include
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
 
 # Linker Flags
-LDFLAGS = -L$(HIPBLAS_ROOT)/lib -lhipblas
-
+LDFLAGS = -lhipblas
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g
   LDFLAGS  += -g
 endif
+
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -56,4 +54,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 100
+	$(LAUNCHER) ./$(program) 79 91 83 1000
+	$(LAUNCHER) ./$(program) 2048 2048 2048 1000
