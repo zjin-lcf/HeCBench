@@ -46,13 +46,13 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, floydwarshall2, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, blockAccess, blockexchange, collision, concurrentKernels, conversion, copy, dispatch, graphExecution, ert, interleave, intrinsics-cast, kernelLaunch, layout, mallocFree, maxFlops, mixbench, mkl-sgemm, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamCreateCopyDestroy streamOrderedAllocation, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy 
+    aligned-types, asta, blockAccess, blockexchange, collision, concurrentKernels, conversion, copy, dispatch, graphExecution, ert, interleave, intrinsics-cast, kernelLaunch, layout, mallocFree, maxFlops, mixbench, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamCreateCopyDestroy streamOrderedAllocation, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy 
 
 ### Machine learning  
     accuracy, adam, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, expdist, flip, fused-softmax, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, perplexity, pointwise, pool, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, rotary, sampling, scel, softmax, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
 
 ### Math
-    atan2, complex, cross, determinant, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gels, gemmBatched, gemmEx, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, ludb, michalewicz, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, reverse2D, rfs, romberg, rsc, sddmm-batch, secp256k1, simpleSpmv, slu, spd2s, spgeam, spgemm, spmm, spnnz, sps2d, spsort, sptrsv, thomas, wyllie, zeropoint
+    atan2, blas-gemm, blas-gemmBatched, blas-gemmEx, complex, cross, determinant, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gels, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, ludb, michalewicz, matrix-rotate, matrixT, minkowski, mr, norm2, nqueen, ntt, phmm, pnpoly, reverse2D, rfs, romberg, rsc, sddmm-batch, secp256k1, simpleSpmv, slu, spd2s, spgeam, spgemm, spmm, spnnz, sps2d, spsort, sptrsv, thomas, wyllie, zeropoint
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -289,6 +289,16 @@ Early results are shown [here](results/README.md)
 
 ### black-scholes (cuda)
   The Black-Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
+
+### blas-gemm (sycl) 
+  General matrix-matrix multiplication
+
+### blas-gemmBatched (cuda)
+  Batched general matrix-matrix multiplication (https://github.com/pyrovski/cublasSgemmBatched-example)
+
+### blas-gemmEx (cuda)
+  Extended general matrix-matrix multiplication (https://godweiyang.com/2021/08/24/gemm/)
+
 
 ### blockAccess (cuda)
   Block access from the CUB's collective primitives (https://github.com/NVIDIA/cub)
@@ -638,12 +648,6 @@ Early results are shown [here](results/README.md)
 ### ge-spmm (cuda)
   General-purposed sparse matrix-matrix multiplication on GPUs for graph neural networks (https://github.com/hgyhungry/ge-spmm)
 
-### gemmBatched (cuda)
-  General matrix multiplication in batch on GPUs (https://github.com/pyrovski/cublasSgemmBatched-example)
-
-### gemmEx (cuda)
-  General matrix-matrix multiplication on GPUs (https://godweiyang.com/2021/08/24/gemm/)
-
 ### gibbs (cuda)
   Implementation of a Gibbs-Metropolis sampling algorithm (https://github.com/arendsee/cuda-gibbs-example)
 
@@ -979,9 +983,6 @@ Early results are shown [here](results/README.md)
 
 ### mixbench (cuda)
   A read-only version of mixbench (https://github.com/ekondis/mixbench)
-
-### mkl-sgemm (sycl) 
-  Single-precision floating-point matrix multiply using Intel<sup>®</sup> Math Kernel Library 
 
 ### mmcsf (cuda)
   MTTKRP kernel using mixed-mode CSF (https://github.com/isratnisa/MM-CSF)
