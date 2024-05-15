@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+ONEDNN    = yes
 LAUNCHER  =
 
 GPU       = yes
@@ -46,6 +47,11 @@ ifeq ($(HIP), yes)
 	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 
+ifeq ($(ONEDNN),yes)
+  CFLAGS  += -DONEDNN_CONV
+  LDFLAGS += -ldnnl
+endif
+
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS  += -g -DDEBUG
@@ -67,7 +73,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp conv3d_s4.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
+#include <iostream>
 #include <hip/hip_runtime.h>
 
 #define TILE_WIDTH 16
@@ -16,6 +17,18 @@
 #define II(n,c,h,w) ((n)*C*Hin*Win+(c)*Hin*Win+(h)*Win+w)
 #define WI(n,c,h,w) ((n)*C*K*K+(c)*K*K+(h)*K+w)
 #define OI(n,c,h,w) ((n)*M*Hout*Wout+(c)*Hout*Wout+(h)*Wout+w)
+
+#ifdef MIOPEN_CONV
+#include <miopen/miopen.h>
+#define checkMIOpen(expression)                              \
+  {                                                          \
+    miopenStatus_t status = (expression);                    \
+    if (status != miopenStatusSuccess) {                     \
+      std::cerr << "Error on line " << __LINE__ << ": "      \
+                << miopenGetErrorString(status) << std::endl;\
+    }                                                        \
+  }
+#endif
 
 template<typename T>
 __global__
@@ -158,7 +171,7 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
 
   srand(123);
 
-  for (size_t i = 0; i < W_size; i++) W[i] = rand() % W_size; 
+  for (size_t i = 0; i < W_size; i++) W[i] = rand() % 31;
   for (size_t i = 0; i < X_size; i++) X[i] = rand() % 13;
 
   for (size_t i = 0; i < Y_size; i++) {
@@ -224,17 +237,21 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
   printf("Average kernel execution time of conv3d_s3 kernel: %f (us)\n",
          (time * 1e-3f) / repeat);
 
+#ifdef MIOPEN_CONV
+  #include "conv3d_s4.cu"
+#endif
+
   hipMemcpy(Y, dY, Y_bytes, hipMemcpyDeviceToHost);
   reference(X, W, Y_ref, N, M, C, K, Hin, Win, Hout, Wout);
 
   bool ok = true;
   for (size_t i = 0; i < Y_size; i++) {
     if (fabs(Y[i] - Y_ref[i]) > 1e-3f) {
-      printf("%f (device) != %f ", Y[i], Y_ref[i]); 
+      printf("%f (device) != %f ", Y[i], Y_ref[i]);
       printf("at n=%zu m=%zu h=%zu w=%zu\n",
-      i / (M * Hout * Wout), 
-      i % (M * Hout * Wout) / (Hout * Wout), 
-      i % (M * Hout * Wout) % (Hout * Wout) / Wout, 
+      i / (M * Hout * Wout),
+      i % (M * Hout * Wout) / (Hout * Wout),
+      i % (M * Hout * Wout) % (Hout * Wout) / Wout,
       i % (M * Hout * Wout) % (Hout * Wout) % Wout);
       ok = false; break;
     }
