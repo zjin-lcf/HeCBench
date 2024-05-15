@@ -65,7 +65,7 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
 
   srand(123);
 
-  for (size_t i = 0; i < W_size; i++) W[i] = rand() % W_size; 
+  for (size_t i = 0; i < W_size; i++) W[i] = rand() % 31; 
   for (size_t i = 0; i < X_size; i++) X[i] = rand() % 13;
 
   for (size_t i = 0; i < Y_size; i++) {

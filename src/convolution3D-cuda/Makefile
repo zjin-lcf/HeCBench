@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+CUDNN_V8  = yes
 LAUNCHER  =
 
 #===============================================================================
@@ -29,12 +30,16 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 # Linker Flags
 LDFLAGS = 
 
-# Debug Flags
-ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+ifeq ($(CUDNN_V8),yes)
+  CFLAGS += -DCUDNN_CONV
+  LDFLAGS  += -lcudnn
 endif
 
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g -DDEBUG
+  LDFLAGS  += -g
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
@@ -48,7 +53,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+%.o: %.cu conv3d_s4.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

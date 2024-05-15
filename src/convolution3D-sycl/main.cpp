@@ -17,6 +17,13 @@
 #define WI(n,c,h,w) ((n)*C*K*K+(c)*K*K+(h)*K+w)
 #define OI(n,c,h,w) ((n)*M*Hout*Wout+(c)*Hout*Wout+(h)*Wout+w)
 
+#ifdef ONEDNN_CONV
+  #include "onednn_utils.hpp"
+  using namespace dnnl;
+  using tag = memory::format_tag;
+  using dt = memory::data_type;
+#endif
+
 template<typename T>
 void conv3d_s1(const T * __restrict__ X,
                const T * __restrict__ W,
@@ -160,7 +167,7 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
 
   srand(123);
 
-  for (size_t i = 0; i < W_size; i++) W[i] = rand() % W_size; 
+  for (size_t i = 0; i < W_size; i++) W[i] = rand() % 31; 
   for (size_t i = 0; i < X_size; i++) X[i] = rand() % 13;
 
   for (size_t i = 0; i < Y_size; i++) {
@@ -247,7 +254,11 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
   printf("Average kernel execution time of conv3d_s3 kernel: %f (us)\n",
          (time * 1e-3f) / repeat);
 
+#ifdef ONEDNN_CONV
+  #include "conv3d_s4.cpp"
+#else
   q.memcpy(Y, dY, Y_bytes).wait();
+#endif
   reference(X, W, Y_ref, N, M, C, K, Hin, Win, Hout, Wout);
 
   bool ok = true;
