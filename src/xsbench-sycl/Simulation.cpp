@@ -28,7 +28,7 @@ void lookup (
     const sycl::nd_item<1> &item) {
 
   // get the index to operate on, first dimemsion
-  size_t i = item.get_global_id(0);
+  int i = item.get_global_id(0);
 
   if (i < n_lookups) {
 
@@ -84,6 +84,119 @@ void lookup (
   }
 }
 
+void lookup_reference (
+    const int *__restrict__ num_nucs,
+    const double *__restrict__ concs,
+    const int *__restrict__ mats,
+    const NuclideGridPoint *__restrict__ nuclide_grid,
+    int*__restrict__  verification,
+    const double *__restrict__ unionized_energy_array,
+    const int *__restrict__ index_grid,
+    const int n_lookups,
+    const long n_isotopes,
+    const long n_gridpoints,
+    const int grid_type,
+    const int hash_bins,
+    const int max_num_nucs ) {
+
+  #pragma omp parallel for
+  for (int i = 0; i < n_lookups; i++) {
+
+    // Set the initial seed value
+    uint64_t seed = STARTING_SEED;
+
+    // Forward seed to lookup index (we need 2 samples per lookup)
+    seed = fast_forward_LCG(seed, 2*i);
+
+    // Randomly pick an energy and material for the particle
+    double p_energy = LCG_random_double(&seed);
+    int mat         = pick_mat(&seed);
+
+    // debugging
+    //printf("E = %lf mat = %d\n", p_energy, mat);
+
+    double macro_xs_vector[5] = {0};
+
+    // Perform macroscopic Cross Section Lookup
+    calculate_macro_xs(
+        p_energy,     // Sampled neutron energy (in lethargy)
+        mat,          // Sampled material type index neutron is in
+        n_isotopes,   // Total number of isotopes in simulation
+        n_gridpoints, // Number of gridpoints per isotope in simulation
+        num_nucs,     // 1-D array with number of nuclides per material
+        concs,        // Flattened 2-D array with concentration of each nuclide in each material
+        unionized_energy_array, // 1-D Unionized energy array
+        index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
+        nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
+        mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
+        macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
+        grid_type,    // Lookup type (nuclide, hash, or unionized)
+        hash_bins,    // Number of hash bins used (if using hash lookup type)
+        max_num_nucs  // Maximum number of nuclides present in any material
+     );
+
+    // For verification, and to prevent the compiler from optimizing
+    // all work out, we interrogate the returned macro_xs_vector array
+    // to find its maximum value index, then increment the verification
+    // value by that index. In this implementation, we store to a global
+    // array that will get tranferred back and reduced on the host.
+    double max = -1.0;
+    int max_idx = 0;
+    for(int j = 0; j < 5; j++ )
+    {
+      if( macro_xs_vector[j] > max )
+      {
+        max = macro_xs_vector[j];
+        max_idx = j;
+      }
+    }
+    verification[i] = max_idx+1;
+  }
+}
+
+
+// run the simulation on a host for validation
+unsigned long long
+run_event_based_simulation(Inputs in, SimulationData SD, int mype)
+{
+  if(mype==0) printf("Beginning event based simulation on the host for verification...\n");
+
+  int * verification_h = (int *) malloc(in.lookups * sizeof(int));
+
+  // These two are a bit of a hack. Sometimes they are empty buffers (if using hash or nuclide
+  // grid methods). OpenCL will throw an example when we try to create an empty buffer. So, we
+  // will just allocate some memory for them and move them as normal. The rest of our code
+  // won't actually use them if they aren't needed, so this is safe. Probably a cleaner way
+  // of doing this.
+  if( SD.length_unionized_energy_array == 0 )
+  {
+    SD.length_unionized_energy_array = 1;
+    SD.unionized_energy_array = (double *) malloc(sizeof(double));
+  }
+
+  if( SD.length_index_grid == 0 )
+  {
+    SD.length_index_grid = 1;
+    SD.index_grid = (int *) malloc(sizeof(int));
+  }
+
+  lookup_reference (
+      SD.num_nucs, SD.concs, SD.mats,
+      SD.nuclide_grid, verification_h, SD.unionized_energy_array,
+      SD.index_grid, in.lookups, in.n_isotopes, in.n_gridpoints,
+      in.grid_type, in.hash_bins, SD.max_num_nucs );
+
+  // Host reduces the verification array
+  unsigned long long verification_scalar = 0;
+  for( int i = 0; i < in.lookups; i++ )
+    verification_scalar += verification_h[i];
+
+  if( SD.length_unionized_energy_array == 0 ) free(SD.unionized_energy_array);
+  if( SD.length_index_grid == 0 ) free(SD.index_grid);
+  free(verification_h);
+
+  return verification_scalar;
+}
 
 unsigned long long
 run_event_based_simulation(Inputs in, SimulationData SD,

@@ -92,30 +92,33 @@ void fancy_int(long a);
 Inputs read_CLI( int argc, char * argv[] );
 void print_CLI_error(void);
 void print_inputs(Inputs in, int nprocs, int version);
-int print_results( Inputs in, int mype, double runtime, int nprocs, unsigned long long vhash, double time );
+int print_results( Inputs in, int mype, double runtime, int nprocs,
+                   unsigned long long *vhash, double time );
 void binary_write( Inputs in, SimulationData SD );
 SimulationData binary_read( Inputs in );
 
 // Simulation.c
 unsigned long long run_event_based_simulation(Inputs in, SimulationData SD, int mype, double * kernel_init_time);
-__device__
+unsigned long long run_event_based_simulation(Inputs in, SimulationData SD, int mype);
+
+__host__ __device__
 int pick_mat(unsigned long * seed);
 __host__ __device__
 double LCG_random_double(uint64_t * seed);
 __host__ __device__
 uint64_t fast_forward_LCG(uint64_t seed, uint64_t n);
 template <class T>
-__device__
+__host__ __device__
 long grid_search( long n, double quarry, T A);
 template <class Double_Type, class Int_Type, class NGP_Type>
-__device__
+__host__ __device__
 void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
     long n_gridpoints,
     Double_Type  egrid, Int_Type  index_data,
     NGP_Type  nuclide_grids,
     long idx, double *  xs_vector, int grid_type, int hash_bins );
 template <class Double_Type, class Int_Type, class NGP_Type, class E_GRID_TYPE, class INDEX_TYPE>
-__device__
+__host__ __device__
 void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
     long n_gridpoints, Int_Type  num_nucs,
     Double_Type  concs,
