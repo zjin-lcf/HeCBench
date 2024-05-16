@@ -18,6 +18,7 @@
  */
 
 #include <sycl/sycl.hpp>
+#include <dpct/dpct.hpp>
 #include <iostream>
 #include <iomanip>
 #include <chrono>
@@ -44,16 +45,11 @@ class PerfStreamCreateCopyDestroy {
 };
 
 void PerfStreamCreateCopyDestroy::run(unsigned int testNumber) {
-#ifdef USE_GPU
-  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
-#else
-  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
-#endif
-
+  dpct::device_ext &device = dpct::get_current_device();
+  sycl::queue &q = device.in_order_queue();
   numStreams_ = totalStreams_[testNumber % TotalStreams];
   size_t iter = Iterations / (numStreams_ * ((size_t)1 << (testNumber / TotalBufs + 1)));
-
-  sycl::queue *streams[numStreams_];
+  dpct::queue_ptr streams[numStreams_];
 
   numBuffers_ = totalBuffers_[testNumber / TotalBufs];
   float* dSrc[numBuffers_];
@@ -73,10 +69,7 @@ void PerfStreamCreateCopyDestroy::run(unsigned int testNumber) {
 
   for (size_t i = 0; i < iter; ++i) {
     for (size_t s = 0; s < numStreams_; ++s) {
-      streams[s] = new sycl::queue(q.get_device(),
-                                   sycl::property_list{sycl::property::queue::in_order()
-                                                       sycl::ext::oneapi::property::queue::discard_events()
-                                                      });
+      streams[s] = device.create_queue();
     }
 
     for (size_t s = 0; s < numStreams_; ++s) {
@@ -87,7 +80,7 @@ void PerfStreamCreateCopyDestroy::run(unsigned int testNumber) {
 
     for (size_t s = 0; s < numStreams_; ++s) {
       streams[s]->wait();
-      delete(streams[s]);
+      device.destroy_queue(streams[s]);
     }
   }
 
@@ -102,7 +95,7 @@ void PerfStreamCreateCopyDestroy::run(unsigned int testNumber) {
 
   delete [] hSrc;
   for (size_t b = 0; b < numBuffers_; ++b) {
-    sycl::free(dSrc[b], q);
+    dpct::dpct_free(dSrc[b], q);
   }
 }
 
