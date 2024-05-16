@@ -13,7 +13,7 @@ int main( int argc, char* argv[] )
   int mype = 0;
   double omp_start, omp_end;
   int nprocs = 1;
-  unsigned long long verification;
+  unsigned long long verification[2];
 
 #ifdef MPI
   MPI_Status stat;
@@ -77,7 +77,8 @@ int main( int argc, char* argv[] )
   {
     if( in.kernel_id == 0 )
     {
-      verification = run_event_based_simulation(in, SD, mype, &kernel_time);
+      verification[0] = run_event_based_simulation(in, SD, mype, &kernel_time);
+      verification[1] = run_event_based_simulation(in, SD, mype);
     }
     else
     {
@@ -104,11 +105,9 @@ int main( int argc, char* argv[] )
   // Output Results & Finalize
   // =====================================================================
 
-  // Final Hash Step
-  verification = verification % 999983;
-
   // Print / Save Results and Exit
-  int is_invalid_result = print_results( in, mype, omp_end-omp_start, nprocs, verification, kernel_time );
+  int is_invalid_result = print_results( in, mype, omp_end-omp_start, nprocs,
+                                         verification, kernel_time );
 
 #ifdef MPI
   MPI_Finalize();

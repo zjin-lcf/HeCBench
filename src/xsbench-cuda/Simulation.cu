@@ -14,32 +14,102 @@
 __global__ void lookup (
     const int *__restrict__ num_nucs,
     const double *__restrict__ concs,
-    const int *__restrict__ mats, 
+    const int *__restrict__ mats,
     const NuclideGridPoint *__restrict__ nuclide_grid,
     int*__restrict__  verification,
     const double *__restrict__ unionized_energy_array,
     const int *__restrict__ index_grid,
     const int n_lookups,
-    const long n_isotopes, 
+    const long n_isotopes,
     const long n_gridpoints,
     const int grid_type,
     const int hash_bins,
     const int max_num_nucs ) {
 
   // get the index to operate on, first dimemsion
-  size_t i = threadIdx.x + blockIdx.x * blockDim.x;
+  int i = threadIdx.x + blockIdx.x * blockDim.x;
 
   if (i < n_lookups) {
 
     // Set the initial seed value
-    uint64_t seed = STARTING_SEED;  
+    uint64_t seed = STARTING_SEED;
 
     // Forward seed to lookup index (we need 2 samples per lookup)
     seed = fast_forward_LCG(seed, 2*i);
 
     // Randomly pick an energy and material for the particle
     double p_energy = LCG_random_double(&seed);
-    int mat         = pick_mat(&seed); 
+    int mat         = pick_mat(&seed);
+
+    // debugging
+    //printf("E = %lf mat = %d\n", p_energy, mat);
+
+    double macro_xs_vector[5] = {0};
+
+    // Perform macroscopic Cross Section Lookup
+    calculate_macro_xs(
+        p_energy,     // Sampled neutron energy (in lethargy)
+        mat,          // Sampled material type index neutron is in
+        n_isotopes,   // Total number of isotopes in simulation
+        n_gridpoints, // Number of gridpoints per isotope in simulation
+        num_nucs,     // 1-D array with number of nuclides per material
+        concs,        // Flattened 2-D array with concentration of each nuclide in each material
+        unionized_energy_array, // 1-D Unionized energy array
+        index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
+        nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
+        mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
+        macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
+        grid_type,    // Lookup type (nuclide, hash, or unionized)
+        hash_bins,    // Number of hash bins used (if using hash lookup type)
+        max_num_nucs  // Maximum number of nuclides present in any material
+     );
+
+    // For verification, and to prevent the compiler from optimizing
+    // all work out, we interrogate the returned macro_xs_vector array
+    // to find its maximum value index, then increment the verification
+    // value by that index. In this implementation, we store to a global
+    // array that will get tranferred back and reduced on the host.
+    double max = -1.0;
+    int max_idx = 0;
+    for(int j = 0; j < 5; j++ )
+    {
+      if( macro_xs_vector[j] > max )
+      {
+        max = macro_xs_vector[j];
+        max_idx = j;
+      }
+    }
+    verification[i] = max_idx+1;
+  }
+}
+
+void lookup_reference (
+    const int *__restrict__ num_nucs,
+    const double *__restrict__ concs,
+    const int *__restrict__ mats,
+    const NuclideGridPoint *__restrict__ nuclide_grid,
+    int*__restrict__  verification,
+    const double *__restrict__ unionized_energy_array,
+    const int *__restrict__ index_grid,
+    const int n_lookups,
+    const long n_isotopes,
+    const long n_gridpoints,
+    const int grid_type,
+    const int hash_bins,
+    const int max_num_nucs ) {
+
+  #pragma omp parallel for
+  for (int i = 0; i < n_lookups; i++) {
+
+    // Set the initial seed value
+    uint64_t seed = STARTING_SEED;
+
+    // Forward seed to lookup index (we need 2 samples per lookup)
+    seed = fast_forward_LCG(seed, 2*i);
+
+    // Randomly pick an energy and material for the particle
+    double p_energy = LCG_random_double(&seed);
+    int mat         = pick_mat(&seed);
 
     // debugging
     //printf("E = %lf mat = %d\n", p_energy, mat);
@@ -84,6 +154,51 @@ __global__ void lookup (
 }
 
 
+// run the simulation on a host for validation
+unsigned long long
+run_event_based_simulation(Inputs in, SimulationData SD, int mype)
+{
+  if(mype==0) printf("Beginning event based simulation on the host for verification...\n");
+
+  int * verification_h = (int *) malloc(in.lookups * sizeof(int));
+
+  // These two are a bit of a hack. Sometimes they are empty buffers (if using hash or nuclide
+  // grid methods). OpenCL will throw an example when we try to create an empty buffer. So, we
+  // will just allocate some memory for them and move them as normal. The rest of our code
+  // won't actually use them if they aren't needed, so this is safe. Probably a cleaner way
+  // of doing this.
+  if( SD.length_unionized_energy_array == 0 )
+  {
+    SD.length_unionized_energy_array = 1;
+    SD.unionized_energy_array = (double *) malloc(sizeof(double));
+  }
+
+  if( SD.length_index_grid == 0 )
+  {
+    SD.length_index_grid = 1;
+    SD.index_grid = (int *) malloc(sizeof(int));
+  }
+
+  lookup_reference (
+      SD.num_nucs, SD.concs, SD.mats,
+      SD.nuclide_grid, verification_h, SD.unionized_energy_array,
+      SD.index_grid, in.lookups, in.n_isotopes, in.n_gridpoints,
+      in.grid_type, in.hash_bins, SD.max_num_nucs );
+
+  // Host reduces the verification array
+  unsigned long long verification_scalar = 0;
+  for( int i = 0; i < in.lookups; i++ )
+    verification_scalar += verification_h[i];
+
+  if( SD.length_unionized_energy_array == 0 ) free(SD.unionized_energy_array);
+  if( SD.length_index_grid == 0 ) free(SD.index_grid);
+  free(verification_h);
+
+  return verification_scalar;
+}
+
+
+
 unsigned long long
 run_event_based_simulation(Inputs in, SimulationData SD,
                            int mype, double *kernel_time)
@@ -100,7 +215,7 @@ run_event_based_simulation(Inputs in, SimulationData SD,
   // double * unionized_energy_array;    // Length = length_unionized_energy_array
   // int * index_grid;                   // Length = length_index_grid
   // NuclideGridPoint * nuclide_grid;    // Length = length_nuclide_grid
-  // 
+  //
   // Note: "unionized_energy_array" and "index_grid" can be of zero length
   //        depending on lookup method.
   //
@@ -164,7 +279,7 @@ run_event_based_simulation(Inputs in, SimulationData SD,
   //buffer<double,1> unionized_energy_array_d(SD.unionized_energy_array, SD.length_unionized_energy_array);
   double *unionized_energy_array_d = nullptr;
   cudaMalloc((void**)&unionized_energy_array_d, sizeof(double) * SD.length_unionized_energy_array);
-  cudaMemcpy(unionized_energy_array_d, SD.unionized_energy_array, 
+  cudaMemcpy(unionized_energy_array_d, SD.unionized_energy_array,
       sizeof(double) * SD.length_unionized_energy_array, cudaMemcpyHostToDevice);
 
   if( SD.length_index_grid == 0 )
@@ -188,11 +303,11 @@ run_event_based_simulation(Inputs in, SimulationData SD,
 
   double kstart = get_time();
 
-  for (int i = 0; i < in.kernel_repeat; i++) { 
+  for (int i = 0; i < in.kernel_repeat; i++) {
     lookup<<< grids, blocks >>> (
-        num_nucs_d, concs_d, mats_d, 
+        num_nucs_d, concs_d, mats_d,
         nuclide_grid_d, verification_d, unionized_energy_array_d,
-        index_grid_d, in.lookups, in.n_isotopes, in.n_gridpoints, 
+        index_grid_d, in.lookups, in.n_isotopes, in.n_gridpoints,
         in.grid_type, in.hash_bins, SD.max_num_nucs );
   }
 
@@ -226,7 +341,7 @@ run_event_based_simulation(Inputs in, SimulationData SD,
 // binary search for energy on unionized energy grid
 // returns lower index
 template <class T>
-__device__
+__host__ __device__
 long grid_search( long n, double quarry, T A)
 {
   long lowerLimit = 0;
@@ -251,7 +366,7 @@ long grid_search( long n, double quarry, T A)
 
 // Calculates the microscopic cross section for a given nuclide & energy
 template <class Double_Type, class Int_Type, class NGP_Type>
-__device__
+__host__ __device__
 void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
     long n_gridpoints,
     Double_Type  egrid, Int_Type  index_data,
@@ -345,9 +460,9 @@ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
   xs_vector[4] = high.nu_fission_xs - f * (high.nu_fission_xs - low.nu_fission_xs);
 }
 
-// Calculates macroscopic cross section based on a given material & energy 
+// Calculates macroscopic cross section based on a given material & energy
 template <class Double_Type, class Int_Type, class NGP_Type, class E_GRID_TYPE, class INDEX_TYPE>
-__device__
+__host__ __device__
 void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
     long n_gridpoints, Int_Type  num_nucs,
     Double_Type  concs,
@@ -356,7 +471,7 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
     Int_Type  mats,
     double * macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs ){
   int p_nuc; // the nuclide we are looking up
-  long idx = -1;  
+  long idx = -1;
   double conc; // the concentration of the nuclide in the material
 
   // cleans out macro_xs_vector
@@ -369,7 +484,7 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
   // done inside of the "calculate_micro_xs" function for each different
   // nuclide in the material.
   if( grid_type == UNIONIZED )
-    idx = grid_search( n_isotopes * n_gridpoints, p_energy, egrid);  
+    idx = grid_search( n_isotopes * n_gridpoints, p_energy, egrid);
   else if( grid_type == HASH )
   {
     double du = 1.0 / hash_bins;
@@ -400,15 +515,15 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
 }
 
 // picks a material based on a probabilistic distribution
-__device__
+__host__ __device__
 int pick_mat( unsigned long * seed )
 {
   // I have a nice spreadsheet supporting these numbers. They are
-  // the fractions (by volume) of material in the core. Not a 
+  // the fractions (by volume) of material in the core. Not a
   // *perfect* approximation of where XS lookups are going to occur,
   // but this will do a good job of biasing the system nonetheless.
 
-  // Also could be argued that doing fractions by weight would be 
+  // Also could be argued that doing fractions by weight would be
   // a better approximation, but volume does a good enough job for now.
 
   double dist[12];
@@ -449,7 +564,7 @@ double LCG_random_double(uint64_t * seed)
   const uint64_t c = 1ULL;
   *seed = (a * (*seed) + c) % m;
   return (double) (*seed) / (double) m;
-}  
+}
 
 __host__ __device__
 uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
@@ -464,7 +579,7 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
   uint64_t a_new = 1;
   uint64_t c_new = 0;
 
-  while(n > 0) 
+  while(n > 0)
   {
     if(n & 1)
     {
