@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../gemmEx-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../blas-gemmEx-cuda
 
 # Linker Flags
 LDFLAGS = -lhipblas
@@ -45,7 +45,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../gemmEx-cuda/utils.h Makefile
+%.o: %.cu ../blas-gemmEx-cuda/utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
