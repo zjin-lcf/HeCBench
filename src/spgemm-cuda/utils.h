@@ -28,6 +28,23 @@ void init_matrix(float *matrix, int num_rows, int num_cols, int nnz)
   free(d);
 }
 
+void init_coo(int *row_indices, float *values,
+              int *col_indices, float *matrix,
+              int num_rows, int num_cols, int nnz)
+{
+  int tmp = 0;
+  for (int i = 0; i < num_rows; i++) {
+    for (int j = 0; j < num_cols; j++) {
+      if(matrix[i*num_cols+j] != 0) {
+        values[tmp] = matrix[i*num_cols+j];
+        row_indices[tmp] = i;
+        col_indices[tmp] = j;
+        tmp++;
+      }
+    }
+  }
+}
+
 void init_csr(int *row_indices, float *values,
               int *col_indices, float *matrix,
               int num_rows, int num_cols, int nnz)
