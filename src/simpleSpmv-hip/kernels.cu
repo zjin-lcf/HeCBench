@@ -139,31 +139,15 @@ long mv_csr_parallel(const int repeat,
                __LINE__, #token_); \
         break
 
-#define CHECK_HIPSPARSE(error)                                                      \
-    {                                                                                     \
-        auto local_error = (error);                                                       \
-        if(local_error != HIPSPARSE_STATUS_SUCCESS)                                       \
-        {                                                                                 \
-            fprintf(stderr, "hipSPARSE error: ");                                         \
-            switch(local_error)                                                           \
-            {                                                                             \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_SUCCESS);                   \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_NOT_INITIALIZED);           \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_ALLOC_FAILED);              \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_INVALID_VALUE);             \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_ARCH_MISMATCH);             \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_MAPPING_ERROR);             \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_EXECUTION_FAILED);          \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_INTERNAL_ERROR);            \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED); \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_ZERO_PIVOT);                \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_NOT_SUPPORTED);             \
-                CHECK_HIPSPARSE_ERROR_CASE__(HIPSPARSE_STATUS_INSUFFICIENT_RESOURCES);    \
-            }                                                                             \
-            fprintf(stderr, "\n");                                                        \
-            return local_error;                                                           \
-        }                                                                                 \
-    }                                                                                     
+#define CHECK_HIPSPARSE(func)                                                \
+{                                                                            \
+    hipsparseStatus_t status = (func);                                       \
+    if (status != HIPSPARSE_STATUS_SUCCESS) {                                \
+        printf("HIPSPARSE API failed at line %d with error: %s (%d)\n",      \
+               __LINE__, hipsparseGetErrorString(status), status);           \
+        return EXIT_FAILURE;                                                 \
+    }                                                                        \
+}
 
 long spmv_csr(const int repeat,
               const int num_rows,
