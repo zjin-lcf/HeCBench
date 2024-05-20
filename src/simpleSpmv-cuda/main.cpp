@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
     printf("Error rate: %f\n", check(y, y_csr, num_rows));
   }
 
-  #ifdef ONEMKL
+  #ifdef BLAS_SPMV
   {
     printf("\n");
     // warmup run

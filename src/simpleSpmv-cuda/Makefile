@@ -7,6 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
+BLAS_SPMV = yes
 LAUNCHER  =
 
 #===============================================================================
@@ -28,6 +29,10 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = -lcusparse
+
+ifeq ($(BLAS_SPMV),yes)
+  CFLAGS += -DBLAS_SPMV
+endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

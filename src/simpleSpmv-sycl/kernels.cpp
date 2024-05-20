@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
-#ifdef ONEMKL
+#ifdef BLAS_SPMV
 #include <oneapi/mkl.hpp>
 #endif
 #include "mv.h"
@@ -161,7 +161,7 @@ long mv_csr_parallel(const int repeat,
   return time;
 }
 
-#ifdef ONEMKL
+#ifdef BLAS_SPMV
 long spmv_csr(const int repeat,
               const int num_rows,
               const REAL* x,
