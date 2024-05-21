@@ -93,3 +93,4 @@ float check(REAL *A, REAL *B, size_t n)
   }
   return diffsum / sum;
 }
+
