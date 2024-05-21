@@ -34,10 +34,11 @@ int main(int argc, char *argv[])
   size_t *col_indices = (size_t *) malloc (colidx_size_bytes);
   REAL *values = (REAL *) malloc (value_size_bytes);
 
+  REAL *y[4];
+
   REAL *x = (REAL *) malloc (vector_size_bytes);
-  REAL *y = (REAL *) malloc (vector_size_bytes);
-  REAL *y_csr = (REAL *) malloc (vector_size_bytes);
-  REAL *y_dense = (REAL *) malloc (vector_size_bytes);
+  for (int i = 0; i < 4; i++)
+    y[i] = (REAL *) malloc (vector_size_bytes);
   REAL *matrix = (REAL *) malloc (matrix_size_bytes);
 
   srand48(1<<12);
@@ -46,32 +47,38 @@ int main(int argc, char *argv[])
   init_csr(row_indices, values, col_indices, matrix, num_rows, nnz);
 
   // reference results in y
-  mv_csr_serial(num_rows, row_indices, col_indices, values, x, y);
+  mv_csr_serial(num_rows, row_indices, col_indices, values, x, y[0]);
 
   printf("Number of non-zero elements: %lu\n", nnz);
   printf("Number of rows in a square matrix: %lu\n", num_rows);
   printf("Sparsity: %lf%%\n", (num_elems - nnz) * 1.0 / num_elems * 100.0);
 
+  long elapsed[3];
+
   // thread block size
   for (int bs = 32; bs <= 1024; bs = bs * 2) {
     printf("\nThread block size: %d\n", bs);
 
-    long elapsed_d = mv_dense_parallel(repeat, bs, num_rows, x, matrix, y_dense);
-    long elapsed_s = mv_csr_parallel(repeat, bs, num_rows, row_indices,
-                                     col_indices, values, x, nnz, matrix, y_csr);
+    elapsed[0] = mv_dense_parallel(repeat, bs, num_rows, x, matrix, y[1]);
+    elapsed[1] = mv_csr_parallel(repeat, bs, num_rows, row_indices,
+                                 col_indices, values, x, nnz, matrix, y[2]);
+    elapsed[2] = vector_mv_csr_parallel(repeat, bs, num_rows, row_indices,
+                                        col_indices, values, x, nnz, matrix, y[3]);
 
-    printf("Average dense and sparse kernel execution time (ms): %lf %lf\n",
-           elapsed_d * 1e-6 / repeat, elapsed_s * 1e-6 / repeat);
-    printf("Error rate: %f %f\n", check(y, y_dense, num_rows), check(y, y_csr, num_rows));
+    printf("Average dense, sparse, and vector sparse kernel execution time (ms):");
+    for (int i = 0; i < 3; i++)
+      printf(" %lf", elapsed[i] * 1e-6 / repeat);
+
+    printf("\nError rate:");
+    for (int i = 1; i < 4; i++) printf(" %f", check(y[0], y[i], num_rows));
+    printf("\n");
   }
 
   free(row_indices);
   free(col_indices);
   free(values);
   free(x);
-  free(y);
-  free(y_csr);
-  free(y_dense);
   free(matrix);
+  for (int i = 0; i < 4; i++) free(y[i]);
   return 0;
 }
