@@ -6,7 +6,7 @@
 int main(int argc, char *argv[])
 {
   size_t nnz = 0;
-  int num_rows = 0;
+  size_t num_rows = 0;
   int repeat = 0;
 
   if (argc != 4) {
@@ -15,10 +15,10 @@ int main(int argc, char *argv[])
   }
 
   nnz = atol(argv[1]);
-  num_rows = atoi(argv[2]);
+  num_rows = atol(argv[2]);
   repeat = atoi(argv[3]);
 
-  size_t num_elems = (size_t)num_rows * num_rows;
+  size_t num_elems = num_rows * num_rows;
 
   assert(nnz > 0);
   assert(num_rows > 0);
@@ -27,11 +27,11 @@ int main(int argc, char *argv[])
   size_t vector_size_bytes = num_rows * sizeof(REAL);
   size_t matrix_size_bytes = num_elems * sizeof(REAL);
   size_t value_size_bytes  = nnz * sizeof(REAL);
-  size_t colidx_size_bytes = nnz * sizeof(int);
+  size_t colidx_size_bytes = nnz * sizeof(size_t);
   size_t rowidx_size_bytes = (num_rows + 1) * sizeof(size_t);
 
   size_t *row_indices = (size_t *) malloc (rowidx_size_bytes);
-  int *col_indices = (int *) malloc (colidx_size_bytes);
+  size_t *col_indices = (size_t *) malloc (colidx_size_bytes);
   REAL *values = (REAL *) malloc (value_size_bytes);
 
   REAL *x = (REAL *) malloc (vector_size_bytes);
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
   mv_csr_serial(num_rows, row_indices, col_indices, values, x, y);
 
   printf("Number of non-zero elements: %lu\n", nnz);
-  printf("Number of rows in a square matrix: %d\n", num_rows);
+  printf("Number of rows in a square matrix: %lu\n", num_rows);
   printf("Sparsity: %lf%%\n", (num_elems - nnz) * 1.0 / num_elems * 100.0);
 
   // thread block size
@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
 
     long elapsed = mv_csr_parallel(repeat, bs, num_rows, x, nnz, matrix, y_csr);
 
-    printf("Average sparse kernel execution time (ms): %lf\n", elapsed * 1e-6 / repeat);
+    printf("Average sparse kernel (CSR) execution time (ms): %lf\n", elapsed * 1e-6 / repeat);
     printf("Error rate: %f\n", check(y, y_csr, num_rows));
   }
 
@@ -86,7 +86,15 @@ int main(int argc, char *argv[])
 
     long elapsed = spmv_csr(repeat, num_rows, x, nnz, matrix, y_csr);
 
-    printf("Average library kernel execution time (ms): %lf\n", elapsed * 1e-6 / repeat);
+    printf("Average library kernel (CSR) execution time (ms): %lf\n", elapsed * 1e-6 / repeat);
+    printf("Error rate: %f\n", check(y, y_csr, num_rows));
+
+    // warmup run
+    spmv_coo(1, num_rows, x, nnz, matrix, y_warmup);
+
+    elapsed = spmv_coo(repeat, num_rows, x, nnz, matrix, y_csr);
+
+    printf("Average library kernel (COO) execution time (ms): %lf\n", elapsed * 1e-6 / repeat);
     printf("Error rate: %f\n", check(y, y_csr, num_rows));
   }
   #endif

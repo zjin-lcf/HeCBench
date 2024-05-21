@@ -1,16 +1,17 @@
 #include <math.h>
+#include <assert.h>
 #include "mv.h"
 
-void init_vector(REAL *vector, int m)
+void init_vector(REAL *vector, size_t m)
 {
-  for (int i = 0; i<m; i++) {
+  for (size_t i = 0; i<m; i++) {
     vector[i] = (REAL)drand48();
   }
 }
 
-void init_matrix(REAL *matrix, int num_rows, size_t nnz)
+void init_matrix(REAL *matrix, size_t num_rows, size_t nnz)
 {
-  size_t n = (size_t)num_rows * num_rows;
+  size_t n = num_rows * num_rows;
 
   REAL *d = (REAL *) malloc(n * sizeof(REAL));
 
@@ -26,8 +27,8 @@ void init_matrix(REAL *matrix, int num_rows, size_t nnz)
     }
   }
 
-  for (int i = 0; i < num_rows; i++) {
-    for (int j = 0; j < num_rows; j++) {
+  for (size_t i = 0; i < num_rows; i++) {
+    for (size_t j = 0; j < num_rows; j++) {
       matrix[i*num_rows+j] = (d[i*num_rows+j] >= nnz) ? 0 : (REAL)(drand48()+1);
     }
   }
@@ -35,18 +36,36 @@ void init_matrix(REAL *matrix, int num_rows, size_t nnz)
   free(d);
 }
 
+void init_coo(size_t *row_indices, REAL *values,
+              size_t *col_indices, REAL *matrix,
+              size_t num_rows, size_t nnz)
+{
+  size_t tmp = 0;
+  for (size_t i = 0; i < num_rows; i++) {
+    for (size_t j = 0; j < num_rows; j++) {
+      if(matrix[i*num_rows+j] != 0) {
+        values[tmp] = matrix[i*num_rows+j];
+        row_indices[tmp] = i;
+        col_indices[tmp] = j;
+        tmp++;
+      }
+    }
+  }
+  assert(tmp == nnz);
+}
+
 void init_csr(size_t *row_indices, REAL *values,
-              int *col_indices, REAL *matrix,
-              int num_rows, size_t nnz)
+              size_t *col_indices, REAL *matrix,
+              size_t num_rows, size_t nnz)
 {
   row_indices[num_rows] = nnz;
   row_indices[0] = 0;
-  int *non_zero_elements = (int*) malloc (num_rows * sizeof(int));
+  size_t *non_zero_elements = (size_t*) malloc (num_rows * sizeof(size_t));
 
   size_t tmp = 0;
-  for (int i = 0; i < num_rows; i++) {
-    int nnz_per_row = 0; // nnz per row
-    for (int j = 0; j < num_rows; j++) {
+  for (size_t i = 0; i < num_rows; i++) {
+    size_t nnz_per_row = 0; // nnz per row
+    for (size_t j = 0; j < num_rows; j++) {
       if(matrix[i*num_rows+j] != 0) {
         values[tmp] = matrix[i*num_rows+j];
         col_indices[tmp] = j;
@@ -56,20 +75,21 @@ void init_csr(size_t *row_indices, REAL *values,
     }
     non_zero_elements[i] = nnz_per_row;
   }
+  assert(tmp == nnz);
 
-  for (int i = 1; i < num_rows; i++) {
+  for (size_t i = 1; i < num_rows; i++) {
     row_indices[i] = row_indices[i-1] + non_zero_elements[i-1];
   }
 
   free(non_zero_elements);
 }
 
-void mv_csr_serial(const int num_rows,
+void mv_csr_serial(const size_t num_rows,
                    const size_t *row_indices,
-                   const int *col_indices,
+                   const size_t *col_indices,
                    const REAL *values, const REAL *x, REAL *y)
 {
-  for(int row = 0; row < num_rows; row++){
+  for(size_t row = 0; row < num_rows; row++){
     size_t row_start = row_indices[row];
     size_t row_end = row_indices[row+1];
 
@@ -84,9 +104,8 @@ void mv_csr_serial(const int num_rows,
 /* compare two arrays and return rate of difference */
 float check(REAL *A, REAL *B, size_t n)
 {
-  size_t i;
   double diffsum = 0, sum = 0;
-  for (i = 0; i < n; i++) {
+  for (size_t i = 0; i < n; i++) {
     diffsum += fabs(A[i] - B[i]);
     sum += fabs(B[i]);
   }
