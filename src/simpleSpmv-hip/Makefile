@@ -6,7 +6,6 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-BLAS_SPMV = yes
 LAUNCHER  =
 
 #===============================================================================
@@ -27,11 +26,7 @@ obj = main.o kernels.o utils.o
 CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../simpleSpmv-cuda
 
 # Linker Flags
-LDFLAGS = -lhipsparse
-
-ifeq ($(BLAS_SPMV),yes)
-  CFLAGS += -DBLAS_SPMV
-endif
+LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

@@ -42,18 +42,14 @@ long mv_dense_parallel(const int repeat,
 long mv_csr_parallel(const int repeat,
                      const int bs,
                      const size_t num_rows,
+                     const size_t *row_indices,
+                     const size_t *col_indices,
+                     const REAL* values,
                      const REAL* x,
                      const size_t nnz,
                      REAL* matrix,
                      REAL* y)
 {
-  size_t *row_indices = (size_t *) malloc((num_rows+1) * sizeof(size_t));
-  size_t *col_indices = (size_t *) malloc(nnz * sizeof(size_t));
-  REAL *values = (REAL *) malloc(nnz * sizeof(REAL));
-
-  // initialize csr structure
-  init_csr(row_indices, values, col_indices, matrix, num_rows, nnz);
-
   long time;
 
   #pragma omp target data map(to: row_indices[0:num_rows+1], \
@@ -81,10 +77,6 @@ long mv_csr_parallel(const int repeat,
     auto end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
-
-  free(values);
-  free(row_indices);
-  free(col_indices);
 
   return time;
 }
