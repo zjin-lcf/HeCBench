@@ -36,24 +36,6 @@ void init_matrix(REAL *matrix, size_t num_rows, size_t nnz)
   free(d);
 }
 
-void init_coo(size_t *row_indices, REAL *values,
-              size_t *col_indices, REAL *matrix,
-              size_t num_rows, size_t nnz)
-{
-  size_t tmp = 0;
-  for (size_t i = 0; i < num_rows; i++) {
-    for (size_t j = 0; j < num_rows; j++) {
-      if(matrix[i*num_rows+j] != 0) {
-        values[tmp] = matrix[i*num_rows+j];
-        row_indices[tmp] = i;
-        col_indices[tmp] = j;
-        tmp++;
-      }
-    }
-  }
-  assert(tmp == nnz);
-}
-
 void init_csr(size_t *row_indices, REAL *values,
               size_t *col_indices, REAL *matrix,
               size_t num_rows, size_t nnz)

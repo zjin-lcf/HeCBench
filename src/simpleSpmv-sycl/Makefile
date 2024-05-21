@@ -13,7 +13,6 @@ CUDA      = no
 CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
-BLAS_SPMV = yes
 #GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
@@ -48,11 +47,6 @@ endif
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
 	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
-endif
-
-ifeq ($(BLAS_SPMV), yes)
-  CC = icpx
-  CFLAGS +=-DBLAS_SPMV -qmkl=parallel
 endif
 
 # Debug Flags
