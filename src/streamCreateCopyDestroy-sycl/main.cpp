@@ -74,7 +74,7 @@ void PerfStreamCreateCopyDestroy::run(unsigned int testNumber) {
   for (size_t i = 0; i < iter; ++i) {
     for (size_t s = 0; s < numStreams_; ++s) {
       streams[s] = new sycl::queue(q.get_device(),
-                                   sycl::property_list{sycl::property::queue::in_order()
+                                   sycl::property_list{sycl::property::queue::in_order(),
                                                        sycl::ext::oneapi::property::queue::discard_events()
                                                       });
     }
