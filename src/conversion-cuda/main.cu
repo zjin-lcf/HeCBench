@@ -23,12 +23,12 @@ template <typename Td, typename Ts>
 void convert(int nelems, int niters)
 {
   Ts *src;
-  cudaMallocManaged((void**)&src, nelems * sizeof(Ts));
+  cudaMalloc((void**)&src, nelems * sizeof(Ts));
   Td *dst;
-  cudaMallocManaged((void**)&dst, nelems * sizeof(Td));
+  cudaMalloc((void**)&dst, nelems * sizeof(Td));
 
-  const size_t ls = std::min((size_t)nelems, (size_t)256);
-  const size_t gs = (nelems + 1) / ls;
+  const int ls = std::min(nelems, 256);
+  const int gs = (nelems + ls - 1) / ls;
   dim3 grid (gs);
   dim3 block (ls);
 
@@ -52,12 +52,12 @@ void convert(int nelems, int niters)
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of elements> <repeat>\n", argv[0]);
     return 1;
   }
-  const int niters = atoi(argv[1]);
-  const int nelems = 1024 * 1024 * 256;
+  const int nelems = atoi(argv[1]);
+  const int niters = atoi(argv[2]);
 
   printf("bfloat16 -> half\n");
   convert<half, __nv_bfloat16>(nelems, niters); 
