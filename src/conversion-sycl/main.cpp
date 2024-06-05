@@ -5,15 +5,17 @@
 #include <sycl/sycl.hpp>
 
 using sycl::ext::oneapi::bfloat16;
+using sycl::half;
+typedef unsigned char uchar;
 
 template <typename Td, typename Ts>
 void convert(sycl::queue &q, int nelems, int niters)
 {
-  Ts *src = sycl::malloc_shared<Ts>(nelems, q);
-  Td *dst = sycl::malloc_shared<Td>(nelems, q);
+  Ts *src = sycl::malloc_device<Ts>(nelems, q);
+  Td *dst = sycl::malloc_device<Td>(nelems, q);
 
-  const size_t ls = std::min<std::size_t>(nelems, 256);
-  const size_t gs = nelems % ls ? (nelems / ls + 1) * ls : nelems;
+  const int ls = std::min(nelems, 256);
+  const int gs = (nelems + ls - 1) / ls * ls;
   sycl::range<1> gws (gs);
   sycl::range<1> lws (ls);
 
@@ -50,12 +52,12 @@ void convert(sycl::queue &q, int nelems, int niters)
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    std::printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of elements> <repeat>\n", argv[0]);
     return 1;
   }
-  const int niters = std::stoi(argv[1]);
-  const int nelems = 1024 * 1024 * 256;
+  const int nelems = atoi(argv[1]);
+  const int niters = atoi(argv[2]);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -64,7 +66,7 @@ int main(int argc, char* argv[]) {
 #endif
 
   std::printf("bfloat16 -> half\n");
-  convert<sycl::half, bfloat16>(q, nelems, niters);
+  convert<half, bfloat16>(q, nelems, niters);
   std::printf("bfloat16 -> float\n");
   convert<float, bfloat16>(q, nelems, niters);
   std::printf("bfloat16 -> int\n");
@@ -72,62 +74,62 @@ int main(int argc, char* argv[]) {
   std::printf("bfloat16 -> char\n");
   convert<char, bfloat16>(q, nelems, niters);
   std::printf("bfloat16 -> unsigned char\n");
-  convert<unsigned char, bfloat16>(q, nelems, niters);
+  convert<uchar, bfloat16>(q, nelems, niters);
 
   std::printf("half -> half\n");
-  convert<sycl::half, sycl::half>(q, nelems, niters);
+  convert<half, half>(q, nelems, niters);
   std::printf("half -> float\n");
-  convert<float, sycl::half>(q, nelems, niters);
+  convert<float, half>(q, nelems, niters);
   std::printf("half -> int\n");
-  convert<int, sycl::half>(q, nelems, niters);
+  convert<int, half>(q, nelems, niters);
   std::printf("half -> char\n");
-  convert<char, sycl::half>(q, nelems, niters);
-  std::printf("half -> unsigned char\n");
-  convert<unsigned char, sycl::half>(q, nelems, niters);
+  convert<char, half>(q, nelems, niters);
+  std::printf("half -> uchar\n");
+  convert<uchar, half>(q, nelems, niters);
 
   std::printf("float -> float\n");
   convert<float, float>(q, nelems, niters);
   std::printf("float -> half\n");
-  convert<sycl::half, float>(q, nelems, niters);
+  convert<half, float>(q, nelems, niters);
   std::printf("float -> int\n");
   convert<int, float>(q, nelems, niters);
   std::printf("float -> char\n");
   convert<char, float>(q, nelems, niters);
-  std::printf("float -> unsigned char\n");
-  convert<unsigned char, float>(q, nelems, niters);
+  std::printf("float -> uchar\n");
+  convert<uchar, float>(q, nelems, niters);
 
   std::printf("int -> int\n");
   convert<int, int>(q, nelems, niters);
   std::printf("int -> float\n");
   convert<float, int>(q, nelems, niters);
   std::printf("int -> half\n");
-  convert<sycl::half, int>(q, nelems, niters);
+  convert<half, int>(q, nelems, niters);
   std::printf("int -> char\n");
   convert<char, int>(q, nelems, niters);
-  std::printf("int -> unsigned char\n");
-  convert<unsigned char, int>(q, nelems, niters);
+  std::printf("int -> uchar\n");
+  convert<uchar, int>(q, nelems, niters);
 
   std::printf("char -> int\n");
   convert<int, char>(q, nelems, niters);
   std::printf("char -> float\n");
   convert<float, char>(q, nelems, niters);
   std::printf("char -> half\n");
-  convert<sycl::half, char>(q, nelems, niters);
+  convert<half, char>(q, nelems, niters);
   std::printf("char -> char\n");
   convert<char, char>(q, nelems, niters);
-  std::printf("char -> unsigned char\n");
-  convert<unsigned char, char>(q, nelems, niters);
+  std::printf("char -> uchar\n");
+  convert<uchar, char>(q, nelems, niters);
 
-  std::printf("unsigned char -> int\n");
-  convert<int, unsigned char>(q, nelems, niters);
-  std::printf("unsigned char -> float\n");
-  convert<float, unsigned char>(q, nelems, niters);
-  std::printf("unsigned char -> half\n");
-  convert<sycl::half, unsigned char>(q, nelems, niters);
-  std::printf("unsigned char -> char\n");
-  convert<char, unsigned char>(q, nelems, niters);
-  std::printf("unsigned char -> unsigned char\n");
-  convert<unsigned char, unsigned char>(q, nelems, niters);
+  std::printf("uchar -> int\n");
+  convert<int, uchar>(q, nelems, niters);
+  std::printf("uchar -> float\n");
+  convert<float, uchar>(q, nelems, niters);
+  std::printf("uchar -> half\n");
+  convert<half, uchar>(q, nelems, niters);
+  std::printf("uchar -> char\n");
+  convert<char, uchar>(q, nelems, niters);
+  std::printf("uchar -> uchar\n");
+  convert<uchar, uchar>(q, nelems, niters);
 
   return 0;
 }
