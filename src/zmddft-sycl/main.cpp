@@ -12,7 +12,8 @@
 #define __syncthreads() \
   item.barrier(sycl::access::fence_space::local_space)
 
-const double d[512] = {
+// When compiling with C++20, constant compile-time initialization for device_globals is supported
+sycl::ext::oneapi::experimental::device_global<const double[512]> D3 {
   1.0, 0.0, 1.0, 0.0,
   1.0, 0.0, 1.0, 0.0,
   1.0, 0.0, 1.0, 0.0,
@@ -144,7 +145,6 @@ const double d[512] = {
 
 void ker_zmddft_fwd_256x256x256_cu0(sycl::nd_item<1> &item,
                                     double *__restrict T3,
-                                    const double *__restrict D3,
                                     const double *__restrict X,
                                     double *__restrict P1) {
   double a495, a496, a497, a498, a499, a500, a501, a502,
@@ -626,7 +626,6 @@ void ker_zmddft_fwd_256x256x256_cu0(sycl::nd_item<1> &item,
 
 void ker_zmddft_fwd_256x256x256_cu1(sycl::nd_item<1> &item,
                                     double *__restrict T33,
-                                    const double *__restrict D3,
                                     const double *__restrict P1,
                                     double *__restrict P2)
 {
@@ -1109,7 +1108,6 @@ void ker_zmddft_fwd_256x256x256_cu1(sycl::nd_item<1> &item,
 
 void ker_zmddft_fwd_256x256x256_cu2(sycl::nd_item<1> &item,
                                     double *__restrict T63,
-                                    const double *__restrict D3,
                                     const double *__restrict P2,
                                     double *__restrict Y)
 {
@@ -1615,9 +1613,6 @@ int main(int argc, char* argv[])
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  double *D = sycl::malloc_device<double>(512, q);
-  q.memcpy(D, d, 512 * sizeof(double));
-
   double *Y = sycl::malloc_device<double>(n, q);
 
   double *X = sycl::malloc_device<double>(n, q);
@@ -1636,21 +1631,21 @@ int main(int argc, char* argv[])
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<double, 1> temp (sycl::range<1>(2048), cgh);
       cgh.parallel_for<class cu0>(sycl::nd_range<1>(g1, b1), [=] (sycl::nd_item<1> item) {
-        ker_zmddft_fwd_256x256x256_cu0(item, temp.get_pointer(), D, X, P1);
+        ker_zmddft_fwd_256x256x256_cu0(item, temp.get_pointer(), X, P1);
       });
     });
 
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<double, 1> temp (sycl::range<1>(2048), cgh);
       cgh.parallel_for<class cu1>(sycl::nd_range<1>(g2, b2), [=] (sycl::nd_item<1> item) {
-        ker_zmddft_fwd_256x256x256_cu1(item, temp.get_pointer(), D, P1, P2);
+        ker_zmddft_fwd_256x256x256_cu1(item, temp.get_pointer(), P1, P2);
       });
     });
 
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<double, 1> temp (sycl::range<1>(2048), cgh);
       cgh.parallel_for<class cu2>(sycl::nd_range<1>(g3, b3), [=] (sycl::nd_item<1> item) {
-        ker_zmddft_fwd_256x256x256_cu2(item, temp.get_pointer(), D, P2, Y);
+        ker_zmddft_fwd_256x256x256_cu2(item, temp.get_pointer(), P2, Y);
       });
     });
   }
