@@ -27,12 +27,12 @@
 // - Same logic applies until we reach the last step.
 // - Step n: at this last step, we have one bitonic sequence of size 2**n. The
 // elements in the sequence are swapped until we have a sequence in increasing
-// oder.
+// order.
 //
 // In this implementation, a randomized sequence of size 2**n is given (n is a
-// positive number). Unified Shared Memory (USM) is used for data management. At
-// each stage, a part of step, the host redefines the ordered sequenes and sends
-// data to the kernel. The kernel swaps the elements accordingly in parallel.
+// positive number). At each stage, a part of step, the host redefines the
+// ordered sequenes and sends data to the kernel. The kernel swaps the elements
+// accordingly in parallel.
 //
 #include <math.h>
 #include <string.h>
@@ -160,7 +160,7 @@ void Usage(std::string prog_name, int exponent) {
                "The number of element in\n";
   std::cout << "    the array must be power of 2 (e.g., 1, 2, 4, ...). Please "
                "enter the corresponding\n";
-  std::cout << "    exponent betwwen 0 and " << exponent - 1 << ".\n";
+  std::cout << "    exponent between 0 and " << exponent - 1 << ".\n";
   std::cout << " k: Seed used to generate a random sequence.\n";
 }
 
