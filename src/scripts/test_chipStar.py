@@ -5,6 +5,7 @@
 import re, time, sys, subprocess, multiprocessing, os
 import argparse
 import json
+from multiprocessing import Manager
 
 
 class Benchmark:
@@ -27,6 +28,7 @@ class Benchmark:
                 self.MAKE_ARGS.append('GPU=no')
         elif name.endswith('cuda'):
             self.MAKE_ARGS = ['CUDA_ARCH=sm_{}'.format(args.nvidia_sm)]
+            self.MAKE_ARGS.append('CC="{}"'.format(args.compiler_name)) # jenny added for cucc compiler
         else:
             self.MAKE_ARGS = []
 
@@ -46,8 +48,12 @@ class Benchmark:
         self.invert = invert
         self.clean = args.clean
         self.verbose = args.verbose
+        self.timeout = args.timeout
 
-    def compile(self):
+    def __eq__(self, other):
+        return self.name == other.name
+
+    def compile(self, benches, outfile_name, lock):
         if self.clean:
             subprocess.run(["make", "clean"], cwd=self.path).check_returncode()
             time.sleep(1) # required to make sure clean is done before building, despite run waiting on the invoked executable
@@ -56,8 +62,7 @@ class Benchmark:
         if self.verbose:
             out = subprocess.PIPE
 
-        proc = subprocess.run(["make"] + self.MAKE_ARGS, cwd=self.path,
-                              stdout=out, stderr=subprocess.STDOUT, encoding="utf-8")
+        proc = subprocess.run(["make"] + self.MAKE_ARGS, cwd=self.path, stdout=out, stderr=subprocess.STDOUT, encoding="utf-8")
         try:
             proc.check_returncode()
         except subprocess.CalledProcessError as e:
@@ -65,43 +70,86 @@ class Benchmark:
             if e.stderr:
                 print(e.stderr, file=sys.stderr)
 
+            # write to error file
+            print("%%%%%%%% " + self.name)
+            #with lock:
+            #    with open(outfile_name, 'a') as f:
+            #        f.write(self.name + ",FAILED,N/A," + str(e).replace('\n', ' ').replace(',', ' ') + "\n")
+
+            print("***write to file - failed compilation***")
             print("-----------------------------------------------------------------------------------------")
             print("Description of the compilation error:")
             cause = subprocess.run(["make"] + self.MAKE_ARGS, cwd=self.path,
                                    check=False, capture_output=True, encoding="utf-8")
+            with lock:
+                with open(outfile_name, 'a') as f:
+                    f.write(self.name + ",FAILED,N/A," + str(cause.stdout).replace('\n', ' ').replace(',', ' ') + str(cause.stderr).replace('\n', ' ').replace(',', ' ') + "\n")
             print(cause.stdout)
             print(cause.stderr)
             print("-----------------------------------------------------------------------------------------")
-            raise(e)
+            with lock:
+                benches.remove(self)
+                print("***remove from benches***")
 
         if self.verbose:
             print(proc.stdout)
 
     def run(self):
         cmd = ["./" + self.binary] + self.args
-        proc = subprocess.run(cmd, cwd=self.path,
-                              stdout=subprocess.PIPE, encoding="utf-8")
+        proc = subprocess.run(cmd, cwd=self.path, stdout=subprocess.PIPE, encoding="utf-8", timeout=self.timeout)
         out = proc.stdout
         if self.verbose:
             print(" ".join(cmd))
             print(out)
         res = re.findall(self.res_regex, out)
+        # Find in output for verification keywords
+        verify_res = re.findall('not passed|pass|fail|succe|correct', out.lower())
+        print("[VALIDATION]")
+        if not verify_res:
+            print("N/A")
+        else:
+            for r in verify_res:
+                print(r)
+        # Result line to be added in the output file
+        res_l = []
+        res_l.append("COMPILED")
+        if out.strip() != "": res_l.append("SUCCESS")
+        else: res_l.append("NO OUTPUT")
+        # If no matching regex
         if not res:
-            raise Exception(self.path + ":\nno regex match for " + self.res_regex + " in\n" + out)
-        res = sum([float(i) for i in res]) #in case of multiple outputs sum them
-        if self.invert:
-            res = 1/res
-        return res
+            out = out.replace('\n', ' ').replace(',', ' ')
+            res_l.append("[NO MATCH] " + out)
+            # res_l[1] = "NO MATCH"
+        else:
+            print("[REGEX MATCHING RESULT]")
+            for i in res:
+                print(i)
+            res_l.append(sum([float(i) for i in res])) #in case of multiple outputs sum them
+            if self.invert:
+                res_l[2] = 1/res_l[2]
+        if verify_res:
+            passing = True
+            for v in verify_res:
+                if ("pass" not in v.lower() and "succe" not in v.lower() and "correct" not in v.lower()) or v.lower() == "not passed":
+                    passing = False
+                    res_l.append("FAIL")
+                    break
+            if passing: res_l.append("PASS")
+        else: res_l.append("N/A")
+        
+        res_l.append(str(self.res_regex).replace(',', ' '))
+
+        return res_l
 
 
-def comp(b):
+def comp(b, benches, outfile_name, lock):
     print("compiling: {}".format(b.name))
-    b.compile()
+    b.compile(benches, outfile_name, lock)
 
 def main():
     parser = argparse.ArgumentParser(description='HeCBench runner')
     parser.add_argument('--output', '-o',
-                        help='Output file for csv results')
+                        help='Output file for csv results', default="out.csv")
     parser.add_argument('--repeat', '-r', type=int, default=1,
                         help='Repeat benchmark run')
     parser.add_argument('--warmup', '-w', type=bool, default=True,
@@ -130,6 +178,8 @@ def main():
                         help='List of failing benchmarks to ignore')
     parser.add_argument('bench', nargs='+',
                         help='Either specific benchmark name or sycl, cuda, or hip')
+    parser.add_argument('--timeout', '-t', type=int,
+                        help='Timeout limit in seconds', default=120)
 
     args = parser.parse_args()
 
@@ -154,27 +204,20 @@ def main():
         fails = f.read().splitlines()
 
     # Build benchmark list
-    benches = []
+    manager = Manager()
+    benches = manager.list()
     for b in args.bench:
         if b in ['sycl', 'cuda', 'hip']:
             benches.extend([Benchmark(args, k, *v)
                             for k, v in benchmarks.items()
                             if k.endswith(b) and k not in fails])
             continue
-
         benches.append(Benchmark(args, b, *benchmarks[b]))
 
-    t0 = time.time()
-    try:
-        with multiprocessing.Pool() as p:
-            p.map(comp, benches)
-    except Exception as e:
-        print("Compilation failed, exiting")
-        print(e)
-        sys.exit(1)
+    # # Clear output file before appending
+    # if (os.path.isfile(args.output)): os.system("rm " + args.output)
 
-    t_compiled = time.time()
-
+    # filter out benches that were already ran or failed to compile
     outfile = sys.stdout
     recorded_benchmarks = set()
     if args.output:
@@ -183,6 +226,7 @@ def main():
             for line in outfile:
                 bench, *rest = line.split(',')
                 recorded_benchmarks.add(bench)
+                print("RECORDDED BENCH: " + bench) # jenny added
             outfile.seek(0, 2) # seek to end of the file.
         else:
             outfile = open(args.output, 'w+t')
@@ -194,21 +238,71 @@ def main():
               " Results already exists in the output file.", flush=True)
     benches = filtered_benches
 
+    # Print out a list of benchmarks to be compiled
+    print("*************FROM JSON FILE - START LIST*************")
+    for b in benches:
+        print(b.name)
+    print("**************FROM JSON FILE - END LIST**************")
+
+    # Create lock for synchronization
+    lock = manager.Lock()
+
+    t0 = time.time()
+
+    try:
+        # Compile with multiprocessing
+        with multiprocessing.Pool() as p:
+            p.starmap(comp, [(b, benches, args.output, lock) for b in benches])
+    except Exception as e:
+        print("Compilation failed, exiting")
+        print(e)
+        sys.exit(1)
+
+    t_compiled = time.time()
+
+    print("hello") # jenny added
+
+    # Print out a list of benchmarks after compiling (failed-to-compile ones are removed)
+    print("**********COMPILED BENCHMARKS (READY TO RUN) - START LIST**********")
+    for b in benches:
+        print(b.name)
+    print("**********COMPILED BENCHMARKS (READY TO RUN) - END LIST**********")
+
     for i, b in enumerate(benches, 1):
         try:
             print(f"running {i}/{len(benches)}: {b.name}", flush=True)
 
             if args.warmup:
+                print("***" + b.name + " warmup***")
                 b.run()
 
-            res = []
-            for i in range(args.repeat):
-                res.append(str(b.run()))
-
-            print(b.name + "," + ", ".join(res), file=outfile)
+            # Run args.repeat times (set the min to the first run, then compare) (if output is not float, directly attatch)
+            print("***Running " + b.name + " (1/" + str(args.repeat) + ") ***")
+            res = b.run()
+            min_value = res[2]
+            res[2] = str(res[2])
+            print("***Done " + b.name + " (1/" + str(args.repeat) + ") ***")
+            for i in range(2, args.repeat + 1):
+                print("***Running " + b.name + " (" + str(i) + "/" + str(args.repeat) + ") ***")
+                res_sub = b.run()
+                if type(min_value) is float:
+                    if res_sub[2] < min_value:
+                        min_value = res_sub[2]
+                        res_sub[2] = str(res_sub[2])
+                        res = res_sub
+                else:
+                    res.append("\n")
+                    for r in res_sub:
+                        res.append(r)
+                print("***Done " + b.name + " (" + str(i) + "/" + str(args.repeat) + ") ***")
+            print(b.name + "," + ",".join(res), file=outfile)
+            print("***write to file - success***")
         except Exception as err:
             print("Error running: ", b.name)
             print(err)
+            outfile.write(b.name + ",COMPILED,ERR," + str(err).replace('\n', ' ').replace(',', ' ') + ",N/A," + str(b.res_regex).replace(',', ' ') + "\n")
+            print("***write to file - error***")
+        print("####DONE BENCHMARK - " + b.name + "####")
 
     if args.output:
         outfile.close()
