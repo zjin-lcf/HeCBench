@@ -586,8 +586,7 @@
     [
       "-n",
       "8192"
-    ],
-    "bs"
+    ]
   ],
   "bh-cuda": [
     "(?:Total kernel execution time: )([0-9.+-e]+)(?: s)",
