@@ -180,5 +180,5 @@ int main(int argc, char *argv[])
   hipFree(d_smax);
   hipFree(d_sbest);
   hipFree(d_oldmax);
-  return 0;
+  return ok ? 0 : 1;
 }

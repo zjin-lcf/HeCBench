@@ -80,5 +80,5 @@ int main(int argc, char *argv[])
   free(x);
   free(output);
   free(h_output);
-  return 0;
+  return ok ? 0 : 1;
 }

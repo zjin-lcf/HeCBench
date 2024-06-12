@@ -241,5 +241,5 @@ int main(int argc, char** argv)
   cudaFree(dev_out);
   cudaFree(dev_length);
   cudaFree(key_length);
-  return 0;
+  return error ? 1 : 0;
 }

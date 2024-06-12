@@ -267,8 +267,9 @@ int main(int argc, char** argv) {
   // verify
   floydWarshallCPUReference(verificationPathDistanceMatrix,
       verificationPathMatrix, numNodes);
-  if(memcmp(pathDistanceMatrix, verificationPathDistanceMatrix,
-        numNodes*numNodes*sizeof(unsigned int)) == 0)
+  int verify = memcmp(pathDistanceMatrix, verificationPathDistanceMatrix,
+        numNodes*numNodes*sizeof(unsigned int));
+  if (verify == 0)
   {
     printf("PASS\n");
   }
@@ -294,5 +295,5 @@ int main(int argc, char** argv) {
   free(pathMatrix);
   free(verificationPathDistanceMatrix);
   free(verificationPathMatrix);
-  return 0;
+  return (verify==0) ? 0 : 1;
 }

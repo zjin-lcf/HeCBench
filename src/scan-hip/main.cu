@@ -17,6 +17,7 @@ void verify(const T* cpu_out, const T* gpu_out, int64_t n)
     }
   }
   printf("%s\n", error ? "FAIL" : "PASS");
+  if (error) exit(1);
 }
 
 // bank conflict aware optimization
@@ -186,7 +187,7 @@ void runTest (const int64_t n, const int repeat, bool timing = false)
            sizeof(T), (time * 1e-3f) / repeat);
   }
   hipMemcpy(gpu_out, d_out, bytes, hipMemcpyDeviceToHost);
-  if (!timing) verify(cpu_out, gpu_out, nelems);
+  verify(cpu_out, gpu_out, nelems);
 
   // bcao
   start = std::chrono::steady_clock::now();
@@ -204,7 +205,7 @@ void runTest (const int64_t n, const int repeat, bool timing = false)
     printf("Reduce the time by %.1f%%\n", (time - bcao_time) * 1.0 / time * 100);
   }
   hipMemcpy(gpu_out, d_out, bytes, hipMemcpyDeviceToHost);
-  if (!timing) verify(cpu_out, gpu_out, nelems);
+  verify(cpu_out, gpu_out, nelems);
 
   hipFree(d_in);
   hipFree(d_out);

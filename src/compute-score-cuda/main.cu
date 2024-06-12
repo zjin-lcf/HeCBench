@@ -246,7 +246,7 @@ void runOnCPU()
     if (cpu_profileScore[doci] != h_profileScore[doci]) {
       printf("FAILED\n   : doc[%d] score: CPU = %lu, Device = %lu\n", \
           doci, cpu_profileScore[doci], h_profileScore[doci]);
-      return;
+      exit(1);
     }
   }
   printf( "Verification: PASS\n" );

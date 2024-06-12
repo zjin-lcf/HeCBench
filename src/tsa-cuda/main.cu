@@ -113,6 +113,7 @@ void tsa(int width, int height, int repeat) {
   cudaFree(d_real[1]);
   cudaFree(d_imag[0]);
   cudaFree(d_imag[1]);
+  if (!ok) exit(1);
 }
 
 int main(int argc, char** argv) {

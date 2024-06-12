@@ -133,7 +133,8 @@ int main(int argc, char** argv)
   mean /= (imageSize * factor);
   std::cout << "The averaged mean of the image: " << mean << std::endl;
 
-  if(fabs(mean) < 1.0)
+  bool ok = fabs(mean) < 1.0;
+  if(ok)
   {
     std::cout << "PASS" << std::endl;
   }
@@ -157,7 +158,7 @@ int main(int argc, char** argv)
   free(inputImageData);
   free(outputImageData);
   free(verificationOutput);
-  return 0;
+  return ok ? 0 : 1;
 }
 
 

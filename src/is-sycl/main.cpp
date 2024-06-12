@@ -434,5 +434,5 @@ int main(int argc, char** argv){
   sycl::free(passed_verification_device, q);
   sycl::free(sum_device, q);
 
-  return 0;  
+  return passed_verification ? 0 : 1;
 }

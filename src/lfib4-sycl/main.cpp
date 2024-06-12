@@ -238,6 +238,7 @@ int main(int argc, char **argv) {
   }
 
   uint32_t n = atoi(argv[1]);
+  bool ok = true;
 
   srand(1234);
   uint32_t *x = (uint32_t*) malloc(n * sizeof(uint32_t));
@@ -283,7 +284,7 @@ int main(int argc, char **argv) {
     // verify
     q.memcpy(z, x_d, sizeof(uint32_t) * n).wait();
 
-    bool ok = true;
+    ok = true;
     for (uint32_t i = 0; i < n; i++) {
       if (x[i] != z[i]) {
         ok = false;
@@ -291,11 +292,12 @@ int main(int argc, char **argv) {
       }
     }
     printf("check = %s\n", ok ? "PASS" : "FAIL");
+    if (!ok) break;
 
     free(z);
     sycl::free(x_d, q);
   }
 
   free(x);
-  return 0;
+  return ok ? 0 : 1;
 }

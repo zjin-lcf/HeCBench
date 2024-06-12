@@ -180,5 +180,5 @@ int main(int argc, char *argv[])
   cudaFree(d_smax);
   cudaFree(d_sbest);
   cudaFree(d_oldmax);
-  return 0;
+  return ok ? 0 : 1;
 }

@@ -129,6 +129,7 @@ void tsa(sycl::queue &q, int width, int height, int repeat) {
   sycl::free(d_real[1], q);
   sycl::free(d_imag[0], q);
   sycl::free(d_imag[1], q);
+  if (!ok) exit(1);
 }
 
 int main(int argc, char** argv) {

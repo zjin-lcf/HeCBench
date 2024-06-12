@@ -217,5 +217,5 @@ int main(int argc, const char * const argv[])
   sycl::free(d_ReadSeq, q);
   sycl::free(d_RefSeq, q);
   sycl::free(d_Results, q);
-  return 0;
+  return error ? 1 : 0;
 }

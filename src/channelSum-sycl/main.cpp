@@ -240,8 +240,10 @@ int main(int argc, char *argv[]) {
       
       if (ok)
         printf("Average time of channel sum (nchw): %f (ms)\n", (time * 1e-6f) / repeat);
-      else
+      else {
         printf("Verification fails for channel sum (nchw)\n");
+        exit(1);
+      }
 
       sycl::free(d_X, q);
       sycl::free(d_sum, q);

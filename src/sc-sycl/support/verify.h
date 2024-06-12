@@ -49,6 +49,7 @@ inline void compare_output(DATA_TYPE *outp, DATA_TYPE *outpCPU, int size) {
   L1norm2      = (double)(sum_delta2 / sum_ref2);
   if(L1norm2 >= 1e-6){
     printf("Test failed\n");
+    exit(1);
   } else {
     printf("Test Passed\n");
   }

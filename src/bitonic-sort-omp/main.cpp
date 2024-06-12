@@ -216,5 +216,5 @@ int main(int argc, char *argv[]) {
   free(data_cpu);
   free(data_gpu);
 
-  return 0;
+  return unequal ? 1 : 0;
 }

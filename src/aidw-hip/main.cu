@@ -236,6 +236,7 @@ int main(int argc, char *argv[])
   if (check) {
     bool ok = verify (iz.data(), h_iz.data(), inum, EPS);
     printf("%s\n", ok ? "PASS" : "FAIL");
+    if (!ok) exit(1);
   }
 
   auto start = std::chrono::steady_clock::now();

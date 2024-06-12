@@ -155,9 +155,10 @@ int main(int argc, char * argv[])
     }
   }
 
-  if (fail)
+  if (fail) {
     std::cout << "FAIL\n";
-  else
+    exit(1);
+  } else
     std::cout << "PASS\n";
 
   //initialize soa data
@@ -195,9 +196,10 @@ int main(int argc, char * argv[])
     }
   }
 
-  if (fail)
+  if (fail) {
     std::cout << "FAIL\n";
-  else
+    exit(1);
+  } else
     std::cout << "PASS\n";
 
   sycl::free(inputBuffer, q);

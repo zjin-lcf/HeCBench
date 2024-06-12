@@ -109,5 +109,5 @@ int main(int argc, char* argv[]) {
   hipFree(d_distance);
   hipFree(d_Apoints);
   hipFree(d_Bpoints);
-  return 0;
+  return error ? 1 : 0;
 }

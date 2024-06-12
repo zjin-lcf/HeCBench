@@ -181,7 +181,8 @@ int main(int argc, char * argv[])
   }
 
   // compare the results and see if they match for the given input image
-  if(compare(outputReference, outputDevice, imageSize))
+  bool ok = compare(outputReference, outputDevice, imageSize);
+  if (ok)
     printf("PASS\n");
   else
     printf("FAIL\n");
@@ -191,5 +192,5 @@ int main(int argc, char * argv[])
   free(verificationOutput);
   free(inputImageData);
   free(outputImageData);
-  return SDK_SUCCESS;
+  return ok ? 0 : 1;
 }

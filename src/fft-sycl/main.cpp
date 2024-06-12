@@ -233,4 +233,5 @@ int main(int argc, char** argv)
 
   free(reference);
   free(source);
+  return error ? 1 : 0;
 }

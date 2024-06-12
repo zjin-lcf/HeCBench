@@ -88,6 +88,6 @@ int main(int argc, char* argv[]) {
 
   // Cleanup
   free(a);
-  free(b); 
-  return 0;
+  free(b);
+  return ok ? 0 : 1;
 }

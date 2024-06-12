@@ -119,8 +119,9 @@ int main(int argc, char** argv)
   std::cout << "Problem size: c(" << M << "," << P << ") = a(" << M << "," << N
             << ") * b(" << N << "," << P << ")\n";
 
+  bool ok = true;
 #ifdef VERIFY
-  VerifyResult(a_host, b_host, c_host, c_back);
+  ok = VerifyResult(a_host, b_host, c_host, c_back);
 #endif
 
   delete[] a_host;
@@ -130,5 +131,5 @@ int main(int argc, char** argv)
   cudaFree(a_device);
   cudaFree(b_device);
   cudaFree(c_device);
-  return 0;
+  return ok ? 0 : 1;
 }

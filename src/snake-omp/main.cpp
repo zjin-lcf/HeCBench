@@ -176,11 +176,11 @@ int main(int argc, const char * const argv[])
   }
   fclose(fp);
 
+  bool error = false;
   #pragma omp target data map(to: ReadSeq[0:NumReads*8], RefSeq[0:NumReads*8]) \
                           map(alloc: DFinal_Results[0:NumReads])
   {
 
-  bool error = false;
   for (int loopPar = 0; loopPar <= 25; loopPar++) {
 
     F_ErrorThreshold = (loopPar*ReadLength)/100;
@@ -217,5 +217,5 @@ int main(int argc, const char * const argv[])
   free(RefSeq);
   free(DFinal_Results);
   free(HFinal_Results);
-  return 0;
+  return error ? 1 : 0;
 }

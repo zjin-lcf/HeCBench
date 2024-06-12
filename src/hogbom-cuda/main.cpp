@@ -80,11 +80,14 @@ int main(int argc, char* argv[])
     device.deconvolve(dirty, dim, psf, psfDim, deviceModel, deviceResidual);
   }
 
+  bool ok = true;
+
 #ifdef VERIFY
   std::cout << "Verifying model...";
   const bool modelDiff = compare(goldenModel, deviceModel);
   if (!modelDiff) {
     std::cout << "FAIL" << std::endl;
+    ok = false;
   } else {
     std::cout << "PASS" << std::endl;
   }
@@ -93,10 +96,11 @@ int main(int argc, char* argv[])
   const bool residualDiff = compare(goldenResidual, deviceResidual);
   if (!residualDiff) {
     std::cout << "FAIL" << std::endl;
+    ok = false;
   } else {
     std::cout << "PASS" << std::endl;
   }
 #endif
 
-  return 0;
+  return ok ? 0 : 1;
 }

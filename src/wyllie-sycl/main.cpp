@@ -105,5 +105,5 @@ int main(int argc, char* argv[]) {
 
   printf("%s\n", (h_res == d_res) ? "PASS" : "FAIL");
 
-  return 0;
+  return (h_res == d_res) ? 0 : 1;
 }

@@ -106,5 +106,5 @@ int main(int argc, char* argv[]) {
   free(output_gpu);
   sycl::free(d_input, q);
   sycl::free(d_output, q);
-  return 0;
+  return ok ? 0 : 1;
 }

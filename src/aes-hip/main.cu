@@ -136,8 +136,10 @@ int main(int argc, char * argv[])
   /* compare the results and see if they match */
   if(memcmp(output, verificationOutput, sizeBytes) == 0)
     std::cout<<"Pass\n";
-  else
+  else {
     std::cout<<"Fail\n";
+    exit(1);
+  }
 
   /* release program resources (input memory etc.) */
   hipFree(inputBuffer);

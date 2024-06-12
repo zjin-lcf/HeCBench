@@ -103,5 +103,5 @@ int main(int argc, char* argv[])
   if (m_gate != NULL) free(m_gate);
   if (m_gate_h != NULL) free(m_gate_h);
   if (Vm != NULL) free(Vm);
-  return 0;
+  return ok ? 0 : 1;
 }

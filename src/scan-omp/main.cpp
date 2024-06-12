@@ -17,6 +17,7 @@ void verify(const T* ref_out, const T* out, int64_t n)
     }
   }
   printf("%s\n", error ? "FAIL" : "PASS");
+  if (error) exit(1);
 }
 
 // bank conflict aware optimization
@@ -110,7 +111,7 @@ void runTest (const int64_t n, const int repeat, bool timing = false)
              sizeof(T), (time * 1e-3f) / repeat);
     }
     #pragma omp target update from (out[0:nelems])
-    if (!timing) verify(ref_out, out, nelems);
+    verify(ref_out, out, nelems);
 
     // bcao
     start = std::chrono::steady_clock::now();
@@ -183,7 +184,7 @@ void runTest (const int64_t n, const int repeat, bool timing = false)
     }
  
     #pragma omp target update from (out[0:nelems])
-    if (!timing) verify(ref_out, out, nelems);
+    verify(ref_out, out, nelems);
   }
 }
 

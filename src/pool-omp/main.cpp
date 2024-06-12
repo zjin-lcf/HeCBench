@@ -208,5 +208,5 @@ int main(int argc, char* argv[])
   delete[] input_grad;
   delete[] input_grad_ref;
   delete[] output_grad;
-  return 0;
+  return ok ? 0 : 1;
 }

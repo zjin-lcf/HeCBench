@@ -112,6 +112,7 @@ void tsa(int width, int height, int repeat) {
   hipFree(d_real[1]);
   hipFree(d_imag[0]);
   hipFree(d_imag[1]);
+  if (!ok) exit(1);
 }
 
 int main(int argc, char** argv) {

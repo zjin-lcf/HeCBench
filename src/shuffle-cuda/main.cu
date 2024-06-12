@@ -54,8 +54,10 @@ void verifyBroadcast(const int *out, const int subGroupSize, int pattern = 0)
   }
   if (errors == 0)
     std::cout << "PASS\n";
-  else
+  else {
     std::cout << "FAIL\n";
+    exit(1);
+  }
 }
 
 void verifyTransposeMatrix(const float *TransposeMatrix,

@@ -158,5 +158,5 @@ int main(int argc, char* argv[]) {
   free(data);
   hipFree(d_std);
   hipFree(d_data);
-  return 0;
+  return ok ? 0 : 1;
 }

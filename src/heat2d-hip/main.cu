@@ -168,5 +168,5 @@ main(int argc, char *argv[]) {
 
   free(cpu_arr);
   free(gpu_arr);
-  return 0;
+  return ok ? 0 : 1;
 }

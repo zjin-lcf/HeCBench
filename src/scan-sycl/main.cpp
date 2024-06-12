@@ -17,6 +17,7 @@ void verify(const T* cpu_out, const T* gpu_out, int64_t n)
     }
   }
   printf("%s\n", error ? "FAIL" : "PASS");
+  if (error) exit(1);
 }
 
 #define LOG_MEM_BANKS 5
@@ -195,7 +196,7 @@ void runTest (sycl::queue &q, const int64_t n, const int repeat, bool timing = f
            sizeof(T), (time * 1e-3f) / repeat);
   }
   q.memcpy(gpu_out, d_out, bytes).wait();
-  if (!timing) verify(cpu_out, gpu_out, nelems);
+  verify(cpu_out, gpu_out, nelems);
 
   // bcao
   start = std::chrono::steady_clock::now();
@@ -218,7 +219,7 @@ void runTest (sycl::queue &q, const int64_t n, const int repeat, bool timing = f
     printf("Reduce the time by %.1f%%\n", (time - bcao_time) * 1.0 / time * 100);
   }
   q.memcpy(gpu_out, d_out, bytes).wait();
-  if (!timing) verify(cpu_out, gpu_out, nelems);
+  verify(cpu_out, gpu_out, nelems);
 
   sycl::free(d_in, q);
   sycl::free(d_out, q);

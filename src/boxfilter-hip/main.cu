@@ -261,6 +261,7 @@ int main(int argc, char** argv)
     }
   }
   printf("%s\n", error ? "FAIL" : "PASS");
+  if (error) exit(1);
 
   free(uiInput);
   free(uiTmp);
