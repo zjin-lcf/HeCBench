@@ -662,8 +662,7 @@
     [
       "200",
       "200"
-    ],
-    "test"
+    ]
   ],
   "cobahh-cuda": [
     "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
