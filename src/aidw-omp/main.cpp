@@ -142,6 +142,7 @@ void AIDW_Kernel_Tiled(
             dist = (six_s * six_s + siy_s * siy_s);
             t = 1.f / (powf(dist, alpha));  sum_dn += t;  sum_up += t * sdz[e];                
           }
+          #pragma omp barrier
         }
         iz[tid] = sum_up / sum_dn;
       }
@@ -230,14 +231,30 @@ int main(int argc, char *argv[])
       printf("%s\n", ok ? "PASS" : "FAIL");
     }
 
+    AIDW_Kernel_Tiled(d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
+    #pragma omp target update from (d_iz[0:inum])
+    if (check) {
+      bool ok = verify (iz.data(), h_iz.data(), inum, EPS);
+      printf("%s\n", ok ? "PASS" : "FAIL");
+    }
+
     auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < iterations; i++)
+      AIDW_Kernel(d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of AIDW_Kernel       %f (s)\n", (time * 1e-9f) / iterations);
+
+    start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < iterations; i++)
       AIDW_Kernel_Tiled(d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
 
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of AIDW_Kernel_Tiled %f (s)\n", (time * 1e-9f) / iterations);
   }
 
   return 0;

@@ -143,6 +143,7 @@ void AIDW_Kernel_Tiled(
       dist = (six_s * six_s + siy_s * siy_s);
       t = 1.f / powf(dist, alpha);  sum_dn += t;  sum_up += t * sdz[e];
     }
+    __syncthreads();
   }
   iz[tid] = sum_up / sum_dn;
 }
@@ -229,7 +230,16 @@ int main(int argc, char *argv[])
 
   // Weighted Interpolate using AIDW
 
-  hipLaunchKernelGGL(AIDW_Kernel, blocksPerGrid, threadsPerBlock, 0, 0, 
+  AIDW_Kernel<<<blocksPerGrid, threadsPerBlock>>>(
+      d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
+  hipMemcpy(iz.data(), d_iz, inum_size, hipMemcpyDeviceToHost); 
+
+  if (check) {
+    bool ok = verify (iz.data(), h_iz.data(), inum, EPS);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
+
+  AIDW_Kernel_Tiled<<<blocksPerGrid, threadsPerBlock>>>(
       d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
   hipMemcpy(iz.data(), d_iz, inum_size, hipMemcpyDeviceToHost); 
 
@@ -241,13 +251,24 @@ int main(int argc, char *argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iterations; i++)
-    hipLaunchKernelGGL(AIDW_Kernel_Tiled, blocksPerGrid, threadsPerBlock, 0, 0, 
+    AIDW_Kernel<<<blocksPerGrid, threadsPerBlock>>>(
       d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
+  printf("Average execution time of AIDW_Kernel       %f (s)\n", (time * 1e-9f) / iterations);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iterations; i++)
+    AIDW_Kernel_Tiled<<<blocksPerGrid, threadsPerBlock>>>(
+      d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of AIDW_Kernel_Tiled %f (s)\n", (time * 1e-9f) / iterations);
 
   hipFree(d_dx);
   hipFree(d_dy);
