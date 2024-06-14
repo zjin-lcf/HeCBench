@@ -167,6 +167,7 @@ void device_cbow(
           }
       }
     }// End for sentence_idx
+    __syncthreads();
 
     // Update d_random
     if (idInWarp == 0 ) d_random[sentence_position] = next_random;

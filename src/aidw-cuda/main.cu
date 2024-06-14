@@ -143,6 +143,9 @@ void AIDW_Kernel_Tiled(
       dist = (six_s * six_s + siy_s * siy_s);
       t = 1.f / powf(dist, alpha);  sum_dn += t;  sum_up += t * sdz[e];
     }
+  
+  __syncthreads();
+
   }
   iz[tid] = sum_up / sum_dn;
 }

@@ -35,6 +35,8 @@ __global__ void benchmark_func(float *g_data, const int blockdim,
         tmps[j] = tmps[j]*tmps[j]+seed;
     }
 
+    __syncthreads();
+
     // Multiply add reduction
     float sum = 0.f;
     #pragma unroll
@@ -44,6 +46,8 @@ __global__ void benchmark_func(float *g_data, const int blockdim,
     #pragma unroll
     for(int j=0; j<granularity; j++)
       g_data[idx+k*big_stride] = sum;
+
+    __syncthreads();
   }
 }
 
