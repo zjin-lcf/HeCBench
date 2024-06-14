@@ -141,6 +141,7 @@ void AIDW_Kernel_Tiled(
       dist = (six_s * six_s + siy_s * siy_s);
       t = 1.f / (sycl::pow(dist, alpha));  sum_dn += t;  sum_up += t * sdz[e];
     }
+    item.barrier(sycl::access::fence_space::local_space);
   }
   iz[tid] = sum_up / sum_dn;
 }
@@ -259,14 +260,69 @@ int main(int argc, char *argv[])
     printf("%s\n", ok ? "PASS" : "FAIL");
   }
 
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> sdx(sycl::range<1>(BLOCK_SIZE), cgh);
+    sycl::local_accessor<float, 1> sdy(sycl::range<1>(BLOCK_SIZE), cgh);
+    sycl::local_accessor<float, 1> sdz(sycl::range<1>(BLOCK_SIZE), cgh);
+    cgh.parallel_for<class aidw_tiled>(
+      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      AIDW_Kernel_Tiled(d_dx, 
+                        d_dy,
+                        d_dz,
+                        dnum,
+                        d_ix,
+                        d_iy,
+                        d_iz,
+                        inum,
+                        area,
+                        d_avg_dist,
+                        sdx.get_pointer(),
+                        sdy.get_pointer(),
+                        sdz.get_pointer(),
+                        item);
+    });
+  });
+  
+  q.memcpy(iz.data(), d_iz, inum_bytes).wait();
+  if (check) {
+    bool ok = verify (iz.data(), h_iz.data(), inum, EPS);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
+
   auto start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iterations; i++) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(
+        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+        AIDW_Kernel(d_dx, 
+                    d_dy,
+                    d_dz,
+                    dnum,
+                    d_ix,
+                    d_iy,
+                    d_iz,
+                    inum,
+                    area,
+                    d_avg_dist,
+                    item);
+      });
+    });
+  }
+
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of AIDW_Kernel       %f (s)\n", (time * 1e-9f) / iterations);
+
+  start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iterations; i++) {
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<float, 1> sdx(sycl::range<1>(BLOCK_SIZE), cgh);
       sycl::local_accessor<float, 1> sdy(sycl::range<1>(BLOCK_SIZE), cgh);
       sycl::local_accessor<float, 1> sdz(sycl::range<1>(BLOCK_SIZE), cgh);
-      cgh.parallel_for<class aidw_tiled>(
+      cgh.parallel_for(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         AIDW_Kernel_Tiled(d_dx, 
                           d_dy,
@@ -287,9 +343,9 @@ int main(int argc, char *argv[])
   }
 
   q.wait();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iterations);
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of AIDW_Kernel_Tiled %f (s)\n", (time * 1e-9f) / iterations);
 
   sycl::free(d_dx, q);
   sycl::free(d_dy, q);
