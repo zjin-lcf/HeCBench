@@ -17,9 +17,9 @@
 #define ALIGNMENT_FACTOR 32
 #define THREADS_PER_WORD 128
 #define BLOCK_SIZE 128
+typedef float real;
 
 #include <sycl/sycl.hpp>
-typedef float real;
 
 void TrainGPU(sycl::queue &q, int sentence_num);
 void GetResultFromGPU(sycl::queue &q);

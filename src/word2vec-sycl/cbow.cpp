@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
+#include <math.h>
 #include "cbow.h"
-
-#define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 extern real *syn0;
 extern int * table;
@@ -25,19 +24,21 @@ int maxThreadsPerBlock = 256;
 int numBlock;
 int shared_mem_usage;
 
-void device_memset(sycl::nd_item<1> &item, real * array, int size){
-  int idx = item.get_global_id(0);
+
+void device_memset(real * array, int size, const sycl::nd_item<3> &item){
+  int idx = item.get_global_id(2);
   if (idx < size)
     array[idx] = 0;
 }
 
-void reduceInWarp(sycl::nd_item<1> &item, volatile float * f, int idInWarp){
+void reduceInWarp(volatile float * f, int idInWarp,
+                  const sycl::nd_item<3> &item){
 
   for (unsigned int i=THREADS_PER_WORD /2; i>32; i>>=1) {
     if (idInWarp < i) {
       f[idInWarp] += f[idInWarp + i];
     }
-    __syncthreads();
+    item.barrier(sycl::access::fence_space::local_space);
   }
   if (idInWarp < 32){
     f[idInWarp] += f[idInWarp + 32];
@@ -49,10 +50,8 @@ void reduceInWarp(sycl::nd_item<1> &item, volatile float * f, int idInWarp){
   }
 }
 
+
 void device_cbow(
-    sycl::nd_item<1> &item,
-    const real *__restrict expTable,
-    float *__restrict shared,
     const int sentence_num,
     const int layer1_size,
     const int layer1_size_aligned,
@@ -60,23 +59,29 @@ void device_cbow(
     const int negative,
     const int table_size,
     const int vocab_size,
-    const int *__restrict d_sen,
-    const int *__restrict d_table,
-    float *__restrict d_syn0,
-    float *__restrict d_syn1neg,
-    unsigned int *__restrict d_random)
+    const int *__restrict__ d_sen,
+    const int *__restrict__ d_table,
+    float *__restrict__ d_syn0,
+    float *__restrict__ d_syn1neg,
+    unsigned int *__restrict__ d_random,
+    const sycl::nd_item<3> &item,
+    real *shared,
+    real const *expTable)
 {
-  int threadIdx_x = item.get_local_id(0);
-  int blockIdx_x = item.get_group(0);
-  int blockDim_x = item.get_local_range(0);
+  int sentence_position =
+      (item.get_local_id(2) / THREADS_PER_WORD) +
+      (item.get_local_range(2) / THREADS_PER_WORD) * item.get_group(2);
+  int idInWarp = item.get_local_id(2) % THREADS_PER_WORD;
 
-  int sentence_position = (threadIdx_x / THREADS_PER_WORD) + (blockDim_x / THREADS_PER_WORD) * blockIdx_x;
-  int idInWarp = threadIdx_x % THREADS_PER_WORD;
-
-  float * f = shared + (threadIdx_x / THREADS_PER_WORD) * THREADS_PER_WORD;
-  float * neu1 = shared + BLOCK_SIZE + (threadIdx_x / THREADS_PER_WORD) * layer1_size_aligned;
-  float * neu1e= shared + BLOCK_SIZE + (blockDim_x / THREADS_PER_WORD) * layer1_size_aligned +
-                 (threadIdx_x / THREADS_PER_WORD) * layer1_size_aligned;
+  float *f =
+      shared + (item.get_local_id(2) / THREADS_PER_WORD) * THREADS_PER_WORD;
+  float *neu1 =
+      shared + BLOCK_SIZE +
+      (item.get_local_id(2) / THREADS_PER_WORD) * layer1_size_aligned;
+  float *neu1e =
+      shared + BLOCK_SIZE +
+      (item.get_local_range(2) / THREADS_PER_WORD) * layer1_size_aligned +
+      (item.get_local_id(2) / THREADS_PER_WORD) * layer1_size_aligned;
 
   if (sentence_position < MAX_SENTENCE_LENGTH) {
     unsigned int next_random = d_random[sentence_position];
@@ -133,24 +138,23 @@ void device_cbow(
 
 
             for (int c = idInWarp; c < layer1_size; c+=THREADS_PER_WORD){
-              f[idInWarp] += neu1[c] * d_syn1neg[c + l2];
+              f[idInWarp] += neu1[c] * d_syn1neg[c + l2];   
             }
-            __syncthreads();
+            item.barrier(sycl::access::fence_space::local_space);
 
             // Do reduction here;
-            reduceInWarp(item, f, idInWarp);
+            reduceInWarp(f, idInWarp, item);
 
-            __syncthreads();
+            item.barrier(sycl::access::fence_space::local_space);
 
             float g;
             if (f[0] > MAX_EXP)
               g = (label - 1) * alpha;
             else if (f[0] < -MAX_EXP)
               g = (label - 0) * alpha;
-            else {
-              const real v = expTable[(int) ((f[0] + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
-              g = (label - v) * alpha;
-            }
+            else
+              g = (label - expTable[(int) ((f[0] + MAX_EXP)
+                    * (EXP_TABLE_SIZE / MAX_EXP / 2))]) * alpha;
 
             for (int c = idInWarp; c < layer1_size; c+=THREADS_PER_WORD)
               neu1e[c] += g * d_syn1neg[c + l2];
@@ -179,18 +183,17 @@ void device_cbow(
   }
 }
 
-void cleanUpGPU(sycl::queue &q){
-  free(d_syn1neg, q);
-  free(d_syn0, q);
-  free(sen, q);
-  free(d_sen, q);
-  free(d_random, q);
-  free(d_table, q);
-  free(d_expTable, q);
+void cleanUpGPU(sycl::queue &q) {
+  sycl::free(d_syn1neg, q);
+  sycl::free(d_syn0, q);
+  sycl::free(sen, q);
+  sycl::free(d_sen, q);
+  sycl::free(d_random, q);
+  sycl::free(d_table, q);
+  sycl::free(d_expTable, q);
 }
 
-void initializeGPU(sycl::queue &q){
-
+void initializeGPU(sycl::queue &q) {
   real * h_expTable = (real *)malloc((EXP_TABLE_SIZE ) * sizeof(real));
   for (int i = 0; i < EXP_TABLE_SIZE; i++) {
     h_expTable[i] = exp((i / (real)EXP_TABLE_SIZE * 2 - 1) * MAX_EXP);
@@ -204,23 +207,26 @@ void initializeGPU(sycl::queue &q){
   if (negative>0) {
     int syn1neg_size = vocab_size * layer1_size_aligned;
     d_syn1neg = sycl::malloc_device<real>(syn1neg_size, q);
-    sycl::range<1> gws ((syn1neg_size / maxThreadsPerBlock + 1) * maxThreadsPerBlock);
-    sycl::range<1> lws (maxThreadsPerBlock);
-    q.submit([&] (sycl::handler &cgh) {
-      auto syn1neg = d_syn1neg;
-      cgh.parallel_for<class reset>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        device_memset(item, syn1neg, syn1neg_size );
-      });
+    q.submit([&](sycl::handler &cgh) {
+      real *d_syn1neg_p = d_syn1neg;
+
+      cgh.parallel_for(
+          sycl::nd_range<3>(
+              sycl::range<3>(1, 1, syn1neg_size / maxThreadsPerBlock + 1) *
+                  sycl::range<3>(1, 1, maxThreadsPerBlock),
+              sycl::range<3>(1, 1, maxThreadsPerBlock)),
+          [=](sycl::nd_item<3> item) {
+            device_memset(d_syn1neg_p, syn1neg_size, item);
+          });
     }).wait();
   }
 
   int syn0_size = vocab_size * layer1_size_aligned;
   d_syn0 = sycl::malloc_device<real>(syn0_size, q);
-  q.memcpy(d_syn0, syn0, syn0_size * sizeof(real));
+  q.memcpy(d_syn0, syn0, syn0_size * sizeof(real)).wait();
 
-  sen = sycl::malloc_host<int>(MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM, q);
-  d_sen = sycl::malloc_device<int>(MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM, q);
-
+  sen = sycl::malloc_host<int>((MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM), q);
+  d_sen = sycl::malloc_device<int>((MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM), q);
   d_random = sycl::malloc_device<unsigned int>(MAX_SENTENCE_LENGTH, q);
 
   int h_random[MAX_SENTENCE_LENGTH];
@@ -229,13 +235,16 @@ void initializeGPU(sycl::queue &q){
   for (int i = 0 ; i < MAX_SENTENCE_LENGTH; i++)
     h_random[i] = (unsigned int) rand();
 
-  q.memcpy(d_random, h_random, MAX_SENTENCE_LENGTH * sizeof(unsigned int));
-
+  q.memcpy(d_random, h_random, MAX_SENTENCE_LENGTH * sizeof(unsigned int)).wait();
   d_table = sycl::malloc_device<int>(table_size, q);
-  q.memcpy(d_table, table, table_size * sizeof(int));
+  q.memcpy(d_table, table, table_size * sizeof(int)).wait();
 
   numBlock = MAX_SENTENCE_LENGTH / (BLOCK_SIZE/THREADS_PER_WORD) + 1;
   shared_mem_usage = (BLOCK_SIZE + (BLOCK_SIZE/THREADS_PER_WORD) * layer1_size_aligned * 2);
+}
+
+void TransferDataToGPU(sycl::queue &q) {
+  q.memcpy(d_sen, sen, (MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM) * sizeof(int)).wait();
 }
 
 void GetResultFromGPU(sycl::queue &q) {
@@ -243,31 +252,39 @@ void GetResultFromGPU(sycl::queue &q) {
 }
 
 void TrainGPU(sycl::queue &q, int sentence_num) {
-  q.memcpy(d_sen, sen,
-           (MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM) * sizeof(int));
+  TransferDataToGPU(q);
 
-  sycl::range<1> gws (numBlock * BLOCK_SIZE);
-  sycl::range<1> lws (BLOCK_SIZE);
+  q.submit([&](sycl::handler &cgh) {
 
-  q.submit([&] (sycl::handler &cgh) {
-    sycl::local_accessor<real, 1> sm (sycl::range<1>(shared_mem_usage), cgh);
-    auto etab = d_expTable;
-    auto l1s = layer1_size;
-    auto l1s_aligned = layer1_size_aligned;
-    auto w = window;
-    auto n = negative;
-    auto ts = table_size;
-    auto vs = vocab_size;
-    auto sen = d_sen;
-    auto tab = d_table;
-    auto syn0 = d_syn0;
-    auto syn1neg = d_syn1neg;
-    auto random = d_random;
-    cgh.parallel_for<class cbow>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
-      [[intel::reqd_sub_group_size(32)]]  {
-      device_cbow(item, etab, sm.get_pointer(),
-        sentence_num, l1s, l1s_aligned, w,
-        n, ts, vs, sen, tab, syn0, syn1neg, random);
-    });
+    sycl::local_accessor<real, 1> sm (
+        sycl::range<1>(shared_mem_usage), cgh);
+
+    auto expTable_p = d_expTable;
+    const int layer1_size_p = layer1_size;
+    const int layer1_size_aligned_p = layer1_size_aligned;
+    const int window_p = window;
+    const int negative_p = negative;
+    const int table_size_p = table_size;
+    const int vocab_size_p = vocab_size;
+    const int *d_sen_p = d_sen;
+    const int *d_table_p = d_table;
+    real *d_syn0_p = d_syn0;
+    real *d_syn1neg_p = d_syn1neg;
+    unsigned int *d_random_p = d_random;
+
+    cgh.parallel_for(
+        sycl::nd_range<3>(sycl::range<3>(1, 1, numBlock) *
+                          sycl::range<3>(1, 1, BLOCK_SIZE),
+                          sycl::range<3>(1, 1, BLOCK_SIZE)),
+        [=](sycl::nd_item<3> item) {
+          device_cbow(
+              sentence_num, layer1_size_p, layer1_size_aligned_p,
+              window_p, negative_p, table_size_p, vocab_size_p,
+              d_sen_p, d_table_p, d_syn0_p, d_syn1neg_p,
+              d_random_p, item,
+              sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+              expTable_p);
+        });
   });
+  
 }
