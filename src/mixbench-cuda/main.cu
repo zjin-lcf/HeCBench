@@ -15,10 +15,10 @@
 #define fusion_degree (4)
 #define seed 0.1f
 
-__global__ void benchmark_func(float *g_data, const int blockdim,
+__global__ void benchmark_func(float *g_data,
                                const int compute_iterations)
 {
-  const unsigned int blockSize = blockdim;
+  const unsigned int blockSize = blockDim.x;
   const int stride = blockSize;
   int idx = blockIdx.x*blockSize*granularity + threadIdx.x;
   const int big_stride = gridDim.x*blockSize*granularity;
@@ -63,14 +63,14 @@ void mixbenchGPU(long size, int repeat) {
 
   // warmup
   for (int i = 0; i < repeat; i++) {
-    benchmark_func<<<grid_dim, block_dim>>>(d_cd, block_dim, i);
+    benchmark_func<<<grid_dim, block_dim>>>(d_cd, i);
   }
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    benchmark_func<<<grid_dim, block_dim>>>(d_cd, block_dim, i);
+    benchmark_func<<<grid_dim, block_dim>>>(d_cd, i);
   }
 
   cudaDeviceSynchronize();
