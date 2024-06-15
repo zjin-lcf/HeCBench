@@ -15,10 +15,10 @@
 #define seed 0.1f
 
 void benchmark_func(sycl::nd_item<1> &item,
-                    float *g_data, const int block_dim,
+                    float *g_data,
                     const int compute_iterations)
 {
-  const unsigned int blockSize = block_dim;
+  const unsigned int blockSize = item.get_local_range(0);
   const int stride = blockSize;
   int idx = item.get_group(0)*blockSize*granularity + item.get_local_id(0);
   const int big_stride = item.get_group_range(0)*blockSize*granularity;
@@ -70,7 +70,7 @@ void mixbenchGPU(long size, int repeat) {
     q.submit([&](sycl::handler &h) {
       h.parallel_for<class mixbench_warmup>(
         sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        benchmark_func(item, d_cd, block_dim, i);
+        benchmark_func(item, d_cd, i);
       });
     });
   }
@@ -82,7 +82,7 @@ void mixbenchGPU(long size, int repeat) {
     q.submit([&](sycl::handler &h) {
       h.parallel_for<class mixbench_timing>(
         sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        benchmark_func(item, d_cd, block_dim, i);
+        benchmark_func(item, d_cd, i);
       });
     });
   }
