@@ -17,6 +17,7 @@
 #include <string.h>
 #include <math.h>
 #include <pthread.h>
+#include <time.h>
 #include "cbow.h"
 
 const int vocab_hash_size = 30000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
@@ -51,7 +52,8 @@ void InitUnigramTable() {
   double train_words_pow = 0;
   double d1, power = 0.75;
   table = (int *)malloc(table_size * sizeof(int));
-  for (a = 0; a < vocab_size; a++) train_words_pow += pow(vocab[a].cn, power);
+  for (a = 0; a < vocab_size; a++) train_words_pow +=
+      pow(vocab[a].cn, power);
   i = 0;
   d1 = pow(vocab[i].cn, power) / train_words_pow;
   for (a = 0; a < table_size; a++) {
@@ -344,15 +346,15 @@ void InitNet() {
   CreateBinaryTree();
 }
 
-typedef struct thread_arguments {
-  long n;
-  sycl::queue *q;
-} thargs_t;
 
 void *TrainModelThread(void *id) {
-  // read the arguments
-  unsigned int next_random = ((thargs_t*)id)->n;
-  sycl::queue &q = *(((thargs_t*)id)->q);
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
+
+  unsigned int next_random = (long)id;
 
   int   word, sentence_length = 0;
   long long word_count = 0, last_word_count = 0;
@@ -436,10 +438,7 @@ void TrainModel() {
   }
 
   long a, b, c, d;
-
   pthread_t *pt = (pthread_t *)malloc(num_threads * sizeof(pthread_t));
-  thargs_t *pa = (thargs_t *) malloc (num_threads * sizeof(thargs_t));
-
   printf("Starting training using file %s\n", train_file);
   starting_alpha = alpha;
   if (read_vocab_file[0] != 0) ReadVocab(); else LearnVocabFromTrainFile();
@@ -454,17 +453,13 @@ void TrainModel() {
 #else
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    
+
   initializeGPU(q);
 
   start = clock();
 
   // Training on a GPU
-  for (a = 0; a < num_threads; a++) {
-    pa[a].n = a;
-    pa[a].q = &q;
-    pthread_create(&pt[a], NULL, TrainModelThread, &pa[a]);
-  }
+  for (a = 0; a < num_threads; a++) pthread_create(&pt[a], NULL, TrainModelThread, (void *)a);
 
   // Training complete
   for (a = 0; a < num_threads; a++) pthread_join(pt[a], NULL);
@@ -525,7 +520,6 @@ void TrainModel() {
     free(cl);
   }
   free(pt);
-  free(pa);
   fclose(fo);
 }
 
