@@ -13,7 +13,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = page-rank
+program = main
 
 source = main.cpp
 
