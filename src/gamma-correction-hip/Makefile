@@ -12,7 +12,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = gamma-correction
+program = main
 
 source = main.cu
 
