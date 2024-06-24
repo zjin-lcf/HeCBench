@@ -13,7 +13,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = BlackScholesEngine
+program = main
 
 source = blackScholesAnalyticEngine.cu
 
