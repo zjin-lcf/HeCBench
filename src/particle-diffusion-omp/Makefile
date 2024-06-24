@@ -13,7 +13,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = motionsim
+program = main
 
 source = motionsim.cpp
 
