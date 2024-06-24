@@ -14,7 +14,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = s3d
+program = main
 
 source = main.cpp  Option.cpp  OptionParser.cpp  S3D.cpp 
 
