@@ -12,7 +12,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = hmm
+program = main
 
 source = HiddenMarkovModel.cu  ViterbiCPU.cu  ViterbiGPU.cu
 
