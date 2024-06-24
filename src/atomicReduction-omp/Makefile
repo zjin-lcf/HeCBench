@@ -13,7 +13,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = reduction
+program = main
 
 source = reduction.cpp
 
