@@ -10,12 +10,13 @@
 static mnist_data *train_set, *test_set;
 static unsigned int train_cnt, test_cnt;
 
-static inline void loaddata()
+static inline int loaddata()
 {
-  mnist_load("data/train-images.idx3-ubyte", "data/train-labels.idx1-ubyte",
-      &train_set, &train_cnt);
-  mnist_load("data/t10k-images.idx3-ubyte", "data/t10k-labels.idx1-ubyte",
-      &test_set, &test_cnt);
+  int s1 = mnist_load("data/train-images.idx3-ubyte", "data/train-labels.idx1-ubyte",
+                      &train_set, &train_cnt);
+  int s2 = mnist_load("data/t10k-images.idx3-ubyte", "data/t10k-labels.idx1-ubyte",
+                      &test_set, &test_cnt);
+  return s1 | s2;
 }
 
 // replace cublas function in the case n = 10
@@ -399,7 +400,7 @@ int main(int argc, const  char **argv)
 
   const int iter = atoi(argv[1]);
   srand(123);
-  loaddata();
+  if (loaddata() != 0) return 1;
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());

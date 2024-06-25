@@ -18,7 +18,7 @@ extern "C" {
 #ifdef MNIST_STATIC
 #define _STATIC static
 #else
-#define _STATIC 
+#define _STATIC
 #endif
 
   /*
@@ -93,18 +93,21 @@ extern "C" {
     FILE *lfp = fopen(label_filename, "rb");
 
     if (!ifp || !lfp) {
+      fprintf(stderr, "Error: input images or labels not found.\n");
       return_code = -1; /* No such files */
       goto cleanup;
     }
 
     fread(tmp, 1, 4, ifp);
     if (mnist_bin_to_int(tmp) != 2051) {
+      fprintf(stderr, "Error: invalid input images.\n");
       return_code = -2; /* Not a valid image file */
       goto cleanup;
     }
 
     fread(tmp, 1, 4, lfp);
     if (mnist_bin_to_int(tmp) != 2049) {
+      fprintf(stderr, "Error: invalid input labels.\n");
       return_code = -3; /* Not a valid label file */
       goto cleanup;
     }
@@ -116,6 +119,7 @@ extern "C" {
     label_cnt = mnist_bin_to_int(tmp);
 
     if (image_cnt != label_cnt) {
+      fprintf(stderr, "Error: element counts of input files mismatch.\n");
       return_code = -4; /* Element counts of 2 files mismatch */
       goto cleanup;
     }
@@ -126,6 +130,7 @@ extern "C" {
     }
 
     if (image_dim[0] != 28 || image_dim[1] != 28) {
+      fprintf(stderr, "Error: invalid input images.\n");
       return_code = -2; /* Not a valid image file */
       goto cleanup;
     }
