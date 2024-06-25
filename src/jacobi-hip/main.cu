@@ -97,7 +97,7 @@ __global__ void jacobi_step (float*__restrict__ f,
   // For simplicity, we do this outside the above conditional
   // so that all threads participate
   for (int offset = 8; offset > 0; offset /= 2) {
-    err += __shfl_down(0xffffffff, err, offset);
+    err += __shfl_down(err, offset);
   }
 
   // If we're thread 0 in the warp, update our value to shared memory
@@ -117,7 +117,7 @@ __global__ void jacobi_step (float*__restrict__ f,
   if (threadIdx.y == 0) {
     err = reduction_array[threadIdx.x];
     for (int offset = 8; offset > 0; offset /= 2) {
-      err += __shfl_down(0xffffffff, err, offset);
+      err += __shfl_down(err, offset);
     }
     if (threadIdx.x == 0) {
       atomicAdd(error, err);
