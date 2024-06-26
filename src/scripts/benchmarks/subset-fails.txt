@@ -1,5 +1,3 @@
-ace-sycl
-minimod-cuda
-aop-sycl
+bh-sycl
+complex-sycl
 bn-hip
-jacobi-hip
