@@ -278,6 +278,6 @@ int main(int argc, char *argv[])
     read_data(files[f%17], &d);
     time += extend2(q, &d);
   }
-  printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
+  printf("Average offload time %f (us)\n", (time * 1e-3f) / repeat);
   return 0;
 }
