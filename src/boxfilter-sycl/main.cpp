@@ -171,7 +171,7 @@ void BoxFilterGPU ( sycl::queue &q,
    q.wait();
    auto end = std::chrono::steady_clock::now();
    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-   printf("Average device execution time %f (us)\n", (time * 1e-3f) / iCycles);
+   printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / iCycles);
 }
 
 int main(int argc, char** argv)
