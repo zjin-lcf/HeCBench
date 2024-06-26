@@ -102,14 +102,14 @@ Each benchmark falls into a single category. While such classification is not ac
     It works with a `.json` file containing the benchmark names, a regex to
     find the timings in the benchmark output and optional arguments that
     must be provided to the benchmark binary. The `subset.json` contains
-    roughly 70 of the benchmarks for cuda, hip and sycl at the moment, more
+    a subset of the benchmarks for cuda, hip and sycl at the moment, so more
     work would be required to support the rest of the benchmarks. In
     addition if there are failing benchmarks in the `.json` list, an
     additional text file can be provided with a list of benchmarks to skip
     when running all of them. Benchmarks in the text file can still be run
     explicitly.
 
-    For example to run all the SYCL benchmarks and then all the CUDA
+    For example, to run all the SYCL benchmarks and then all the CUDA
     benchmarks and compare the two:
 
     ```
@@ -139,15 +139,15 @@ Each benchmark falls into a single category. While such classification is not ac
     By default it will run a warmup iteration before running each benchmark,
     and it is possible to run the benchmarks multiple times with `-r`:
     ```
-    ./autohecbench.py backprop-sycl -r 20 -o mandel.csv
+    ./autohecbench.py backprop-sycl -r 20 -o mandel-sycl.csv
     ```
 
     And it also has options to pick the CUDA SM version or HIP architecture and a
-    few other parameters.
+    few other parameters. Type `./autohecbench.py` to see all the options.
 
 # Dataset
 For Rodinia benchmarks, please download the dataset at http://lava.cs.virginia.edu/Rodinia/download.htm  
-For other benchmarks, datasets are either included with the repository or could be downloaded through the links to the benchmarks 
+For other benchmarks, datasets are either included with the benchmarks or could be downloaded through the links described in the README files.
 
 # Known issues
 The programs have not been evaluated on Windows or MacOS  
@@ -1532,7 +1532,7 @@ Early results are shown [here](results/README.md)
 Authored and maintained by Zheming Jin (https://github.com/zjin-lcf) 
 
 ## Acknowledgement
-Abhishek Bagusetty, Andrey Alekseenko, Anton Gorshkov, Beau Johnston, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, Daine McNiven, David Oro, David Sanchez, Douglas Franz, Edson Borin, Gabriell Araujo, Georgi Mirazchiyski, Henry Linjamäki, Henry Gabb, Hugh Delaney, Ian Karlin, Istvan Reguly, Jack Kirk, Jason Lau, Jeff Hammond, Jenny Chen, Jeongnim Kim, Jianxin Qiu, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Junchao Zhang, Kali Uday Balleda, Kinman Lei, Luke Drummond, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Franusich, Mike Giles, Mikhail Dvorskiy, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pavel Samolysov, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Shaoyi Peng, Steffen Larsen, Rafal Bielski, Robert Harrison, Robin Kobus, Rod Burns, Rodrigo Vimieiro, Romanov Vlad, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Timmie Smith, Tobias Baumann, Usman Roshan, Wayne Joubert, Ye Luo, Yongbin Gu, Zhe Chen
+Abhishek Bagusetty, Andrey Alekseenko, Anton Gorshkov, Beau Johnston, Bernhard Esslinger, Bert de Jong, Chengjian Liu, Chris Knight, Daine McNiven, David Oro, David Sanchez, Douglas Franz, Edson Borin, Gabriell Araujo, Georgi Mirazchiyski, Henry Linjamäki, Henry Gabb, Hugh Delaney, Ian Karlin, Istvan Reguly, Jack Kirk, Jason Lau, Jeff Hammond, Jenny Chen, Jeongnim Kim, Jianxin Qiu, Jakub Chlanda, Jiya Su, John Tramm, Ju Zheng, Junchao Zhang, Kali Uday Balleda, Kinman Lei, Luke Drummond, Martin Burtscher, Matthias Noack, Michael Kruse, Michel Migdal, Mike Franusich, Mike Giles, Mikhail Dvorskiy, Mohammed Alser, Muhammad Haseeb, Muaaz Awan, Nevin Liber, Nicholas Miller, Pavel Samolysov, Pedro Valero Lara, Piotr Różański, Rahulkumar Gayatri, Samyak Gangwal, Shaoyi Peng, Steffen Larsen, Rafal Bielski, Robert Harrison, Robin Kobus, Rod Burns, Rodrigo Vimieiro, Romanov Vlad, Tadej Ciglarič, Thomas Applencourt, Tiago Carneiro, Tiago Cogumbreiro, Timmie Smith, Tobias Baumann, Usman Roshan, Wayne Joubert, Ye Luo, Yongbin Gu, Zhe Chen
 
 Codeplay<sup>®</sup> and Intel<sup>®</sup> for their contributions to the oneAPI ecosystem   
 
