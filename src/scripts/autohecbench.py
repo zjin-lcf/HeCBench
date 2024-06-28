@@ -18,7 +18,6 @@ class Benchmark:
     def __init__(self, args, name, res_regex, run_args = [], binary = "main", invert = False):
         if name.endswith('sycl'):
             self.MAKE_ARGS = ['GCC_TOOLCHAIN="{}"'.format(args.gcc_toolchain)]
-            self.MAKE_ARGS.append('CC={}'.format(args.compiler_name))
             if args.sycl_type == 'cuda':
                 self.MAKE_ARGS.append('CUDA=yes')
                 self.MAKE_ARGS.append('CUDA_ARCH=sm_{}'.format(args.nvidia_sm))
@@ -36,6 +35,8 @@ class Benchmark:
             self.MAKE_ARGS = ['ARCH=sm_{}'.format(args.nvidia_sm)]
         else:
             self.MAKE_ARGS = []
+        if args.compiler_name: # if compiler is specified, use the specified one; otherwise, the default compiler in Makefiles will be used (clang++ for SYCL, nvcc for CUDA)
+            self.MAKE_ARGS.append('CC={}'.format(args.compiler_name))
 
         if args.extra_compile_flags:
             flags = args.extra_compile_flags.replace(',',' ')
@@ -133,8 +134,8 @@ def main():
                         help='NVIDIA SM version (default is 60)')
     parser.add_argument('--amd-arch', default='gfx908',
                         help='AMD Architecture (default is gfx908)')
-    parser.add_argument('--compiler-name', default='clang++',
-                        help='Name of a SYCL compiler (default is clang++)')
+    parser.add_argument('--compiler-name', default='',
+                        help='Name of a compiler (default is clang++ for SYCL and nvcc for CUDA)')
     parser.add_argument('--gcc-toolchain', default='',
                         help='GCC toolchain location (e.g. /path/to/gcc/x86_64/gcc-9.1.0)')
     parser.add_argument('--extra-compile-flags', '-e', default='',
