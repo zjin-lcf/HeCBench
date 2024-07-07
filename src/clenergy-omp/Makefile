@@ -13,7 +13,7 @@ LAUNCHER    =
 # Program name & source code list
 #===============================================================================
 
-program = clenergy
+program = main
 
 source = clenergy.cpp WKFUtils.cpp
 
