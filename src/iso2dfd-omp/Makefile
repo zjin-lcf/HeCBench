@@ -13,7 +13,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = iso2dfd
+program = main
 
 source = iso2dfd.cpp
 
