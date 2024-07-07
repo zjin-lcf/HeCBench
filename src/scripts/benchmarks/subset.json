@@ -443,7 +443,7 @@
         ]
     ],
     "gpp": [
-        "(?:[*]* Kernel Time Taken [*]*= )([0-9.+-e]+)(?: secs)"
+        "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))"
     ],
     "haccmk": [
         "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
@@ -693,7 +693,7 @@
         ]
     ],
     "pathfinder": [
-        "(?:Device offloading time = )([0-9.+-e]+)(?:\\(s\\))",
+        "(?:Device offloading time = )([0-9.+-e]+)(?: \\(s\\))",
         [
             "1000",
             "1000",
