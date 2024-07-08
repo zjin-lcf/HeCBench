@@ -57,6 +57,7 @@ void get_CRSM_from_svm(Classification_Data_CRS &M, const std::string &file_path)
   }
   else {
     std::cout << "Could not find the SMV file, check again!" << std::endl;
+    exit(1); 
   }
   //numRows will be given by the rowpointer size -1
   M.m = static_cast<int>(M.row_ptr.size())-1;
