@@ -59,8 +59,8 @@ namespace mean_shift::gpu {
       else {
         for (int j = 0; j < D; ++j) {
           local_data[local_row + j] = 0;
-          valid_data[lid] = 0;
         }
+        valid_data[lid] = 0;
       }
       item.barrier(sycl::access::fence_space::local_space);
       for (int i = 0; i < TILE_WIDTH; ++i) {

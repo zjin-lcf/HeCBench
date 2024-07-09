@@ -62,8 +62,8 @@ namespace mean_shift::gpu {
           else {
             for (int j = 0; j < D; ++j) {
               local_data[local_row + j] = 0;
-              valid_data[lid] = 0;
             }
+            valid_data[lid] = 0;
           }
           #pragma omp barrier
           for (int i = 0; i < TILE_WIDTH; ++i) {
