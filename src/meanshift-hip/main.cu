@@ -136,10 +136,11 @@ int main(int argc, char* argv[]) {
   // Verify these centroids are sufficiently close to real ones
   hipMemcpy(result.data(), d_data, data_bytes, hipMemcpyDeviceToHost);
   auto centroids = mean_shift::gpu::utils::reduce_to_centroids<N, D>(result, mean_shift::gpu::MIN_DISTANCE);
-  assert(centroids.size() == M);
   bool are_close = mean_shift::gpu::utils::are_close_to_real<M, D>(centroids, real, DIST_TO_REAL);
-  assert(are_close);
-  std::cout << "PASS\n";
+  if (centroids.size() == M && are_close)
+     std::cout << "PASS\n";
+  else
+     std::cout << "FAIL\n";
 
   // Reset device data
   hipMemcpy(d_data, data.data(), data_bytes, hipMemcpyHostToDevice);
@@ -158,10 +159,12 @@ int main(int argc, char* argv[]) {
   // Verify these centroids are sufficiently close to real ones
   hipMemcpy(result.data(), d_data, data_bytes, hipMemcpyDeviceToHost);
   centroids = mean_shift::gpu::utils::reduce_to_centroids<N, D>(result, mean_shift::gpu::MIN_DISTANCE);
-  assert(centroids.size() == M);
   are_close = mean_shift::gpu::utils::are_close_to_real<M, D>(centroids, real, DIST_TO_REAL);
-  assert(are_close);
-  std::cout << "PASS\n";
+  if (centroids.size() == M && are_close)
+     std::cout << "PASS\n";
+  else
+     std::cout << "FAIL\n";
+
 
   hipFree(d_data);
   hipFree(d_data_next);
