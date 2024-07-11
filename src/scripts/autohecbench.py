@@ -303,7 +303,8 @@ def main():
         logging.info(f"Wrote the summary to {args.summary}.")
     else:
         print(json.dumps(summary, indent=4, sort_keys=True))
-    res = sum((x['compile'] == 'failed' or x['run'] == 'failed') for x in summary.values())
+    res = sum(('compile' in x.keys() and x['compile'] == 'failed' or
+               'run' in x.keys() and x['run'] == 'failed') for x in summary.values())
     print(f'Number of benchmark compile or run failures: {res}');
     print("*****************************************************************************************")
 
