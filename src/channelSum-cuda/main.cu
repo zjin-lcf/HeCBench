@@ -208,10 +208,8 @@ int main(int argc, char* argv[])
       ref_nhwc (N, C, W*H, h_X, r_sum, h_sumsq);
       bool ok = check(C, h_sum, r_sum);
 
-      if (ok)
-        printf("Average time of channel sum (nhwc): %f (ms)\n", (time * 1e-6f) / repeat);
-      else
-        printf("Verification fails for channel sum (nhwc)\n");
+      printf("Average time of channel sum (nhwc): %f (ms)\n", (time * 1e-6f) / repeat);
+      printf("Verification %s for channel sum (nhwc)\n", ok ? "PASS" : "FAIL");
 
       ComputeChannelSumNCHW (N, C, W*H, d_X, d_sum, d_sumsq, time, repeat);
 
@@ -219,10 +217,8 @@ int main(int argc, char* argv[])
       ref_nchw (N, C, W*H, h_X, r_sum, h_sumsq);
       ok = check(C, h_sum, r_sum);
       
-      if (ok)
-        printf("Average time of channel sum (nchw): %f (ms)\n", (time * 1e-6f) / repeat);
-      else
-        printf("Verification fails for channel sum (nchw)\n");
+      printf("Average time of channel sum (nchw): %f (ms)\n", (time * 1e-6f) / repeat);
+      printf("Verification %s for channel sum (nchw)\n", ok ? "PASS" : "FAIL");
 
       cudaFree(d_X);
       cudaFree(d_sum);
