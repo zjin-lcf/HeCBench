@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <chrono>
+#include <random>
 #include <cuda.h>
 #include "reference.h"
 
@@ -14,7 +15,6 @@ void kernel1 (
     const int n,
     const int d) 
 {
-
   int i = blockIdx.x * blockDim.x + threadIdx.x;  
   if (i < n) {
     float sum = 0;
@@ -32,7 +32,6 @@ void kernel2 (
     float*__restrict__ score, 
     const int n)
 {
-
   int i = blockIdx.x * blockDim.x + threadIdx.x;  
   if (i < n)
     score[i] = expf(dot_product[i]) / exp_sum[0];
@@ -133,14 +132,13 @@ int main(int argc, char* argv[]) {
   float* value = (float*) malloc (n * d * sizeof(float));
   float* query = (float*) malloc (d * sizeof(float));
 
-  srand(2);
+  std::mt19937 gen(19937);
+  std::uniform_real_distribution<float> dist(-0.01f, 0.01f);
+
   for (int i = 0; i < n * d; i++) {
-    key[i] = 0.1;
-    value[i] = 0.3;
-    if (rand() % 2)
-      query[i % d] = value[i] + key[i] ;
-    else
-      query[i % d] = value[i] - key[i] ;
+    key[i] = dist(gen);
+    value[i] = dist(gen);
+    query[i % d] = dist(gen);
   }
 
   float* hout = attention_host(key, value, query, n, d);
