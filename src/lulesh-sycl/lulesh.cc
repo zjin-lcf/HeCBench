@@ -1022,6 +1022,33 @@ int main(int argc, char *argv[])
   Real_t *ydd = &locDom->m_ydd[0];
   Real_t *zdd = &locDom->m_zdd[0];
 
+  Real_t *p = &locDom->m_p[0];
+  Real_t *q = &locDom->m_q[0];
+  Real_t *volo = &locDom->m_volo[0];
+  Real_t *nodalMass = &locDom->m_nodalMass[0];
+  Index_t *symmX = &locDom->m_symmX[0];
+  Index_t *symmY = &locDom->m_symmY[0];
+  Index_t *symmZ = &locDom->m_symmZ[0];
+  Real_t *delv = &locDom->m_delv[0];
+  Real_t *arealg = &locDom->m_arealg[0];
+  Real_t *dxx = &locDom->m_dxx[0];
+  Real_t *dyy = &locDom->m_dyy[0];
+  Real_t *dzz = &locDom->m_dzz[0];
+  Index_t *elemBC = &locDom->m_elemBC[0];
+  Index_t *lxim = &locDom->m_lxim[0];
+  Index_t *lxip = &locDom->m_lxip[0];
+  Index_t *letam = &locDom->m_letam[0];
+  Index_t *letap = &locDom->m_letap[0];
+  Index_t *lzetam = &locDom->m_lzetam[0];
+  Index_t *lzetap = &locDom->m_lzetap[0];
+  Real_t *elemMass = &locDom->m_elemMass[0];
+  Index_t *elemRep = &locDom->m_elemRep[0];
+  Index_t *elemElem = &locDom->m_elemElem[0];
+  Real_t *v = &locDom->m_v[0];
+  Real_t *vdov = &locDom->m_vdov[0];
+  Real_t *e = &locDom->m_e[0];
+  Real_t *ss = &locDom->m_ss[0];
+
   Index_t *nodelist = &locDom->m_nodelist[0];
 
 #ifdef VERIFY
@@ -1080,10 +1107,10 @@ int main(int argc, char *argv[])
   buffer<Real_t, 1> d_delx_eta (numElem);
   buffer<Real_t, 1> d_delv_zeta (numElem);
   buffer<Real_t, 1> d_delx_zeta (numElem);
-  buffer<Real_t, 1> d_p (numElem);
-  buffer<Real_t, 1> d_q (numElem);
-  buffer<Real_t, 1> d_volo(numElem);
-  buffer<Real_t, 1> d_v(numElem);
+  buffer<Real_t, 1> d_p (p, numElem);
+  buffer<Real_t, 1> d_q (q, numElem);
+  buffer<Real_t, 1> d_volo(volo, numElem);
+  buffer<Real_t, 1> d_v(v, numElem);
   buffer<int, 1> d_vol_error(1);
 
   Index_t *nodeElemStart = &locDom->m_nodeElemStart[0];
@@ -1129,36 +1156,62 @@ int main(int argc, char *argv[])
   gamma[31] = Real_t(-1.);
 
   buffer<Real_t, 1> d_gamma(gamma, 32);
-  buffer<Real_t, 1> d_ss(numElem);
-  buffer<Real_t, 1> d_elemMass(numElem);
-  buffer<Real_t, 1> d_nodalMass(numNode);
+  buffer<Real_t, 1> d_ss(ss, numElem);
+  buffer<Real_t, 1> d_elemMass(elemMass, numElem);
+  buffer<Real_t, 1> d_nodalMass(nodalMass, numNode);
 
   Index_t size = locDom->sizeX();
   Index_t numNodeBC = (size+1)*(size+1) ;
-  buffer<Index_t, 1> d_symmX(numNodeBC);
-  buffer<Index_t, 1> d_symmY(numNodeBC);
-  buffer<Index_t, 1> d_symmZ(numNodeBC);
+  buffer<Index_t, 1> d_symmX(symmX, numNodeBC);
+  buffer<Index_t, 1> d_symmY(symmY, numNodeBC);
+  buffer<Index_t, 1> d_symmZ(symmZ, numNodeBC);
 
-  buffer<Real_t, 1> d_vdov (numElem);
-  buffer<Real_t, 1> d_delv (numElem);
-  buffer<Real_t, 1> d_arealg (numElem);
-  buffer<Real_t, 1> d_dxx (numElem);
-  buffer<Real_t, 1> d_dyy (numElem);
-  buffer<Real_t, 1> d_dzz (numElem);
+  buffer<Real_t, 1> d_vdov (vdov, numElem);
+  buffer<Real_t, 1> d_delv (delv, numElem);
+  buffer<Real_t, 1> d_arealg (arealg, numElem);
+  buffer<Real_t, 1> d_dxx (dxx, numElem);
+  buffer<Real_t, 1> d_dyy (dyy, numElem);
+  buffer<Real_t, 1> d_dzz (dzz, numElem);
   buffer<Real_t, 1> d_vnew (numElem);
 
-  buffer<Index_t, 1> d_lzetam(numElem);
-  buffer<Index_t, 1> d_lzetap(numElem);
-  buffer<Index_t, 1> d_letap(numElem);
-  buffer<Index_t, 1> d_letam(numElem);
-  buffer<Index_t, 1> d_lxip(numElem);
-  buffer<Index_t, 1> d_lxim(numElem);
-  buffer<Index_t, 1> d_elemBC(numElem);
+  buffer<Index_t, 1> d_lzetam(lzetam, numElem);
+  buffer<Index_t, 1> d_lzetap(lzetap, numElem);
+  buffer<Index_t, 1> d_letap(letap, numElem);
+  buffer<Index_t, 1> d_letam(letam, numElem);
+  buffer<Index_t, 1> d_lxip(lxip, numElem);
+  buffer<Index_t, 1> d_lxim(lxim, numElem);
+  buffer<Index_t, 1> d_elemBC(elemBC, numElem);
   buffer<Real_t, 1> d_ql(numElem);
   buffer<Real_t, 1> d_qq(numElem);
-  buffer<Real_t, 1> d_e (numElem);
-  buffer<Index_t, 1> d_elemRep (numElem);
-  buffer<Index_t, 1> d_elemElem (numElem);
+  buffer<Real_t, 1> d_e (e, numElem);
+  buffer<Index_t, 1> d_elemRep (elemRep, numElem);
+  buffer<Index_t, 1> d_elemElem (elemElem, numElem);
+
+  d_symmX.set_final_data(nullptr);
+  d_symmY.set_final_data(nullptr);
+  d_symmZ.set_final_data(nullptr);
+  d_dxx.set_final_data(nullptr);
+  d_dyy.set_final_data(nullptr);
+  d_dzz.set_final_data(nullptr);
+  d_ss.set_final_data(nullptr);
+  d_vdov.set_final_data(nullptr);
+  d_delv.set_final_data(nullptr);
+  d_arealg.set_final_data(nullptr);
+  d_p.set_final_data(nullptr);
+  d_q.set_final_data(nullptr);
+  d_e.set_final_data(nullptr);
+  d_v.set_final_data(nullptr);
+  d_nodalMass.set_final_data(nullptr);
+  d_elemMass.set_final_data(nullptr);
+  d_elemRep.set_final_data(nullptr);
+  d_elemElem.set_final_data(nullptr);
+  d_elemBC.set_final_data(nullptr);
+  d_lzetam.set_final_data(nullptr);
+  d_lzetap.set_final_data(nullptr);
+  d_letap.set_final_data(nullptr);
+  d_letam.set_final_data(nullptr);
+  d_lxip.set_final_data(nullptr);
+  d_lxim.set_final_data(nullptr);
 
   sycl::queue &device_queue = locDom->device_queue;
 
@@ -1205,20 +1258,6 @@ int main(int argc, char *argv[])
     //=====================================================================
 
     Real_t  hgcoef = domain.hgcoef() ;
-
-    // Sum contributions to total stress tensor 
-    Real_t *p = &domain.m_p[0];
-    Real_t *q = &domain.m_q[0];
-
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_p.get_access<sycl_write>(cgh);
-      cgh.copy(p, acc);
-    });
-
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_q.get_access<sycl_write>(cgh);
-      cgh.copy(q, acc);
-    });
 
     range<1> gws_elem ((numElem+THREADS-1)/THREADS*THREADS);
     range<1> gws_node ((numNode+THREADS-1)/THREADS*THREADS);
@@ -1368,18 +1407,8 @@ int main(int argc, char *argv[])
     // CalcHourglassControlForElems(device_queue, domain, determ, hgcoef) ;  
     //=================================================================================
 
-    Real_t *volo = &domain.m_volo[0];
-    Real_t *v = &domain.m_v[0];
     int vol_error = -1;
 
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_volo.get_access<sycl_write>(cgh);
-      cgh.copy(volo, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_v.get_access<sycl_write>(cgh);
-      cgh.copy(v, acc);
-    });
     device_queue.submit([&] (handler &cgh) {
       auto acc = d_vol_error.get_access<sycl_write>(cgh);
       cgh.copy(&vol_error, acc);
@@ -1481,8 +1510,8 @@ int main(int argc, char *argv[])
     device_queue.submit([&] (handler &cgh) {
       auto d_acc = d_determ.get_access<sycl_read>(cgh);
       cgh.copy(d_acc, determ);
-    });
-    device_queue.wait();
+    }).wait();
+
     // volumn derivative
     for (int i = 0; i < numElem8; i++) {
       printf("vd %d %f %f %f %f %f %f %f\n", 
@@ -1502,29 +1531,10 @@ int main(int argc, char *argv[])
 
     if ( hgcoef > Real_t(0.) ) {
 
-      Real_t *ss = &domain.m_ss[0];
-      Real_t *elemMass = &domain.m_elemMass[0];
-
       //Index_t *nodeElemStart = &domain.m_nodeElemStart[0];
       //Index_t len1 = numNode + 1;
       //Index_t *nodeElemCornerList = &domain.m_nodeElemCornerList[0];
       //Index_t len2 = nodeElemStart[numNode];
-
-#ifdef VERIFY
-      // initialize data for testing
-      for (int i = 0; i < numElem; i++) {
-        ss[i] = dis(gen);
-        elemMass[i] = dis(gen);
-      }
-#endif
-      device_queue.submit([&] (handler &cgh) {
-        auto acc = d_ss.get_access<sycl_write>(cgh);
-        cgh.copy(ss, acc);
-      });
-      device_queue.submit([&] (handler &cgh) {
-        auto acc = d_elemMass.get_access<sycl_write>(cgh);
-        cgh.copy(elemMass, acc);
-      });
 
       device_queue.submit([&] (handler &cgh) {
         auto dvdx = d_dvdx.get_access<sycl_read>(cgh);
@@ -1791,12 +1801,6 @@ int main(int argc, char *argv[])
     //===========================================================================
     //CalcAccelerationForNodes(domain, domain.numNode());   // IN: fx  OUT: m_xdd
     //===========================================================================
-    Real_t *nodalMass = &domain.m_nodalMass[0];
-
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_nodalMass.get_access<sycl_write>(cgh);
-      cgh.copy(nodalMass, acc);
-    });
 
     device_queue.submit([&] (handler &cgh) {
       auto fx = d_fx.get_access<sycl_read>(cgh);
@@ -1823,22 +1827,6 @@ int main(int argc, char *argv[])
     //Index_t size = domain.sizeX();
     //Index_t numNodeBC = (size+1)*(size+1) ;
 
-    Index_t *symmX = &domain.m_symmX[0];
-    Index_t *symmY = &domain.m_symmY[0];
-    Index_t *symmZ = &domain.m_symmZ[0];
-
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_symmX.get_access<sycl_write>(cgh);
-      cgh.copy(symmX, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_symmY.get_access<sycl_write>(cgh);
-      cgh.copy(symmY, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_symmZ.get_access<sycl_write>(cgh);
-      cgh.copy(symmZ, acc);
-    });
 
     Index_t s1 = domain.symmXempty();
     Index_t s2 = domain.symmYempty();
@@ -1952,38 +1940,6 @@ int main(int argc, char *argv[])
     // LagrangeElements(domain);
     //=========================================================
 
-    Real_t *dxx = &domain.m_dxx[0];
-    Real_t *dyy = &domain.m_dyy[0];
-    Real_t *dzz = &domain.m_dzz[0];
-
-    Real_t *delv = &domain.m_delv[0];
-    Real_t *arealg = &domain.m_arealg[0];
-    Real_t *vdov = &domain.m_vdov[0];
-
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_vdov.get_access<sycl_write>(cgh);
-      cgh.copy(vdov, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_delv.get_access<sycl_write>(cgh);
-      cgh.copy(delv, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_arealg.get_access<sycl_write>(cgh);
-      cgh.copy(arealg, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_dxx.get_access<sycl_write>(cgh);
-      cgh.copy(dxx, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_dyy.get_access<sycl_write>(cgh);
-      cgh.copy(dyy, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_dzz.get_access<sycl_write>(cgh);
-      cgh.copy(dzz, acc);
-    });
 
     //========================================================================
     // void CalcKinematicsForElems( Domain &domain, Real_t *vnew, 
@@ -2336,50 +2292,6 @@ int main(int argc, char *argv[])
     Real_t qlc_monoq = domain.qlc_monoq();
     Real_t qqc_monoq = domain.qqc_monoq();
 
-    Index_t *elemBC = &domain.m_elemBC[0];
-    Index_t *lxim = &domain.m_lxim[0];
-    Index_t *lxip = &domain.m_lxip[0];
-    Index_t *letam = &domain.m_letam[0];
-    Index_t *letap = &domain.m_letap[0];
-    Index_t *lzetam = &domain.m_lzetam[0];
-    Index_t *lzetap = &domain.m_lzetap[0];
-    Real_t *elemMass = &domain.m_elemMass[0];
-    //Real_t *ql = &domain.m_ql[0];
-    //Real_t *qq = &domain.m_qq[0];
-
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_lzetam.get_access<sycl_write>(cgh);
-      cgh.copy(lzetam, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_lzetap.get_access<sycl_write>(cgh);
-      cgh.copy(lzetap, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_letap.get_access<sycl_write>(cgh);
-      cgh.copy(letap, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_letam.get_access<sycl_write>(cgh);
-      cgh.copy(letam, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_lxip.get_access<sycl_write>(cgh);
-      cgh.copy(lxip, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_lxim.get_access<sycl_write>(cgh);
-      cgh.copy(lxim, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_elemBC.get_access<sycl_write>(cgh);
-      cgh.copy(elemBC, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_elemMass.get_access<sycl_write>(cgh);
-      cgh.copy(elemMass, acc);
-    });
-
     device_queue.submit([&] (handler &cgh) {
       auto elemBC = d_elemBC.get_access<sycl_read>(cgh);
       auto elemMass = d_elemMass.get_access<sycl_read>(cgh);
@@ -2584,29 +2496,6 @@ int main(int argc, char *argv[])
     Real_t pmin    = domain.pmin() ;
     Real_t emin    = domain.emin() ;
     Real_t rho0    = domain.refdens() ;
-
-    Real_t *e = &domain.m_e[0];
-    Real_t *ss = &domain.m_ss[0];
-
-    Index_t *elemRep = &domain.m_elemRep[0];
-    Index_t *elemElem = &domain.m_elemElem[0];
-
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_e.get_access<sycl_write>(cgh);
-      cgh.copy(e, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_ss.get_access<sycl_write>(cgh);
-      cgh.copy(ss, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_elemRep.get_access<sycl_write>(cgh);
-      cgh.copy(elemRep, acc);
-    });
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_elemElem.get_access<sycl_write>(cgh);
-      cgh.copy(elemElem, acc);
-    });
 
     device_queue.submit([&] (handler &cgh) {
       auto ql = d_ql.get_access<sycl_read>(cgh);
@@ -2824,20 +2713,29 @@ int main(int argc, char *argv[])
     });
 
     device_queue.submit([&] (handler &cgh) {
-      auto acc = d_q.get_access<sycl_read>(cgh);
-      cgh.copy(acc, q);
+      auto acc = d_ss.get_access<sycl_read>(cgh);
+      cgh.copy(acc, ss);
     });
+
+    device_queue.submit([&] (handler &cgh) {
+      auto acc = d_arealg.get_access<sycl_read>(cgh);
+      cgh.copy(acc, arealg);
+    });
+
+    device_queue.wait();
+
+#ifdef VERIFY
     device_queue.submit([&] (handler &cgh) {
       auto acc = d_p.get_access<sycl_read>(cgh);
       cgh.copy(acc, p);
     });
     device_queue.submit([&] (handler &cgh) {
-      auto acc = d_e.get_access<sycl_read>(cgh);
-      cgh.copy(acc, e);
+      auto acc = d_q.get_access<sycl_read>(cgh);
+      cgh.copy(acc, q);
     });
     device_queue.submit([&] (handler &cgh) {
-      auto acc = d_ss.get_access<sycl_read>(cgh);
-      cgh.copy(acc, ss);
+      auto acc = d_e.get_access<sycl_read>(cgh);
+      cgh.copy(acc, e);
     });
     device_queue.submit([&] (handler &cgh) {
       auto acc = d_v.get_access<sycl_read>(cgh);
@@ -2846,7 +2744,6 @@ int main(int argc, char *argv[])
 
     device_queue.wait();
 
-#ifdef VERIFY
     for (int i = 0; i < numElem; i++) {
       printf("eos: %f %f %f %f %f\n", q[i], p[i], e[i], ss[i], v[i]);
     }

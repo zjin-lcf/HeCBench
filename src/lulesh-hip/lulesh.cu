@@ -2450,6 +2450,78 @@ int main(int argc, char *argv[])
   Index_t* d_elemElem;
   hipMalloc((void**)&d_elemElem, sizeof(Index_t)*numElem);
 
+  // Sum contributions to total stress tensor 
+  Real_t *p = &locDom->m_p[0];
+  Real_t *q = &locDom->m_q[0];
+
+  hipMemcpy(d_p, p, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
+  hipMemcpy(d_q, q, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
+
+  Real_t *volo = &locDom->m_volo[0];
+  hipMemcpy(d_volo, volo, sizeof(Real_t)*numElem, hipMemcpyHostToDevice); 
+
+  Real_t *nodalMass = &locDom->m_nodalMass[0];
+  hipMemcpy(d_nodalMass, nodalMass, sizeof(Real_t)*numNode, hipMemcpyHostToDevice);
+
+  Index_t *symmX = &locDom->m_symmX[0];
+  Index_t *symmY = &locDom->m_symmY[0];
+  Index_t *symmZ = &locDom->m_symmZ[0];
+
+  hipMemcpy(d_symmX, symmX,  sizeof(Index_t)*numNodeBC, hipMemcpyHostToDevice);
+  hipMemcpy(d_symmY, symmY,  sizeof(Index_t)*numNodeBC, hipMemcpyHostToDevice);
+  hipMemcpy(d_symmZ, symmZ,  sizeof(Index_t)*numNodeBC, hipMemcpyHostToDevice);
+
+  Real_t *delv = &locDom->m_delv[0];
+  hipMemcpy(d_delv, delv, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
+
+  Real_t *arealg = &locDom->m_arealg[0];
+  hipMemcpy(d_arealg, arealg, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
+
+  Real_t *dxx = &locDom->m_dxx[0];
+  Real_t *dyy = &locDom->m_dyy[0];
+  Real_t *dzz = &locDom->m_dzz[0];
+  hipMemcpy(d_dxx, dxx, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
+  hipMemcpy(d_dyy, dyy, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
+  hipMemcpy(d_dzz, dzz, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
+
+  Index_t *elemBC = &locDom->m_elemBC[0];
+  Index_t *lxim = &locDom->m_lxim[0];
+  Index_t *lxip = &locDom->m_lxip[0];
+  Index_t *letam = &locDom->m_letam[0];
+  Index_t *letap = &locDom->m_letap[0];
+  Index_t *lzetam = &locDom->m_lzetam[0];
+  Index_t *lzetap = &locDom->m_lzetap[0];
+  Real_t *elemMass = &locDom->m_elemMass[0];
+  //Real_t *ql = &locDom->m_ql[0];
+  //Real_t *qq = &locDom->m_qq[0];
+
+  hipMemcpy(d_lzetam, lzetam, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
+  hipMemcpy(d_lzetap, lzetap, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
+  hipMemcpy(d_letam, letam, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
+  hipMemcpy(d_letap, letap, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
+  hipMemcpy(d_lxip, lxip, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
+  hipMemcpy(d_lxim, lxim, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
+  hipMemcpy(d_elemBC, elemBC, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
+  hipMemcpy(d_elemMass, elemMass, sizeof(Real_t)*numElem, hipMemcpyHostToDevice); 
+
+  Index_t *elemRep = &locDom->m_elemRep[0];
+  Index_t *elemElem = &locDom->m_elemElem[0];
+
+  hipMemcpy(d_elemRep, elemRep, sizeof(Index_t)*numElem, hipMemcpyHostToDevice);
+  hipMemcpy(d_elemElem, elemElem, sizeof(Index_t)*numElem, hipMemcpyHostToDevice);
+
+  Real_t *v = &locDom->m_v[0];
+  hipMemcpy(d_v, v, sizeof(Real_t)*numElem, hipMemcpyHostToDevice); 
+
+  Real_t *vdov = &locDom->m_vdov[0];
+  hipMemcpy(d_vdov, vdov, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
+
+  Real_t *e = &locDom->m_e[0];
+  Real_t *ss = &locDom->m_ss[0];
+
+  hipMemcpy(d_e, e, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
+  hipMemcpy(d_ss, ss, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
+
   // error checking on the host
   Real_t *determ = Allocate<Real_t>(numElem) ;
   // resize m_dxx, m_dyy, and m_dzz
@@ -2493,24 +2565,17 @@ int main(int argc, char *argv[])
 
     Real_t  hgcoef = domain.hgcoef() ;
 
-    // Sum contributions to total stress tensor 
-    Real_t *p = &domain.m_p[0];
-    Real_t *q = &domain.m_q[0];
-
-    hipMemcpy(d_p, p, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-    hipMemcpy(d_q, q, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-
     dim3 gws_elem ((numElem+THREADS-1)/THREADS);
     dim3 gws_node ((numNode+THREADS-1)/THREADS);
     dim3 lws (THREADS);
 
-    hipLaunchKernelGGL(fill_sig, gws_elem, lws, 0, 0, d_sigxx, d_sigyy, d_sigzz, d_p, d_q, numElem);
+    fill_sig<<<gws_elem, lws>>>(d_sigxx, d_sigyy, d_sigzz, d_p, d_q, numElem);
 
     //==============================================================================================
     // IntegrateStressForElems( domain, sigxx, sigyy, sigzz, determ, numElem, domain.numNode())
     //==============================================================================================
 
-    hipLaunchKernelGGL(integrateStress, gws_elem, lws, 0, 0, 
+    integrateStress<<<gws_elem, lws>>>(
         d_fx_elem,
         d_fy_elem,
         d_fz_elem,
@@ -2524,7 +2589,7 @@ int main(int argc, char *argv[])
         d_determ,
         numElem);
 
-    hipLaunchKernelGGL(acc_final_force, gws_node, lws, 0, 0, 
+    acc_final_force<<<gws_node, lws>>>(
         d_fx_elem,
         d_fy_elem,
         d_fz_elem,
@@ -2551,15 +2616,11 @@ int main(int argc, char *argv[])
     // CalcHourglassControlForElems(device_queue, domain, determ, hgcoef) ;  
     //=================================================================================
 
-    Real_t *volo = &domain.m_volo[0];
-    Real_t *v = &domain.m_v[0];
     int vol_error = -1;
 
-    hipMemcpy(d_volo, volo, sizeof(Real_t)*numElem, hipMemcpyHostToDevice); 
-    hipMemcpy(d_v, v, sizeof(Real_t)*numElem, hipMemcpyHostToDevice); 
     hipMemcpy(d_vol_error, &vol_error, sizeof(int), hipMemcpyHostToDevice); 
 
-    hipLaunchKernelGGL(hgc, gws_elem, lws, 0, 0, 
+    hgc<<<gws_elem, lws>>>(
         d_dvdx,
         d_dvdy,
         d_dvdz,
@@ -2616,25 +2677,12 @@ int main(int argc, char *argv[])
 
     if ( hgcoef > Real_t(0.) ) {
 
-      Real_t *ss = &domain.m_ss[0];
-      Real_t *elemMass = &domain.m_elemMass[0];
-
       //Index_t *nodeElemStart = &domain.m_nodeElemStart[0];
       //Index_t len1 = numNode + 1;
       //Index_t *nodeElemCornerList = &domain.m_nodeElemCornerList[0];
       //Index_t len2 = nodeElemStart[numNode];
 
-#ifdef VERIFY
-      // initialize data for testing
-      for (int i = 0; i < numElem; i++) {
-        ss[i] = dis(gen);
-        elemMass[i] = dis(gen);
-      }
-#endif
-      hipMemcpy(d_ss, ss, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-      hipMemcpy(d_elemMass, elemMass, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-
-      hipLaunchKernelGGL(fb, gws_elem, lws, 0, 0, 
+      fb<<<gws_elem, lws>>>(
           d_dvdx,
           d_dvdy,
           d_dvdz,
@@ -2655,7 +2703,7 @@ int main(int argc, char *argv[])
           hgcoef,
           numElem );
 
-      hipLaunchKernelGGL(collect_final_force, gws_node, lws, 0, 0, 
+      collect_final_force <<<gws_node, lws>>>  (
           d_fx_elem,
           d_fy_elem,
           d_fz_elem,
@@ -2687,11 +2735,8 @@ int main(int argc, char *argv[])
     //===========================================================================
     //CalcAccelerationForNodes(domain, domain.numNode());   // IN: fx  OUT: m_xdd
     //===========================================================================
-    Real_t *nodalMass = &domain.m_nodalMass[0];
 
-    hipMemcpy(d_nodalMass, nodalMass, sizeof(Real_t)*numNode, hipMemcpyHostToDevice);
-
-    hipLaunchKernelGGL(accelerationForNode, gws_node, lws, 0, 0, 
+    accelerationForNode<<<gws_node, lws>>>(
         d_fx,
         d_fy,
         d_fz,
@@ -2706,14 +2751,6 @@ int main(int argc, char *argv[])
     //======================================================================================
     //Index_t size = domain.sizeX();
     //Index_t numNodeBC = (size+1)*(size+1) ;
-
-    Index_t *symmX = &domain.m_symmX[0];
-    Index_t *symmY = &domain.m_symmY[0];
-    Index_t *symmZ = &domain.m_symmZ[0];
-
-    hipMemcpy(d_symmX, symmX,  sizeof(Index_t)*numNodeBC, hipMemcpyHostToDevice);
-    hipMemcpy(d_symmY, symmY,  sizeof(Index_t)*numNodeBC, hipMemcpyHostToDevice);
-    hipMemcpy(d_symmZ, symmZ,  sizeof(Index_t)*numNodeBC, hipMemcpyHostToDevice);
 
     Index_t s1 = domain.symmXempty();
     Index_t s2 = domain.symmYempty();
@@ -2734,7 +2771,7 @@ int main(int argc, char *argv[])
     //=================================================================
     // CalcVelocityForNodes( domain, delt, u_cut, domain.numNode()) ; //uses m_xd and m_xdd
     //=================================================================
-    hipLaunchKernelGGL(calcVelocityForNodes, gws_node, lws, 0, 0, 
+    calcVelocityForNodes <<<gws_node, lws>>>(
         d_xd,
         d_yd,
         d_zd,
@@ -2748,7 +2785,7 @@ int main(int argc, char *argv[])
     //=================================================================================
     // CalcPositionForNodes( domain, delt, domain.numNode() );  //uses m_xd and m_x 
     //=================================================================================
-    hipLaunchKernelGGL(calcPositionForNodes, gws_node, lws , 0, 0, 
+    calcPositionForNodes<<<gws_node, lws >>>(
         d_x,
         d_y,
         d_z,
@@ -2790,25 +2827,12 @@ int main(int argc, char *argv[])
     // LagrangeElements(domain);
     //=========================================================
 
-    Real_t *dxx = &domain.m_dxx[0];
-    Real_t *dyy = &domain.m_dyy[0];
-    Real_t *dzz = &domain.m_dzz[0];
 
-    Real_t *delv = &domain.m_delv[0];
-    Real_t *arealg = &domain.m_arealg[0];
-    Real_t *vdov = &domain.m_vdov[0];
-
-    hipMemcpy(d_vdov, vdov, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-    hipMemcpy(d_delv, delv, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-    hipMemcpy(d_arealg, arealg, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-    hipMemcpy(d_dxx, dxx, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-    hipMemcpy(d_dyy, dyy, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-    hipMemcpy(d_dzz, dzz, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
 
     //========================================================================
     // void CalcKinematicsForElems( Domain &domain, Real_t *vnew, 
     //========================================================================
-    hipLaunchKernelGGL(calcKinematicsForElems, gws_elem, lws, 0, 0, 
+    calcKinematicsForElems<<<gws_elem, lws>>>(
         d_xd,
         d_yd,
         d_zd,
@@ -2831,7 +2855,7 @@ int main(int argc, char *argv[])
 
     hipMemcpy(d_vol_error, &vol_error, sizeof(int), hipMemcpyHostToDevice); 
 
-    hipLaunchKernelGGL(calcStrainRates, gws_elem, lws, 0, 0, 
+    calcStrainRates<<<gws_elem, lws>>>(
         d_dxx,
         d_dyy,
         d_dzz,
@@ -2863,7 +2887,7 @@ int main(int argc, char *argv[])
     // Calculate velocity gradients 
     //CalcMonotonicQGradientsForElems(domain, vnew);
     //================================================================
-    hipLaunchKernelGGL(calcMonotonicQGradientsForElems, gws_elem, lws, 0, 0, 
+    calcMonotonicQGradientsForElems<<<gws_elem, lws>>>(
         d_xd,
         d_yd,
         d_zd,
@@ -2889,27 +2913,7 @@ int main(int argc, char *argv[])
     Real_t qlc_monoq = domain.qlc_monoq();
     Real_t qqc_monoq = domain.qqc_monoq();
 
-    Index_t *elemBC = &domain.m_elemBC[0];
-    Index_t *lxim = &domain.m_lxim[0];
-    Index_t *lxip = &domain.m_lxip[0];
-    Index_t *letam = &domain.m_letam[0];
-    Index_t *letap = &domain.m_letap[0];
-    Index_t *lzetam = &domain.m_lzetam[0];
-    Index_t *lzetap = &domain.m_lzetap[0];
-    Real_t *elemMass = &domain.m_elemMass[0];
-    //Real_t *ql = &domain.m_ql[0];
-    //Real_t *qq = &domain.m_qq[0];
-
-    hipMemcpy(d_lzetam, lzetam, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
-    hipMemcpy(d_lzetap, lzetap, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
-    hipMemcpy(d_letam, letam, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
-    hipMemcpy(d_letap, letap, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
-    hipMemcpy(d_lxip, lxip, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
-    hipMemcpy(d_lxim, lxim, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
-    hipMemcpy(d_elemBC, elemBC, sizeof(Index_t)*numElem, hipMemcpyHostToDevice); 
-    hipMemcpy(d_elemMass, elemMass, sizeof(Real_t)*numElem, hipMemcpyHostToDevice); 
-
-    hipLaunchKernelGGL(calcMonotonicQForElems, gws_elem, lws, 0, 0, 
+    calcMonotonicQForElems<<<gws_elem, lws>>>(
         d_elemBC,
         d_elemMass,
         d_ql,
@@ -2978,18 +2982,7 @@ int main(int argc, char *argv[])
     Real_t emin    = domain.emin() ;
     Real_t rho0    = domain.refdens() ;
 
-    Real_t *e = &domain.m_e[0];
-    Real_t *ss = &domain.m_ss[0];
-
-    Index_t *elemRep = &domain.m_elemRep[0];
-    Index_t *elemElem = &domain.m_elemElem[0];
-
-    hipMemcpy(d_e, e, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-    hipMemcpy(d_ss, ss, sizeof(Real_t)*numElem, hipMemcpyHostToDevice);
-    hipMemcpy(d_elemRep, elemRep, sizeof(Index_t)*numElem, hipMemcpyHostToDevice);
-    hipMemcpy(d_elemElem, elemElem, sizeof(Index_t)*numElem, hipMemcpyHostToDevice);
-
-    hipLaunchKernelGGL(applyMaterialPropertiesForElems, gws_elem, lws, 0, 0, 
+    applyMaterialPropertiesForElems<<<gws_elem, lws>>> (
         d_ql,
         d_qq,
         d_delv,
@@ -3014,13 +3007,14 @@ int main(int argc, char *argv[])
         rho0,
         numElem );
 
+    hipMemcpy(ss, d_ss, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
+    hipMemcpy(arealg, d_arealg, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
+
+#ifdef VERIFY
     hipMemcpy(p, d_p, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
     hipMemcpy(q, d_q, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
     hipMemcpy(e, d_e, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
-    hipMemcpy(ss, d_ss, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
     hipMemcpy(v, d_v, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
-
-#ifdef VERIFY
     for (int i = 0; i < numElem; i++) {
       printf("eos: %f %f %f %f %f\n", q[i], p[i], e[i], ss[i], v[i]);
     }
@@ -3036,7 +3030,7 @@ int main(int argc, char *argv[])
       break;
     }
     opts.iteration_cap -= 1;
-  }
+  } // while
 
   // Use reduced max elapsed time
   double elapsed_time;
