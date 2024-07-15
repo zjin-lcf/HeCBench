@@ -162,8 +162,8 @@ run_event_based_simulation(Inputs in, SimulationData SD,
   const double *SD_unionized_energy_array = SD.unionized_energy_array;
   const    int *SD_index_grid = SD.index_grid;
 
+
   #pragma omp target data \
-    map(to: SD_max_num_nucs) \
     map(to: SD_num_nucs[:SD.length_num_nucs])\
     map(to: SD_concs[:SD.length_concs])\
     map(to: SD_mats[:SD.length_mats])\
@@ -177,7 +177,8 @@ run_event_based_simulation(Inputs in, SimulationData SD,
 
     for (int n = 0; n < in.kernel_repeat; n++) {
 
-      #pragma omp target teams distribute parallel for thread_limit(256)
+      #pragma omp target teams distribute parallel for \
+       map(to:in) firstprivate(SD_max_num_nucs) thread_limit(256)
       for( int i = 0; i < in.lookups; i++ )
       {
         // Set the initial seed value
