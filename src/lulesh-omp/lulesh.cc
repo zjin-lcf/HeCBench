@@ -160,7 +160,6 @@ notice, this list of conditions and the disclaimer (as noted below)
 #include <string>
 #ifdef VERIFY
 #include <cassert>
-#include <random>
 #endif
 #include "lulesh.h"
 
@@ -1156,7 +1155,33 @@ int main(int argc, char *argv[])
     nodelist[0:numElem8], \
     nodeElemStart[0:len1],\
     nodeElemCornerList[0:len2], \
-    gamma[0:32]) \
+    gamma[0:32], \
+    elemMass[0:numElem], \
+    nodalMass[0:numNode], \
+    symmX[0:numNodeBC], \
+    symmY[0:numNodeBC], \
+    symmZ[0:numNodeBC], \
+    vdov [0:numElem], \
+    delv [0:numElem], \
+    arealg [0:numElem], \
+    dxx [0:numElem], \
+    dyy [0:numElem], \
+    dzz [0:numElem], \
+    lzetam[0:numElem], \
+    lzetap[0:numElem], \
+    letap[0:numElem], \
+    letam[0:numElem], \
+    lxip[0:numElem], \
+    lxim[0:numElem], \
+    elemBC[0:numElem], \
+    p [0:numElem], \
+    q [0:numElem], \
+    e [0:numElem], \
+    v[0:numElem], \
+    ss[0:numElem], \
+    volo[0:numElem], \
+    elemRep [0:numElem], \
+    elemElem [0:numElem]) \
   map (alloc: \
       determ[0:numElem], \
       fx_elem[0:numElem8], \
@@ -1177,36 +1202,11 @@ int main(int argc, char *argv[])
       delx_eta [0:numElem], \
       delv_zeta [0:numElem], \
       delx_zeta [0:numElem], \
-      p [0:numElem], \
-  q [0:numElem], \
-  volo[0:numElem], \
-  v[0:numElem], \
-  vol_error[0:1], \
-  ss[0:numElem], \
-  elemMass[0:numElem], \
-  nodalMass[0:numNode], \
-  symmX[0:numNodeBC], \
-  symmY[0:numNodeBC], \
-  symmZ[0:numNodeBC], \
-  vdov [0:numElem], \
-  delv [0:numElem], \
-  arealg [0:numElem], \
-  dxx [0:numElem], \
-  dyy [0:numElem], \
-  dzz [0:numElem], \
-  vnew [0:numElem], \
-  lzetam[0:numElem], \
-  lzetap[0:numElem], \
-  letap[0:numElem], \
-  letam[0:numElem], \
-  lxip[0:numElem], \
-  lxim[0:numElem], \
-  elemBC[0:numElem], \
-  ql[0:numElem], \
-  qq[0:numElem], \
-  e [0:numElem], \
-  elemRep [0:numElem], \
-  elemElem [0:numElem])
+      vol_error[0:1], \
+      vnew [0:numElem], \
+      ql[0:numElem], \
+      qq[0:numElem])
+{
 
   while((locDom->time() < locDom->stoptime()) && (locDom->cycle() < opts.its)) {
 
@@ -1237,12 +1237,6 @@ int main(int argc, char *argv[])
     //=====================================================================
 
     Real_t  hgcoef = domain.hgcoef() ;
-
-    // Sum contributions to total stress tensor 
-
-#pragma omp target update to (p[0:numElem])
-#pragma omp target update to (q[0:numElem])
-
 
 #pragma omp target teams distribute parallel for thread_limit(THREADS)
     for (Index_t i = 0; i < numElem; i++) {
@@ -1353,8 +1347,6 @@ int main(int argc, char *argv[])
     vol_error[0] = -1;
 
 #pragma omp target update to (vol_error[0:1])
-#pragma omp target update to (volo[0:numElem])
-#pragma omp target update to (v[0:numElem])
 
 #pragma omp target teams distribute parallel for thread_limit(THREADS)
     for (Index_t i = 0; i < numElem; i++) {
@@ -1463,9 +1455,6 @@ int main(int argc, char *argv[])
         elemMass[i] = dis(gen);
       }
 #endif
-
-#pragma omp target update to (ss[0:numElem])
-#pragma omp target update to (elemMass[0:numElem])
 
 #pragma omp target teams distribute parallel for thread_limit(THREADS)
       for (Index_t i2 = 0; i2 < numElem; i2++) {
@@ -1687,8 +1676,6 @@ int main(int argc, char *argv[])
     //CalcAccelerationForNodes(domain, domain.numNode());   // IN: fx  OUT: m_xdd
     //===========================================================================
 
-#pragma omp target update to (nodalMass[0:numNode])
-
 #pragma omp target teams distribute parallel for thread_limit(THREADS)
     for (Index_t i = 0; i < numNode; i++) {
       Real_t one_over_nMass = Real_t(1.) / nodalMass[i];
@@ -1702,10 +1689,6 @@ int main(int argc, char *argv[])
     //======================================================================================
     //Index_t size = domain.sizeX();
     //Index_t numNodeBC = (size+1)*(size+1) ;
-
-#pragma omp target update to (symmX[0:numNodeBC])
-#pragma omp target update to (symmY[0:numNodeBC])
-#pragma omp target update to (symmZ[0:numNodeBC])
 
     Index_t s1 = domain.symmXempty();
     Index_t s2 = domain.symmYempty();
@@ -1771,14 +1754,6 @@ int main(int argc, char *argv[])
     // LagrangeElements(domain);
     //=========================================================
     //domain.AllocateStrains(numElem);
-
-
-#pragma omp target update to (vdov[0:numElem])
-#pragma omp target update to (delv[0:numElem])
-#pragma omp target update to (arealg[0:numElem])
-#pragma omp target update to (dxx[0:numElem])
-#pragma omp target update to (dyy[0:numElem])
-#pragma omp target update to (dzz[0:numElem])
 
     //========================================================================
     // void CalcKinematicsForElems( Domain &domain, Real_t *vnew, 
@@ -2078,16 +2053,6 @@ int main(int argc, char *argv[])
     Real_t qlc_monoq = domain.qlc_monoq();
     Real_t qqc_monoq = domain.qqc_monoq();
 
-
-#pragma omp target update to (lzetam[0:numElem])
-#pragma omp target update to (lzetap[0:numElem])
-#pragma omp target update to (letap[0:numElem])
-#pragma omp target update to (letam[0:numElem])
-#pragma omp target update to (lxip[0:numElem])
-#pragma omp target update to (lxim[0:numElem])
-#pragma omp target update to (elemBC[0:numElem])
-#pragma omp target update to (elemMass[0:numElem])
-
 #pragma omp target teams distribute parallel for thread_limit(THREADS)
     for (Index_t i = 0; i < numElem; i++) {
 
@@ -2270,11 +2235,6 @@ int main(int argc, char *argv[])
     Real_t pmin    = domain.pmin() ;
     Real_t emin    = domain.emin() ;
     Real_t rho0    = domain.refdens() ;
-
-#pragma omp target update to (e[0:numElem])
-#pragma omp target update to (ss[0:numElem])
-#pragma omp target update to (elemRep[0:numElem])
-#pragma omp target update to (elemElem[0:numElem])
 
 #pragma omp target teams distribute parallel for thread_limit(THREADS)
     for (Index_t elem = 0; elem < numElem; elem++) {
@@ -2478,14 +2438,14 @@ int main(int argc, char *argv[])
       v[elem] = vnew_t ;
     }
 
-#pragma omp target update from (q[0:numElem])
-#pragma omp target update from (p[0:numElem])
-#pragma omp target update from (e[0:numElem])
 #pragma omp target update from (ss[0:numElem])
-#pragma omp target update from (v[0:numElem])
-
+#pragma omp target update from (arealg[0:numElem])
 
 #ifdef VERIFY
+    #pragma omp target update from (q[0:numElem])
+    #pragma omp target update from (p[0:numElem])
+    #pragma omp target update from (e[0:numElem])
+    #pragma omp target update from (v[0:numElem])
     for (int i = 0; i < numElem; i++) {
       printf("eos: %f %f %f %f %f\n", q[i], p[i], e[i], ss[i], v[i]);
     }
@@ -2502,6 +2462,7 @@ int main(int argc, char *argv[])
     }
     opts.iteration_cap -= 1;
   }
+}
 
   // Use reduced max elapsed time
   double elapsed_time;
