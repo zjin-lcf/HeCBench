@@ -72,12 +72,12 @@ void prefetch(sycl::queue &q, const int numElements, const int repeat)
     q.prefetch(B, numElements * sizeof(float)).wait();
   }
 
-  for (int i = 0; i < numElements; i++)
-    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
-
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time: %f (ms)\n", time * 1e-6f / repeat);
+
+  for (int i = 0; i < numElements; i++)
+    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
 
   sycl::free(A, q);
   sycl::free(B, q);
@@ -118,15 +118,15 @@ void naive(sycl::queue &q, const int numElements, const int repeat)
     }).wait();
   }
 
-  for (int i = 0; i < numElements; i++)
-    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
-
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time: %f (ms)\n", time * 1e-6f / repeat);
 
-  free(A, q);
-  free(B, q);
+  for (int i = 0; i < numElements; i++)
+    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
+
+  sycl::free(A, q);
+  sycl::free(B, q);
 
   bool testResult = (maxError == 0.0f);
   printf("%s\n", testResult ? "PASS" : "FAIL");
