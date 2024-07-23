@@ -1,1 +1,7 @@
-The data files for training/testing are available for download at https://developer.amd.com/wp-content/resources/ROCm%20Learning%20Centre/Data/Chapter4/02_Cuda_To_HIP_CNN.zip
+Copy data.zip from mnist-cuda
+
+  cp ../mnist-cuda/data.zip .
+
+Unzip data.zip before building the program
+
+  unzip data.zip
