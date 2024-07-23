@@ -76,12 +76,12 @@ void prefetch (const int gpuDeviceId, const int numElements, const int repeat)
     CUDACHECK(cudaDeviceSynchronize());
   }
 
-  for (int i = 0; i < numElements; i++)
-    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
-
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time: %f (ms)\n", time * 1e-6f / repeat);
+
+  for (int i = 0; i < numElements; i++)
+    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
 
   CUDACHECK(cudaFree(A));
   CUDACHECK(cudaFree(B));
@@ -121,12 +121,12 @@ void naive (const int numElements, const int repeat)
     CUDACHECK(cudaDeviceSynchronize());
   }
 
-  for (int i = 0; i < numElements; i++)
-    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
-
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time: %f (ms)\n", time * 1e-6f / repeat);
+
+  for (int i = 0; i < numElements; i++)
+    maxError = fmaxf(maxError, fabsf(B[i]-(repeat+2)));
 
   CUDACHECK(cudaFree(A));
   CUDACHECK(cudaFree(B));
