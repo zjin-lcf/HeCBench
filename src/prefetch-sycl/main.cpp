@@ -22,7 +22,7 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 
-constexpr int MEM_ADVISE_READ_MOSTLY = PI_MEM_ADVICE_CUDA_SET_READ_MOSTLY;
+//constexpr int MEM_ADVISE_READ_MOSTLY = PI_MEM_ADVICE_CUDA_SET_READ_MOSTLY;
 
 void add(int n, const float *x, float *y, sycl::nd_item<3> &item)
 {
@@ -57,7 +57,7 @@ void prefetch(sycl::queue &q, const int numElements, const int repeat)
 
   for (int i = 0; i < repeat; i++) {
 
-    q.mem_advise(A, numElements * sizeof(float), MEM_ADVISE_READ_MOSTLY);
+    //q.mem_advise(A, numElements * sizeof(float), MEM_ADVISE_READ_MOSTLY);
 
     q.prefetch(A, numElements * sizeof(float));
     q.prefetch(B, numElements * sizeof(float));
@@ -67,9 +67,9 @@ void prefetch(sycl::queue &q, const int numElements, const int repeat)
         sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         add(numElements, A, B, item);
       });
-    });
+    }).wait();
 
-    q.prefetch(B, numElements * sizeof(float)).wait();
+    //q.prefetch(B, numElements * sizeof(float)).wait();
   }
 
   auto end = std::chrono::steady_clock::now();
@@ -155,16 +155,12 @@ int main(int argc, char *argv[])
 
   const int numElements = 64 * 1024 * 1024;
 
-  printf("------------\n");
-  printf("   Warmup   \n");
-  printf("------------\n");
-  prefetch(q, numElements, repeat);
-  naive(q, numElements, repeat);
-  printf("------------\n");
-  printf("   Done     \n");
-  printf("------------\n");
+  for (int i = 0; i < 10; i++) {
+    prefetch(q, numElements, repeat);
+  }
 
-  prefetch(q, numElements, repeat);
-  naive(q, numElements, repeat);
+  for (int i = 0; i < 10; i++) {
+    naive(q, numElements, repeat);
+  }
   return 0;
 }

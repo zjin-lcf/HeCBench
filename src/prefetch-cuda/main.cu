@@ -66,13 +66,13 @@ void prefetch (const int gpuDeviceId, const int numElements, const int repeat)
 
   for (int i = 0; i < repeat; i++) {
 
-    CUDACHECK(cudaMemAdvise(A, numElements*sizeof(float), cudaMemAdviseSetReadMostly, cudaCpuDeviceId));
+    //CUDACHECK(cudaMemAdvise(A, numElements*sizeof(float), cudaMemAdviseSetReadMostly, cudaCpuDeviceId));
     CUDACHECK(cudaMemPrefetchAsync(A, numElements*sizeof(float), gpuDeviceId));
     CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), gpuDeviceId));
 
     add <<< dimGrid, dimBlock >>> (numElements, A, B);
 
-    CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), cudaCpuDeviceId));
+    //CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), cudaCpuDeviceId));
     CUDACHECK(cudaDeviceSynchronize());
   }
 
@@ -158,16 +158,12 @@ int main(int argc, char *argv[])
 
   const int numElements = 64 * 1024 * 1024;
 
-  printf("------------\n");
-  printf("   Warmup   \n");
-  printf("------------\n");
-  prefetch(p_gpuDevice, numElements, repeat);
-  naive(numElements, repeat);
-  printf("------------\n");
-  printf("   Done     \n");
-  printf("------------\n");
+  for (int i = 0; i < 10; i++) {
+    prefetch(p_gpuDevice, numElements, repeat);
+  }
 
-  prefetch(p_gpuDevice, numElements, repeat);
-  naive(numElements, repeat);
+  for (int i = 0; i < 10; i++) {
+    naive(numElements, repeat);
+  }
   return 0;
 }
