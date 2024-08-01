@@ -1,4 +1,13 @@
 {
+    "accuracy": [
+        "(?:Average execution time of accuracy kernel: )([0-9.+-e]+)(?: \\(us\\))",
+        [
+            "8192",
+            "10000",
+            "10",
+            "100"
+        ]
+    ],
     "ace": [
         "(?:Offload time: )([0-9.+-e]+)(?: \\(ms\\))",
         [
@@ -198,12 +207,35 @@
             "200"
         ]
     ],
+    "channelShuffle": [
+        "(?:Average time of channel shuffle \\(\\w+\\): )([0-9.+-e]+)(?: \\(ms\\))",
+        [
+            "2",
+            "224",
+            "224",
+            "100"
+        ]
+    ],
+    "channelSum": [
+        "(?:Average time of channel sum \\(\\w+\\): )([0-9.+-e]+)(?: \\(ms\\))",
+        [
+            "224",
+            "224",
+            "100"
+        ]
+    ],
     "chemv": [
         "(?:Average execution time of chemv kernels: )([0-9.+-e]+)(?: \\(us\\))",
         []
     ],
     "clenergy": [
         "(?:Kernel time: )([0-9.+-e]+)(?: seconds)"
+    ],
+    "clink": [
+        "(?:Average kernel time: )([0-9.+-e]+)(?: ms)",
+        [
+            "10"
+        ]
     ],
     "cobahh": [
         "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
@@ -223,6 +255,12 @@
         "(?:Kernel Time = )([0-9.+-e]+)(?: ms)",
         [
             "-p=1000"
+        ]
+    ],
+    "concat": [
+        "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(us\\))",
+        [
+            "1000"
         ]
     ],
     "concurrentKernels": [
@@ -250,6 +288,12 @@
         "(?:Average execution time of cross[0-9]+ kernel: )([0-9.+-e]+)(?: \\((?:s|ms|us)\\))",
         [
             "10000000",
+            "100"
+        ]
+    ],
+    "crossEntropy": [
+        "(?:Average GPU kernel time \\(ms\\) : )([0-9.+-e]+)",
+        [
             "100"
         ]
     ],
@@ -285,6 +329,16 @@
         [
             "10000000",
             "10"
+        ]
+    ],
+    "dwconv": [
+        "(?:Average execution time of dwconv2d_forward kernel: )([0-9.+-e]+)(?: \\(ms\\))",
+        [
+            "128",
+            "16",
+            "224",
+            "224",
+            "100"
         ]
     ],
     "dxtc2": [
@@ -374,6 +428,14 @@
             "100"
         ]
     ],
+    "flip": [
+        "(?:Average execution time of the flip kernel: )([0-9.+-e]+)(?: \\(ms\\))",
+        [
+            "3",
+            "1024",
+            "100"
+        ]
+    ],
     "floydwarshall": [
         "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
         [
@@ -425,6 +487,24 @@
             "-t",
             "-s",
             "4096"
+        ]
+    ],
+    "gd": [
+        "(?:Training time takes )([0-9.+-e]+)(?: \\(s\\))",
+	[
+            "gisette_scale",
+            "0.0001",
+            "10",
+            "100"
+        ]
+    ],
+    "gelu": [
+        "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(ms\\))",
+        [
+            "512",
+            "8192",
+            "512",
+            "100"
         ]
     ],
     "glu": [
@@ -551,6 +631,15 @@
             "8"
         ]
     ],
+    "logprob": [
+        "(?:Average execution time of kernels: )([0-9.+-e]+)(?: \\(us\\))",
+        [
+            "100",
+            "128",
+            "60000",
+            "100"
+        ]
+    ],
     "lombscargle": [
         "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
         [
@@ -561,6 +650,15 @@
         "(?:Average kernel execution time: )([0-9.+-e]+)(?: ms)",
         [
             "1000"
+        ]
+    ],
+    "mask": [
+        "(?:Average execution time of \\w+ kernel: )([0-9.+-e]+)(?: \\(us\\))",
+        [
+            "512",
+            "512",
+            "512",
+            "100"
         ]
     ],
     "matrix-rotate": [
@@ -634,6 +732,14 @@
     ],
     "mr": [
         "(?:Total kernel execution time \\(\\w+\\s*\\): )([0-9.+-e]+)(?: \\(ms\\))"
+    ],
+    "multinomial": [
+        "(?:Average execution time of sampleMultinomialOnce kernel: )([0-9.+-e]+)(?: \\(us\\))",
+        [
+            "65536",
+            "2048",
+            "100"
+        ]
     ],
     "murmurhash3": [
         "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(s\\))",
