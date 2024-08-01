@@ -6,9 +6,9 @@
 #include <omp.h>
 
 //define the data set size (cubic volume)
-#define DATAXSIZE 100
-#define DATAYSIZE 100
-#define DATAZSIZE 100
+#define DATAXSIZE 400
+#define DATAYSIZE 400
+#define DATAZSIZE 400
 
 #define SQ(x) ((x)*(x))
 

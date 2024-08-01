@@ -5,9 +5,9 @@
 #include <sycl/sycl.hpp>
 
 //define the data set size (cubic volume)
-#define DATAXSIZE 600
-#define DATAYSIZE 600
-#define DATAZSIZE 600
+#define DATAXSIZE 400
+#define DATAYSIZE 400
+#define DATAZSIZE 400
 
 typedef double nRarray[DATAYSIZE][DATAXSIZE];
 
