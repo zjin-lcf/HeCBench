@@ -149,15 +149,16 @@ int main(int argc, char** argv)
   const size_t localsz = 64;
   const size_t globalsz = localsz * n_ffts;
 
-  q.submit([&](sycl::handler& cgh) {
+  auto fft_kernel = [&](sycl::handler& cgh) {
     sycl::local_accessor <T, 1> smem (sycl::range<1>(8*8*9), cgh);
     cgh.parallel_for(
       sycl::nd_range<1>(sycl::range<1>(globalsz), sycl::range<1>(localsz)),
       [=] (sycl::nd_item<1> item) {
       #include "fft1D_512.sycl"
     });
-  });
+  };
 
+  q.submit(fft_kernel);
   fft1D_512_reference<64>(reference, n_ffts);
   q.memcpy(source, work, used_bytes).wait();
 
@@ -176,16 +177,17 @@ int main(int argc, char** argv)
   }
   std::cout << "FFT " << (error ? "FAIL" : "PASS")  << std::endl;
 
-  q.submit([&](sycl::handler& cgh) {
+  auto ifft_kernel = [&](sycl::handler& cgh) {
     sycl::local_accessor <T, 1> smem (sycl::range<1>(8*8*9), cgh);
     cgh.parallel_for(
       sycl::nd_range<1>(sycl::range<1>(globalsz), sycl::range<1>(localsz)),
       [=] (sycl::nd_item<1> item) {
       #include "ifft1D_512.sycl"
     });
-  });
+  };
 
   // verify iFFT
+  q.submit(ifft_kernel);
   q.memcpy(source, work, used_bytes).wait();
   error = false;
   for (int i = 0; i < n_cmplx; i++) {
@@ -204,24 +206,8 @@ int main(int argc, char** argv)
   auto start = std::chrono::steady_clock::now();
 
   for (int k=0; k<passes; k++) {
-
-    q.submit([&](sycl::handler& cgh) {
-      sycl::local_accessor <T, 1> smem (sycl::range<1>(8*8*9), cgh);
-      cgh.parallel_for<class fft_Kernel>(
-        sycl::nd_range<1>(sycl::range<1>(globalsz), sycl::range<1>(localsz)),
-        [=] (sycl::nd_item<1> item) {
-        #include "fft1D_512.sycl"
-      });
-    });
-
-    q.submit([&](sycl::handler& cgh) {
-      sycl::local_accessor <T, 1> smem (sycl::range<1>(8*8*9), cgh);
-      cgh.parallel_for<class ifft_Kernel>(
-        sycl::nd_range<1>(sycl::range<1>(globalsz), sycl::range<1>(localsz)),
-        [=] (sycl::nd_item<1> item) {
-        #include "ifft1D_512.sycl"
-      });
-    });
+    q.submit(fft_kernel);
+    q.submit(ifft_kernel);
   }
 
   q.wait();
@@ -233,4 +219,6 @@ int main(int argc, char** argv)
 
   free(reference);
   free(source);
+
+  return 0;
 }
