@@ -200,7 +200,7 @@ long lstm_n5( sycl::queue &q,
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-  q.memcpy(d_y, y, sizeof(float) * N * SAMPLE_TEST_LEN).wait();
+  q.memcpy(y, d_y, sizeof(float) * N * SAMPLE_TEST_LEN).wait();
   sycl::free(d_x ,q);
   sycl::free(d_inW ,q);
   sycl::free(d_intW ,q);
