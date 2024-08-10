@@ -53,7 +53,8 @@ compute (
 }
 
 __global__ void
-update(float * __restrict__ x, float * __restrict__ grad, 
+update(float * __restrict__ x,
+       const float * __restrict__ grad,
        int m, int n, float lambda, float alpha) 
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
