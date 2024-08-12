@@ -164,35 +164,33 @@ Some host programs contain platform-specific intrinsics, so they may cause compi
 When double-precision floating-point operations are not supported on certain Intel GPU devices, software emulation may be enabled. [FP64 emulation](https://github.com/intel/compute-runtime/blob/master/opencl/doc/FAQ.md#feature-double-precision-emulation-fp64)
 
 # Feedback from the papers
-## Faqir-Rhazoui, Y. and García, C., 2024. SYCL in the edge: performance and energy evaluation for heterogeneous acceleration. The Journal of Supercomputing, pp.1-21.
+Faqir-Rhazoui, Y. and García, C., 2024. SYCL in the edge: performance and energy evaluation for heterogeneous acceleration. The Journal of Supercomputing, pp.1-21.
 
-## Dearing, M.T., Tao, Y., Wu, X., Lan, Z. and Taylor, V., 2024. LASSI: An LLM-based Automated Self-Correcting Pipeline for Translating Parallel Scientific Codes. arXiv preprint arXiv:2407.01638.
+Dearing, M.T., Tao, Y., Wu, X., Lan, Z. and Taylor, V., 2024. LASSI: An LLM-based Automated Self-Correcting Pipeline for Translating Parallel Scientific Codes. arXiv preprint arXiv:2407.01638.
 
-## Marzen, L., Dutta, A. and Jannesari, A., 2024. Static Generation of Efficient OpenMP Offload Data Mappings. arXiv preprint arXiv:2406.13881.
+Marzen, L., Dutta, A. and Jannesari, A., 2024. Static Generation of Efficient OpenMP Offload Data Mappings. arXiv preprint arXiv:2406.13881.
 
-## Ivanov, I.R., Zinenko, O., Domke, J., Endo, T. and Moses, W.S., 2024, March. Retargeting and Respecializing GPU Workloads for Performance Portability. In 2024 IEEE/ACM International Symposium on Code Generation and Optimization (CGO) (pp. 119-132). IEEE.
+Ivanov, I.R., Zinenko, O., Domke, J., Endo, T. and Moses, W.S., 2024, March. Retargeting and Respecializing GPU Workloads for Performance Portability. In 2024 IEEE/ACM International Symposium on Code Generation and Optimization (CGO) (pp. 119-132). IEEE.
 
-## Shilpage, W.R. and Wright, S.A., 2023, May. An investigation into the performance and portability of sycl compiler implementations. In International Conference on High Performance Computing (pp. 605-619). Cham: Springer Nature Switzerland.
+Shilpage, W.R. and Wright, S.A., 2023, May. An investigation into the performance and portability of sycl compiler implementations. In International Conference on High Performance Computing (pp. 605-619). Cham: Springer Nature Switzerland.
 
-## Tian, S., Chapman, B. and Doerfert, J., 2023, August. Maximizing Parallelism and GPU Utilization For Direct GPU Compilation Through Ensemble Execution. In Proceedings of the 52nd International Conference on Parallel Processing Workshops (pp. 112-118).
+Tian, S., Chapman, B. and Doerfert, J., 2023, August. Maximizing Parallelism and GPU Utilization For Direct GPU Compilation Through Ensemble Execution. In Proceedings of the 52nd International Conference on Parallel Processing Workshops (pp. 112-118).
 
-## Tian, S., Scogland, T., Chapman, B. and Doerfert, J., 2023, November. OpenMP kernel language extensions for performance portable GPU codes. In Proceedings of the SC'23 Workshops of The International Conference on High Performance Computing, Network, Storage, and Analysis (pp. 876-883).
+Tian, S., Scogland, T., Chapman, B. and Doerfert, J., 2023, November. OpenMP kernel language extensions for performance portable GPU codes. In Proceedings of the SC'23 Workshops of The International Conference on High Performance Computing, Network, Storage, and Analysis (pp. 876-883).
 
-## Murtovi, A., Georgakoudis, G., Parasyris, K., Liao, C., Laguna, I. and Steffen, B., 2023. Enhancing Performance Through Control-flow Unmerging and Loop Unrolling (No. LLNL-CONF-849354). Lawrence Livermore National Laboratory (LLNL), Livermore, CA (United States).
+Murtovi, A., Georgakoudis, G., Parasyris, K., Liao, C., Laguna, I. and Steffen, B., 2023. Enhancing Performance Through Control-flow Unmerging and Loop Unrolling (No. LLNL-CONF-849354). Lawrence Livermore National Laboratory (LLNL), Livermore, CA (United States).
 
-## Alpay, A., Soproni, B., Wünsche, H. and Heuveline, V., 2022, May. Exploring the possibility of a hipSYCL-based implementation of oneAPI. In Proceedings of the 10th International Workshop on OpenCL (pp. 1-12).
+Alpay, A., Soproni, B., Wünsche, H. and Heuveline, V., 2022, May. Exploring the possibility of a hipSYCL-based implementation of oneAPI. In Proceedings of the 10th International Workshop on OpenCL (pp. 1-12).
 
-## Thavappiragasam, M. and Kale, V., 2022, November. OpenMP’s Asynchronous Offloading for All-pairs Shortest Path Graph Algorithms on GPUs. In 2022 IEEE/ACM International Workshop on Hierarchical Parallelism for Exascale Computing (HiPar) (pp. 1-11). IEEE.
+Thavappiragasam, M. and Kale, V., 2022, November. OpenMP’s Asynchronous Offloading for All-pairs Shortest Path Graph Algorithms on GPUs. In 2022 IEEE/ACM International Workshop on Hierarchical Parallelism for Exascale Computing (HiPar) (pp. 1-11). IEEE.
 
-## Doerfert, J., Jasper, M., Huber, J., Abdelaal, K., Georgakoudis, G., Scogland, T. and Parasyris, K., 2022, October. Breaking the vendor lock: performance portable programming through OpenMP as target independent runtime layer. In Proceedings of the International Conference on Parallel Architectures and Compilation Techniques (pp. 494-504).
+Doerfert, J., Jasper, M., Huber, J., Abdelaal, K., Georgakoudis, G., Scogland, T. and Parasyris, K., 2022, October. Breaking the vendor lock: performance portable programming through OpenMP as target independent runtime layer. In Proceedings of the International Conference on Parallel Architectures and Compilation Techniques (pp. 494-504).
 
-## Tian, S., Huber, J., Parasyris, K., Chapman, B. and Doerfert, J., 2022, November. Direct GPU compilation and execution for host applications with OpenMP Parallelism. In 2022 IEEE/ACM Eighth Workshop on the LLVM Compiler Infrastructure in HPC (LLVM-HPC) (pp. 43-51). IEEE.
+Tian, S., Huber, J., Parasyris, K., Chapman, B. and Doerfert, J., 2022, November. Direct GPU compilation and execution for host applications with OpenMP Parallelism. In 2022 IEEE/ACM Eighth Workshop on the LLVM Compiler Infrastructure in HPC (LLVM-HPC) (pp. 43-51). IEEE.
 
-## Jin, Z. and Vetter, J.S., 2022, December. Understanding performance portability of bioinformatics applications in SYCL on an NVIDIA GPU. In 2022 IEEE International Conference on Bioinformatics and Biomedicine (BIBM) (pp. 2190-2195). IEEE.
+Jin, Z. and Vetter, J.S., 2022, December. Understanding performance portability of bioinformatics applications in SYCL on an NVIDIA GPU. In 2022 IEEE International Conference on Bioinformatics and Biomedicine (BIBM) (pp. 2190-2195). IEEE.
 
-## Thavappiragasam, M. and Kale, V., 2022, November. OpenMP’s Asynchronous Offloading for All-pairs Shortest Path Graph Algorithms on GPUs. In 2022 IEEE/ACM International Workshop on Hierarchical Parallelism for Exascale Computing (HiPar) (pp. 1-11). IEEE.
-
-## Jin, Z., 2021. The Rodinia Benchmarks in SYCL (No. ORNL/TM-2021/2338). Oak Ridge National Laboratory (ORNL), Oak Ridge, TN (United States).
+Jin, Z., 2021. The Rodinia Benchmarks in SYCL (No. ORNL/TM-2021/2338). Oak Ridge National Laboratory (ORNL), Oak Ridge, TN (United States).
   
 
 # Experimental Results
