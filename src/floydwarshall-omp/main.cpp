@@ -232,6 +232,7 @@ int main(int argc, char** argv) {
           }
         }
       }
+      #pragma omp taskwait
 
       auto end = std::chrono::steady_clock::now();
       auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
