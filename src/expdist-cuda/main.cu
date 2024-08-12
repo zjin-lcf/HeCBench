@@ -29,7 +29,7 @@ void test(const int size, const int repeat) {
                       ceilf(size / (block_size_y * tile_size_y));
 
   size_t point_size_bytes = sizeof(FP) * size * 2;
-  size_t scale_size_bytes = sizeof(FP) * size * 2;
+  size_t scale_size_bytes = sizeof(FP) * size;
   size_t cost_size_bytes = sizeof(FP) * nblocks;
 
   FP *A = (FP*) malloc (point_size_bytes);
