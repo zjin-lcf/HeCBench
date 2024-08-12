@@ -73,62 +73,26 @@ int main () {
     // Initialize error to zero (we'll add to it the following step)
     // Perform a Jacobi relaxation step
     error = 0.f;
-    #pragma omp target teams num_teams(N/16*N/16) thread_limit(256) map(tofrom: error)
-    {
-      float f_old_tile[18][18];
-      #pragma omp parallel
-      {
-        int tx = omp_get_thread_num() % 16;
-        int ty = omp_get_thread_num() / 16;
-        int i = omp_get_team_num() % (N/16) * 16 + tx;
-        int j = omp_get_team_num() / (N/16) * 16 + ty;
     
-        // First read in the "interior" data, one value per thread
-        // Note the offset by 1, to reserve space for the "left"/"bottom" halo
-        f_old_tile[ty+1][tx+1] = f_old[IDX(i,j)];
-
-        // Now read in the halo data; we'll pick the "closest" thread
-        // to each element. When we do this, make sure we don't fall
-        // off the end of the global memory array. Note that this
-        // code does not fill the corners, as they are not used in
-        // this stencil.
-
-        if (tx == 0 && i >= 1) {
-          f_old_tile[ty+1][tx+0] = f_old[IDX(i-1,j)];
-        }
-        if (tx == 15 && i <= N-2) {
-          f_old_tile[ty+1][tx+2] = f_old[IDX(i+1,j)];
-        }
-        if (ty == 0 && j >= 1) {
-          f_old_tile[ty+0][tx+1] = f_old[IDX(i,j-1)];
-        }
-        if (ty == 15 && j <= N-2) {
-          f_old_tile[ty+2][tx+1] = f_old[IDX(i,j+1)];
-        }
-
-        #pragma omp barrier
-
-        float err = 0.f;
-        if (j >= 1 && j <= N-2 && i >= 1 && i <= N-2) {
-          // Perform the read from shared memory
-          f[IDX(i,j)] = 0.25f * (f_old_tile[ty+1][tx+2] + 
-                                 f_old_tile[ty+1][tx+0] + 
-                                 f_old_tile[ty+2][tx+1] + 
-                                 f_old_tile[ty+0][tx+1]);
-          float df = f[IDX(i,j)] - f_old_tile[ty+1][tx+1];
-          err = df * df;
-        }
-
-        #pragma omp atomic update
-        error += err;
+    #pragma omp target teams distribute parallel for collapse(2) \
+     reduction(+:error) num_teams(N*N/256) thread_limit(256) map(tofrom: error)
+    for (int i = 1; i <= N-2; i++) {
+      for (int j = 1; j <= N-2; j++) {
+        float t = 0.25f * (f_old[IDX(i-1,j)] +
+                           f_old[IDX(i+1,j)] +
+                           f_old[IDX(i,j-1)] +
+                           f_old[IDX(i,j+1)]);
+        float df = t - f_old[IDX(i, j)];
+        f[IDX(i,j)] = t;
+        error += df * df;
       }
     }
       
     // Swap the old data and the new data
     // We're doing this explicitly for pedagogical purposes, even though
     // in this specific application a std::swap would have been OK
-    #pragma omp target teams distribute parallel for \
-    collapse(2) thread_limit(256)
+    #pragma omp target teams distribute parallel for collapse(2) \
+     thread_limit(256)
     for (int j = 0; j < N; j++) 
       for (int i = 0; i < N; i++) 
         if (j >= 1 && j <= N-2 && i >= 1 && i <= N-2)
