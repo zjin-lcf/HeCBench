@@ -16,10 +16,18 @@
 
 // Define the compress match kernel functions
 template <typename T>
-void compressKernelI(T *input, uint32_t numOfBlocks, uint32_t *flagArrSizeGlobal, uint32_t *compressedDataSizeGlobal, uint8_t *tmpFlagArrGlobal, uint8_t *tmpCompressedDataGlobal, int minEncodeLength,
-                     const sycl::nd_item<3> &item, T *buffer,
-                     uint8_t *lengthBuffer, uint8_t *offsetBuffer,
-                     uint32_t *prefixBuffer, uint8_t *byteFlagArr)
+void compressKernelI(const T *input, uint32_t numOfBlocks,
+                     uint32_t *__restrict flagArrSizeGlobal,
+                     uint32_t *__restrict compressedDataSizeGlobal,
+                     uint8_t *__restrict tmpFlagArrGlobal,
+                     uint8_t *__restrict tmpCompressedDataGlobal,
+                     int minEncodeLength,
+                     const sycl::nd_item<3> &item,
+                     T *__restrict buffer,
+                     uint8_t *__restrict lengthBuffer,
+                     uint8_t *__restrict offsetBuffer,
+                     uint32_t *__restrict prefixBuffer,
+                     uint8_t *__restrict byteFlagArr)
 {
   // Block size in uint of datatype
   const uint32_t blockSize = BLOCK_SIZE / sizeof(T);
@@ -235,7 +243,13 @@ void compressKernelI(T *input, uint32_t numOfBlocks, uint32_t *flagArrSizeGlobal
 
 // Define the compress Encode kernel functions
 template <typename T>
-void compressKernelIII(uint32_t numOfBlocks, uint32_t *flagArrOffsetGlobal, uint32_t *compressedDataOffsetGlobal, uint8_t *tmpFlagArrGlobal, uint8_t *tmpCompressedDataGlobal, uint8_t *flagArrGlobal, uint8_t *compressedDataGlobal,
+void compressKernelIII(uint32_t numOfBlocks,
+                       const uint32_t *__restrict flagArrOffsetGlobal,
+                       const uint32_t *__restrict compressedDataOffsetGlobal,
+                       const uint8_t *__restrict tmpFlagArrGlobal,
+                       const uint8_t *__restrict tmpCompressedDataGlobal,
+                       uint8_t *__restrict flagArrGlobal,
+                       uint8_t *__restrict compressedDataGlobal,
                        const sycl::nd_item<3> &item)
 {
   // Block size in uint of bytes
@@ -272,7 +286,11 @@ void compressKernelIII(uint32_t numOfBlocks, uint32_t *flagArrOffsetGlobal, uint
 
 // Define the decompress kernel functions
 template <typename T>
-void decompressKernel(T *output, uint32_t numOfBlocks, uint32_t *flagArrOffsetGlobal, uint32_t *compressedDataOffsetGlobal, uint8_t *flagArrGlobal, uint8_t *compressedDataGlobal,
+void decompressKernel(T *output, uint32_t numOfBlocks,
+                      const uint32_t *__restrict flagArrOffsetGlobal,
+                      const uint32_t *__restrict compressedDataOffsetGlobal,
+                      const uint8_t *__restrict flagArrGlobal,
+                      const uint8_t *__restrict compressedDataGlobal,
                       const sycl::nd_item<3> &item)
 {
   // Block size in unit of datatype
