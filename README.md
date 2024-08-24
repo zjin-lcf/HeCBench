@@ -25,7 +25,7 @@ Each benchmark falls into a single category. While such classification is not ac
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
 
 ### Computer vision and image processing
-    affine, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, colorwheel, convolution1D, convolution3D, convolutionDeformable, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, ssim, stencil1d, stencil3d, surfel, zoom
+    affine, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, colorwheel, convolution1D, convolution3D, convolutionDeformable, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, opticalFlow, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, ssim, stencil1d, stencil3d, surfel, zoom
     
 ### Cryptography
     aes, bitcracker, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
@@ -1088,6 +1088,9 @@ Early results are shown [here](results/README.md)
 
 ### openmp (cuda)
   Multi-threading over a single device (https://docs.nvidia.com/cuda/cuda-samples/index.html)
+
+### opticalFlow (cuda)
+  Optical flow estimation (https://github.com/NVIDIA/cuda-samples/blob/master/Samples/5_Domain_Specific/HSOpticalFlow)
 
 ### overlap (cuda)
   Overlap data copies with compute kernels (https://docs.nvidia.com/cuda/cuda-samples/index.html)
