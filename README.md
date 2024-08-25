@@ -19,7 +19,7 @@ Each benchmark falls into a single category. While such classification is not ac
     daphne
 
 ### Bandwidth
-    cmembench, babelstream, memcpy, memtest, randomAccess, shmembench, triad 
+    allreduce, cmembench, babelstream, memcpy, memtest, randomAccess, shmembench, triad 
 
 ### Bioinformatics
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
@@ -223,6 +223,9 @@ Early results are shown [here](results/README.md)
 
 ### aligned-types (cuda)
   Alignment specification for variables of structured types (http://docs.nvidia.com/cuda/cuda-samples/index.html)
+
+### allreduce (cuda)
+  The ring allreduce and ring allgather (https://github.com/baidu-research/baidu-allreduce)
 
 ### all-pairs-distance (cuda)
   All-pairs distance calculation (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2910913/)
