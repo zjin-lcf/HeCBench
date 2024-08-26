@@ -599,7 +599,7 @@ extern "C" shrBOOL shrComparePGM( const char *src_file, const char *ref_file, co
 
 extern "C" unsigned char* shrLoadRawFile(const char* filename, size_t size);
 
-extern "C" size_t shrRoundUp(int group_size, int global_size);
+extern "C" size_t shrRoundUp(int group_size, size_t global_size);
 
 // companion inline function for error checking and exit on error WITH Cleanup Callback (if supplied)
 // *********************************************************************
