@@ -23,9 +23,10 @@
 #include <cmath>
 #include <cuda.h>
 #include <cub/cub.cuh>
+#include <cublas_v2.h>
 #include "shrUtils.h"
 
-typedef int Type;
+typedef double Type;  // validation fails for FP32
 
 // Forward Declarations
 Type DotProductHost(const Type* pfData1, const Type* pfData2, size_t iNumElements);
@@ -93,6 +94,9 @@ int main(int argc, char **argv)
     srcA[i] = srcB[i] = 0;
   }
 
+  // Compute and compare results for golden-host and report errors and pass/fail
+  Type Golden = DotProductHost (srcA, srcB, iNumElements);
+
   Type *d_srcA;
   Type *d_srcB;
   Type *d_dst;
@@ -122,15 +126,32 @@ int main(int argc, char **argv)
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
 
   cudaMemcpy(&dst, d_dst, sizeof(Type), cudaMemcpyDeviceToHost);
+  bool bMatch = std::abs(Golden - dst) < 1e-3f;
+  printf("GPU Result %s CPU Result\n\n", bMatch ? "matches" : "DOESN'T match");
+
+  cublasHandle_t h;
+  cublasCreate(&h);
+  cublasSetPointerMode(h, CUBLAS_POINTER_MODE_DEVICE);
+
+  start = std::chrono::steady_clock::now();
+
+  for (i = 0; i < (size_t)iNumIterations; i++) {
+    cublasDdot(h, iNumElements, d_srcA, 1, d_srcB, 1, d_dst);
+  }
+  cudaDeviceSynchronize();
+
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average cublasDdot execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+
+  cudaMemcpy(&dst, d_dst, sizeof(Type), cudaMemcpyDeviceToHost);
+  bMatch = std::abs(Golden - dst) < 1e-3f;
+  printf("\nGPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
+
   cudaFree(d_dst);
   cudaFree(d_srcA);
   cudaFree(d_srcB);
-
-  // Compute and compare results for golden-host and report errors and pass/fail
-  printf("Comparing against Host/C++ computation...\n\n");
-  Type Golden = DotProductHost (srcA, srcB, iNumElements);
-  bool bMatch = std::abs(Golden - dst) < 1e-3f;
-  printf("\nGPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
+  cublasDestroy(h);
 
   free(srcA);
   free(srcB);

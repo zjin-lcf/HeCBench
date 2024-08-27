@@ -17,6 +17,9 @@
 // against basic host CPU/C++ computation.
 // *********************************************************************
 
+#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/numeric>
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
@@ -24,7 +27,7 @@
 #include <sycl/sycl.hpp>
 #include "shrUtils.h"
 
-typedef int Type;
+typedef double Type;
 
 // Forward Declarations
 Type DotProductHost(const Type* pfData1, const Type* pfData2, size_t iNumElements);
@@ -67,6 +70,9 @@ int main(int argc, char **argv)
   for (i = iNumElements; i < src_size ; ++i) {
     srcA[i] = srcB[i] = 0;
   }
+
+  // Compute and compare results for golden-host and report errors and pass/fail
+  Type Golden = DotProductHost (srcA, srcB, iNumElements);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -120,15 +126,25 @@ int main(int argc, char **argv)
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
 
   q.memcpy(&dst, d_dst, sizeof(Type)).wait();
+  bool bMatch = std::abs(Golden - dst) < 1e-3f;
+  printf("GPU Result %s CPU Result\n\n", bMatch ? "matches" : "DOESN'T match");
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iNumIterations; i++) {
+    dst = std::transform_reduce(oneapi::dpl::execution::make_device_policy(q),
+                                d_srcA, d_srcA + iNumElements, d_srcB, .0);
+  }
+
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average std::transform_reduce execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+  bMatch = std::abs(Golden - dst) < 1e-3f;
+  printf("\nGPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
+
   sycl::free(d_dst, q);
   sycl::free(d_srcA, q);
   sycl::free(d_srcB, q);
-
-  // Compute and compare results for golden-host and report errors and pass/fail
-  printf("Comparing against Host/C++ computation...\n\n");
-  Type Golden = DotProductHost (srcA, srcB, iNumElements);
-  bool bMatch = std::abs(Golden - dst) < 1e-3f;
-  printf("\nGPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
 
   free(srcA);
   free(srcB);
