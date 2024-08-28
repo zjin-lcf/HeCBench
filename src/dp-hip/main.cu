@@ -146,7 +146,7 @@ int main(int argc, char **argv)
 
   hipMemcpy(&dst, d_dst, sizeof(Type), hipMemcpyDeviceToHost);
   bMatch = std::abs(Golden - dst) < 1e-3f;
-  printf("\nGPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
+  printf("GPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
 
   hipFree(d_dst);
   hipFree(d_srcA);

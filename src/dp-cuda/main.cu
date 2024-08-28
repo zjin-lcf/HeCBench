@@ -146,7 +146,7 @@ int main(int argc, char **argv)
 
   cudaMemcpy(&dst, d_dst, sizeof(Type), cudaMemcpyDeviceToHost);
   bMatch = std::abs(Golden - dst) < 1e-3f;
-  printf("\nGPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
+  printf("GPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
 
   cudaFree(d_dst);
   cudaFree(d_srcA);
