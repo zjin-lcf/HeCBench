@@ -25,6 +25,7 @@
 #include <chrono>
 #include <cmath>
 #include <sycl/sycl.hpp>
+#include <oneapi/mkl.hpp>
 #include "shrUtils.h"
 
 typedef double Type;
@@ -132,6 +133,20 @@ int main(int argc, char **argv)
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iNumIterations; i++) {
+    oneapi::mkl::blas::dot(q, iNumElements, d_srcA, 1, d_srcB, 1, d_dst);
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average oneMKL::dot execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+  q.memcpy(&dst, d_dst, sizeof(Type)).wait();
+  bMatch = std::abs(Golden - dst) < 1e-3f;
+  printf("GPU Result %s CPU Result\n\n", bMatch ? "matches" : "DOESN'T match");
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iNumIterations; i++) {
     dst = std::transform_reduce(oneapi::dpl::execution::make_device_policy(q),
                                 d_srcA, d_srcA + iNumElements, d_srcB, .0);
   }
@@ -140,7 +155,8 @@ int main(int argc, char **argv)
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average std::transform_reduce execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
   bMatch = std::abs(Golden - dst) < 1e-3f;
-  printf("\nGPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
+  printf("GPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
+
 
   sycl::free(d_dst, q);
   sycl::free(d_srcA, q);
