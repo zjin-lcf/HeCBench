@@ -16,7 +16,6 @@
 // Runs computations with on the GPU device and then checks results
 // *********************************************************************
 
-#include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/numeric>
 #include <stdio.h>
