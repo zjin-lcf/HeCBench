@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 LAUNCHER  =
 
+HIP_ARCH  = gfx90a
 #===============================================================================
 # Program name & source code list
 #===============================================================================
@@ -23,7 +24,9 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall \
+          --hipstdpar --hipstdpar-path=roc-stdpar/include \
+          --offload-arch=$(HIP_ARCH)
 
 # Linker Flags
 LDFLAGS = -lhipblas
@@ -53,4 +56,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 268435456 100
+	$(LAUNCHER) ./$(program) 268435456 1000

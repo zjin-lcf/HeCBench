@@ -20,6 +20,8 @@
 #include <stdlib.h>
 #include <chrono>
 #include <cmath>
+#include <numeric>
+#include <execution>
 #include <cuda.h>
 #include <cub/cub.cuh>
 #include <cublas_v2.h>
@@ -112,7 +114,7 @@ void dot (const size_t iNumElements, const int iNumIterations)
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
 
   cudaMemcpy(&dst, d_dst, sizeof(T), cudaMemcpyDeviceToHost);
-  printf("Absolute result difference is %lf\n", std::abs(dst - iNumElements));
+  printf("Absolute result difference is %lf\n\n", std::abs(dst - iNumElements));
 
   cublasHandle_t h;
   cublasCreate(&h);
@@ -133,6 +135,18 @@ void dot (const size_t iNumElements, const int iNumIterations)
   printf("Average cublasDot execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
 
   cudaMemcpy(&dst, d_dst, sizeof(T), cudaMemcpyDeviceToHost);
+  printf("Absolute result difference is %lf\n\n", std::abs(dst - iNumElements));
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < iNumIterations; i++) {
+    dst = std::transform_reduce(std::execution::par_unseq,
+                                d_srcA, d_srcA + iNumElements, d_srcB, T(0));
+  }
+
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average std::transform_reduce execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
   printf("Absolute result difference is %lf\n\n", std::abs(dst - iNumElements));
 
   cudaFree(d_dst);
