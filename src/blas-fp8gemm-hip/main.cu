@@ -21,7 +21,8 @@ void LtFp8Matmul(const int repeat,
                  const hipblaslt_f8_fnuz *B,
                  int ldb,
                  const float *c_scale, /* device pointer */
-                 const hip_bfloat16 *C,
+                 //const hip_bfloat16 *C,
+                 const hipblaslt_f8_fnuz *C,
                  int ldc,
                  const float *d_scale, /* device pointer */
                  hipblaslt_f8_fnuz *D,
@@ -40,42 +41,44 @@ void LtFp8Matmul(const int repeat,
 
     // create operation desciriptor; see hipblasLtMatmulDescAttributes_t for details about defaults; here we just need to
     // set the transforms for A and B
-    checkCublasStatus(hipblasLtMatmulDescCreate(&operationDesc, HIPBLAS_COMPUTE_32F, HIP_R_32F));
-    checkCublasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_TRANSA, &transa, sizeof(transa)));
-    checkCublasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_TRANSB, &transb, sizeof(transb)));
+    checkHipblasStatus(hipblasLtMatmulDescCreate(&operationDesc, HIPBLAS_COMPUTE_32F, HIP_R_32F));
+    checkHipblasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_TRANSA, &transa, sizeof(transa)));
+    checkHipblasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_TRANSB, &transb, sizeof(transb)));
 
     // set scaling factors
-    checkCublasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER, &a_scale, sizeof(a_scale)));
-    checkCublasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_B_SCALE_POINTER, &b_scale, sizeof(b_scale)));
-    checkCublasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_C_SCALE_POINTER, &c_scale, sizeof(c_scale)));
-    checkCublasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_D_SCALE_POINTER, &d_scale, sizeof(d_scale)));
-    checkCublasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_AMAX_D_POINTER, &amax_d, sizeof(amax_d)));
+    checkHipblasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER, &a_scale, sizeof(a_scale)));
+    checkHipblasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_B_SCALE_POINTER, &b_scale, sizeof(b_scale)));
+    checkHipblasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_C_SCALE_POINTER, &c_scale, sizeof(c_scale)));
+    checkHipblasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_D_SCALE_POINTER, &d_scale, sizeof(d_scale)));
+    checkHipblasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_AMAX_D_POINTER, &amax_d, sizeof(amax_d)));
 
     // create matrix descriptors, we are good with the details here so no need to set any extra attributes
     // table of supported type combinations can be found in the documentation: https://docs.nvidia.com/cuda/hipblas/index.html#hipblasltmatmul
-    checkCublasStatus(hipblasLtMatrixLayoutCreate(&Adesc, HIP_R_8F_E4M3_FNUZ, transa == HIPBLAS_OP_N ? m : k, transa == HIPBLAS_OP_N ? k : m, lda));
-    checkCublasStatus(hipblasLtMatrixLayoutCreate(&Bdesc, HIP_R_8F_E4M3_FNUZ, transb == HIPBLAS_OP_N ? k : n, transb == HIPBLAS_OP_N ? n : k, ldb));
-    checkCublasStatus(hipblasLtMatrixLayoutCreate(&Cdesc, HIP_R_16BF, m, n, ldc));
-    checkCublasStatus(hipblasLtMatrixLayoutCreate(&Ddesc, HIP_R_8F_E4M3_FNUZ, m, n, ldc));
+    checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Adesc, HIP_R_8F_E4M3_FNUZ, transa == HIPBLAS_OP_N ? m : k, transa == HIPBLAS_OP_N ? k : m, lda));
+    checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Bdesc, HIP_R_8F_E4M3_FNUZ, transb == HIPBLAS_OP_N ? k : n, transb == HIPBLAS_OP_N ? n : k, ldb));
+    //checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Cdesc, HIP_R_16BF, m, n, ldc));
+    checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Cdesc, HIP_R_8F_E4M3_FNUZ, m, n, ldc));
+    checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Ddesc, HIP_R_8F_E4M3_FNUZ, m, n, ldc));
 
     // create preference handle; here we could use extra attributes to disable tensor ops or to make sure algo selected
     // will work with badly aligned A, B, C; here for simplicity we just assume A,B,C are always well aligned (e.g.
     // directly come from hipMalloc)
-    checkCublasStatus(hipblasLtMatmulPreferenceCreate(&preference));
-    checkCublasStatus(hipblasLtMatmulPreferenceSetAttribute(preference, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES, &workspaceSize, sizeof(workspaceSize)));
+    checkHipblasStatus(hipblasLtMatmulPreferenceCreate(&preference));
+    checkHipblasStatus(hipblasLtMatmulPreferenceSetAttribute(preference, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES, &workspaceSize, sizeof(workspaceSize)));
 
     // we just need the best available heuristic to try and run matmul. There is no guarantee this will work, e.g. if A
     // is badly aligned, you can request more (e.g. 32) algos and try to run them one by one until something works
-    checkCublasStatus(hipblasLtMatmulAlgoGetHeuristic(ltHandle, operationDesc, Adesc, Bdesc, Cdesc, Ddesc, preference, 1, &heuristicResult, &returnedResults));
+    checkHipblasStatus(hipblasLtMatmulAlgoGetHeuristic(ltHandle, operationDesc, Adesc, Bdesc, Cdesc, Ddesc, preference, 1, &heuristicResult, &returnedResults));
 
     if (returnedResults == 0) {
-        checkCublasStatus(HIPBLAS_STATUS_NOT_SUPPORTED);
+        printf("no heuristic function available for current configuration\n");
+        return;
     }
 
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      checkCublasStatus(hipblasLtMatmul(ltHandle,
+      checkHipblasStatus(hipblasLtMatmul(ltHandle,
                                      operationDesc,
                                      alpha, A, Adesc,
                                      B, Bdesc, beta,
@@ -93,12 +96,12 @@ void LtFp8Matmul(const int repeat,
     printf("Average hipblasLtMatmul execution time %f (us)\n", (time * 1e-3f) / repeat);
 
     // descriptors are no longer needed as all GPU work was already enqueued
-    if (preference) checkCublasStatus(hipblasLtMatmulPreferenceDestroy(preference));
-    if (Ddesc) checkCublasStatus(hipblasLtMatrixLayoutDestroy(Ddesc));
-    if (Cdesc) checkCublasStatus(hipblasLtMatrixLayoutDestroy(Cdesc));
-    if (Bdesc) checkCublasStatus(hipblasLtMatrixLayoutDestroy(Bdesc));
-    if (Adesc) checkCublasStatus(hipblasLtMatrixLayoutDestroy(Adesc));
-    if (operationDesc) checkCublasStatus(hipblasLtMatmulDescDestroy(operationDesc));
+    if (preference) checkHipblasStatus(hipblasLtMatmulPreferenceDestroy(preference));
+    if (Ddesc) checkHipblasStatus(hipblasLtMatrixLayoutDestroy(Ddesc));
+    if (Cdesc) checkHipblasStatus(hipblasLtMatrixLayoutDestroy(Cdesc));
+    if (Bdesc) checkHipblasStatus(hipblasLtMatrixLayoutDestroy(Bdesc));
+    if (Adesc) checkHipblasStatus(hipblasLtMatrixLayoutDestroy(Adesc));
+    if (operationDesc) checkHipblasStatus(hipblasLtMatmulDescDestroy(operationDesc));
 }
 
 
@@ -112,7 +115,7 @@ int main(int argc, char *argv[])
 
 
    TestBench<hipblaslt_f8_fnuz, 
-             hip_bfloat16, // hipblasLtMatrixLayoutCreate
+             hipblaslt_f8_fnuz, //hip_bfloat16 ( hipblasLtMatrixLayoutCreate)
              hipblaslt_f8_fnuz,
              float> props(64, 128, 256, 2.0f, 1.0f, 32ULL * 1024 * 1024);
 
