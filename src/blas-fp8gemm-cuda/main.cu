@@ -69,7 +69,8 @@ void LtFp8Matmul(const int repeat,
     checkCublasStatus(cublasLtMatmulAlgoGetHeuristic(ltHandle, operationDesc, Adesc, Bdesc, Cdesc, Ddesc, preference, 1, &heuristicResult, &returnedResults));
 
     if (returnedResults == 0) {
-        checkCublasStatus(CUBLAS_STATUS_NOT_SUPPORTED);
+        printf("no heuristic function available for current configuration\n");
+        return;
     }
 
     auto start = std::chrono::steady_clock::now();
