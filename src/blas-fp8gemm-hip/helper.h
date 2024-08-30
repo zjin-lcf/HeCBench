@@ -37,19 +37,17 @@
 #include <hip/hip_runtime_api.h>
 #include <hipblaslt/hipblaslt.h>
 
-HIP_R_8F_E4M3_FNUZ
-
-inline void checkCudaStatus(hipError_t status) {
+inline void checkHipStatus(hipError_t status) {
     if (status != hipSuccess) {
-        printf("cuda API failed with status %d: %s\n", status, hipGetErrorString(status));
-        throw std::logic_error("cuda API failed");
+        printf("hip API failed with status %d: %s\n", status, hipGetErrorString(status));
+        throw std::logic_error("hip API failed");
     }
 }
 
-inline void checkCublasStatus(hipblasStatus_t status) {
+inline void checkHipblasStatus(hipblasStatus_t status) {
     if (status != HIPBLAS_STATUS_SUCCESS) {
-        printf("cuBLAS API failed with status %d\n", status);
-        throw std::logic_error("cuBLAS API failed");
+        printf("hipBLAS API failed with status %d\n", status);
+        throw std::logic_error("hipBLAS API failed");
     }
 }
 
@@ -65,45 +63,45 @@ struct TestBench {
         m(m), n(n), k(k), N(N), alpha(alpha), beta(beta), workspaceSize(workspaceSize), 
         Ahost(m * k * N), Bhost(n * k * N), Chost(m * n * N), Dhost(m * n * N),
         biasHost(m * N), AscaleHost(Ascale), BscaleHost(Bscale), CscaleHost(Cscale), DscaleHost(Dscale) {
-        checkCublasStatus(hipblasLtCreate(&ltHandle));
-        checkCudaStatus(hipMalloc(reinterpret_cast<void**>(&Adev), m * k * N * sizeof(InType)));
-        checkCudaStatus(hipMalloc(reinterpret_cast<void**>(&Bdev), n * k * N  * sizeof(InType)));
-        checkCudaStatus(hipMalloc(reinterpret_cast<void**>(&Cdev), m * n * N  * sizeof(CType)));
-        checkCudaStatus(hipMalloc(reinterpret_cast<void**>(&Ddev), m * n * N  * sizeof(OutType)));
-        checkCudaStatus(hipMalloc(reinterpret_cast<void**>(&biasDev), m * N * sizeof(OutType)));
-        checkCudaStatus(hipMalloc(&workspace, workspaceSize));
-        checkCudaStatus(hipStreamCreate(&stream));
+        checkHipblasStatus(hipblasLtCreate(&ltHandle));
+        checkHipStatus(hipMalloc(reinterpret_cast<void**>(&Adev), m * k * N * sizeof(InType)));
+        checkHipStatus(hipMalloc(reinterpret_cast<void**>(&Bdev), n * k * N  * sizeof(InType)));
+        checkHipStatus(hipMalloc(reinterpret_cast<void**>(&Cdev), m * n * N  * sizeof(CType)));
+        checkHipStatus(hipMalloc(reinterpret_cast<void**>(&Ddev), m * n * N  * sizeof(OutType)));
+        checkHipStatus(hipMalloc(reinterpret_cast<void**>(&biasDev), m * N * sizeof(OutType)));
+        checkHipStatus(hipMalloc(&workspace, workspaceSize));
+        checkHipStatus(hipStreamCreate(&stream));
 
         // Currently only fp8 supports per-tensor scaling
         perTensorScalingEnabled = std::is_same<InType, hipblaslt_f8_fnuz>::value || std::is_same<InType, hipblaslt_bf8_fnuz>::value;
 
         if (perTensorScalingEnabled) {
-            checkCudaStatus(hipMalloc(reinterpret_cast<void**>(&AscaleDev), sizeof(*AscaleDev)));
-            checkCudaStatus(hipMalloc(reinterpret_cast<void**>(&BscaleDev), sizeof(*BscaleDev)));
-            checkCudaStatus(hipMalloc(reinterpret_cast<void**>(&CscaleDev), sizeof(*CscaleDev)));
-            checkCudaStatus(hipMalloc(reinterpret_cast<void**>(&DscaleDev), sizeof(*DscaleDev)));
-            checkCudaStatus(hipMalloc(reinterpret_cast<void**>(&DamaxDev), sizeof(*DamaxDev)));
+            checkHipStatus(hipMalloc(reinterpret_cast<void**>(&AscaleDev), sizeof(*AscaleDev)));
+            checkHipStatus(hipMalloc(reinterpret_cast<void**>(&BscaleDev), sizeof(*BscaleDev)));
+            checkHipStatus(hipMalloc(reinterpret_cast<void**>(&CscaleDev), sizeof(*CscaleDev)));
+            checkHipStatus(hipMalloc(reinterpret_cast<void**>(&DscaleDev), sizeof(*DscaleDev)));
+            checkHipStatus(hipMalloc(reinterpret_cast<void**>(&DamaxDev), sizeof(*DamaxDev)));
         }
 
         fillData();
     }
 
     ~TestBench() {
-        checkCublasStatus(hipblasLtDestroy(ltHandle));
-        checkCudaStatus(hipFree(Adev));
-        checkCudaStatus(hipFree(Bdev));
-        checkCudaStatus(hipFree(Cdev));
-        checkCudaStatus(hipFree(Ddev));
-        checkCudaStatus(hipFree(biasDev));
-        checkCudaStatus(hipFree(workspace));
+        checkHipblasStatus(hipblasLtDestroy(ltHandle));
+        checkHipStatus(hipFree(Adev));
+        checkHipStatus(hipFree(Bdev));
+        checkHipStatus(hipFree(Cdev));
+        checkHipStatus(hipFree(Ddev));
+        checkHipStatus(hipFree(biasDev));
+        checkHipStatus(hipFree(workspace));
         if (perTensorScalingEnabled) {
-            checkCudaStatus(hipFree(AscaleDev));
-            checkCudaStatus(hipFree(BscaleDev));
-            checkCudaStatus(hipFree(CscaleDev));
-            checkCudaStatus(hipFree(DscaleDev));
-            checkCudaStatus(hipFree(DamaxDev));
+            checkHipStatus(hipFree(AscaleDev));
+            checkHipStatus(hipFree(BscaleDev));
+            checkHipStatus(hipFree(CscaleDev));
+            checkHipStatus(hipFree(DscaleDev));
+            checkHipStatus(hipFree(DamaxDev));
         }
-        checkCudaStatus(hipStreamDestroy(stream));
+        checkHipStatus(hipStreamDestroy(stream));
     }
 
     void fillData() {
@@ -114,25 +112,25 @@ struct TestBench {
     }
 
     void copyDataToDevice() {
-        checkCudaStatus(hipMemcpyAsync(Adev, Ahost.data(), Ahost.size() * sizeof(Ahost[0]), hipMemcpyHostToDevice, stream));
-        checkCudaStatus(hipMemcpyAsync(Bdev, Bhost.data(), Bhost.size() * sizeof(Bhost[0]), hipMemcpyHostToDevice, stream));
-        checkCudaStatus(hipMemcpyAsync(Cdev, Chost.data(), Chost.size() * sizeof(Chost[0]), hipMemcpyHostToDevice, stream));
-        checkCudaStatus(hipMemcpyAsync(biasDev, biasHost.data(), biasHost.size() * sizeof(biasHost[0]), hipMemcpyHostToDevice));
+        checkHipStatus(hipMemcpyAsync(Adev, Ahost.data(), Ahost.size() * sizeof(Ahost[0]), hipMemcpyHostToDevice, stream));
+        checkHipStatus(hipMemcpyAsync(Bdev, Bhost.data(), Bhost.size() * sizeof(Bhost[0]), hipMemcpyHostToDevice, stream));
+        checkHipStatus(hipMemcpyAsync(Cdev, Chost.data(), Chost.size() * sizeof(Chost[0]), hipMemcpyHostToDevice, stream));
+        checkHipStatus(hipMemcpyAsync(biasDev, biasHost.data(), biasHost.size() * sizeof(biasHost[0]), hipMemcpyHostToDevice));
         if (perTensorScalingEnabled) {
-            checkCudaStatus(hipMemcpyAsync(AscaleDev, &AscaleHost, sizeof(AscaleHost), hipMemcpyHostToDevice));
-            checkCudaStatus(hipMemcpyAsync(BscaleDev, &BscaleHost, sizeof(BscaleHost), hipMemcpyHostToDevice));
-            checkCudaStatus(hipMemcpyAsync(CscaleDev, &CscaleHost, sizeof(CscaleHost), hipMemcpyHostToDevice));
-            checkCudaStatus(hipMemcpyAsync(DscaleDev, &DscaleHost, sizeof(DscaleHost), hipMemcpyHostToDevice));
-            checkCudaStatus(hipMemcpyAsync(DamaxDev, &DamaxHost, sizeof(DamaxHost), hipMemcpyHostToDevice));
+            checkHipStatus(hipMemcpyAsync(AscaleDev, &AscaleHost, sizeof(AscaleHost), hipMemcpyHostToDevice));
+            checkHipStatus(hipMemcpyAsync(BscaleDev, &BscaleHost, sizeof(BscaleHost), hipMemcpyHostToDevice));
+            checkHipStatus(hipMemcpyAsync(CscaleDev, &CscaleHost, sizeof(CscaleHost), hipMemcpyHostToDevice));
+            checkHipStatus(hipMemcpyAsync(DscaleDev, &DscaleHost, sizeof(DscaleHost), hipMemcpyHostToDevice));
+            checkHipStatus(hipMemcpyAsync(DamaxDev, &DamaxHost, sizeof(DamaxHost), hipMemcpyHostToDevice));
         }
     }
 
     void copyDataFromDevice() {
-        checkCudaStatus(hipMemcpyAsync(Dhost.data(), Ddev, Dhost.size() * sizeof(Dhost[0]), hipMemcpyDeviceToHost, stream));
+        checkHipStatus(hipMemcpyAsync(Dhost.data(), Ddev, Dhost.size() * sizeof(Dhost[0]), hipMemcpyDeviceToHost, stream));
     }
 
     void streamSynchronize() {
-        checkCudaStatus(hipStreamSynchronize(stream));
+        checkHipStatus(hipStreamSynchronize(stream));
     }
 
     void run(const SampleRunner& runSample) {
