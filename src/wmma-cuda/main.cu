@@ -76,17 +76,18 @@ const uint32_t WAVE_SIZE = 32;
 // Thread block
 // : T_BLOCK_X must be multiple of WAVE_SIZE.
 // Note: Each wave will compute one BLOCK_M x BLOCK_N output block
-// Note: Workgroup will compute
-//  T_BLOCK_X / WAVE_SIZE x T_BLOCK_Y output blocks
-const int T_BLOCK_X = 4 * WAVE_SIZE;
-const int T_BLOCK_Y = 4;
+// Note: A workgroup will compute T_BLOCK_X / WAVE_SIZE x T_BLOCK_Y output blocks
+const int NUM_WAVES_X = 4;
+const int NUM_WAVES_Y = 4;
+const int T_BLOCK_X = NUM_WAVES_X * WAVE_SIZE;
+const int T_BLOCK_Y = NUM_WAVES_Y;
 
 // The following device kernel is a naive implementation
 // of blocked GEMM. Each wave will compute one BLOCK_M x BLOCK_N
 // output block of the M x N x K GEMM, generalized as:
 // D = alpha * (A x B) + beta * C
 //
-// In this simplified example, we assume:
+// In this example, we assume:
 // : A is in row-major format     (M x K)
 // : B is in col-major format     (K x N)
 // : C, D are in row-major format (M x N)
@@ -95,7 +96,9 @@ const int T_BLOCK_Y = 4;
 //
 // Note: demonstrate API usage in context of wave-level GEMM computation, and is not optimized.
 __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
-                     float16_t const *a, float16_t const *b, float32_t const *c,
+                     float16_t const *__restrict__ a,
+                     float16_t const *__restrict__ b,
+                     float32_t const *c,
                      float32_t *d, const uint32_t lda, const uint32_t ldb,
                      const uint32_t ldc, const uint32_t ldd,
                      const float32_t alpha, const float32_t beta) {
@@ -122,7 +125,7 @@ __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
     for (int i = 0; i < k; i += WMMA_K) {
       // Load the inputs
       wmma::load_matrix_sync(fragA, a + (cRow * lda + i), lda);
-      wmma::load_matrix_sync(fragB, b + (i + cCol * ldb), ldb);
+      wmma::load_matrix_sync(fragB, b + (cCol * ldb + i), ldb);
 
       // Matrix multiply - accumulate using MFMA units
       wmma::mma_sync(fragAcc, fragA, fragB, fragAcc);
@@ -146,15 +149,15 @@ __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
 __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
                         float32_t beta, int32_t repeat, int32_t verify) {
   // Bounds check
-  if ((m < (WMMA_M * T_BLOCK_X / WAVE_SIZE) || n < (WMMA_N * T_BLOCK_Y) ||
+  if ((m < (WMMA_M * NUM_WAVES_X) || n < (WMMA_N * NUM_WAVES_Y) ||
        k < WMMA_K) || (m % WMMA_M || n % WMMA_N || k % WMMA_K)) {
     std::cout << "Unsupported size!\n";
     return;
   }
 
-  int lda = k;
-  int ldb = k;
-  int ldc = n;
+  int lda = k; // row major
+  int ldb = k; // col major
+  int ldc = n; // row major
   int ldd = ldc;
 
   std::cout << "Initializing host data..." << std::endl;
@@ -175,20 +178,18 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
   std::cout << "Initializing device data..." << std::endl;
 
   // Allocate and copy device memory
-  float16_t *d_a;
-  float16_t *d_b;
-  float32_t *d_c;
-  float32_t *d_d;
+  float16_t *d_a, *d_b;
+  float32_t *d_c, *d_d;
 
   const size_t bytesA = matrixA.size() * sizeof(float16_t);
   const size_t bytesB = matrixB.size() * sizeof(float16_t);
   const size_t bytesC = matrixC.size() * sizeof(float32_t);
   const size_t bytesD = matrixD.size() * sizeof(float32_t);
 
-  CHECK_CUDA_ERROR(cudaMalloc(&d_a, bytesA));
-  CHECK_CUDA_ERROR(cudaMalloc(&d_b, bytesB));
-  CHECK_CUDA_ERROR(cudaMalloc(&d_c, bytesC));
-  CHECK_CUDA_ERROR(cudaMalloc(&d_d, bytesD));
+  CHECK_CUDA_ERROR(cudaMalloc((void**)&d_a, bytesA));
+  CHECK_CUDA_ERROR(cudaMalloc((void**)&d_b, bytesB));
+  CHECK_CUDA_ERROR(cudaMalloc((void**)&d_c, bytesC));
+  CHECK_CUDA_ERROR(cudaMalloc((void**)&d_d, bytesD));
 
   CHECK_CUDA_ERROR(
       cudaMemcpy(d_a, matrixA.data(), bytesA, cudaMemcpyHostToDevice));
@@ -200,9 +201,8 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
       cudaMemcpy(d_d, matrixD.data(), bytesD, cudaMemcpyHostToDevice));
 
   auto blockDim = dim3(T_BLOCK_X, T_BLOCK_Y);
-  auto gridDim = dim3((m + WMMA_M * T_BLOCK_X / WAVE_SIZE - 1) /
-                          (WMMA_M * T_BLOCK_X / WAVE_SIZE),
-                      (n + WMMA_N * T_BLOCK_Y - 1) / WMMA_N * T_BLOCK_Y);
+  auto gridDim = dim3((m + WMMA_M * NUM_WAVES_X - 1) / (WMMA_M * NUM_WAVES_X),
+                      (n + WMMA_N * NUM_WAVES_Y - 1) / (WMMA_N * NUM_WAVES_Y));
 
   std::cout << "Launching GEMM kernel..." << std::endl;
 
