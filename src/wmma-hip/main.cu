@@ -76,10 +76,12 @@ const uint32_t WAVE_SIZE = 64;
 // Thread block
 // : T_BLOCK_X must be multiple of WAVE_SIZE.
 // Note: Each wave will compute one BLOCK_M x BLOCK_N output block
-// Note: Workgroup will compute
+// Note: A workgroup will compute
 //  T_BLOCK_X / WAVE_SIZE x T_BLOCK_Y output blocks
-const int T_BLOCK_X = 4 * WAVE_SIZE;
-const int T_BLOCK_Y = 4;
+const int NUM_WAVES_X = 4;
+const int NUM_WAVES_Y = 4;
+const int T_BLOCK_X = NUM_WAVES_X * WAVE_SIZE;
+const int T_BLOCK_Y = NUM_WAVES_Y;
 
 // The following device kernel is a naive implementation
 // of blocked GEMM. Each wave will compute one BLOCK_M x BLOCK_N
@@ -95,7 +97,9 @@ const int T_BLOCK_Y = 4;
 //
 // Note: demonstrate API usage in context of wave-level GEMM computation, and is not optimized.
 __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
-                     fp16_t const *a, fp16_t const *b, fp32_t const *c,
+                     fp16_t const *__restrict__ a,
+                     fp16_t const *__restrict__ b,
+                     fp32_t const *c,
                      fp32_t *d, const uint32_t lda, const uint32_t ldb,
                      const uint32_t ldc, const uint32_t ldd,
                      const fp32_t alpha, const fp32_t beta) {
@@ -175,20 +179,18 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32_t alpha,
   std::cout << "Initializing device data..." << std::endl;
 
   // Allocate and copy device memory
-  fp16_t *d_a;
-  fp16_t *d_b;
-  fp32_t *d_c;
-  fp32_t *d_d;
+  fp16_t *d_a, *d_b;
+  fp32_t *d_c, *d_d;
 
   const size_t bytesA = matrixA.size() * sizeof(fp16_t);
   const size_t bytesB = matrixB.size() * sizeof(fp16_t);
   const size_t bytesC = matrixC.size() * sizeof(fp32_t);
   const size_t bytesD = matrixD.size() * sizeof(fp32_t);
 
-  CHECK_HIP_ERROR(hipMalloc(&d_a, bytesA));
-  CHECK_HIP_ERROR(hipMalloc(&d_b, bytesB));
-  CHECK_HIP_ERROR(hipMalloc(&d_c, bytesC));
-  CHECK_HIP_ERROR(hipMalloc(&d_d, bytesD));
+  CHECK_HIP_ERROR(hipMalloc((void**)&d_a, bytesA));
+  CHECK_HIP_ERROR(hipMalloc((void**)&d_b, bytesB));
+  CHECK_HIP_ERROR(hipMalloc((void**)&d_c, bytesC));
+  CHECK_HIP_ERROR(hipMalloc((void**)&d_d, bytesD));
 
   CHECK_HIP_ERROR(
       hipMemcpy(d_a, matrixA.data(), bytesA, hipMemcpyHostToDevice));
@@ -200,9 +202,8 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32_t alpha,
       hipMemcpy(d_d, matrixD.data(), bytesD, hipMemcpyHostToDevice));
 
   auto blockDim = dim3(T_BLOCK_X, T_BLOCK_Y);
-  auto gridDim = dim3((m + WMMA_M * T_BLOCK_X / WAVE_SIZE - 1) /
-                          (WMMA_M * T_BLOCK_X / WAVE_SIZE),
-                      (n + WMMA_N * T_BLOCK_Y - 1) / WMMA_N * T_BLOCK_Y);
+  auto gridDim = dim3((m + WMMA_M * NUM_WAVES_X - 1) / (WMMA_M * NUM_WAVES_X),
+                      (n + WMMA_N * NUM_WAVES_Y - 1) / (WMMA_N * NUM_WAVES_Y));
 
   std::cout << "Launching GEMM kernel..." << std::endl;
 

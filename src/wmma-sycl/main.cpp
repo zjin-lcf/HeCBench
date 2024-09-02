@@ -76,16 +76,18 @@ const int WMMA_N = 16;
 const int WMMA_K = 16;
 
 // Device warp size
-const uint32_t WAVE_SIZE = 32;
+const uint32_t WAVE_SIZE = 32;  // 64
 
-const int T_BLOCK_X = 4 * WAVE_SIZE;
-const int T_BLOCK_Y = 4;
+const int NUM_WAVES_X = 4;
+const int NUM_WAVES_Y = 4;
+const int T_BLOCK_X = NUM_WAVES_X * WAVE_SIZE;
+const int T_BLOCK_Y = NUM_WAVES_Y;
 
 void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
                float32_t beta, int32_t repeat, int32_t verify)
 {
     // Bounds check
-    if((m < (WMMA_M * T_BLOCK_X / WAVE_SIZE) || n < (WMMA_N * T_BLOCK_Y) || k < WMMA_K)
+    if((m < (WMMA_M * NUM_WAVES_X) || n < (WMMA_N * NUM_WAVES_Y) || k < WMMA_K)
        || (m % WMMA_M || n % WMMA_N || k % WMMA_K))
     {
         std::cout << "Unsupported size!\n";
@@ -134,8 +136,8 @@ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
     std::cout << "Launching GEMM kernel..." << std::endl;
 
     sycl::range<2> lws = {T_BLOCK_Y, T_BLOCK_X};
-    size_t rx = (m + WMMA_M * T_BLOCK_X / WAVE_SIZE - 1) / (WMMA_M * T_BLOCK_X / WAVE_SIZE) * T_BLOCK_X;
-    size_t ry = (n + WMMA_N * T_BLOCK_Y - 1) / (WMMA_N * T_BLOCK_Y) * T_BLOCK_Y;
+    size_t rx = (m + WMMA_M * NUM_WAVES_X - 1) / (WMMA_M * NUM_WAVES_X) * T_BLOCK_X;
+    size_t ry = (n + WMMA_N * NUM_WAVES_Y - 1) / (WMMA_N * NUM_WAVES_Y) * T_BLOCK_Y;
     sycl::range<2> gws = {ry, rx};
 
     std::chrono::time_point<std::chrono::steady_clock> start, end;
