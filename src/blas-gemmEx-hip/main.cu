@@ -183,7 +183,7 @@ int main(int argc, char* argv[]) {
   printf(">>>>>>>>>>>>>>>>> compare first ten values >>>>>>>>>>>>>>>>>\n");
   printf("fp64: ");
   for (int i = 0; i < 10; ++i)
-    printf("%.5lf%c", fC[i], " \n"[i==9]);
+    printf("%.5lf%c", dC[i], " \n"[i==9]);
 
   printf("fp32: ");
   for (int i = 0; i < 10; ++i)
