@@ -8,9 +8,9 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = sgemm
+program = main
 
-source = gemm.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -19,13 +19,10 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -Wall -I${MKLROOT}/include
+CFLAGS := $(EXTRA_CFLAGS) -Wall
 
 # Linker Flags
-LDFLAGS = -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_ilp64.a \
-	  ${MKLROOT}/lib/intel64/libmkl_sequential.a \
-	  ${MKLROOT}/lib/intel64/libmkl_core.a -Wl,--end-group  \
-	  -lOpenCL  -lpthread -ldl -lm 
+LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -39,10 +36,9 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-DMKL_ILP64 -D__STRICT_ANSI__ -m64 \
-           -fiopenmp -fopenmp-targets=spir64  -mllvm -vpo-paropt-use-interop
+  CFLAGS +=-qmkl=parallel -fiopenmp -fopenmp-targets=spir64 -fopenmp-version=51
 else
-  CFLAGS +=-qopenmp
+  CFLAGS +=-qmkl=parallel
 endif
 
 #===============================================================================
@@ -59,4 +55,5 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 100
+	$(LAUNCHER) ./$(program) 79 91 83 1000
+	$(LAUNCHER) ./$(program) 4096 4096 4096 100

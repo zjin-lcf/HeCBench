@@ -14,7 +14,7 @@ LAUNCHER  =
 
 program = main
 
-source = gemm.cu
+source = main.cu
 
 obj = $(source:.cu=.o)
 
@@ -55,4 +55,4 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) 79 91 83 1000
-	$(LAUNCHER) ./$(program) 2048 2048 2048 1000
+	$(LAUNCHER) ./$(program) 4096 4096 4096 100

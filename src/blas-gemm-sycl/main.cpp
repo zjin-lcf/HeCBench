@@ -150,10 +150,10 @@ void run_gemm_example(MKL_INT m, MKL_INT k, MKL_INT n, int repeat) {
   std::cout << "\n\t\tOutputting 2x2 block of A,B,C matrices:" << std::endl;
 
   // output the top 2x2 block of A matrix
-  print_2x2_matrix_values(a, k, "A");
+  //print_2x2_matrix_values(a, k, "A");
 
   // output the top 2x2 block of B matrix
-  print_2x2_matrix_values(b, n, "B");
+  //print_2x2_matrix_values(b, n, "B");
 
   // output the top 2x2 block of C matrix
   print_2x2_matrix_values(c, n, "C");
@@ -181,6 +181,9 @@ int main (int argc, char ** argv) {
 
   std::cout << "\tRunning with single precision data type:" << std::endl;
   run_gemm_example<float>(m, k, n, repeat);
+
+  std::cout << "\tRunning with double precision data type:" << std::endl;
+  run_gemm_example<double>(m, k, n, repeat);
 
   return 0;
 }
