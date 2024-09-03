@@ -73,25 +73,24 @@ template <typename fp> void rand_matrix(fp *M, int n_row, int n_col)
 {
   for (int i = 0; i < n_row; i++)
     for (int j = 0; j < n_col; j++)
-      M[i * n_col + j] = rand() % 5;
+      M[i * n_col + j] = rand() % 2;
 }
 
 template <typename fp>
-void run_gemm_example(int repeat) {
+void run_gemm_example(MKL_INT m, MKL_INT k, MKL_INT n, int repeat) {
 
-  // matrix data sizes
-  MKL_INT m = 79;
-  MKL_INT n = 83; 
-  MKL_INT k = 91;
-
-  // set scalar fp values     
-  fp alpha = fp(2.0); 
+  // set scalar fp values
+  fp alpha = fp(2.0);
   fp beta  = fp(0.5);
 
+  const size_t A_size = sizeof(fp) * m * k;
+  const size_t B_size = sizeof(fp) * k * n;
+  const size_t C_size = sizeof(fp) * m * n;
+
   // prepare matrix data
-  fp* a = (float *)mkl_malloc((m * k) * sizeof(float), 64);
-  fp* b = (float *)mkl_malloc((k * n) * sizeof(float), 64);
-  fp* c = (float *)mkl_malloc((m * n) * sizeof(float), 64);
+  fp* a = (fp *)mkl_malloc(A_size, 64);
+  fp* b = (fp *)mkl_malloc(B_size, 64);
+  fp* c = (fp *)mkl_malloc(C_size, 64);
 
   srand(2);
   rand_matrix(a, m, k);
@@ -104,18 +103,27 @@ void run_gemm_example(int repeat) {
 
   #pragma omp target data map(to:a[0:m*k], b[0:k*n]) map(tofrom:c[0:m*n]) device(0)
   {
-    // run gemm on gpu, use standard oneMKL interface within a variant dispatch construct
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) 
     {
-      #pragma omp target variant dispatch device(0) use_device_ptr(a, b, c)
-      sgemm("N", "N", &n, &m, &k, &alpha, b, &n, a, &k, &beta, c, &n);
+      if constexpr (std::is_same_v<fp, MKL_F16>) {
+        #pragma omp dispatch
+        hgemm("N", "N", &n, &m, &k, &alpha, b, &n, a, &k, &beta, c, &n);
+      }
+      else if constexpr (std::is_same_v<fp, float>) {
+        #pragma omp dispatch
+        sgemm("N", "N", &n, &m, &k, &alpha, b, &n, a, &k, &beta, c, &n);
+      }
+      else if constexpr (std::is_same_v<fp, double>) {
+        #pragma omp dispatch
+        dgemm("N", "N", &n, &m, &k, &alpha, b, &n, a, &k, &beta, c, &n);
+      }
     }
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average sgemm execution time: %f (s)\n", (time * 1e-9f) / repeat);
+    printf("Average GEMM execution time: %f (us)\n", (time * 1e-3f) / repeat);
   }
 
   //
@@ -124,10 +132,10 @@ void run_gemm_example(int repeat) {
   std::cout << "\n\t\tOutputting 2x2 block of A,B,C matrices:" << std::endl;
 
   // output the top 2x2 block of A matrix
-  print_2x2_matrix_values(a, k, "A");
+  //print_2x2_matrix_values(a, k, "A");
 
   // output the top 2x2 block of B matrix
-  print_2x2_matrix_values(b, n, "B");
+  //print_2x2_matrix_values(b, n, "B");
 
   // output the top 2x2 block of C matrix
   print_2x2_matrix_values(c, n, "C");
@@ -138,16 +146,24 @@ void run_gemm_example(int repeat) {
 }
 
 //
-// Main entry point for example.  
-//
 int main (int argc, char ** argv) {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <m> <k> <n> <repeat>\n", argv[0]);
     return 1;
   }
-  const int repeat = atoi(argv[1]);
+  const int m = atoi(argv[1]);
+  const int k = atoi(argv[2]);
+  const int n = atoi(argv[3]);
+  const int repeat = atoi(argv[4]);
 
-  std::cout << "\tRunning with single precision real data type:" << std::endl;
-  run_gemm_example<float>(repeat);
+  std::cout << "\tRunning with half precision data type:" << std::endl;
+  run_gemm_example<MKL_F16>(m, k, n, repeat);
+
+  std::cout << "\tRunning with single precision data type:" << std::endl;
+  run_gemm_example<float>(m, k, n, repeat);
+
+  std::cout << "\tRunning with double precision data type:" << std::endl;
+  run_gemm_example<double>(m, k, n, repeat);
+
   return 0;
 }

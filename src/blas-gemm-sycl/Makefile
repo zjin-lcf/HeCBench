@@ -25,7 +25,7 @@ ONEMKL_PATH   = /path/to/oneMKL
 
 program = main
 
-source = gemm.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -87,4 +87,4 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) 79 91 83 1000
-	$(LAUNCHER) ./$(program) 2048 2048 2048 1000
+	$(LAUNCHER) ./$(program) 4096 4096 4096 100

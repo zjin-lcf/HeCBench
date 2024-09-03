@@ -8,9 +8,9 @@
 #include <list>
 #include <vector>
 #include <type_traits>
-#include <hip/hip_runtime.h>
-#include <hip/hip_fp16.h>
-#include <hipblas/hipblas.h>
+#include <cuda.h>
+#include <cuda_fp16.h>
+#include <cublas_v2.h>
 
 template <typename T>
 void print_2x2_matrix_values(T M, int ldM, std::string M_name)
@@ -69,39 +69,42 @@ void run_gemm_example(int m, int k, int n, int repeat) {
   rand_matrix(c, m, n);
 
   fp *da, *db, *dc;
-  hipMalloc((void**)&da, A_size);
-  hipMalloc((void**)&db, B_size);
-  hipMalloc((void**)&dc, C_size);
-  hipMemcpy(da, a, A_size, hipMemcpyHostToDevice);
-  hipMemcpy(db, b, B_size, hipMemcpyHostToDevice);
+  cudaMalloc((void**)&da, A_size);
+  cudaMalloc((void**)&db, B_size);
+  cudaMalloc((void**)&dc, C_size);
+  cudaMemcpy(da, a, A_size, cudaMemcpyHostToDevice);
+  cudaMemcpy(db, b, B_size, cudaMemcpyHostToDevice);
 
   // create execution queue and buffers of matrix data
-  hipblasHandle_t h;
-  hipblasCreate(&h);
+  cublasHandle_t h;
+  cublasCreate(&h);
 
-  hipDeviceSynchronize();
+  cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    if constexpr (std::is_same_v<fp, hipblasHalf>)
-      hipblasHgemm(h, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k,
-                   &alpha, db, n, da, k, &beta, dc, n);
+    if constexpr (std::is_same_v<fp, __half>)
+      cublasHgemm(h, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k,
+                  &alpha, db, n, da, k, &beta, dc, n);
     else if constexpr (std::is_same_v<fp, float>)
-      hipblasSgemm(h, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k,
-                   &alpha, db, n, da, k, &beta, dc, n);
+      cublasSgemm(h, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k,
+                  &alpha, db, n, da, k, &beta, dc, n);
+    else if constexpr (std::is_same_v<fp, double>)
+      cublasDgemm(h, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k,
+                  &alpha, db, n, da, k, &beta, dc, n);
   }
 
-  hipDeviceSynchronize();
+  cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average GEMM execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-  hipMemcpy(c, dc, C_size, hipMemcpyDeviceToHost);
-  hipblasDestroy(h);
+  cudaMemcpy(c, dc, C_size, cudaMemcpyDeviceToHost);
+  cublasDestroy(h);
 
-  hipFree(da);
-  hipFree(db);
-  hipFree(dc);
+  cudaFree(da);
+  cudaFree(db);
+  cudaFree(dc);
 
   //
   // Post Processing
@@ -110,10 +113,10 @@ void run_gemm_example(int m, int k, int n, int repeat) {
   std::cout << "\n\t\tOutputting 2x2 block of A,B,C matrices:" << std::endl;
 
   // output the top 2x2 block of A matrix
-  print_2x2_matrix_values(a, k, "A");
+  //print_2x2_matrix_values(a, k, "A");
 
   // output the top 2x2 block of B matrix
-  print_2x2_matrix_values(b, n, "B");
+  //print_2x2_matrix_values(b, n, "B");
 
   // output the top 2x2 block of C matrix
   print_2x2_matrix_values(c, n, "C");
@@ -137,10 +140,13 @@ int main (int argc, char ** argv) {
   const int repeat = atoi(argv[4]);
 
   std::cout << "\tRunning with half precision data type:" << std::endl;
-  run_gemm_example<hipblasHalf>(m, k, n, repeat);
+  run_gemm_example<__half>(m, k, n, repeat);
 
   std::cout << "\tRunning with single precision data type:" << std::endl;
   run_gemm_example<float>(m, k, n, repeat);
+
+  std::cout << "\tRunning with double precision data type:" << std::endl;
+  run_gemm_example<double>(m, k, n, repeat);
 
   return 0;
 }
