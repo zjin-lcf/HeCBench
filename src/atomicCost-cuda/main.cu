@@ -1,11 +1,9 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include <assert.h>
 #include <cuda.h>
-#include <cuda_fp16.h>
-#include <cuda_bf16.h>
 
 static void CheckError( cudaError_t err, const char *file, int line ) {
   if (err != cudaSuccess) {
@@ -18,7 +16,7 @@ static void CheckError( cudaError_t err, const char *file, int line ) {
 
 // measure cost of additions without atomics
 template <typename T>
-__global__ void woAtomicOnGlobalMem(T* result, int size, int n)
+__global__ void woAtomicOnGlobalMem(T* result, int size)
 {
   unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
   for ( unsigned int i = tid * size; i < (tid + 1) * size; i++){
@@ -28,22 +26,25 @@ __global__ void woAtomicOnGlobalMem(T* result, int size, int n)
 
 // measure cost of additions with atomics
 template <typename T>
-__global__ void wiAtomicOnGlobalMem(T* result, int size, int n)
+__global__ void wiAtomicOnGlobalMem(T* result, int size)
 {
   unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  atomicAdd(&result[tid/size], tid % 2);
+  for ( unsigned int i = tid * size; i < (tid + 1) * size; i++){
+    atomicAdd(&result[tid], i % 2);
+  }
 }
 
 template <typename T>
-void atomicCost (int t, int size, int repeat)
+void atomicCost (int length, int size, int repeat)
 {
   printf("\n\n");
   printf("Each thread sums up %d elements\n", size);
 
-  assert(t % size == 0);
-  assert(t / size % BLOCK_SIZE == 0);
+  int num_threads = length / size;
+  assert(length % size == 0);
+  assert(num_threads % BLOCK_SIZE == 0);
 
-  size_t result_size = sizeof(T) * t / size;
+  size_t result_size = sizeof(T) * num_threads;
 
   T* result_wi = (T*) malloc (result_size);
   T* result_wo = (T*) malloc (result_size);
@@ -55,14 +56,13 @@ void atomicCost (int t, int size, int repeat)
   CHECK_ERROR( cudaMemset(d_result_wo, 0, result_size) );
 
   dim3 block (BLOCK_SIZE);
-  dim3 grid_wo (t / size / BLOCK_SIZE);
-  dim3 grid_wi (t / BLOCK_SIZE);
+  dim3 grid (num_threads / BLOCK_SIZE);
 
   CHECK_ERROR( cudaDeviceSynchronize() );
   auto start = std::chrono::steady_clock::now();
   for(int i=0; i<repeat; i++)
   {
-    wiAtomicOnGlobalMem<T><<<grid_wi, block>>>(d_result_wi, size, t);
+    wiAtomicOnGlobalMem<T><<<grid, block>>>(d_result_wi, size);
   }
   CHECK_ERROR( cudaDeviceSynchronize() );
   auto end = std::chrono::steady_clock::now();
@@ -74,7 +74,7 @@ void atomicCost (int t, int size, int repeat)
   start = std::chrono::steady_clock::now();
   for(int i=0; i<repeat; i++)
   {
-    woAtomicOnGlobalMem<T><<<grid_wo, block>>>(d_result_wo, size, t/size);
+    woAtomicOnGlobalMem<T><<<grid, block>>>(d_result_wo, size);
   }
   CHECK_ERROR( cudaDeviceSynchronize() );
   end = std::chrono::steady_clock::now();
@@ -113,14 +113,6 @@ int main(int argc, char* argv[])
 
   printf("\nFP32 atomic add\n");
   atomicCost<float>(length, nelems, repeat);
-
-  // supported by devices of compute capability 7.x and higher
-  printf("\nFP16 atomic add\n");
-  atomicCost<__half>(length, nelems, repeat);
-
-  // supported by devices of compute capability 8.x and higher
-  printf("\nBF16 atomic add\n");
-  atomicCost<__nv_bfloat16>(length, nelems, repeat);
 
   return 0;
 }
