@@ -24,6 +24,7 @@
 #include <execution>
 #include <hip/hip_runtime.h>
 #include <hipcub/hipcub.hpp>
+#define HIPBLAS_V2
 #include <hipblas/hipblas.h>
 #include "shrUtils.h"
 
@@ -78,7 +79,7 @@ void dot (const size_t iNumElements, const int iNumIterations)
   srand(123);
   for (i = 0; i < iNumElements ; ++i)
   {
-    srcA[i] = -1;
+    srcA[i] = (i < iNumElements / 2) ? -1 : 1;
     srcB[i] = -1;
   }
   for (i = iNumElements; i < src_size ; ++i) {
@@ -111,10 +112,10 @@ void dot (const size_t iNumElements, const int iNumIterations)
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+  printf("Average kernel execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
 
   hipMemcpy(&dst, d_dst, sizeof(T), hipMemcpyDeviceToHost);
-  printf("Absolute result difference is %lf\n\n", std::abs(dst - iNumElements));
+  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
 
   hipblasHandle_t h;
   hipblasCreate(&h);
@@ -123,19 +124,24 @@ void dot (const size_t iNumElements, const int iNumIterations)
   start = std::chrono::steady_clock::now();
 
   for (i = 0; i < (size_t)iNumIterations; i++) {
-    if constexpr (std::is_same_v<T, double>)
-      hipblasDdot_64(h, iNumElements, d_srcA, 1, d_srcB, 1, d_dst);
-    else if constexpr (std::is_same_v<T, float>)
-      hipblasSdot_64(h, iNumElements, d_srcA, 1, d_srcB, 1, d_dst);
+    hipDataType xType, yType, rType, eType;
+    if (std::is_same<T, double>::value) {
+      xType = yType = rType = eType = HIPBLAS_R_64F;
+    } else if (std::is_same<T, float>::value) {
+      xType = yType = rType = eType = HIPBLAS_R_32F;
+    }
+
+    hipblasDotEx(h, iNumElements, d_srcA, xType, 1, d_srcB,
+                yType, 1, d_dst, rType, eType);
   }
 
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average hipblasDot execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+  printf("Average hipblasDot execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
 
   hipMemcpy(&dst, d_dst, sizeof(T), hipMemcpyDeviceToHost);
-  printf("Absolute result difference is %lf\n\n", std::abs(dst - iNumElements));
+  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
 
   start = std::chrono::steady_clock::now();
 
@@ -146,8 +152,8 @@ void dot (const size_t iNumElements, const int iNumIterations)
 
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average std::transform_reduce execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
-  printf("Absolute result difference is %lf\n\n", std::abs(dst - iNumElements));
+  printf("Average std::transform_reduce execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
+  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
 
   hipFree(d_dst);
   hipFree(d_srcA);

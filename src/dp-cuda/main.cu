@@ -78,8 +78,8 @@ void dot (const size_t iNumElements, const int iNumIterations)
   srand(123);
   for (i = 0; i < iNumElements ; ++i)
   {
-    srcA[i] = -1;
-    srcB[i] = -1;
+    srcA[i] = (i < iNumElements / 2) ? -1 : 1;
+    srcB[i] = 1;
   }
   for (i = iNumElements; i < src_size ; ++i) {
     srcA[i] = srcB[i] = 0;
@@ -111,10 +111,10 @@ void dot (const size_t iNumElements, const int iNumIterations)
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+  printf("Average kernel execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
 
   cudaMemcpy(&dst, d_dst, sizeof(T), cudaMemcpyDeviceToHost);
-  printf("Absolute result difference is %lf\n\n", std::abs(dst - iNumElements));
+  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
 
   cublasHandle_t h;
   cublasCreate(&h);
@@ -123,19 +123,24 @@ void dot (const size_t iNumElements, const int iNumIterations)
   start = std::chrono::steady_clock::now();
 
   for (i = 0; i < (size_t)iNumIterations; i++) {
-    if constexpr (std::is_same_v<T, double>)
-      cublasDdot_64(h, iNumElements, d_srcA, 1, d_srcB, 1, d_dst);
-    else if constexpr (std::is_same_v<T, float>)
-      cublasSdot_64(h, iNumElements, d_srcA, 1, d_srcB, 1, d_dst);
+    cudaDataType xType, yType, rType, eType;
+    if (std::is_same<T, double>::value) {
+      xType = yType = rType = eType = CUDA_R_64F;
+    } else if (std::is_same<T, float>::value) {
+      xType = yType = rType = eType = CUDA_R_32F;
+    }
+
+    cublasDotEx(h, iNumElements, d_srcA, xType, 1, d_srcB,
+                yType, 1, d_dst, rType, eType);
   }
 
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average cublasDot execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+  printf("Average cublasDotEx execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
 
   cudaMemcpy(&dst, d_dst, sizeof(T), cudaMemcpyDeviceToHost);
-  printf("Absolute result difference is %lf\n\n", std::abs(dst - iNumElements));
+  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
 
   start = std::chrono::steady_clock::now();
 
@@ -146,8 +151,8 @@ void dot (const size_t iNumElements, const int iNumIterations)
 
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average std::transform_reduce execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
-  printf("Absolute result difference is %lf\n\n", std::abs(dst - iNumElements));
+  printf("Average std::transform_reduce execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
+  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
 
   cudaFree(d_dst);
   cudaFree(d_srcA);
