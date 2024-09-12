@@ -52,7 +52,7 @@ void dot (const size_t iNumElements, const int iNumIterations)
   srand(123);
   for (i = 0; i < iNumElements ; ++i)
   {
-    srcA[i] = -1;
+    srcA[i] = (i < iNumElements / 2) ? -1 : 1;
     srcB[i] = -1;
   }
   for (i = iNumElements; i < src_size ; ++i) {
@@ -108,9 +108,9 @@ void dot (const size_t iNumElements, const int iNumIterations)
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+  printf("Average kernel execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
   q.memcpy(&dst, d_dst, sizeof(T)).wait();
-  printf("Absolute result difference is %lf\n", std::abs(dst - iNumElements));
+  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
 
   start = std::chrono::steady_clock::now();
 
@@ -121,9 +121,9 @@ void dot (const size_t iNumElements, const int iNumIterations)
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average oneMKL::dot execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+  printf("Average oneMKL::dot execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
   q.memcpy(&dst, d_dst, sizeof(T)).wait();
-  printf("Absolute result difference is %lf\n", std::abs(dst - iNumElements));
+  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
 
   start = std::chrono::steady_clock::now();
 
@@ -134,8 +134,8 @@ void dot (const size_t iNumElements, const int iNumIterations)
 
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average std::transform_reduce execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
-  printf("Absolute result difference is %lf\n\n", std::abs(dst - iNumElements));
+  printf("Average std::transform_reduce execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
+  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
 
   sycl::free(d_dst, q);
   sycl::free(d_srcA, q);

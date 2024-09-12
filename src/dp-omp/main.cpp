@@ -11,7 +11,7 @@
 
 // *********************************************************************
 // A simple demo application that implements a
-// vector dot product computation between 2 Type arrays.
+// vector dot product computation between 2 T arrays.
 //
 // Runs computations with on the GPU device and then checks results
 // against basic host CPU/C++ computation.
@@ -23,20 +23,9 @@
 #include <cmath>
 #include "shrUtils.h"
 
-typedef int Type;
-
-// Forward Declarations
-Type DotProductHost(const Type* pfData1, const Type* pfData2, size_t iNumElements);
-
-int main(int argc, char **argv)
+template <typename T>
+void dot (const size_t iNumElements, const int iNumIterations)
 {
-  if (argc != 3) {
-    printf("Usage: %s <number of elements> <repeat>\n", argv[0]);
-    return 1;
-  }
-  const size_t iNumElements = atol(argv[1]);
-  const int iNumIterations = atoi(argv[2]);
-
   // set and log Global and Local work size dimensions
   int szLocalWorkSize = 256;
   size_t szGlobalWorkSize = shrRoundUp(szLocalWorkSize, iNumElements);
@@ -45,24 +34,24 @@ int main(int argc, char **argv)
          szGlobalWorkSize, szLocalWorkSize);
 
   const size_t src_size = szGlobalWorkSize;
-  const size_t src_size_bytes = src_size * sizeof(Type);
+  const size_t src_size_bytes = src_size * sizeof(T);
 
   // Allocate and initialize host arrays
-  Type* srcA = (Type*) malloc (src_size_bytes);
-  Type* srcB = (Type*) malloc (src_size_bytes);
+  T* srcA = (T*) malloc (src_size_bytes);
+  T* srcB = (T*) malloc (src_size_bytes);
 
   size_t i;
   srand(123);
   for (i = 0; i < iNumElements ; ++i)
   {
-    srcA[i] = 1;
+    srcA[i] = (i < iNumElements / 2) ? -1 : 1;
     srcB[i] = -1;
   }
   for (i = iNumElements; i < src_size ; ++i) {
     srcA[i] = srcB[i] = 0;
   }
 
-  Type dst;
+  T dst;
   #pragma omp target data map(to: srcA[0:src_size], srcB[0:src_size])
   {
     auto start = std::chrono::steady_clock::now();
@@ -82,28 +71,27 @@ int main(int argc, char **argv)
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iNumIterations);
+    printf("Average kernel execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
+    printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
   }
 
   // Compute and compare results for golden-host and report errors and pass/fail
-  printf("Comparing against Host/C++ computation...\n\n");
-  Type Golden = DotProductHost (srcA, srcB, iNumElements);
-  bool bMatch = std::abs(Golden - dst) < 1e-3f;
-  printf("\nGPU Result %s CPU Result\n", bMatch ? "matches" : "DOESN'T match");
 
   free(srcA);
   free(srcB);
-  return EXIT_SUCCESS;
 }
 
-// "Golden" Host processing dot product function for comparison purposes
-// *********************************************************************
-Type DotProductHost(const Type* pfData1, const Type* pfData2, size_t iNumElements)
+int main(int argc, char **argv)
 {
-  Type r = 0;
-  for (size_t i = 0; i < iNumElements; i++)
-  {
-    r += pfData1[i] * pfData2[i];
+  if (argc != 3) {
+    printf("Usage: %s <number of elements> <repeat>\n", argv[0]);
+    return 1;
   }
-  return r;
+  const size_t iNumElements = atol(argv[1]);
+  const int iNumIterations = atoi(argv[2]);
+
+  dot<float>(iNumElements, iNumIterations);
+  dot<double>(iNumElements, iNumIterations);
+
+  return EXIT_SUCCESS;
 }
