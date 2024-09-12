@@ -700,7 +700,7 @@ Early results are shown [here](results/README.md)
   Simulate the dynamics of a small part of a cardiac myocyte, specifically the fast sodium m-gate  (https://github.com/LLNL/goulash)
 
 ### gpp (cuda, omp)
-  General Plasman Pole Self-Energy Simulation the BerkeleyGW software package (https://github.com/NERSC/gpu-for-science-day-july-2019)
+  General Plasmon Pole Self-Energy Simulation the BerkeleyGW software package (https://github.com/NERSC/gpu-for-science-day-july-2019)
 
 ### graphExecution (cuda)
   A demonstration of graphs creation, instantiation and launch (https://github.com/NVIDIA/cuda-samples/tree/master/Samples/3_CUDA_Features/simpleCudaGraphs)
