@@ -22,40 +22,22 @@ __forceinline__ __device__
 void reduceInShared_intrinsics(half2 * const v)
 {
   int lid = threadIdx.x;  
-  if(lid<64) v[lid] = __hadd2( v[lid], v[lid+64]);
-  __syncthreads();
-  if(lid<32) v[lid] = __hadd2( v[lid], v[lid+32]);
-  __syncthreads();
-  if(lid<16) v[lid] = __hadd2( v[lid], v[lid+16]);
-  __syncthreads();
-  if(lid<8) v[lid] = __hadd2( v[lid], v[lid+8]);
-  __syncthreads();
-  if(lid<4) v[lid] = __hadd2( v[lid], v[lid+4]);
-  __syncthreads();
-  if(lid<2) v[lid] = __hadd2( v[lid], v[lid+2]);
-  __syncthreads();
-  if(lid<1) v[lid] = __hadd2( v[lid], v[lid+1]);
-  __syncthreads();
+  #pragma unroll
+  for (int i = NUM_OF_THREADS/2; i >= 1; i = i / 2) {
+    if(lid<i) v[lid] = __hadd2(v[lid], v[lid+i]);
+    __syncthreads();
+  }
 }
 
 __forceinline__ __device__
 void reduceInShared_native(half2 * const v)
 {
   int lid = threadIdx.x;  
-  if(lid<64) v[lid] = v[lid] + v[lid+64];
-  __syncthreads();
-  if(lid<32) v[lid] = v[lid] + v[lid+32];
-  __syncthreads();
-  if(lid<16) v[lid] = v[lid] + v[lid+16];
-  __syncthreads();
-  if(lid<8) v[lid] = v[lid] + v[lid+8];
-  __syncthreads();
-  if(lid<4) v[lid] = v[lid] + v[lid+4];
-  __syncthreads();
-  if(lid<2) v[lid] = v[lid] + v[lid+2];
-  __syncthreads();
-  if(lid<1) v[lid] = v[lid] + v[lid+1];
-  __syncthreads();
+  #pragma unroll
+  for (int i = NUM_OF_THREADS/2; i >= 1; i = i / 2) {
+    if(lid<i) v[lid] = v[lid] + v[lid+i];
+    __syncthreads();
+  }
 }
 
 __global__
@@ -83,7 +65,7 @@ void scalarProductKernel_intrinsics(
   {
     half2 result = shArray[0];
     float f_result = __low2float(result) + __high2float(result);
-    results[blockIdx.x] = f_result;
+    atomicAdd(results, f_result);
   }
 }
 
@@ -113,7 +95,7 @@ void scalarProductKernel_native(
   {
     half2 result = shArray[0];
     float f_result = (float)result.y + (float)result.x;
-    results[blockIdx.x] = f_result;
+    atomicAdd(results, f_result);
   }
 }
 
@@ -138,20 +120,18 @@ int main(int argc, char *argv[])
 
   const size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS;
   const size_t size_bytes = size * sizeof(half2);
-  const size_t result_bytes = NUM_OF_BLOCKS*sizeof(float);
+  const size_t result_bytes = sizeof(float);
 
   half2 *a, *b;
   half2 *d_a, *d_b;
 
-  float *r;  // result
-  float *d_r;
+  float r1, r2, *d_r;
 
   a = (half2*) malloc (size_bytes);
   b = (half2*) malloc (size_bytes);
   cudaMalloc((void**)&d_a, size_bytes);
   cudaMalloc((void**)&d_b, size_bytes);
 
-  r = (float*) malloc (result_bytes);
   cudaMalloc((void**)&d_r, result_bytes);
 
   srand(123); 
@@ -167,7 +147,6 @@ int main(int argc, char *argv[])
     result_ref += (float)a[i].x * (float)b[i].x +
                   (float)a[i].y * (float)b[i].y;
   }
-  //printf("Result reference: %f\n", result_ref);
 
   // warmup
   for (int i = 0; i < repeat; i++)
@@ -176,22 +155,18 @@ int main(int argc, char *argv[])
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
+  for (int i = 0; i < repeat; i++) {
+    cudaMemset(d_r, 0, result_bytes);
     scalarProductKernel_intrinsics<<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
+  }
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-  cudaMemcpy(r, d_r, result_bytes, cudaMemcpyDeviceToHost);
-
-  float result_intrinsics = 0;
-  for (int i = 0; i < NUM_OF_BLOCKS; ++i)
-  {
-    result_intrinsics += r[i];
-  }
-  printf("Result (intrinsics)\t: %f \n", result_intrinsics);
+  cudaMemcpy(&r1, d_r, result_bytes, cudaMemcpyDeviceToHost);
+  printf("Result (intrinsics)\t: %f \n", r1);
 
   // warmup
   for (int i = 0; i < repeat; i++)
@@ -200,25 +175,21 @@ int main(int argc, char *argv[])
   cudaDeviceSynchronize();
   start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
+  for (int i = 0; i < repeat; i++) {
+    cudaMemset(d_r, 0, result_bytes);
     scalarProductKernel_native<<<NUM_OF_BLOCKS, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
+  }
 
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-  cudaMemcpy(r, d_r, result_bytes, cudaMemcpyDeviceToHost);
+  cudaMemcpy(&r2, d_r, result_bytes, cudaMemcpyDeviceToHost);
+  printf("Result (native operators)\t: %f \n", r2);
 
-  float result_native = 0;
-  for (int i = 0; i < NUM_OF_BLOCKS; ++i)
-  {
-    result_native += r[i];
-  }
-  printf("Result (native operators)\t: %f \n", result_native);
-
-  bool ok = fabsf(result_intrinsics - result_ref) < 0.00001f &&
-            fabsf(result_native - result_ref) < 0.00001f;
+  bool ok = fabsf(r1 - result_ref) < 0.00001f &&
+            fabsf(r2 - result_ref) < 0.00001f;
   printf("fp16ScalarProduct %s\n", ok ?  "PASS" : "FAIL");
 
   cudaFree(d_a);
@@ -226,7 +197,6 @@ int main(int argc, char *argv[])
   cudaFree(d_r);
   free(a);
   free(b);
-  free(r);
 
   return EXIT_SUCCESS;
 }
