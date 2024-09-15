@@ -22,20 +22,11 @@ inline
 void reduceInShared_native(sycl::half2 *const v, sycl::nd_item<1> &item)
 {
   int lid = item.get_local_id(0);
-  if(lid<64) v[lid] = v[lid] + v[lid+64];
-  item.barrier(sycl::access::fence_space::local_space);
-  if(lid<32) v[lid] = v[lid] + v[lid+32];
-  item.barrier(sycl::access::fence_space::local_space);
-  if(lid<16) v[lid] = v[lid] + v[lid+16];
-  item.barrier(sycl::access::fence_space::local_space);
-  if(lid<8) v[lid] = v[lid] + v[lid+8];
-  item.barrier(sycl::access::fence_space::local_space);
-  if(lid<4) v[lid] = v[lid] + v[lid+4];
-  item.barrier(sycl::access::fence_space::local_space);
-  if(lid<2) v[lid] = v[lid] + v[lid+2];
-  item.barrier(sycl::access::fence_space::local_space);
-  if(lid<1) v[lid] = v[lid] + v[lid+1];
-  item.barrier(sycl::access::fence_space::local_space);
+  #pragma unroll
+  for (int i = NUM_OF_THREADS/2; i >= 1; i = i / 2) {
+    if(lid<i) v[lid] = v[lid] + v[lid+i];
+    item.barrier(sycl::access::fence_space::local_space);
+  }
 }
 
 void scalarProductKernel_native(const sycl::half2 *a,
@@ -66,7 +57,10 @@ void scalarProductKernel_native(const sycl::half2 *a,
   {
     sycl::half2 result = shArray[0];
     float f_result = (float)result.y() + (float)result.x();
-    results[gid] = f_result;
+    auto ao = sycl::atomic_ref<float, sycl::memory_order::relaxed, \
+                     sycl::memory_scope::device,\
+                     sycl::access::address_space::global_space>(results[0]);
+    ao.fetch_add(f_result);
   }
 }
 
@@ -91,7 +85,7 @@ int main(int argc, char *argv[])
 
   const size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS;
   const size_t size_bytes = size * sizeof(sycl::half2);
-  const size_t result_bytes = NUM_OF_BLOCKS*sizeof(float);
+  const size_t result_bytes = sizeof(float);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -101,7 +95,7 @@ int main(int argc, char *argv[])
 
   sycl::half2 *a = (sycl::half2 *) malloc (size_bytes);
   sycl::half2 *b = (sycl::half2 *) malloc (size_bytes);
-  float *r = (float*) malloc (result_bytes);
+  float r;
 
   float *d_r = sycl::malloc_device<float>(NUM_OF_BLOCKS, q);
 
@@ -145,6 +139,7 @@ int main(int argc, char *argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
+    q.memset(d_r, 0, result_bytes);
     q.submit([&](sycl::handler &cgh) {
       sycl::local_accessor<sycl::half2> shArray(sycl::range<1>(NUM_OF_THREADS), cgh);
       cgh.parallel_for<class sp2>(
@@ -164,16 +159,11 @@ int main(int argc, char *argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-  q.memcpy(r, d_r, result_bytes).wait();
+  q.memcpy(&r, d_r, result_bytes).wait();
 
-  float result_native = 0;
-  for (int i = 0; i < NUM_OF_BLOCKS; ++i)
-  {
-    result_native += r[i];
-  }
-  printf("Result (native operators)\t: %f \n", result_native);
+  printf("Result (native operators)\t: %f \n", r);
 
-  bool ok = fabsf(result_native - result_ref) < 0.00001f;
+  bool ok = fabsf(r - result_ref) < 0.00001f;
   printf("fp16ScalarProduct %s\n", ok ?  "PASS" : "FAIL");
 
   sycl::free(d_a, q);
@@ -181,7 +171,6 @@ int main(int argc, char *argv[])
   sycl::free(d_r, q);
   free(a);
   free(b);
-  free(r);
 
   return EXIT_SUCCESS;
 }
