@@ -56,8 +56,8 @@ SimpleTensor<__half> solve_gemv_int8_quantized_with_params(
   dim3 grid_dim(1, mat.height_ / block_dim_y);
   dim3 block_dim(block_dim_x, block_dim_y);
 
-  auto start = std::chrono::steady_clock::now();
   hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; ++i) {
     gemv_quantized_int8<<<grid_dim, block_dim>>>(
       mat.data_, vec.data_, result.data_, mat.width_, scale,
@@ -87,8 +87,8 @@ SimpleTensor<__half> solve_gemv_with_params(
   dim3 grid_dim(1, mat.height_ / block_dim_y);
   dim3 block_dim(block_dim_x, block_dim_y);
 
-  auto start = std::chrono::steady_clock::now();
   hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; ++i) {
     gemv_fp16<<<grid_dim, block_dim>>>(
       mat.data_, vec.data_, result.data_, mat.width_, num_per_thread);

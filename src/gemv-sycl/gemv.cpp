@@ -125,8 +125,8 @@ solve_gemv_with_params(sycl::queue &q,
   sycl::range<3> gws (1, mat.height_, block_dim_x);
   sycl::range<3> lws (1, block_dim_y, block_dim_x);
 
-  auto start = std::chrono::steady_clock::now();
   q.wait();
+  auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; ++i) {
     q.submit([&](sycl::handler &cgh) {
       sycl::local_accessor<float[SHARED_MEM_MAX_ROWS][WARP_SIZE], 0>
