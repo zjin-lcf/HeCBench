@@ -7,9 +7,9 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
-MPI_INCLUDE = "/opt/nvidia/hpc_sdk/Linux_x86_64/22.11/comm_libs/mpi/include"
-MPI_LIB_DIR = "/opt/nvidia/hpc_sdk/Linux_x86_64/22.11/comm_libs/mpi/lib"
-LAUNCHER    =
+NVHPC_SDK = /opt/nvidia/hpc_sdk/Linux_x86_64/24.5
+MPI_ROOT  = $(NVHPC_SDK)/comm_libs/12.4/openmpi4/openmpi-4.1.5
+LAUNCHER  = $(NVHPC_SDK)/comm_libs/mpi/bin/mpirun -n 1
 
 #===============================================================================
 # Program name & source code list
@@ -30,11 +30,11 @@ CFLAGS := -DNX=400 \
        	  -DNZ=200 \
 	  -DSIM_TIME=600 \
 	  -DDATA_SPEC=DATA_SPEC_THERMAL \
-          -I$(MPI_INCLUDE) \
+          -I$(MPI_ROOT)/include \
           -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
-LDFLAGS = -L$(MPI_LIB_DIR) -lmpi
+LDFLAGS = -L$(MPI_ROOT)/lib -lmpi
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -61,4 +61,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) mpiexec -n 1 ./$(program)
+	$(LAUNCHER) ./$(program)
