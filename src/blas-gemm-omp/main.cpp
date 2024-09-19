@@ -60,8 +60,8 @@
 void print_2x2_matrix_values(T M, int ldM, std::string M_name) 
 {
   std::cout << std::endl;
-  std::cout << "\t\t\t" << M_name << " = [ " << M[0*ldM + 0] << ", " << M[1*ldM + 0]         << ", ...\n";
-  std::cout << "\t\t\t    [ "                << M[0*ldM + 1] << ", " << M[1*ldM + 1] << ", ...\n";
+  std::cout << "\t\t\t" << M_name << " = [ " << (float)M[0*ldM + 0] << ", " << (float)M[1*ldM + 0]         << ", ...\n";
+  std::cout << "\t\t\t    [ "                << (float)M[0*ldM + 1] << ", " << (float)M[1*ldM + 1] << ", ...\n";
   std::cout << "\t\t\t    [ "                << "...\n";
   std::cout << std::endl;
 }
@@ -107,9 +107,10 @@ void run_gemm_example(MKL_INT m, MKL_INT k, MKL_INT n, int repeat) {
 
     for (int i = 0; i < repeat; i++) 
     {
-      if constexpr (std::is_same_v<fp, MKL_F16>) {
+      if constexpr (std::is_same_v<fp, _Float16>) {
         #pragma omp dispatch
-        hgemm("N", "N", &n, &m, &k, &alpha, b, &n, a, &k, &beta, c, &n);
+        hgemm("N", "N", &n, &m, &k, (MKL_F16*)&alpha, (MKL_F16*)b, &n,
+              (MKL_F16*)a, &k, (MKL_F16*)&beta, (MKL_F16*)c, &n);
       }
       else if constexpr (std::is_same_v<fp, float>) {
         #pragma omp dispatch
@@ -157,7 +158,7 @@ int main (int argc, char ** argv) {
   const int repeat = atoi(argv[4]);
 
   std::cout << "\tRunning with half precision data type:" << std::endl;
-  run_gemm_example<MKL_F16>(m, k, n, repeat);
+  run_gemm_example<_Float16>(m, k, n, repeat);
 
   std::cout << "\tRunning with single precision data type:" << std::endl;
   run_gemm_example<float>(m, k, n, repeat);
