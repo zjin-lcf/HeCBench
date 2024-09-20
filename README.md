@@ -19,7 +19,7 @@ Each benchmark falls into a single category. While such classification is not ac
     daphne
 
 ### Bandwidth
-    allreduce, cmembench, babelstream, memcpy, memtest, randomAccess, shmembench, triad 
+    allreduce, cmembench, babelstream, ccl, memcpy, memtest, randomAccess, shmembench, triad 
 
 ### Bioinformatics
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
@@ -380,6 +380,9 @@ Early results are shown [here](results/README.md)
 
 ### cc (cuda)
   Connected components (https://userweb.cs.txstate.edu/~burtscher/research/ECL-CC/)
+
+### ccl (cuda)
+  Collective communications library (https://github.com/NVIDIA/nccl)
 
 ### ccs (cuda)
   Condition-dependent Correlation Subgroups (https://github.com/abhatta3/Condition-dependent-Correlation-Subgroups-CCS)
