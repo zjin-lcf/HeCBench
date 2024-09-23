@@ -1,23 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <cuda.h>
+#include <sycl/sycl.hpp>
 #include <mpi.h>
-
-// Macro for checking errors in CUDA API calls
-#define cudaErrorCheck(call)                                                              \
-  do{                                                                                     \
-    cudaError_t cuErr = call;                                                             \
-    if(cudaSuccess != cuErr){                                                             \
-      printf("CUDA Error - %s:%d: '%s'\n", __FILE__, __LINE__, cudaGetErrorString(cuErr));\
-      exit(0);                                                                            \
-    }                                                                                     \
-  }while(0)
 
 
 int main(int argc, char *argv[])
 {
   /* -------------------------------------------------------------------------------------------
-     MPI Initialization 
+     MPI Initialization
      --------------------------------------------------------------------------------------------*/
   MPI_Init(&argc, &argv);
 
@@ -38,17 +28,16 @@ int main(int argc, char *argv[])
   }
 
   // Map MPI ranks to GPUs
-  int num_devices = 0;
-  cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
-  cudaErrorCheck( cudaSetDevice(rank % num_devices) );
+  auto const& gpu_devices = sycl::device::get_devices(sycl::info::device_type::gpu);
+  int num_devices = gpu_devices.size();
+  sycl::queue q(gpu_devices[rank % num_devices], sycl::property::queue::in_order());
 
   //   Loop from 65536 B to 1 GB
   for(int i=16; i<=27; i++){
 
     long int N = 1 << i;
 
-    double *d_A;
-    cudaErrorCheck( cudaMalloc((void**)&d_A, N*sizeof(double)) );
+    double *d_A = sycl::malloc_device<double>(N, q);
 
     const int tag1 = 10;
     const int tag2 = 20;
@@ -93,7 +82,7 @@ int main(int argc, char *argv[])
       printf("Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f\n",
              num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer );
 
-    cudaErrorCheck( cudaFree(d_A) );
+    sycl::free(d_A, q);
   }
 
   MPI_Finalize();
