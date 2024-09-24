@@ -11,17 +11,20 @@ ARCH      = sm_60
 #LAUNCHER  = /usr/bin/mpirun -n 2
 NVHPC_SDK = /opt/nvidia/hpc_sdk/Linux_x86_64/24.5
 MPI_ROOT  = $(NVHPC_SDK)/comm_libs/12.4/openmpi4/openmpi-4.1.5/
-LAUNCHER  = $(NVHPC_SDK)/comm_libs/mpi/bin/mpirun -n 2
+LAUNCHER  = $(NVHPC_SDK)/comm_libs/mpi/bin/mpirun --mca coll ^hcoll -n 2
 
 #===============================================================================
 # Program name & source code list
 #===============================================================================
 
-program = main
+mpi-program = main-mpi
+nccl-program = main-nccl
 
-source = main.cu
+mpi-source = main-mpi.cu
+nccl-source = main-nccl.cu
 
-obj = $(source:.cu=.o)
+mpi-obj = $(mpi-source:.cu=.o)
+nccl-obj = $(nccl-source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
@@ -32,7 +35,7 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -I$(MPI_ROOT)/include \
           -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
-LDFLAGS = -L$(MPI_ROOT)/lib -lmpi
+LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lnccl
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -48,14 +51,19 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+$(mpi-program): $(mpi-obj) Makefile
+	$(CC) $(CFLAGS) $(mpi-obj) -o $@ $(LDFLAGS)
+
+$(nccl-program): $(nccl-obj) Makefile
+	$(CC) $(CFLAGS) $(nccl-obj) -o $@ $(LDFLAGS)
 
 %.o: %.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(mpi-program) $(mpi-obj)
+	rm -rf $(nccl-program) $(nccl-obj)
 
-run: $(program)
-	$(LAUNCHER) ./$(program)
+run: $(mpi-program) $(nccl-program)
+	$(LAUNCHER) ./$(mpi-program)
+	$(LAUNCHER) ./$(nccl-program)
