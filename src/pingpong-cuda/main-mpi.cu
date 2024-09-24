@@ -14,6 +14,14 @@
   }while(0)
 
 
+__global__
+void test(double *d, const long int n) {
+  for (long i = blockDim.x * blockIdx.x + threadIdx.x;
+       i < n; i += blockDim.x * gridDim.x) {
+    d[i] = d[i] + 1;
+  }
+}
+
 int main(int argc, char *argv[])
 {
   /* -------------------------------------------------------------------------------------------
@@ -47,15 +55,17 @@ int main(int argc, char *argv[])
 
     long int N = 1 << i;
 
-    double *d_A;
+    double *h_A, *d_A;
+    h_A = (double*) malloc (N*sizeof(double)); 
     cudaErrorCheck( cudaMalloc((void**)&d_A, N*sizeof(double)) );
+    cudaErrorCheck( cudaMemset(d_A, 0, N*sizeof(double)) );
 
     const int tag1 = 10;
     const int tag2 = 20;
 
     int loop_count = 50;
 
-    // Warm-up loop
+    // Warm-up and validate MPI pingpong
     for(int i=1; i<=5; i++){
       if(rank == 0){
         MPI_Send(d_A, N, MPI_DOUBLE, 1, tag1, MPI_COMM_WORLD);
@@ -63,11 +73,23 @@ int main(int argc, char *argv[])
       }
       else if(rank == 1){
         MPI_Recv(d_A, N, MPI_DOUBLE, 0, tag1, MPI_COMM_WORLD, &stat);
+        test<<<1024, 256>>>(d_A, N);
         MPI_Send(d_A, N, MPI_DOUBLE, 0, tag2, MPI_COMM_WORLD);
       }
     }
+    if(rank == 0) {
+      cudaErrorCheck(cudaMemcpy(h_A, d_A, N*sizeof(double), cudaMemcpyDeviceToHost));
+      for (long int i = 0; i < N; i++) {
+        if(h_A[i] != 5) {
+          printf("ERROR: MPI pingpong test failed\n");
+          break;
+        }
+      }
+    }
 
-    // Time ping-pong for loop_count iterations of data transfer size 8*N bytes
+    free(h_A);
+
+    // Time loop_count iterations of data transfer size 8*N bytes
     double start_time, stop_time, elapsed_time;
     start_time = MPI_Wtime();
 
@@ -90,7 +112,7 @@ int main(int argc, char *argv[])
     double avg_time_per_transfer = elapsed_time / (2.0*(double)loop_count);
 
     if(rank == 0)
-      printf("Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f\n",
+      printf("MPI : Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f\n",
              num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer );
 
     cudaErrorCheck( cudaFree(d_A) );
