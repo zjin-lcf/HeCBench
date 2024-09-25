@@ -3,6 +3,12 @@
 #include <sycl/sycl.hpp>
 #include <mpi.h>
 
+void test(sycl::nd_item<1> item, double *d, const long int n) {
+  for (long i = item.get_global_id(0);
+       i < n; i += item.get_local_range(0) * item.get_group_range(0)) {
+    d[i] = d[i] + 1;
+  }
+}
 
 int main(int argc, char *argv[])
 {
@@ -37,7 +43,10 @@ int main(int argc, char *argv[])
 
     long int N = 1 << i;
 
-    double *d_A = sycl::malloc_device<double>(N, q);
+    double *h_A, *d_A;
+    h_A = (double*) malloc (N*sizeof(double)); 
+    d_A = sycl::malloc_device<double>(N, q);
+    q.memset(d_A, 0, N*sizeof(double));
 
     const int tag1 = 10;
     const int tag2 = 20;
@@ -52,9 +61,26 @@ int main(int argc, char *argv[])
       }
       else if(rank == 1){
         MPI_Recv(d_A, N, MPI_DOUBLE, 0, tag1, MPI_COMM_WORLD, &stat);
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for(
+            sycl::nd_range<1>(1024*256, 256), [=] (sycl::nd_item<1> item) {
+              test(item, d_A, N);
+          });
+        });
         MPI_Send(d_A, N, MPI_DOUBLE, 0, tag2, MPI_COMM_WORLD);
       }
     }
+    if(rank == 0) {
+      q.memcpy(h_A, d_A, N*sizeof(double)).wait();
+      for (long int i = 0; i < N; i++) {
+        if(h_A[i] != 5) {
+          printf("ERROR: MPI pingpong test failed\n");
+          break;
+        }
+      }
+    }
+
+    free(h_A);
 
     // Time ping-pong for loop_count iterations of data transfer size 8*N bytes
     double start_time, stop_time, elapsed_time;
@@ -79,7 +105,7 @@ int main(int argc, char *argv[])
     double avg_time_per_transfer = elapsed_time / (2.0*(double)loop_count);
 
     if(rank == 0)
-      printf("Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f\n",
+      printf("MPI: Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f\n",
              num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer );
 
     sycl::free(d_A, q);

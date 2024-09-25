@@ -6,11 +6,13 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-#MPI_ROOT  = /usr/lib/x86_64-linux-gnu/openmpi
-#LAUNCHER  = /usr/bin/mpirun -n 1
-# when CUDA enabled
-MPI_ROOT  = /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/comm_libs/12.4/openmpi4/openmpi-4.1.5/
-LAUNCHER  = /opt/nvidia/hpc_sdk/Linux_x86_64/24.5/comm_libs/mpi/bin/mpirun -n 2
+MPI_ROOT  = /opt/intel/oneapi/2024.1
+LAUNCHER  = $(MPI_ROOT)/bin/mpirun -n 2
+
+# when CUDA enabled for the MPI pingpong
+#NVHPC_SDK = /opt/nvidia/hpc_sdk/Linux_x86_64/24.5
+#MPI_ROOT  = $(NVHPC_SDK)/comm_libs/12.4/openmpi4/openmpi-4.1.5/
+#LAUNCHER  = $(NVHPC_SDK)/comm_libs/mpi/bin/mpirun --mca coll ^hcoll -n 2
 
 GPU       = yes
 CUDA      = no
@@ -24,18 +26,21 @@ GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 # Program name & source code list
 #===============================================================================
 
-program = main
+mpi-program = main-mpi
+ccl-program = main-ccl
 
-source = main.cpp
+mpi-source = main-mpi.cpp
+ccl-source = main-ccl.cpp
 
-obj = $(source:.cpp=.o)
+mpi-obj = $(mpi-source:.cpp=.o)
+ccl-obj = $(ccl-source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I$(MPI_ROOT)/include \
            -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 # Linker Flags
-LDFLAGS = -L$(MPI_ROOT)/lib -lmpi
+LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lccl
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
@@ -65,14 +70,19 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+$(mpi-program): $(mpi-obj)
+	$(CC) $(CFLAGS) $(mpi-obj) -o $@ $(LDFLAGS)
+
+$(ccl-program): $(ccl-obj)
+	$(CC) $(CFLAGS) $(ccl-obj) -o $@ $(LDFLAGS)
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(mpi-program) $(mpi-obj)
+	rm -rf $(ccl-program) $(ccl-obj)
 
-run: $(program)
-	$(LAUNCHER) ./$(program)
+run: $(mpi-program) $(ccl-program)
+	$(LAUNCHER) ./$(mpi-program)
+	$(LAUNCHER) ./$(ccl-program)
