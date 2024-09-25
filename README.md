@@ -19,7 +19,7 @@ Each benchmark falls into a single category. While such classification is not ac
     daphne
 
 ### Bandwidth
-    allreduce, cmembench, babelstream, ccl, memcpy, memtest, randomAccess, shmembench, triad 
+    allreduce, cmembench, babelstream, ccl, memcpy, memtest, pingpong, randomAccess, shmembench, triad 
 
 ### Bioinformatics
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
@@ -1157,6 +1157,9 @@ Early results are shown [here](results/README.md)
 
 ### phmm (cuda)
   Pair hidden Markov model (https://github.com/lienliang/Pair_HMM_forward_GPU)
+
+### pingpong (cuda)
+  Two MPI ranks pass data back and forth (https://github.com/olcf-tutorials/MPI_ping_pong)
 
 ### pitch (cuda)
   Pitched memory allocation (https://docs.nvidia.com/cuda/cuda-c-programming-guide)
