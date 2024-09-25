@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.cpp_extension import load
-np.set_printoptions(precision=4, suppress=True, linewidth=200)
 torch.backends.cudnn.benchmark = True
 # turn off TF32 for higher accuracy
 torch.backends.cudnn.allow_tf32 = False
@@ -25,8 +24,8 @@ def get_err_ratio(x, y):
 ######################################################################################################
 # The formula:
 # w.shape = (C, T)
-# k.shape = (B, C, T)  
-  
+# k.shape = (B, C, T)
+
 # out.shape = (B, C, T)
 # out[b][c][t] = sum_u{ w[c][(T-1)-(t-u)] * k[b][c][u] }
 ######################################################################################################
