@@ -21,8 +21,8 @@ def get_err_ratio(x, y):
 ######################################################################################################
 # The formula:
 # w.shape = (C, T)
-# k.shape = (B, C, T)  
-  
+# k.shape = (B, C, T)
+
 # out.shape = (B, C, T)
 # out[b][c][t] = sum_u{ w[c][(T-1)-(t-u)] * k[b][c][u] }
 ######################################################################################################
@@ -58,7 +58,7 @@ B_GROUP_FORWARD = 8
 B_GROUP_BACKWARD = 2
 
 timex_xpu = load(name="timex", sources=["src/timex_op.cpp", "src/timex.cpp"],
-                 verbose=True, extra_xpu_cflags=['-ffast-math', f'-DTmax={T_MAX}', f'-DBF={B_GROUP_FORWARD}', f'-DBB={B_GROUP_BACKWARD}'])
+                 verbose=True, extra_cflags=['-ffast-math', f'-DTmax={T_MAX}', f'-DBF={B_GROUP_FORWARD}', f'-DBB={B_GROUP_BACKWARD}'])
 
 def check_input(ctx):
     assert ctx.T % 4 == 0 and ctx.T <= T_MAX and ctx.B % B_GROUP_FORWARD == 0 and ctx.B % B_GROUP_BACKWARD == 0, \

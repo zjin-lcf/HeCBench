@@ -3,6 +3,10 @@
 #include <xpu/Macros.h>
 #include <xpu/Stream.h>
 #include <c10/core/Device.h>
+#include <c10/core/DeviceGuard.h>
+#include <c10/core/Stream.h>
+#include <c10/core/StreamGuard.h>
+
 
 // require T <= Tmax, T % 4 == 0, B % BF == 0, B % BB === 0 (Tmax and BF and BB are passed by compiler)
 
@@ -10,11 +14,11 @@
 
 inline sycl::queue& getQueue() 
 {
-  c10::xpu::XPUStream stream = c10::xpu::getCurrentXPUStream();
-  return stream.queue();
+  auto device_type = c10::DeviceType::XPU;
+  c10::impl::VirtualGuardImpl impl(device_type);
+  c10::Stream xpu_stream = impl.getStream(impl.getDevice());
+  return xpu::get_queue_from_stream(xpu_stream);
 }
-
-#endif
 
 /* template <typename F>
 __global__ void kernel_forward(const F *__restrict__ const __w, const F
@@ -155,7 +159,7 @@ void kernel_backward(const F *__restrict__ const __w,
     }
 }
 
-void cuda_forward(const float *w, const float *k, float *x, float eps, int B, int C, int T) {
+void gpu_forward(const float *w, const float *k, float *x, float eps, int B, int C, int T) {
     sycl::range<3> gridDim(1, B * C / BF, 1);
     sycl::range<3> blockDim(1, 1, T >> 2);
     getQueue().submit([&](sycl::handler &cgh) {
@@ -167,17 +171,13 @@ void cuda_forward(const float *w, const float *k, float *x, float eps, int B, in
             [=](sycl::nd_item<3> item) {
                 kernel_forward(
                     w, k, x, eps, B, C, T, item,
-                    (float *)ww_acc
-                        .template get_multi_ptr<sycl::access::decorated::no>()
-                        .get(),
-                    (float *)kk_acc
-                        .template get_multi_ptr<sycl::access::decorated::no>()
-                        .get());
+                    ww_acc.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                    kk_acc.template get_multi_ptr<sycl::access::decorated::no>().get());
             });
     });
 }
 
-void cuda_backward(const float *w, const float *k, const float *gwk, float *gw, float *gk, int B, int C, int T) {
+void gpu_backward(const float *w, const float *k, const float *gwk, float *gw, float *gk, int B, int C, int T) {
     sycl::range<3> gridDim(1, B * C / BB, 1);
     sycl::range<3> blockDim(1, 1, T >> 2);
     getQueue().submit([&](sycl::handler &cgh) {
@@ -190,15 +190,9 @@ void cuda_backward(const float *w, const float *k, const float *gwk, float *gw, 
             [=](sycl::nd_item<3> item) {
                 kernel_backward(
                     w, k, gwk, gw, gk, B, C, T, item,
-                    (float *)ww_acc
-                        .template get_multi_ptr<sycl::access::decorated::no>()
-                        .get(),
-                    (float *)kk_acc
-                        .template get_multi_ptr<sycl::access::decorated::no>()
-                        .get(),
-                    (float *)gg_acc
-                        .template get_multi_ptr<sycl::access::decorated::no>()
-                        .get());
+                    ww_acc.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                    kk_acc.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                    gg_acc.template get_multi_ptr<sycl::access::decorated::no>().get());
             });
     });
 }
