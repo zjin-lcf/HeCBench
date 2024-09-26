@@ -125,9 +125,9 @@ void dot (const size_t iNumElements, const int iNumIterations)
 
   for (i = 0; i < (size_t)iNumIterations; i++) {
     hipDataType xType, yType, rType, eType;
-    if (std::is_same<T, double>::value) {
+    if constexpr (std::is_same<T, double>::value) {
       xType = yType = rType = eType = HIPBLAS_R_64F;
-    } else if (std::is_same<T, float>::value) {
+    } else if constexpr (std::is_same<T, float>::value) {
       xType = yType = rType = eType = HIPBLAS_R_32F;
     }
 
