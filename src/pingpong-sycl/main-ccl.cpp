@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     double *h_A, *d_A;
     h_A = (double*) malloc (N*sizeof(double)); 
     d_A = sycl::malloc_device<double>(N, q);
-    q.memset(d_A, 0, N*sizeof(double));
+    q.memset(d_A, 0, N*sizeof(double)).wait();
 
     int loop_count = 50;
 
@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
             sycl::nd_range<1>(1024*256, 256), [=] (sycl::nd_item<1> item) {
               test(item, d_A, N);
           });
-        });
+        }).wait();
         ccl::send(d_A, N, ccl::datatype::float64, 0, comm, stream);
       }
     }

@@ -81,6 +81,7 @@ int main(int argc, char *argv[])
     h_A = (double*) malloc (N*sizeof(double)); 
     cudaErrorCheck( cudaMalloc((void**)&d_A, N*sizeof(double)) );
     cudaErrorCheck( cudaMemset(d_A, 0, N*sizeof(double)) );
+    cudaErrorCheck( cudaDeviceSynchronize() );
 
     int loop_count = 50;
 
@@ -93,6 +94,7 @@ int main(int argc, char *argv[])
       else if(rank == 1){
         NCCLCHECK(ncclRecv(d_A, N, ncclFloat64, 0, comm, stream));
         test<<<1024, 256, 0, stream>>>(d_A, N);
+        cudaErrorCheck( cudaStreamSynchronize(stream) );
         NCCLCHECK(ncclSend(d_A, N, ncclFloat64, 0, comm, stream));
       }
     }

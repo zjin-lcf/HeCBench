@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
     h_A = (double*) malloc (N*sizeof(double)); 
     cudaErrorCheck( cudaMalloc((void**)&d_A, N*sizeof(double)) );
     cudaErrorCheck( cudaMemset(d_A, 0, N*sizeof(double)) );
+    cudaErrorCheck( cudaDeviceSynchronize() );
 
     const int tag1 = 10;
     const int tag2 = 20;
@@ -74,6 +75,7 @@ int main(int argc, char *argv[])
       else if(rank == 1){
         MPI_Recv(d_A, N, MPI_DOUBLE, 0, tag1, MPI_COMM_WORLD, &stat);
         test<<<1024, 256>>>(d_A, N);
+        cudaErrorCheck( cudaDeviceSynchronize() );
         MPI_Send(d_A, N, MPI_DOUBLE, 0, tag2, MPI_COMM_WORLD);
       }
     }
