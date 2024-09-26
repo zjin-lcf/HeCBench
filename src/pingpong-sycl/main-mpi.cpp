@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
     double *h_A, *d_A;
     h_A = (double*) malloc (N*sizeof(double)); 
     d_A = sycl::malloc_device<double>(N, q);
-    q.memset(d_A, 0, N*sizeof(double));
+    q.memset(d_A, 0, N*sizeof(double)).wait();
 
     const int tag1 = 10;
     const int tag2 = 20;
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
             sycl::nd_range<1>(1024*256, 256), [=] (sycl::nd_item<1> item) {
               test(item, d_A, N);
           });
-        });
+        }).wait();
         MPI_Send(d_A, N, MPI_DOUBLE, 0, tag2, MPI_COMM_WORLD);
       }
     }

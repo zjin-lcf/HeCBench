@@ -81,6 +81,7 @@ int main(int argc, char *argv[])
     h_A = (double*) malloc (N*sizeof(double)); 
     hipErrorCheck( hipMalloc((void**)&d_A, N*sizeof(double)) );
     hipErrorCheck( hipMemset(d_A, 0, N*sizeof(double)) );
+    hipErrorCheck( hipDeviceSynchronize() );
 
     int loop_count = 50;
 
@@ -93,6 +94,7 @@ int main(int argc, char *argv[])
       else if(rank == 1){
         NCCLCHECK(ncclRecv(d_A, N, ncclFloat64, 0, comm, stream));
         test<<<1024, 256, 0, stream>>>(d_A, N);
+        hipErrorCheck( hipStreamSynchronize(stream) );
         NCCLCHECK(ncclSend(d_A, N, ncclFloat64, 0, comm, stream));
       }
     }
