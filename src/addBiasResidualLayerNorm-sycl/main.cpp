@@ -115,7 +115,7 @@ void layer(int repeat) {
 
   int dim[] = {256, 512, 768, 1024, 2048, 4096, 8192};
 
-  for (int i = 0; i < 7; i++) {
+  for (int i = 0; i < sizeof(dim) / sizeof(int); i++) {
 
     std::mt19937 gen (19937);
     std::uniform_real_distribution<float> dis(0.f, 1.f);
