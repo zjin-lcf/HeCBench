@@ -1,7 +1,7 @@
-#include <cmath>  // std::isfinite
+#include <cfloat>
+#include <cmath>
 #include <hip/hip_runtime.h>
 #include <hip/hip_cooperative_groups.h>
-#include <float.h>
 
 namespace cg = cooperative_groups;
 

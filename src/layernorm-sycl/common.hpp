@@ -1,11 +1,11 @@
 #ifndef LLM_SYCL_COMMON_HPP
 #define LLM_SYCL_COMMON_HPP
 
-#include <sycl/sycl.hpp>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
 #include <chrono>
+#include <sycl/sycl.hpp>
 
 float* make_random_float(size_t N) {
     float* arr = (float*)malloc(N * sizeof(float));
