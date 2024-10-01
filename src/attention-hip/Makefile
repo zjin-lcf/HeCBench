@@ -47,11 +47,16 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../attention-cuda/reference.h Makefile
+%.o: %.cu ../attention-cuda/reference.h kernels.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 65536 2048 100
+	$(LAUNCHER) ./$(program) 65536 2048 0 100
+	$(LAUNCHER) ./$(program) 65536 2048 1 100
+	$(LAUNCHER) ./$(program) 65536 2048 2 100
+	$(LAUNCHER) ./$(program) 8192 8192 0 100
+	$(LAUNCHER) ./$(program) 8192 8192 1 100
+	$(LAUNCHER) ./$(program) 8192 8192 2 100
