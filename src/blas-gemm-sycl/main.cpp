@@ -34,32 +34,17 @@
 *******************************************************************************/
 
 // stl includes
-#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <iterator>
-#include <limits>
-#include <list>
-#include <vector>
 
 // mkl/sycl includes
 #include <sycl/sycl.hpp>
 #include "oneapi/mkl/blas.hpp"
 #include "mkl.h"
 
-#ifdef DEBUG
-template <typename T>
-void print_2x2_matrix_values(T M, int ldM, std::string M_name)
-{
-  std::cout << std::endl;
-  std::cout << "\t\t\t" << M_name << " = [ " << (float)M[0*ldM + 0] << ", " << (float)M[1*ldM + 0]         << ", ...\n";
-  std::cout << "\t\t\t    [ "                << (float)M[0*ldM + 1] << ", " << (float)M[1*ldM + 1] << ", ...\n";
-  std::cout << "\t\t\t    [ "                << "...\n";
-  std::cout << std::endl;
-}
-#endif
+#include "utils.h"
 
 #define TILE_X 16
 #define TILE_Y 16
@@ -88,16 +73,6 @@ void run_simple_gemm(sycl::queue &q, T *a, T *b, T *c, int M, int K, int N, T al
       matrix_mul(item, a, b, c, M, K, N, alpha, beta);
     });
   });
-}
-
-//
-// helpers for initializing templated scalar data type values.
-//
-template <typename fp> void rand_matrix(fp *M, int n_row, int n_col)
-{
-  for (int i = 0; i < n_row; i++)
-    for (int j = 0; j < n_col; j++)
-      M[i * n_col + j] = rand() % 2;
 }
 
 //
@@ -178,7 +153,7 @@ void run_gemm_example(MKL_INT m, MKL_INT k, MKL_INT n, int repeat) {
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average GEMM execution time: %f (us)\n", (time * 1e-3f) / repeat);
+  performance(m, n, k, false, time / repeat);
 
   //
   // Post Processing
