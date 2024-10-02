@@ -1,17 +1,13 @@
-#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <iterator>
-#include <limits>
-#include <list>
-#include <vector>
 #include <type_traits>
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
 #include <hipblas/hipblas.h>
 
+#ifdef DEBUG
 template <typename T>
 void print_2x2_matrix_values(T M, int ldM, std::string M_name)
 {
@@ -20,6 +16,30 @@ void print_2x2_matrix_values(T M, int ldM, std::string M_name)
   std::cout << "\t\t\t    [ "                << (float)M[0*ldM + 1] << ", " << (float)M[1*ldM + 1] << ", ...\n";
   std::cout << "\t\t\t    [ "                << "...\n";
   std::cout << std::endl;
+}
+#endif
+
+#define TILE_X 16
+#define TILE_Y 16
+
+// M * K, K * N
+template <typename T>
+__global__ void matrix_mul(T *a, T *b, T *c, int M, int K, int N, T alpha, T beta) {
+  int row = blockIdx.y * TILE_Y + threadIdx.y;
+  int col = blockIdx.x * TILE_X + threadIdx.x;
+  if (row < M && col < N) {
+    T s = 0;
+    for (int k = 0; k < K; k++)
+      s += a[row * K + k] * b[k * N + col];
+    c[row * N + col] = alpha * s + beta * c[row * N + col];
+  }
+}
+
+template <typename T>
+void run_simple_gemm(T *a, T *b, T *c, int M, int K, int N, T alpha, T beta) {
+  dim3 grids ((N + TILE_X - 1) / TILE_X, (M + TILE_Y - 1) / TILE_Y);
+  dim3 blocks (TILE_X, TILE_Y);
+  matrix_mul<<<grids, blocks>>>(a, b, c, M, K, N, alpha, beta);
 }
 
 //
@@ -62,33 +82,55 @@ void run_gemm_example(int m, int k, int n, int repeat) {
   fp* a = (fp *) aligned_alloc(64, A_size);
   fp* b = (fp *) aligned_alloc(64, B_size);
   fp* c = (fp *) aligned_alloc(64, C_size);
+  fp* r = (fp *) aligned_alloc(64, C_size);
 
   srand(2);
   rand_matrix(a, m, k);
   rand_matrix(b, k, n);
   rand_matrix(c, m, n);
 
-  fp *da, *db, *dc;
+  fp *da, *db, *dc, *dr;
   hipMalloc((void**)&da, A_size);
   hipMalloc((void**)&db, B_size);
   hipMalloc((void**)&dc, C_size);
+  hipMalloc((void**)&dr, C_size);
   hipMemcpy(da, a, A_size, hipMemcpyHostToDevice);
   hipMemcpy(db, b, B_size, hipMemcpyHostToDevice);
+  hipMemcpy(dc, c, C_size, hipMemcpyHostToDevice);
+  hipMemcpy(dr, c, C_size, hipMemcpyHostToDevice);
 
   // create execution queue and buffers of matrix data
   hipblasHandle_t h;
   hipblasCreate(&h);
 
+  std::cout << "Checking BLAS GEMM.. ";
+  run_simple_gemm(da, db, dr, m, k, n, alpha, beta);
+
+  if constexpr (std::is_same_v<fp, __half>)
+    hipblasHgemm(h, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k,
+                &alpha, db, n, da, k, &beta, dc, n);
+  else if constexpr (std::is_same_v<fp, float>)
+    hipblasSgemm(h, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k,
+                &alpha, db, n, da, k, &beta, dc, n);
+  else if constexpr (std::is_same_v<fp, double>)
+    hipblasDgemm(h, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k,
+                &alpha, db, n, da, k, &beta, dc, n);
+
+  hipMemcpy(c, dc, C_size, hipMemcpyDeviceToHost);
+  hipMemcpy(r, dr, C_size, hipMemcpyDeviceToHost);
+  int error = memcmp(c, r, C_size);
+  std::cout << (error ? "FAIL" : "PASS") << std::endl;
+
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    if constexpr (std::is_same_v<fp, hipblasHalf>)
+    if constexpr (std::is_same_v<fp, __half>)
       hipblasHgemm(h, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k,
-                   &alpha, db, n, da, k, &beta, dc, n);
+                  &alpha, db, n, da, k, &beta, dc, n);
     else if constexpr (std::is_same_v<fp, float>)
       hipblasSgemm(h, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k,
-                   &alpha, db, n, da, k, &beta, dc, n);
+                  &alpha, db, n, da, k, &beta, dc, n);
     else if constexpr (std::is_same_v<fp, double>)
       hipblasDgemm(h, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k,
                   &alpha, db, n, da, k, &beta, dc, n);
@@ -97,33 +139,38 @@ void run_gemm_example(int m, int k, int n, int repeat) {
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average GEMM execution time: %f (us)\n", (time * 1e-3f) / repeat);
+  std::cout << "Average GEMM execution time: " << time * 1e-3f / repeat <<  " (us)" << std::endl;
 
-  hipMemcpy(c, dc, C_size, hipMemcpyDeviceToHost);
-  hipblasDestroy(h);
-
-  hipFree(da);
-  hipFree(db);
-  hipFree(dc);
 
   //
   // Post Processing
   //
 
+#ifdef DEBUG
   std::cout << "\n\t\tOutputting 2x2 block of A,B,C matrices:" << std::endl;
 
   // output the top 2x2 block of A matrix
-  //print_2x2_matrix_values(a, k, "A");
+  print_2x2_matrix_values(a, k, "A");
 
   // output the top 2x2 block of B matrix
-  //print_2x2_matrix_values(b, n, "B");
+  print_2x2_matrix_values(b, n, "B");
 
   // output the top 2x2 block of C matrix
+  hipMemcpy(c, dc, C_size, hipMemcpyDeviceToHost);
   print_2x2_matrix_values(c, n, "C");
+#endif
+
+  hipblasDestroy(h);
+
+  hipFree(da);
+  hipFree(db);
+  hipFree(dc);
+  hipFree(dr);
 
   free(a);
   free(b);
   free(c);
+  free(r);
 }
 
 //
@@ -140,7 +187,7 @@ int main (int argc, char ** argv) {
   const int repeat = atoi(argv[4]);
 
   std::cout << "\tRunning with half precision data type:" << std::endl;
-  run_gemm_example<hipblasHalf>(m, k, n, repeat);
+  run_gemm_example<__half>(m, k, n, repeat);
 
   std::cout << "\tRunning with single precision data type:" << std::endl;
   run_gemm_example<float>(m, k, n, repeat);
