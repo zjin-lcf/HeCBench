@@ -49,6 +49,7 @@
 #include "oneapi/mkl/blas.hpp"
 #include "mkl.h"
 
+#ifdef DEBUG
 template <typename T>
 void print_2x2_matrix_values(T M, int ldM, std::string M_name)
 {
@@ -57,6 +58,36 @@ void print_2x2_matrix_values(T M, int ldM, std::string M_name)
   std::cout << "\t\t\t    [ "                << (float)M[0*ldM + 1] << ", " << (float)M[1*ldM + 1] << ", ...\n";
   std::cout << "\t\t\t    [ "                << "...\n";
   std::cout << std::endl;
+}
+#endif
+
+#define TILE_X 16
+#define TILE_Y 16
+
+// M * K, K * N
+template <typename T>
+void matrix_mul(sycl::nd_item<2> &item, T *a, T *b, T *c, int M, int K, int N, T alpha, T beta) {
+  int row = item.get_global_id(0);
+  int col = item.get_global_id(1);
+  if (row < M && col < N) {
+    T s = 0;
+    for (int k = 0; k < K; k++)
+      s += a[row * K + k] * b[k * N + col];
+    c[row * N + col] = alpha * s + beta * c[row * N + col];
+  }
+}
+
+template <typename T>
+void run_simple_gemm(sycl::queue &q, T *a, T *b, T *c, int M, int K, int N, T alpha, T beta) {
+  sycl::range<2> gws ((M + TILE_Y - 1) / TILE_Y * TILE_Y,
+                      (N + TILE_X - 1) / TILE_X * TILE_X);
+  sycl::range<2> lws (TILE_Y, TILE_X);
+
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+      matrix_mul(item, a, b, c, M, K, N, alpha, beta);
+    });
+  });
 }
 
 //
@@ -102,6 +133,7 @@ void run_gemm_example(MKL_INT m, MKL_INT k, MKL_INT n, int repeat) {
   fp* a = (fp *)mkl_malloc(A_size, 64);
   fp* b = (fp *)mkl_malloc(B_size, 64);
   fp* c = (fp *)mkl_malloc(C_size, 64);
+  fp* r = (fp *)mkl_malloc(C_size, 64);
 
   srand(2);
   rand_matrix(a, m, k);
@@ -115,52 +147,66 @@ void run_gemm_example(MKL_INT m, MKL_INT k, MKL_INT n, int repeat) {
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  fp *d_a = sycl::malloc_device<fp>(m*k, q);
-  fp *d_b = sycl::malloc_device<fp>(k*n, q);
-  fp *d_c = sycl::malloc_device<fp>(m*n, q);
-  q.memcpy(d_a, a, A_size);
-  q.memcpy(d_b, b, B_size);
+  fp *da, *db, *dc, *dr;
+  da = sycl::malloc_device<fp>(m*k, q);
+  db = sycl::malloc_device<fp>(k*n, q);
+  dc = sycl::malloc_device<fp>(m*n, q);
+  dr = sycl::malloc_device<fp>(m*n, q);
+  q.memcpy(da, a, A_size);
+  q.memcpy(db, b, B_size);
+  q.memcpy(dc, c, B_size);
+  q.memcpy(dr, c, B_size);
+
+  std::cout << "Checking BLAS GEMM.. ";
+  run_simple_gemm(q, da, db, dr, m, k, n, alpha, beta);
+
+  oneapi::mkl::blas::gemm(q, transA, transB,
+                          n, m, k, alpha, db, n, da, k, beta, dc, n);
+  q.memcpy(c, dc, C_size).wait();
+  q.memcpy(r, dr, C_size).wait();
+  int error = memcmp(c, r, C_size);
+  std::cout << (error ? "FAIL" : "PASS") << std::endl;
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++)
-    oneapi::mkl::blas::gemm(
-        q, transA, transB,
-        n, m, k, alpha,
-        d_b, n,
-        d_a, k,
-        beta, d_c, n);
+  for (int i = 0; i < repeat; i++) {
+    oneapi::mkl::blas::gemm(q, transA, transB, n, m, k,
+                            alpha, db, n, da, k, beta, dc, n);
+  }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average GEMM execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-  q.memcpy(c, d_c, C_size).wait();
-
-  sycl::free(d_a, q);
-  sycl::free(d_b, q);
-  sycl::free(d_c, q);
-
   //
   // Post Processing
   //
 
+#ifdef DEBUG
   std::cout << "\n\t\tOutputting 2x2 block of A,B,C matrices:" << std::endl;
 
   // output the top 2x2 block of A matrix
-  //print_2x2_matrix_values(a, k, "A");
+  print_2x2_matrix_values(a, k, "A");
 
   // output the top 2x2 block of B matrix
-  //print_2x2_matrix_values(b, n, "B");
+  print_2x2_matrix_values(b, n, "B");
 
   // output the top 2x2 block of C matrix
+  q.memcpy(c, dc, C_size).wait();
   print_2x2_matrix_values(c, n, "C");
+#endif
+
+  sycl::free(da, q);
+  sycl::free(db, q);
+  sycl::free(dc, q);
+  sycl::free(dr, q);
 
   mkl_free(a);
   mkl_free(b);
   mkl_free(c);
+  mkl_free(r);
 }
 
 //
