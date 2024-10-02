@@ -2,14 +2,15 @@
 #include <cstdlib>
 #include <cstdio>
 #include <hip/hip_runtime.h>
+#include <hip/hip_cooperative_groups.h>
 
 #define BLOCK_SIZE 256
 
-// A C model derived from the OpenCL kernel 
+// A C model derived from the OpenCL kernel
 void softMax_cpu(const int numSlice, const int sliceSize, const float* src, float* dest) {
   for (int i = 0; i < numSlice; i++) {
     float max_ = src[i * sliceSize];
-    for (int j = 1; j < sliceSize; j++) {
+    for (int j = 0; j < sliceSize; j++) {
       max_ = (max_ < src[i * sliceSize + j]) ? src[i * sliceSize + j] : max_;
     }
     float sum = 0;
@@ -31,7 +32,7 @@ void softMax (const int numSlice, const int sliceSize,
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= numSlice) return;
   float max_ = src[i * sliceSize];
-  for (int j = 1; j < sliceSize; j++) {
+  for (int j = 0; j < sliceSize; j++) {
     max_ = max(max_, src[i * sliceSize + j]);
   }
   float sum = 0;
@@ -43,15 +44,57 @@ void softMax (const int numSlice, const int sliceSize,
   }
 }
 
+__device__ inline float warpReduceSum(cooperative_groups::thread_block_tile<32> &warp, float val) {
+    for (int offset = 16; offset > 0; offset /= 2) {
+        val += warp.shfl_xor(val, offset);
+    }
+    return val;
+}
+
+__device__ inline float warpReduceMax(cooperative_groups::thread_block_tile<32> &warp, float val) {
+    for (int offset = 16; offset > 0; offset /= 2) {
+        val = max(val, warp.shfl_xor(val, offset));
+    }
+    return val;
+}
+
+__global__
+void softMax2 (const int numSlice, const int sliceSize,
+              const float* src, float* dest)
+{
+  namespace cg = cooperative_groups;
+  cg::thread_block block = cg::this_thread_block();
+  cg::thread_block_tile<32> warp = cg::tiled_partition<32>(block);
+  int i = blockIdx.x * warp.meta_group_size() + warp.meta_group_rank();
+  if (i >= numSlice) return;
+  float max_ = src[i * sliceSize];
+  for (int j = warp.thread_rank(); j < sliceSize; j += warp.size()) {
+    max_ = max(max_, src[i * sliceSize + j]);
+  }
+  max_ = warpReduceMax(warp, max_);
+  float sum = 0;
+  for (int j = warp.thread_rank(); j < sliceSize; j += warp.size()) {
+    sum += expf(src[i * sliceSize + j] - max_);
+  }
+  sum = warpReduceSum(warp, sum);
+  for (int j = warp.thread_rank(); j < sliceSize; j += warp.size()) {
+    dest[i * sliceSize + j] = expf(src[i * sliceSize + j] - max_) / sum;
+  }
+}
+
+
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
-    printf("Usage: %s <number of slices> <slice size> <repeat>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <number of slices> <slice size> <implementations> <repeat>\n", argv[0]);
+    printf("implementation 0: naive\n");
+    printf("implementation 1: optimized\n");
     return 1;
   }
-   
+
   int numSlice = atoi(argv[1]);
   int sliceSize = atoi(argv[2]);
-  int repeat = atoi(argv[3]);
+  int kernel = atoi(argv[3]);
+  int repeat = atoi(argv[4]);
   int numElem = numSlice * sliceSize;
 
   float* input = (float*) aligned_alloc(1024, sizeof(float) * numElem);
@@ -61,28 +104,45 @@ int main(int argc, char* argv[]) {
   srand(2);
   for (int i = 0; i < numSlice; i++)
     for (int j = 0; j < sliceSize; j++)
-      input[i*sliceSize+j] = rand() % 13; 
+      input[i*sliceSize+j] = rand() % 13;
 
   float *d_input, *d_output;
   hipMalloc((void**)&d_input, sizeof(float) * numElem);
   hipMalloc((void**)&d_output, sizeof(float) * numElem);
   hipMemcpy(d_input, input, sizeof(float) * numElem, hipMemcpyHostToDevice);
 
-  dim3 global_work_size ((numSlice+BLOCK_SIZE-1)/BLOCK_SIZE);
-  dim3 local_work_size (BLOCK_SIZE);
+  if (kernel == 1) {
+    dim3 grids ((numSlice+BLOCK_SIZE/32-1)/(BLOCK_SIZE/32));
+    dim3 blocks (BLOCK_SIZE);
 
-  hipDeviceSynchronize();
-  auto start = std::chrono::steady_clock::now();
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
 
-  for (int n = 0; n < repeat; n++) {
-    hipLaunchKernelGGL(softMax, global_work_size, local_work_size, 0, 0,
-                       numSlice, sliceSize, d_input, d_output);
+    for (int n = 0; n < repeat; n++) {
+      softMax2<<<grids, blocks>>>(numSlice, sliceSize, d_input, d_output);
+    }
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
   }
+  else {
+    dim3 grids ((numSlice+BLOCK_SIZE-1)/BLOCK_SIZE);
+    dim3 blocks (BLOCK_SIZE);
 
-  hipDeviceSynchronize();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+    hipDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+
+    for (int n = 0; n < repeat; n++) {
+      softMax<<<grids, blocks>>>(numSlice, sliceSize, d_input, d_output);
+    }
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
+  }
 
   hipMemcpy(output_gpu, d_output, sizeof(float) * numElem, hipMemcpyDeviceToHost);
 
