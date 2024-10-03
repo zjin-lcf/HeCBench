@@ -23,75 +23,22 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
-#include <fstream>
-#include <vector>
 #include <chrono>
-#include <cfloat>
-#include <iomanip>
-#include <cmath>
 #include <hip/hip_runtime.h>
-
-
-__global__ void atomic_reduction(int *in, int* out, int arrayLength) {
-  int sum=int(0);
-  int idx = blockIdx.x*blockDim.x+threadIdx.x;
-  for(int i= idx;i<arrayLength;i+=blockDim.x*gridDim.x) {
-    sum+=in[i];
-  }
-  atomicAdd(out,sum);
-}
-
-__global__ void atomic_reduction_v2(int *in, int* out, int arrayLength) {
-  int sum=int(0);
-  int idx = blockIdx.x*blockDim.x+threadIdx.x;
-  for(int i= idx*2;i<arrayLength;i+=blockDim.x*gridDim.x*2) {
-    sum+=in[i] + in[i+1];
-  }
-  atomicAdd(out,sum);
-}
-
-__global__ void atomic_reduction_v4(int *in, int* out, int arrayLength) {
-  int sum=int(0);
-  int idx = blockIdx.x*blockDim.x+threadIdx.x;
-  for(int i= idx*4;i<arrayLength;i+=blockDim.x*gridDim.x*4) {
-    sum+=in[i] + in[i+1] + in[i+2] + in[i+3];
-  }
-  atomicAdd(out,sum);
-}
-
-__global__ void atomic_reduction_v8(int *in, int* out, int arrayLength) {
-  int sum=int(0);
-  int idx = blockIdx.x*blockDim.x+threadIdx.x;
-  for(int i= idx*8;i<arrayLength;i+=blockDim.x*gridDim.x*8) {
-    sum+=in[i] + in[i+1] + in[i+2] + in[i+3] +in[i+4] +in[i+5] +in[i+6] +in[i+7];
-  }
-  atomicAdd(out,sum);
-}
-
-__global__ void atomic_reduction_v16(int *in, int* out, int arrayLength) {
-  int sum=int(0);
-  int idx = blockIdx.x*blockDim.x+threadIdx.x;
-  for(int i= idx*16;i<arrayLength;i+=blockDim.x*gridDim.x*16) {
-    sum+=in[i] + in[i+1] + in[i+2] + in[i+3] +in[i+4] +in[i+5] +in[i+6] +in[i+7] 
-      +in[i+8] +in[i+9] +in[i+10] +in[i+11] +in[i+12] +in[i+13] +in[i+14] +in[i+15] ;
-  }
-  atomicAdd(out,sum);
-}
+#include "kernels.h"
 
 int main(int argc, char** argv)
 {
   int arrayLength = 52428800;
-  int threads=256;
+  int block_sizes[] = {128, 256, 512, 1024};
   int N = 32;
 
-  if (argc == 4) {
+  if (argc == 3) {
     arrayLength=atoi(argv[1]);
-    threads=atoi(argv[2]);
-    N=atoi(argv[3]);
+    N=atoi(argv[2]);
   }
 
   std::cout << "Array size: " << arrayLength*sizeof(int)/1024.0/1024.0 << " MB"<<std::endl;
-  std::cout << "Thread block size: " << threads << std::endl;
   std::cout << "Repeat the kernel execution: " << N << " times" << std::endl;
 
   int* array=(int*)malloc(arrayLength*sizeof(int));
@@ -100,125 +47,61 @@ int main(int argc, char** argv)
     array[i]=rand()%2;
     checksum+=array[i];
   }
-  int *in, *out;
 
   // Declare timers
   std::chrono::high_resolution_clock::time_point t1, t2;
 
-
-  long long size=sizeof(int)*arrayLength;
+  size_t size=sizeof(int)*arrayLength;
 
   // Get device properties
   hipDeviceProp_t props;
   hipGetDeviceProperties(&props, 0);
   std::cout << "Device name: " << props.name << std::endl;
 
+  int *in, *out;
   hipMalloc(&in,size);
   hipMalloc(&out,sizeof(int));
 
   hipMemcpy(in,array,arrayLength*sizeof(int),hipMemcpyHostToDevice);
   hipDeviceSynchronize();
 
-  int blocks=std::min((arrayLength+threads-1)/threads,2048);
-
   // warmup
   for(int i=0;i<N;i++) {
-    hipMemsetAsync(out,0,sizeof(int));
-    hipLaunchKernelGGL(atomic_reduction, dim3(blocks), dim3(threads), 0, 0, in,out,arrayLength);
+    hipMemset(out,0,sizeof(int));
+    atomic_reduction<<< dim3(2048), dim3(256) >>>(in,out,arrayLength);
   }
   hipDeviceSynchronize();
 
-  // start timing
-  t1 = std::chrono::high_resolution_clock::now();
-  for(int i=0;i<N;i++) {
-    hipMemsetAsync(out,0,sizeof(int));
-    hipLaunchKernelGGL(atomic_reduction, dim3(blocks), dim3(threads), 0, 0, in,out,arrayLength);
-  }
-  hipDeviceSynchronize();
-  t2 = std::chrono::high_resolution_clock::now();
-  double times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
   float GB=(float)arrayLength*sizeof(int)*N;
-  std::cout << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
-
   int sum;
-  hipMemcpy(&sum,out,sizeof(int),hipMemcpyDeviceToHost);
+  double times;
 
-  if(sum==checksum)
-    std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
-  else
-    std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
+#define benchmark(kernel_name, grid_size) \
+    t1 = std::chrono::high_resolution_clock::now(); \
+    for(int i=0;i<N;i++) { \
+      hipMemset(out,0,sizeof(int)); \
+      kernel_name<<< dim3(grid_size), dim3(block_size) >>>(in,out,arrayLength); \
+    } \
+    hipDeviceSynchronize(); \
+    t2 = std::chrono::high_resolution_clock::now(); \
+    times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count(); \
+    std::cout << "Thread block size: " <<  block_size << ", "; \
+    std::cout << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl; \
+    hipMemcpy(&sum,out,sizeof(int),hipMemcpyDeviceToHost); \
+    if(sum==checksum) \
+      std::cout<<"VERIFICATION: PASS"<<std::endl<<std::endl; \
+    else \
+      std::cout<<"VERIFICATION: FAIL!!"<<std::endl<<std::endl; \
 
-  t1 = std::chrono::high_resolution_clock::now();
-  for(int i=0;i<N;i++) {
-    hipMemsetAsync(out,0,sizeof(int));
-    hipLaunchKernelGGL(atomic_reduction_v2, dim3(blocks/2), dim3(threads), 0, 0, in,out,arrayLength);
+  for (size_t k = 0; k < sizeof(block_sizes) / sizeof(int); k++) {
+    int block_size = block_sizes[k];
+    int blocks=std::min((arrayLength+block_size-1)/block_size,2048);
+    benchmark(atomic_reduction, blocks);
+    benchmark(atomic_reduction_v2, blocks/2);
+    benchmark(atomic_reduction_v4, blocks/4);
+    benchmark(atomic_reduction_v8, blocks/8);
+    benchmark(atomic_reduction_v16, blocks/16);
   }
-  hipDeviceSynchronize();
-  t2 = std::chrono::high_resolution_clock::now();
-  times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-  GB=(float)arrayLength*sizeof(int)*N;
-  std::cout << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
-
-  hipMemcpy(&sum,out,sizeof(int),hipMemcpyDeviceToHost);
-
-  if(sum==checksum)
-    std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
-  else
-    std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
-  t1 = std::chrono::high_resolution_clock::now();
-
-  for(int i=0;i<N;i++) {
-    hipMemsetAsync(out,0,sizeof(int));
-    hipLaunchKernelGGL(atomic_reduction_v4, dim3(blocks/4), dim3(threads), 0, 0, in,out,arrayLength);
-  }
-  hipDeviceSynchronize();
-  t2 = std::chrono::high_resolution_clock::now();
-  times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-  GB=(float)arrayLength*sizeof(int)*N;
-  std::cout << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
-
-  hipMemcpy(&sum,out,sizeof(int),hipMemcpyDeviceToHost);
-
-  if(sum==checksum)
-    std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
-  else
-    std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
-
-  t1 = std::chrono::high_resolution_clock::now();
-  for(int i=0;i<N;i++) {
-    hipMemsetAsync(out,0,sizeof(int));
-    hipLaunchKernelGGL(atomic_reduction_v8, dim3(blocks/8), dim3(threads), 0, 0, in,out,arrayLength);
-  }
-  hipDeviceSynchronize();
-  t2 = std::chrono::high_resolution_clock::now();
-  times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-  GB=(float)arrayLength*sizeof(int)*N;
-  std::cout << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
-
-  hipMemcpy(&sum,out,sizeof(int),hipMemcpyDeviceToHost);
-
-  if(sum==checksum)
-    std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
-  else
-    std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
-
-  t1 = std::chrono::high_resolution_clock::now();
-  for(int i=0;i<N;i++) {
-    hipMemsetAsync(out,0,sizeof(int));
-    hipLaunchKernelGGL(atomic_reduction_v16, dim3(blocks/16), dim3(threads), 0, 0, in,out,arrayLength);
-  }
-  hipDeviceSynchronize();
-  t2 = std::chrono::high_resolution_clock::now();
-  times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-  GB=(float)arrayLength*sizeof(int)*N;
-  std::cout << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl;
-
-  hipMemcpy(&sum,out,sizeof(int),hipMemcpyDeviceToHost);
-
-  if(sum==checksum)
-    std::cout<<"VERIFICATION: result is CORRECT"<<std::endl<<std::endl;
-  else
-    std::cout<<"VERIFICATION: result is INCORRECT!!"<<std::endl<<std::endl;
 
   hipFree(in);
   hipFree(out);
