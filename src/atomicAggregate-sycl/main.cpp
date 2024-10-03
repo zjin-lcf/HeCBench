@@ -11,10 +11,49 @@ inline int ffs(int x) {
   return (x == 0) ? 0 : sycl::ctz(x) + 1;
 }
 
+#define DPCT
+/// https://github.com/oneapi-src/SYCLomatic/
+/// The function match_any_over_sub_group conducts a comparison of values
+/// across work-items within a sub-group. match_any_over_sub_group return a mask
+/// in which some bits are set to 1, indicating that the values provided by
+/// the work-items represented by these bits are equal. The n-th bit of mask
+/// representing the work-item with id n. The parameter \p member_mask
+/// indicating the work-items participating the call.
+template <typename T>
+unsigned int match_any_over_sub_group(sycl::sub_group g, unsigned member_mask,
+                                      T value) {
+  static_assert(std::is_trivially_copyable_v<T>,
+                "Value type must be trivially copyable type.");
+  if (!member_mask) {
+    return 0;
+  }
+  unsigned int id = g.get_local_linear_id();
+  unsigned int flag = 0, result = 0, reduce_result = 0;
+  unsigned int bit_index = 0x1 << id;
+  bool is_participate = member_mask & bit_index;
+  T broadcast_value = 0;
+  bool matched = false;
+  while (flag != member_mask) {
+    broadcast_value =
+        sycl::select_from_group(g, value, sycl::ctz((~flag & member_mask)));
+    reduce_result = sycl::reduce_over_group(
+        g, is_participate ? (broadcast_value == value ? bit_index : 0) : 0,
+        sycl::plus<>());
+    flag |= reduce_result;
+    matched = reduce_result & bit_index;
+    result = matched * reduce_result + (1 - matched) * result;
+  }
+  return result;
+}
+
+
 // increment the value at ptr by 1 and return the old value
 int atomicAggInc(int* ptr, sycl::nd_item<1> &item) {
   int mask;
   auto sg = item.get_sub_group();
+#ifdef DPCT
+  mask = match_any_over_sub_group(sg, 0xFFFFFFFF, (unsigned long long)ptr);
+#else
   for (int i = 0; i < warpSize; i++) {
     unsigned long long tptr = sycl::select_from_group(sg, (unsigned long long)ptr, i);
     auto gb = sycl::ext::oneapi::group_ballot(sg, (tptr == (unsigned long long)ptr));
@@ -22,6 +61,7 @@ int atomicAggInc(int* ptr, sycl::nd_item<1> &item) {
     gb.extract_bits(my_mask, 0);
     if (i == (item.get_local_id(0) & (warpSize - 1))) mask = my_mask;
   }
+#endif
 
   int leader = ffs(mask) - 1; // select a leader
   int res = 0;
