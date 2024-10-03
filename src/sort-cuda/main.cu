@@ -6,6 +6,9 @@
 #include <vector>
 #include <chrono>
 #include <cuda.h>
+#include <thrust/sort.h>
+#include <thrust/functional.h>
+#include <thrust/device_vector.h>
 
 typedef unsigned int T;
 typedef uint4 VECTYPE;
@@ -91,9 +94,7 @@ int main(int argc, char** argv)
   cudaMalloc((void**)&d_odata, size * sizeof(T));
   cudaMalloc((void**)&d_isums, num_work_groups * num_digits * sizeof(T));
 
-  T* d_in;
-  T* d_out;
-
+  T *d_in, *d_out;
   double time = 0.0;
 
   for (int k = 0; k < passes; k++)
@@ -125,14 +126,31 @@ int main(int argc, char** argv)
     time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }  // passes
 
-  printf("Average elapsed time per pass %lf (s)\n", time * 1e-9 / passes);
+  printf("Average elapsed time of sort: %lf (s)\n", time * 1e-9 / passes);
 
   cudaMemcpy(h_odata, d_out, size * sizeof(T), cudaMemcpyDeviceToHost);
+  verifySort(h_odata, size);
+
+  // reference sort
+  time = 0.0;
+  for (int k = 0; k < passes; k++) {
+    cudaMemcpy(d_odata, h_idata, size * sizeof(T), cudaMemcpyHostToDevice);
+    cudaDeviceSynchronize();
+    auto start = std::chrono::steady_clock::now();
+    thrust::device_ptr<T> d_out_ptr (d_odata);
+    thrust::sort(d_out_ptr, d_out_ptr + size, thrust::less<T>());
+    cudaDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  }
+  printf("Average elapsed time of Thrust::sort: %lf (s)\n", time * 1e-9 / passes);
+
+  cudaMemcpy(h_odata, d_odata, size * sizeof(T), cudaMemcpyDeviceToHost);
+  verifySort(h_odata, size);
+
   cudaFree(d_idata);
   cudaFree(d_odata);
   cudaFree(d_isums);
-
-  verifySort(h_odata, size);
 
   free(h_idata);
   free(h_odata);

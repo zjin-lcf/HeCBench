@@ -1,3 +1,5 @@
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/algorithm>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -152,14 +154,30 @@ int main(int argc, char** argv)
     time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }  // passes
 
-  printf("Average elapsed time per pass %lf (s)\n", time * 1e-9 / passes);
+  printf("Average elapsed time of sort: %lf (s)\n", time * 1e-9 / passes);
 
   q.memcpy(h_odata, d_odata, size * sizeof(T)).wait();
+  verifySort(h_odata, size);
+
+  // reference sort
+  time = 0.0;
+  for (int k = 0; k < passes; k++) {
+    q.memcpy(d_odata, h_idata, size * sizeof(T));
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+    oneapi::dpl::sort(oneapi::dpl::execution::make_device_policy(q), d_odata, d_odata + size);
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  }
+  printf("Average elapsed time of oneDPL::sort: %lf (s)\n", time * 1e-9 / passes);
+
+  q.memcpy(h_odata, d_odata, size * sizeof(T)).wait();
+  verifySort(h_odata, size);
+
   sycl::free(d_idata, q);
   sycl::free(d_odata, q);
   sycl::free(d_isums, q);
-
-  verifySort(h_odata, size);
 
   free(h_idata);
   free(h_odata);
