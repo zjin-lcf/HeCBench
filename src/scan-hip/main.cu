@@ -38,7 +38,7 @@ __global__ void scan_bcao (
     auto gi = g_idata + bid * N;
     auto go = g_odata + bid * N;
 
-    int thid = threadIdx.x; 
+    int thid = threadIdx.x;
     int a = thid;
     int b = a + (N/2);
     int oa = OFFSET(a);
@@ -48,10 +48,10 @@ __global__ void scan_bcao (
     temp[b + ob] = gi[b];
 
     int offset = 1;
-    for (int d = N >> 1; d > 0; d >>= 1) 
+    for (int d = N >> 1; d > 0; d >>= 1)
     {
       __syncthreads();
-      if (thid < d) 
+      if (thid < d)
       {
         int ai = offset*(2*thid+1)-1;
         int bi = offset*(2*thid+2)-1;
@@ -98,11 +98,11 @@ __global__ void scan(
     auto gi = g_idata + bid * N;
     auto go = g_odata + bid * N;
 
-    int thid = threadIdx.x; 
+    int thid = threadIdx.x;
     int offset = 1;
     temp[2*thid]   = gi[2*thid];
     temp[2*thid+1] = gi[2*thid+1];
-    for (int d = N >> 1; d > 0; d >>= 1) 
+    for (int d = N >> 1; d > 0; d >>= 1)
     {
       __syncthreads();
       if (thid < d)
@@ -118,12 +118,12 @@ __global__ void scan(
     for (int d = 1; d < N; d *= 2) // traverse down
     {
       offset >>= 1;
-      __syncthreads();      
+      __syncthreads();
       if (thid < d)
       {
         int ai = offset*(2*thid+1)-1;
         int bi = offset*(2*thid+2)-1;
-        float t = temp[ai];
+        T t = temp[ai];
         temp[ai] = temp[bi];
         temp[bi] += t;
       }
@@ -134,7 +134,7 @@ __global__ void scan(
 }
 
 template <typename T, int N>
-void runTest (const int64_t n, const int repeat, bool timing = false) 
+void runTest (const int64_t n, const int repeat, bool timing = false)
 {
   int64_t num_blocks = (n + N - 1) / N;
 
@@ -151,9 +151,9 @@ void runTest (const int64_t n, const int repeat, bool timing = false)
 
   T *t_in = in;
   T *t_out = cpu_out;
-  for (int64_t n = 0; n < num_blocks; n++) { 
+  for (int64_t n = 0; n < num_blocks; n++) {
     t_out[0] = 0;
-    for (int i = 1; i < N; i++) 
+    for (int i = 1; i < N; i++)
       t_out[i] = t_out[i-1] + t_in[i-1];
     t_out += N;
     t_in += N;
@@ -162,7 +162,7 @@ void runTest (const int64_t n, const int repeat, bool timing = false)
   T *d_in, *d_out;
 
   hipMalloc((void**)&d_in, bytes);
-  hipMemcpy(d_in, in, bytes, hipMemcpyHostToDevice); 
+  hipMemcpy(d_in, in, bytes, hipMemcpyHostToDevice);
 
   hipMalloc((void**)&d_out, bytes);
 
@@ -234,11 +234,11 @@ int main(int argc, char* argv[])
   const int64_t n = atol(argv[1]);
   const int repeat = atoi(argv[2]);
 
-  run< 128>(n, repeat);  
-  run< 256>(n, repeat);  
-  run< 512>(n, repeat);  
-  run<1024>(n, repeat);  
-  run<2048>(n, repeat);  
+  run< 128>(n, repeat);
+  run< 256>(n, repeat);
+  run< 512>(n, repeat);
+  run<1024>(n, repeat);
+  run<2048>(n, repeat);
 
-  return 0; 
+  return 0;
 }
