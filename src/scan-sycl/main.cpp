@@ -128,7 +128,7 @@ void scan (
       {
         int ai = offset*(2*thid+1)-1;
         int bi = offset*(2*thid+2)-1;
-        float t = temp[ai];
+        T t = temp[ai];
         temp[ai] = temp[bi];
         temp[bi] += t;
       }
@@ -171,7 +171,7 @@ void runTest (sycl::queue &q, const int64_t n, const int repeat, bool timing = f
   T *d_out = sycl::malloc_device<T>(nelems, q);
 
   int cu = q.get_device().get_info<sycl::info::device::max_compute_units>();
-  
+
   sycl::range<1> gws (16 * cu * N/2);
   sycl::range<1> lws (N/2);
 
