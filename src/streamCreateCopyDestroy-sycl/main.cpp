@@ -17,16 +17,18 @@
  THE SOFTWARE.
  */
 
-#include <sycl/sycl.hpp>
 #include <iostream>
 #include <iomanip>
 #include <chrono>
+#include <sycl/sycl.hpp>
 
 #define BufSize 0x1000
 #define Iterations 0x100
 #define TotalStreams 4
 #define TotalBufs 4
 
+sycl::property_list p {sycl::property::queue::in_order(),
+                       sycl::ext::oneapi::property::queue::discard_events()};
 
 class PerfStreamCreateCopyDestroy {
   private:
@@ -34,21 +36,20 @@ class PerfStreamCreateCopyDestroy {
     unsigned int numStreams_;
     const size_t totalStreams_[TotalStreams];
     const size_t totalBuffers_[TotalBufs];
+    sycl::queue q_;
   public:
-    PerfStreamCreateCopyDestroy() : numBuffers_(0), numStreams_(0),
-                                       totalStreams_{1, 2, 4, 8},
-                                       totalBuffers_{1, 100, 1000, 5000} {};
+    PerfStreamCreateCopyDestroy(sycl::queue &q) :
+        numBuffers_(0), numStreams_(0),
+        totalStreams_{1, 2, 4, 8},
+        totalBuffers_{1, 100, 1000, 5000},
+        q_(q) {};
     ~PerfStreamCreateCopyDestroy() {};
     void open(int deviceID);
-    void run(unsigned int testNumber);
+    void run_baseline(unsigned int testNumber);
+    void run_stream(unsigned int testNumber);
 };
 
-void PerfStreamCreateCopyDestroy::run(unsigned int testNumber) {
-#ifdef USE_GPU
-  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
-#else
-  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
-#endif
+void PerfStreamCreateCopyDestroy::run_stream(unsigned int testNumber) {
 
   numStreams_ = totalStreams_[testNumber % TotalStreams];
   size_t iter = Iterations / (numStreams_ * ((size_t)1 << (testNumber / TotalBufs + 1)));
@@ -60,7 +61,7 @@ void PerfStreamCreateCopyDestroy::run(unsigned int testNumber) {
   size_t nBytes = BufSize * sizeof(float);
 
   for (size_t b = 0; b < numBuffers_; ++b) {
-    dSrc[b] = (float *)sycl::malloc_device(nBytes, q);
+    dSrc[b] = (float *)sycl::malloc_device(nBytes, q_);
   }
 
   float* hSrc;
@@ -73,10 +74,7 @@ void PerfStreamCreateCopyDestroy::run(unsigned int testNumber) {
 
   for (size_t i = 0; i < iter; ++i) {
     for (size_t s = 0; s < numStreams_; ++s) {
-      streams[s] = new sycl::queue(q.get_device(),
-                                   sycl::property_list{sycl::property::queue::in_order(),
-                                                       sycl::ext::oneapi::property::queue::discard_events()
-                                                      });
+      streams[s] = new sycl::queue(q_.get_device(), p);
     }
 
     for (size_t s = 0; s < numStreams_; ++s) {
@@ -96,20 +94,77 @@ void PerfStreamCreateCopyDestroy::run(unsigned int testNumber) {
 
   auto time = static_cast<float>(diff.count() * 1000 / (iter * numStreams_));
 
-  std::cout << "Create+Copy+Synchronize+Destroy time for " << numStreams_ << " streams and "
+  std::cout << "[Stream] Create+Copy+Synchronize+Destroy time for " << numStreams_ << " streams and "
        << std::setw(4) << numBuffers_ << " buffers " << " and " << std::setw(4)
        << iter << " iterations " << time << " (ms) " << std::endl;
 
   delete [] hSrc;
   for (size_t b = 0; b < numBuffers_; ++b) {
-    sycl::free(dSrc[b], q);
+    sycl::free(dSrc[b], q_);
+  }
+}
+
+void PerfStreamCreateCopyDestroy::run_baseline(unsigned int testNumber) {
+
+  numStreams_ = totalStreams_[testNumber % TotalStreams];
+  size_t iter = Iterations / (numStreams_ * ((size_t)1 << (testNumber / TotalBufs + 1)));
+
+  numBuffers_ = totalBuffers_[testNumber / TotalBufs];
+  float* dSrc[numBuffers_];
+  size_t nBytes = BufSize * sizeof(float);
+
+  for (size_t b = 0; b < numBuffers_; ++b) {
+    dSrc[b] = (float *)sycl::malloc_device(nBytes, q_);
+  }
+
+  float* hSrc;
+  hSrc = new float[nBytes];
+  for (size_t i = 0; i < BufSize; i++) {
+    hSrc[i] = 1.618f + i;
+  }
+
+  auto start = std::chrono::steady_clock::now();
+
+  for (size_t i = 0; i < iter; ++i) {
+    for (size_t s = 0; s < numStreams_; ++s) {
+      for (size_t b = 0; b < numBuffers_; ++b) {
+        q_.memcpy(dSrc[b], hSrc, nBytes);
+      }
+    }
+    q_.wait();
+  }
+
+  auto end = std::chrono::steady_clock::now();
+  std::chrono::duration<double> diff = end - start;
+
+  auto time = static_cast<float>(diff.count() * 1000 / (iter * numStreams_));
+
+  std::cout << "[Baseline] Copy+Synchronize time for the default stream and "
+       << std::setw(4) << numBuffers_ << " buffers " << " and " << std::setw(4)
+       << iter << " iterations " << time << " (ms) " << std::endl;
+
+  delete [] hSrc;
+  for (size_t b = 0; b < numBuffers_; ++b) {
+    sycl::free(dSrc[b], q_);
   }
 }
 
 int main(int argc, char* argv[]) {
-  PerfStreamCreateCopyDestroy streamCCD;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, p);
+#else
+  sycl::queue q(sycl::cpu_selector_v, p);
+#endif
 
+  PerfStreamCreateCopyDestroy streamCCD(q);
+
+  streamCCD.run_baseline(0); // warmup
   for (auto testCase = 0; testCase < TotalStreams * TotalBufs; testCase++) {
-    streamCCD.run(testCase);
+    streamCCD.run_baseline(testCase);
+  }
+
+  streamCCD.run_stream(0); // warmup
+  for (auto testCase = 0; testCase < TotalStreams * TotalBufs; testCase++) {
+    streamCCD.run_stream(testCase);
   }
 }
