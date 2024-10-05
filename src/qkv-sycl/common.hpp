@@ -1,10 +1,8 @@
-#ifndef LLM_SYCL_COMMON_HPP
-#define LLM_SYCL_COMMON_HPP
-
 #include <cfloat>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <chrono>
+#include <iostream>
 #include <sycl/sycl.hpp>
 
 float* make_random_float(size_t N) {
@@ -86,4 +84,3 @@ template<class T>
 T ceil_div(T dividend, T divisor) {
     return (dividend + divisor - 1) / divisor;
 }
-#endif //LLM_SYCL_COMMON_HPP

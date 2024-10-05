@@ -1,6 +1,6 @@
-#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
 #include <omp.h>
-#include <sycl/sycl.hpp>
 #include <oneapi/mkl.hpp>
 #include <oneapi/dnnl/dnnl.hpp>
 #include <oneapi/dnnl/dnnl_sycl.hpp>
@@ -236,6 +236,7 @@ void matmul_forward2(sycl::queue &q, float* out,
 void matmul_forward3(sycl::queue& queue, float* out,
                      const float* inp, const float* weight, const float* bias,
                      int B, int T, int C, int OC) {
+/*
     bool has_bias = (bias != nullptr);
     bool has_gelu = false;
 
@@ -292,6 +293,7 @@ void matmul_forward3(sycl::queue& queue, float* out,
         });
     }
     stream.wait();
+*/
 }
 
 // handwritten, relatively efficient non-tensorcore matmul kernel

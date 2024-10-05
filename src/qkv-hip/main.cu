@@ -4,9 +4,6 @@ Kernels for matmul forward pass.
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <hip/hip_runtime.h>
-#include <hipblas/hipblas.h>
-#include <hipblaslt/hipblaslt.h>
 #include <omp.h>
 #include "common.h"
 
