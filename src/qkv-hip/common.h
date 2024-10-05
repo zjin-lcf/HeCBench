@@ -1,6 +1,9 @@
 #include <cfloat>
+#include <chrono>
 #include <cmath>
 #include <hip/hip_runtime.h>
+#include <hipblas/hipblas.h>
+#include <hipblaslt/hipblaslt.h>
 
 float* make_random_float(size_t N) {
     float* arr = (float*)malloc(N * sizeof(float));

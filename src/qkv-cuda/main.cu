@@ -4,9 +4,6 @@ Kernels for matmul forward pass.
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <cuda_runtime.h>
-#include <cublas_v2.h>
-#include <cublasLt.h>
 #include <omp.h>
 #include "common.h"
 
