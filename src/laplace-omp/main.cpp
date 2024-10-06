@@ -17,10 +17,10 @@
 #include "timer.h"
 
 /** Problem size along one side; total number of cells is this squared */
-#define NUM 512
+#define NUM 1024
 
 // block size
-#define BLOCK_SIZE 128
+#define BLOCK_SIZE 256
 
 #define Real float
 #define ZERO 0.0f
@@ -182,7 +182,7 @@ int main (void) {
   
       Real norm_L2 = ZERO;
   
-      #pragma omp target teams distribute parallel for collapse(2)
+      #pragma omp target teams distribute parallel for collapse(2) num_threads(BLOCK_SIZE)
       for (int row = 1; row <= NUM/2; row++) {
         for (int col = 1; col <= NUM; col++) {
           int ind_red = col * ((NUM >> 1) + 2) + row;  					// local (red) index
@@ -203,14 +203,13 @@ int main (void) {
           bl_norm_L2[ind_red] = res * res;
         }
       }
-      #pragma omp target update from (bl_norm_L2[0:size_norm])
-  
       // add red cell contributions to residual
+      #pragma omp target teams distribute parallel for reduction(+:norm_L2)
       for (int i = 0; i < size_norm; ++i) {
         norm_L2 += bl_norm_L2[i];
       }
   
-      #pragma omp target teams distribute parallel for collapse(2)
+      #pragma omp target teams distribute parallel for collapse(2) num_threads(BLOCK_SIZE)
       for (int row = 1; row <= NUM/2; row++) {
         for (int col = 1; col <= NUM; col++) {
           int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
@@ -231,11 +230,10 @@ int main (void) {
           bl_norm_L2[ind_black] = res * res;
         }
       }
-      #pragma omp target update from (bl_norm_L2[0:size_norm])
-  
-      // transfer residual value(s) back to CPU and 
       // add black cell contributions to residual
-      for (int i = 0; i < size_norm; ++i) norm_L2 += bl_norm_L2[i];
+      #pragma omp target teams distribute parallel for reduction(+:norm_L2)
+      for (int i = 0; i < size_norm; ++i)
+        norm_L2 += bl_norm_L2[i];
   
       // calculate residual
       norm_L2 = sqrt(norm_L2 / ((Real)size));

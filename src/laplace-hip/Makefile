@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../laplace-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -47,7 +47,7 @@ endif
 $(program): $(obj) 
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu timer.h 
+%.o: %.cu timer.h  ../laplace-cuda/kernels.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

@@ -48,7 +48,7 @@ endif
 $(program): $(obj) 
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu timer.h
+%.o: %.cu kernels.h timer.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
