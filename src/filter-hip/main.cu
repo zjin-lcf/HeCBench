@@ -16,12 +16,13 @@
 #include <random>
 #include <vector>
 #include <hip/hip_runtime.h>
+#include <hip/hip_cooperative_groups.h>
 
 __global__ 
-void filter_shared (int *__restrict__ dst,
-                    int *__restrict__ nres,
-                    const int*__restrict__ src,
-                    int n)
+void filter (int *__restrict__ dst,
+             int *__restrict__ nres,
+             const int*__restrict__ src,
+             int n)
 {
   __shared__ int l_n;
   int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -54,6 +55,26 @@ void filter_shared (int *__restrict__ dst,
   }
   __syncthreads();
 }
+
+__device__ int atomicAggInc(int *ctr) {
+  auto g = cooperative_groups::coalesced_threads();
+  int warp_res = 0;
+  if(g.thread_rank() == 0)
+    warp_res = atomicAdd(ctr, g.size());
+  return g.shfl(warp_res, 0) + g.thread_rank();
+}
+
+__global__
+void filter2 (int *__restrict__ dst,
+              int *__restrict__ nres,
+              const int*__restrict__ src,
+              int n)
+{
+  int i = threadIdx.x + blockIdx.x * blockDim.x;
+  if(i < n && src[i] > 0)
+    dst[atomicAggInc(nres)] = src[i];
+}
+
 
 // compare device results with host results
 bool check(int *d_nres, int *d_output, int h_nres, std::vector<int> &h_output) {
@@ -115,7 +136,7 @@ int main(int argc, char **argv) {
   hipMalloc(&d_nres, sizeof(int));
 
   hipMemcpy(d_input, input.data(),
-            sizeof(int) * num_elems, hipMemcpyHostToDevice);
+             sizeof(int) * num_elems, hipMemcpyHostToDevice);
 
   dim3 dimBlock (block_size);
   dim3 dimGrid ((num_elems + block_size - 1) / block_size);
@@ -125,7 +146,7 @@ int main(int argc, char **argv) {
 
   for (int i = 0; i < repeat; i++) {
     hipMemset(d_nres, 0, sizeof(int));
-    filter_shared<<<dimGrid, dimBlock>>>(d_output, d_nres, d_input, num_elems);
+    filter<<<dimGrid, dimBlock>>>(d_output, d_nres, d_input, num_elems);
   }
 
   hipDeviceSynchronize();
@@ -135,6 +156,22 @@ int main(int argc, char **argv) {
          (time * 1e-6) / repeat);
 
   bool match = check(d_nres, d_output, h_flt_count, h_output);
+  printf("%s\n", match ? "PASS" : "FAIL");
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    hipMemset(d_nres, 0, sizeof(int));
+    filter2<<<dimGrid, dimBlock>>>(d_output, d_nres, d_input, num_elems);
+  }
+
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of filter (global aggregate) %lf (ms)\n",
+         (time * 1e-6) / repeat);
+
+  match = check(d_nres, d_output, h_flt_count, h_output);
   printf("%s\n", match ? "PASS" : "FAIL");
 
   hipFree(d_input);
