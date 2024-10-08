@@ -37,12 +37,12 @@ bool check(sycl::queue &q, int *d_nres, int *d_output, int h_nres, std::vector<i
   return equal;
 }
 
-void filter_shared (int *__restrict d_output,
-                    int *__restrict d_nres,
-                    const int*__restrict__ d_input,
-                    const int num_elems,
-                    int &l_n,
-                    sycl::nd_item<1> &item)
+void filter(int *__restrict d_output,
+            int *__restrict d_nres,
+            const int*__restrict__ d_input,
+            const int num_elems,
+            int &l_n,
+            sycl::nd_item<1> &item)
 {
   int i = item.get_global_id(0);
 
@@ -83,6 +83,32 @@ void filter_shared (int *__restrict d_output,
   }
   item.barrier(sycl::access::fence_space::local_space);
 }
+
+int atomicAggInc(int *ctr) {
+  auto g = sycl::ext::oneapi::experimental::this_kernel::get_opportunistic_group();
+  int warp_res = 0;
+  if (g.leader()) {
+    auto ao = sycl::atomic_ref<int,
+              sycl::memory_order::relaxed,
+              sycl::memory_scope::device,
+              sycl::access::address_space::global_space> (ctr[0]);
+    warp_res = ao.fetch_add(g.get_local_linear_range());
+  }
+  return sycl::group_broadcast(g, warp_res) + g.get_local_linear_id();
+}
+
+
+void filter2 (int *__restrict__ dst,
+              int *__restrict__ nres,
+              const int*__restrict__ src,
+              int n,
+              const sycl::nd_item<1> &item)
+{
+  int i = item.get_global_id(0);
+  if (i < n && src[i] > 0)
+    dst[atomicAggInc(nres)] = src[i];
+}
+
 
 int main(int argc, char **argv) {
   if (argc != 4) {
@@ -138,12 +164,11 @@ int main(int argc, char **argv) {
 
   for (int i = 0; i < repeat; i++) {
     q.memset(d_nres, 0, sizeof(int));
-
     q.submit([&](sycl::handler &h) {
       sycl::local_accessor <int, 0> l_n (h);
-      h.parallel_for<class filter>(
+      h.parallel_for<class filter_sharedMem>(
       sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        filter_shared(d_output, d_nres, d_input, num_elems, l_n, item);
+        filter(d_output, d_nres, d_input, num_elems, l_n, item);
       });
     });
   }
@@ -155,6 +180,27 @@ int main(int argc, char **argv) {
          (time * 1e-6) / repeat);
 
   bool match = check(q, d_nres, d_output, h_flt_count, h_output);
+  printf("%s\n", match ? "PASS" : "FAIL");
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++) {
+    q.memset(d_nres, 0, sizeof(int));
+    q.submit([&](sycl::handler &h) {
+      h.parallel_for<class filter_atomicAggInc>(
+      sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        filter2(d_output, d_nres, d_input, num_elems, item);
+      });
+    });
+  }
+
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of filter (global aggregate) %lf (ms)\n",
+         (time * 1e-6) / repeat);
+
+  match = check(q, d_nres, d_output, h_flt_count, h_output);
   printf("%s\n", match ? "PASS" : "FAIL");
 
   sycl::free(d_input, q);
