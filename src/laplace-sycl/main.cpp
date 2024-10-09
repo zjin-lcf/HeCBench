@@ -15,7 +15,7 @@
  */
 
 #include <oneapi/dpl/execution>
-#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/numeric>
 #include <sycl/sycl.hpp>
 #include <stdlib.h>
 #include <stdio.h>
@@ -176,17 +176,17 @@ int main(void) {
   // residual
   // one for each temperature value
   int size_norm = size_temp;
-  bl_norm_L2_d = (float *)sycl::malloc_device(size_norm * sizeof(Real), q);
-  q.memset(bl_norm_L2_d, 0, size_norm * sizeof(Real)).wait();
+  bl_norm_L2_d = sycl::malloc_device<Real>(size_norm, q);
+  q.memset(bl_norm_L2_d, 0, size_norm * sizeof(Real));
 
-  aP_d = (float *)sycl::malloc_device(size * sizeof(Real), q);
-  aW_d = (float *)sycl::malloc_device(size * sizeof(Real), q);
-  aE_d = (float *)sycl::malloc_device(size * sizeof(Real), q);
-  aS_d = (float *)sycl::malloc_device(size * sizeof(Real), q);
-  aN_d = (float *)sycl::malloc_device(size * sizeof(Real), q);
-  b_d = (float *)sycl::malloc_device(size * sizeof(Real), q);
-  temp_red_d = (float *)sycl::malloc_device(size_temp * sizeof(Real), q);
-  temp_black_d = (float *)sycl::malloc_device(size_temp * sizeof(Real), q);
+  aP_d = sycl::malloc_device<Real>(size, q);
+  aW_d = sycl::malloc_device<Real>(size, q);
+  aE_d = sycl::malloc_device<Real>(size, q);
+  aS_d = sycl::malloc_device<Real>(size, q);
+  aN_d = sycl::malloc_device<Real>(size, q);
+  b_d = sycl::malloc_device<Real>(size, q);
+  temp_red_d = sycl::malloc_device<Real>(size_temp, q);
+  temp_black_d = sycl::malloc_device<Real>(size_temp, q);
 
   // copy to device memory
   q.memcpy(aP_d, aP, size * sizeof(Real));
