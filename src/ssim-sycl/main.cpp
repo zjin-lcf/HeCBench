@@ -1,5 +1,5 @@
 #include <oneapi/dpl/execution>
-#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/numeric>
 #include <sycl/sycl.hpp>
 #include <chrono>
 #include <stdlib.h>
