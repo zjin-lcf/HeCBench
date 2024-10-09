@@ -112,7 +112,6 @@ template <typename scalar_t> void nonzero(int nrows, int ncols, int repeat) {
 
     // Number of non-zeros computed by a device
     int64_t h_nzeros;
-    int64_t *d_nzeros = sycl::malloc_device<int64_t>(1, q);
 
     // Time the sum reduction on a device
     auto start = std::chrono::steady_clock::now();
@@ -123,13 +122,10 @@ template <typename scalar_t> void nonzero(int nrows, int ncols, int repeat) {
     oneapi::dpl::transform_iterator<scalar_t *, NonZero<scalar_t>> itr(
         d_in, conversion_op);
 
-    q.fill(d_nzeros, oneapi::dpl::reduce(policy, itr, itr + num_items,
-           typename std::iterator_traits<decltype(d_nzeros)>::value_type{}), 1).wait();
+    h_nzeros = oneapi::dpl::reduce(policy, itr, itr + num_items, (int64_t)0);
 
     auto end = std::chrono::steady_clock::now();
     sum_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
-    q.memcpy(&h_nzeros, d_nzeros, sizeof(int64_t)).wait();
 
     if (h_nzeros != r_nzeros) {
 
@@ -203,7 +199,6 @@ template <typename scalar_t> void nonzero(int nrows, int ncols, int repeat) {
       free(h_out);
     }
 
-    sycl::free(d_nzeros, q);
     sycl::free(d_in, q);
 
     if (!ok) break;
