@@ -104,11 +104,10 @@ void nonzero (int nrows, int ncols, int repeat) {
 
     hipFree(d_temp_storage);
 
-    hipDeviceSynchronize();
+    hipMemcpy(&h_nzeros, d_nzeros, sizeof(int64_t), hipMemcpyDeviceToHost);
+
     auto end = std::chrono::steady_clock::now();
     sum_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
-    hipMemcpy(&h_nzeros, d_nzeros, sizeof(int64_t), hipMemcpyDeviceToHost);
 
     if (h_nzeros != r_nzeros) {
 
