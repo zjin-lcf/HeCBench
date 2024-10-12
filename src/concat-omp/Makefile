@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -qopenmp
 
 # Linker Flags
 LDFLAGS = 
@@ -42,8 +42,6 @@ endif
 
 ifeq ($(DEVICE),gpu)
   CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
-else
-  CFLAGS +=-qopenmp
 endif
 #===============================================================================
 # Targets to Build
@@ -52,7 +50,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

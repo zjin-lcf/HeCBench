@@ -1,15 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
-
-const int max_seq_len = 1024;
-const int max_batch_tokens = 9216;
-
-/* Convert 3-dim tensor index into vector index */
-inline int flat_3dim(int id1, int id2, int id3, int dim2, int dim3) {
-  return id1 * dim2 * dim3 + id2 * dim3 + id3;
-}
+#include "reference.h"
 
 template <typename T>
 void concat (sycl::nd_item<1> &item,
@@ -27,8 +21,8 @@ void concat (sycl::nd_item<1> &item,
   idx = idx / sz2;
   int idx1 = idx % (sz1_1 + sz1_2);
   int idx0 = idx / (sz1_1 + sz1_2);
-  float *src_ptr = nullptr;
-  int sz1 = 0;
+  float *src_ptr;
+  int sz1;
   if (idx1 < sz1_1) {
     sz1 = sz1_1;
     src_ptr = (float *)inp1;
@@ -55,48 +49,47 @@ int main(int argc, char* argv[])
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  for (int nhead = 4; nhead <= 16; nhead += 4) { // a multiple of 4
+  for (int nhead = 6; nhead <= 48; nhead *= 2) {
     srand(nhead);
 
-    int seq_len = rand() % max_seq_len + 1;
-    while (seq_len <= 1) {
-      seq_len = rand() % max_seq_len + 1;
-    }
-
-    const int max_batch_size = max_batch_tokens / seq_len;
-    const int batch_size = rand() % max_batch_size + 1;
-    const int upbound = 1024 / nhead + 1;
-    const int hidden_dim = (rand() % upbound + 1) * nhead * 4;
+    const int seq_len = 1024;
+    const int batch_size = 8;
+    const int hidden_dim = nhead * 128;
     const int head_dim = hidden_dim / nhead;
 
     const int sl1 = rand() % (seq_len - 1) + 1;
     const int sl2 = seq_len - sl1;
-    const int beam_size = rand() % 8 + 1;
+    const int beam_size = 8;
 
+    printf("\n");
     printf("num_head = %d\t", nhead);
     printf("seq_len = %d\t", seq_len);
-    printf("batch size = %d\t", batch_size);
-    printf("hidden dimension = %d\t", hidden_dim);
-    printf("beam size = %d\n", beam_size);
+    printf("batch_size = %d\t", batch_size);
+    printf("hidden_dimension = %d\t", hidden_dim);
+    printf("beam_size = %d\n", beam_size);
 
-    const size_t inp1_size = batch_size * beam_size * nhead * sl1 * head_dim;
-    const size_t inp2_size = batch_size * beam_size * nhead * sl2 * head_dim;
-    const size_t outp_size = batch_size * beam_size * nhead * seq_len * head_dim;
+    const size_t inp1_size = batch_size * beam_size * hidden_dim * sl1;
+    const size_t inp2_size = batch_size * beam_size * hidden_dim * sl2;
+    const size_t outp_size = batch_size * beam_size * hidden_dim * seq_len;
 
     const size_t inp1_size_bytes = inp1_size * sizeof(float);
     const size_t inp2_size_bytes = inp2_size * sizeof(float);
     const size_t outp_size_bytes = outp_size * sizeof(float);
 
+    float size_bytes = 2 * outp_size_bytes * 1e-9;
+    printf("Total device memory usage (GB) = %.2f\n", size_bytes);
+
     float *inp1 = (float*) malloc (inp1_size_bytes);
     float *inp2 = (float*) malloc (inp2_size_bytes);
     float *outp = (float*) malloc (outp_size_bytes);
+    float *outp_ref = (float*) malloc (outp_size_bytes);
 
     for (size_t i = 0; i < inp1_size; i++) {
-      inp1[i] = -1.f;
+      inp1[i] = rand() % inp1_size; 
     }
 
     for (size_t i = 0; i < inp2_size; i++) {
-      inp2[i] = 1.f;
+      inp2[i] = rand() % inp2_size; 
     }
 
     float *d_inp1, *d_inp2, *d_outp;
@@ -112,7 +105,7 @@ int main(int argc, char* argv[])
     sycl::range<1> gws (nblock * 256);
     sycl::range<1> lws (256);
 
-    // warmup
+    // warmup and verify
     q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class warmup>(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
@@ -120,7 +113,13 @@ int main(int argc, char* argv[])
       });
     });
 
-    q.wait();
+    concat_cpu(
+      inp1, inp2, outp_ref, batch_size * beam_size * nhead, head_dim, sl1, sl2);
+
+    q.memcpy (outp, d_outp, outp_size_bytes).wait();
+    int error = memcmp(outp_ref, outp, outp_size_bytes);
+    printf("%s\n", error ? "FAIL" : "PASS");
+
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
@@ -135,15 +134,9 @@ int main(int argc, char* argv[])
     q.wait();
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
-
-    q.memcpy(outp, d_outp, outp_size_bytes).wait();
-
-    double checksum = 0;
-    for (size_t i = 0; i < outp_size; i++) {
-      checksum += outp[i];
-    }
-    printf("Checksum = %lf\n\n", checksum);
+    float avg_time = (time * 1e-3f) / repeat;
+    printf("Average kernel execution time: %f (us)\n", avg_time);
+    printf("Average kernel throughput : %f (GB/s)\n", size_bytes / (avg_time * 1e-6));
 
     sycl::free(d_inp1, q);
     sycl::free(d_inp2, q);
