@@ -30,7 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../multinomial-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -38,7 +38,6 @@ LDFLAGS =
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            -Xcuda-ptxas --maxrregcount=32 \
             --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
 
@@ -69,7 +68,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp ../multinomial-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
