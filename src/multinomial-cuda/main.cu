@@ -4,6 +4,7 @@
 #include <random>
 #include <cuda.h>
 #include <cub/cub.cuh>
+#include "reference.h"
 
 #define GPU_NUM_THREADS 256
 
@@ -12,8 +13,8 @@ __global__ void sampleMultinomialOnce(
     int* dest,
     int distributions,
     int categories,
-    const scalar_t* sampled,
-    const scalar_t* dist,
+    const scalar_t*__restrict__ sampled,
+    const scalar_t*__restrict__ dist,
     int stride_dist,
     int stride_categories)
 {
@@ -147,8 +148,8 @@ int main(int argc, char* argv[])
   const int numCategories = atoi(argv[2]);
   const int repeat = atoi(argv[3]);
 
-  int sample_size_bytes = numDist * sizeof(float); 
-  float *sample = (float*) malloc (sample_size_bytes); 
+  int sample_size_bytes = numDist * sizeof(float);
+  float *sample = (float*) malloc (sample_size_bytes);
 
   std::default_random_engine g (123);
   std::uniform_real_distribution<float> uniform_distr (0.f, 1.f);
@@ -159,10 +160,11 @@ int main(int argc, char* argv[])
 
   int result_size_bytes = numDist * sizeof(int);
   int *result = (int*) malloc (result_size_bytes);
+  int *result_ref = (int*) malloc (result_size_bytes);
 
   size_t distr_size_bytes = numDist * numCategories * sizeof(float);
   float *distr = (float*) malloc (distr_size_bytes);
-  
+
   srand(123);
   for (int i = 0; i < numDist; i++) {
     for (int j = 0; j < numCategories; j++) {
@@ -186,31 +188,43 @@ int main(int argc, char* argv[])
   dim3 grid(512);
   dim3 block(requiredThreads);
 
+  // warmup and verify
+  sampleMultinomialOnce<float, float> <<<grid, block>>>(
+      d_result, numDist, numCategories, d_sample, d_distr, numCategories, 1);
+
+  sampleMultinomialOnce_cpu<float, float> (
+      result_ref, numDist, numCategories, sample, distr, numCategories, 1);
+
+  cudaMemcpy(result, d_result, result_size_bytes, cudaMemcpyDeviceToHost);
+
+  int error = 0;
+  for (int i = 0; i < numDist; i++) {
+    if (abs(result[i] - result_ref[i]) > 1) {
+      printf("results mismatch: %d %d %d\n", i, result[i], result_ref[i]);
+      error = 1;
+      break;
+    }
+  }
+  printf("%s\n", error ? "FAIL" : "PASS");
+
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
     sampleMultinomialOnce<float, float> <<<grid, block>>>(
-      d_result, numDist, numCategories, d_sample, d_distr, numCategories, 1); 
+      d_result, numDist, numCategories, d_sample, d_distr, numCategories, 1);
   }
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of sampleMultinomialOnce kernel: %f (us)\n", (time * 1e-3f) / repeat);
-  cudaMemcpy(result, d_result, result_size_bytes, cudaMemcpyDeviceToHost);
-
-  double sum = 0, var = 0;
-  for (int i = 0; i < numDist; i++) sum += result[i];
-  sum = sum / numDist;
-  for (int i = 0; i < numDist; i++) 
-    var += (result[i] - sum) * (result[i] - sum);
-  printf("Variance = %lf\n", var / numDist);
 
   cudaFree(d_result);
   cudaFree(d_sample);
   cudaFree(d_distr);
 
+  free(result_ref);
   free(result);
   free(sample);
   free(distr);

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <random>
 #include <sycl/sycl.hpp>
+#include "reference.h"
 
 #define GPU_NUM_THREADS 256
 
@@ -15,8 +16,8 @@ void sampleMultinomialOnce(
     int *__restrict dest,
     int distributions,
     int categories,
-    const scalar_t* sampled,
-    const scalar_t* dist,
+    const scalar_t*__restrict sampled,
+    const scalar_t*__restrict dist,
     int stride_dist,
     int stride_categories)
 {
@@ -166,6 +167,7 @@ int main(int argc, char* argv[])
 
   int result_size_bytes = numDist * sizeof(int);
   int *result = (int*) malloc (result_size_bytes);
+  int *result_ref = (int*) malloc (result_size_bytes);
 
   size_t distr_size_bytes = numDist * numCategories * sizeof(float);
   float *distr = (float*) malloc (distr_size_bytes);
@@ -196,6 +198,33 @@ int main(int argc, char* argv[])
   sycl::range<1> gws (512 * requiredThreads);
   sycl::range<1> lws (requiredThreads);
 
+  // warmup and verify
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> smem (sycl::range<1>(requiredThreads), cgh);
+    sycl::local_accessor<bool, 0> found (cgh);
+    sycl::local_accessor<int, 0> foundPos (cgh);
+    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      sampleMultinomialOnce<float, float> (
+        item, smem.get_pointer(), found, foundPos,
+        d_result, numDist, numCategories, d_sample, d_distr, numCategories, 1);
+    });
+  });
+
+  sampleMultinomialOnce_cpu<float, float> (
+      result_ref, numDist, numCategories, sample, distr, numCategories, 1);
+
+  q.memcpy(result, d_result, result_size_bytes).wait();
+
+  int error = 0;
+  for (int i = 0; i < numDist; i++) {
+    if (abs(result[i] - result_ref[i]) > 1) {
+      printf("results mismatch: %d %d %d\n", i, result[i], result_ref[i]);
+      error = 1;
+      break;
+    }
+  }
+  printf("%s\n", error ? "FAIL" : "PASS");
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
@@ -204,7 +233,7 @@ int main(int argc, char* argv[])
       sycl::local_accessor<float, 1> smem (sycl::range<1>(requiredThreads), cgh);
       sycl::local_accessor<bool, 0> found (cgh);
       sycl::local_accessor<int, 0> foundPos (cgh);
-      cgh.parallel_for<class k1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         sampleMultinomialOnce<float, float> (
           item, smem.get_pointer(), found, foundPos,
           d_result, numDist, numCategories, d_sample, d_distr, numCategories, 1);
@@ -216,19 +245,12 @@ int main(int argc, char* argv[])
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of sampleMultinomialOnce kernel: %f (us)\n", (time * 1e-3f) / repeat);
-  q.memcpy(result, d_result, result_size_bytes).wait();
-
-  double sum = 0, var = 0;
-  for (int i = 0; i < numDist; i++) sum += result[i];
-  sum = sum / numDist;
-  for (int i = 0; i < numDist; i++)
-    var += (result[i] - sum) * (result[i] - sum);
-  printf("Variance = %lf\n", var / numDist);
 
   sycl::free(d_result, q);
   sycl::free(d_sample, q);
   sycl::free(d_distr, q);
 
+  free(result_ref);
   free(result);
   free(sample);
   free(distr);
