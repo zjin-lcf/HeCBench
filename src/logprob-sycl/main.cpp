@@ -22,13 +22,15 @@
 #include <random>
 #include <sycl/sycl.hpp>
 
+typedef sycl::half half;
+#include "reference.h"
+
 #ifdef WAVE64
 #define SG 64
 #else
 #define SG 32
 #endif
 
-static const float HALF_FLT_MAX = 65504.F;
 
 #ifndef USE_SYCL_GROUP_REDUCE
   #include "reduce.h"
@@ -48,32 +50,31 @@ void log_probs_kernel(
     const int    max_input_length,
     const int    batch_size,
     const int    vocab_size,
-    const int    vocab_size_padded,
-    bool         batch_first)
+    const int    vocab_size_padded)
 {
   // Calculate the log probability from logits.
   //   log_probs[t, :] = log(softmax(logits))[ids[t + 1, :]]
   //
-  // log_probs: [max_length - 1, batch_size] or [batch_size, max_length -1],
+  // log_probs: [batch_size, max_length -1],
   //     log probabilities of each token.
-  // logits: [max_length, batch_size, vocab_size_padded] or [batch_size, max_length, vocab_size_padded]
+  // logits: [batch_size, max_length, vocab_size_padded]
   // lengths: [batch_size], sequence lengths
   // ids: [max_length, batch_size], token ids.
   // batch_size: [1], batch_size. in case of beam > 1, batch x beam.
   // vocab_size: [1], vocab_size,
   // vocab_size: [1], vocab_size_padded, padded vocab size.
 
-  const bool IS_FP16 = std::is_same<T, sycl::half>::value;
+  const bool IS_FP16 = std::is_same<T, half>::value;
   const T    MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : FLT_MAX;
 
   int tidx = item.get_local_id(1); // vocab dim
-  int bidx = batch_first ? item.get_group(1) : item.get_group(0); // batch dim
-  int step = batch_first ? item.get_group(0) : item.get_group(1); // step dim
+  int step = item.get_group(1); // step dim
+  int bidx = item.get_group(0); // batch dim
 
   if (bidx < batch_size && step < lengths[bidx] - 1) {
     // Compute the address of logits to data for the current batch
-    int step_offset  = batch_first ? step * vocab_size_padded : step * batch_size * vocab_size_padded;
-    int batch_offset = batch_first ? bidx * max_input_length * vocab_size_padded : bidx * vocab_size_padded;
+    int step_offset  = step * vocab_size_padded;
+    int batch_offset = bidx * max_input_length * vocab_size_padded;
     logits += step_offset + batch_offset;
 
     // Find max(logits)
@@ -107,9 +108,9 @@ void log_probs_kernel(
     float sum_exp = blockReduceSum<float>(local_sum_exp, item, shared);
 #endif
     if (tidx == 0) {
-      int idx = batch_first ? step + bidx * (max_input_length - 1) : step * batch_size + bidx;
+      int idx = step + bidx * (max_input_length - 1);
       // log_probs[step, ...] is the log probability of a token at step t + 1.
-      int token_idx = batch_first ? step + 1 + bidx * max_input_length : (step + 1) * batch_size + bidx;
+      int token_idx = step + 1 + bidx * max_input_length;
       log_probs[idx] = static_cast<float>(logits[ids[token_idx]]) -
                        s_max_logit - sycl::log(sum_exp + 1e-9f);
     }
@@ -125,14 +126,13 @@ void accumulate_log_probs(
     const float* log_probs,
     const int*   lengths,
     const int    max_input_length,
-    const int    batch_size,
-    const bool   batch_first)
+    const int    batch_size)
 {
   // Accumulate the log probability along the sequence dimension.
   //   cum_log_probs[j] = sum_i log(softmax(logits))[ids[i,j]]
   //
   // cum_log_probs: [batch_size], cumulative log probability
-  // log_probs: [max_length - 1, batch_size] or [batch_size, max_length - 1],
+  // log_probs: [batch_size, max_length - 1],
   //   log probability of each token
   // lengths: [batch_size], sequence lengths
   // batch_size: [1], batch_size. in case of beam > 1, batch x beam.
@@ -142,12 +142,11 @@ void accumulate_log_probs(
 
   int length = lengths[bidx];
   // reposition logits to data for the current batch.
-  log_probs += batch_first ? bidx * (max_input_length - 1) : bidx;
-  int stride = batch_first ? 1 : batch_size;  // stride along with seq dim.
+  log_probs += bidx * (max_input_length - 1);
   float local_accum = 0.0f;
   for (int step = tidx; step < length - 1;
        step += item.get_local_range(1)) {
-    local_accum += static_cast<float>(log_probs[step * stride]);
+    local_accum += static_cast<float>(log_probs[step]);
   }
 #ifdef USE_SYCL_GROUP_REDUCE
   float accum  = reduce_over_group(item.get_group(), local_accum, plus<>());
@@ -200,16 +199,18 @@ int main(int argc, char* argv[])
   q.memcpy(d_logits, h_logits, logits_size_bytes);
 
   float *h_log_probs = (float*) malloc (log_probs_size_bytes);
+  float *h_log_probs_ref = (float*) malloc (log_probs_size_bytes);
   float *d_log_probs = sycl::malloc_device<float>(log_probs_size, q);
 
   float *h_cum_log_probs = (float*) malloc (batch_size_bytes);
+  float *h_cum_log_probs_ref = (float*) malloc (batch_size_bytes);
   float *d_cum_log_probs = sycl::malloc_device<float>(batch_size, q);
 
   int *h_lengths = (int*) malloc (length_size_bytes);
 
   srand(123);
   for (int i = 0; i < batch_size; i++)
-    h_lengths[i] = rand() % max_length + max_length / 2;
+    h_lengths[i] = max_length;
 
   int *d_lengths = sycl::malloc_device<int>(batch_size, q);
   q.memcpy(d_lengths, h_lengths, length_size_bytes);
@@ -227,21 +228,84 @@ int main(int argc, char* argv[])
   // A batched version of log prob computation.
   //
   // cum_log_probs: [batch_size]
-  // logits: [max_input_length, batch_size, vocab_size] or [batch_size, max_input_length, vocab_size]
-  // input_ids: [max_input_length, batch_size] or [max_input_length, batch_size]
+  // logits: [batch_size, max_input_length, vocab_size]
+  // input_ids: [max_input_length, batch_size]
   // input_lengths: [batch_size]
 
-  // TODO: batch_first = 0 does not produce the same results for each run
-  bool batch_first = 1;
-
   const int block_size = vocab_size < 1024 ? (vocab_size + 31) / 32 * 32 : 1024;
-  const int gx = batch_first ? batch_size : max_length - 1;
-  const int gy = batch_first ? max_length - 1 : batch_size;
+  const int gx = max_length - 1;
+  const int gy = batch_size;
 
   sycl::range<2> gws (gy, gx * block_size);
   sycl::range<2> gws2 (1, batch_size * block_size);
   sycl::range<2> lws (1, block_size);
 
+  // warmup and verify
+    q.submit([&](sycl::handler &cgh) {
+#ifndef USE_SYCL_GROUP_REDUCE
+      sycl::local_accessor<float, 1> sm (sycl::range<1>(SG), cgh);
+#endif
+      sycl::local_accessor<float, 0> s_max_logit (cgh);
+      cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item)
+        [[intel::reqd_sub_group_size(SG)]] {
+        log_probs_kernel<float>(
+            item,
+#ifndef USE_SYCL_GROUP_REDUCE
+            sm.get_pointer(),
+#endif
+            s_max_logit,
+            d_log_probs, d_logits, d_ids, d_lengths, max_length, batch_size,
+            vocab_size, vocab_size_padded);
+      });
+    });
+
+    q.submit([&](sycl::handler &cgh) {
+#ifndef USE_SYCL_GROUP_REDUCE
+      sycl::local_accessor<float, 1> sm (sycl::range<1>(SG), cgh);
+#endif
+      cgh.parallel_for(sycl::nd_range<2>(gws2, lws), [=](sycl::nd_item<2> item)
+        [[intel::reqd_sub_group_size(SG)]] {
+        accumulate_log_probs(
+           item,
+#ifndef USE_SYCL_GROUP_REDUCE
+           sm.get_pointer(),
+#endif
+           d_cum_log_probs, d_log_probs, d_lengths,
+           max_length, batch_size);
+      });
+    });
+
+  log_probs_cpu<float>(
+    h_log_probs_ref,
+    h_logits,
+    h_ids,
+    h_lengths,
+    max_length,
+    batch_size,
+    vocab_size,
+    vocab_size_padded,
+    h_cum_log_probs_ref);
+
+  q.memcpy(h_log_probs, d_log_probs, log_probs_size_bytes);
+  q.memcpy(h_cum_log_probs, d_cum_log_probs, batch_size_bytes);
+  q.wait();
+
+  bool error = false;
+  for (size_t i = 0; i < log_probs_size; i++) {
+    if (fabsf(h_log_probs[i] - h_log_probs_ref[i]) > 1e-3f) {
+      printf("log_probs: @%zu %f != %f\n", i, h_log_probs[i], h_log_probs_ref[i]);
+      error = true;
+      break;
+    }
+  }
+  for (int i = 0; i < batch_size; i++) {
+    // relax error bound
+    if (fabsf(h_cum_log_probs[i] - h_cum_log_probs_ref[i]) > 1e-1f) {
+      error = true;
+      printf("cum_log_probs: @%d %f != %f\n", i, h_cum_log_probs[i], h_cum_log_probs_ref[i]);
+    }
+  }
+  printf("%s\n", error ? "FAIL" : "PASS");
   q.wait();
 
   auto start = std::chrono::steady_clock::now();
@@ -262,7 +326,7 @@ int main(int argc, char* argv[])
 #endif
             s_max_logit,
             d_log_probs, d_logits, d_ids, d_lengths, max_length, batch_size,
-            vocab_size, vocab_size_padded, batch_first);
+            vocab_size, vocab_size_padded);
       });
     });
 
@@ -278,7 +342,7 @@ int main(int argc, char* argv[])
            sm.get_pointer(),
 #endif
            d_cum_log_probs, d_log_probs, d_lengths,
-           max_length, batch_size, batch_first);
+           max_length, batch_size);
       });
     });
   }
@@ -288,19 +352,6 @@ int main(int argc, char* argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of kernels: %f (us)\n", (time * 1e-3f) / repeat);
 
-  q.memcpy(h_log_probs, d_log_probs, log_probs_size_bytes).wait();
-  q.memcpy(h_cum_log_probs, d_cum_log_probs, batch_size_bytes).wait();
-
-  float checksum = 0, checkmax = FLT_MIN, checkmin = FLT_MAX;
-  for (int i = 0; i < batch_size; i++) {
-    checksum += h_cum_log_probs[i];
-    checkmax = fmax(checkmax, h_cum_log_probs[i]);
-    checkmin = fmin(checkmin, h_cum_log_probs[i]);
-  }
-  printf("Checksum = %f\n", checksum / batch_size);
-  printf("Max cumulative log probs = %f\n", checkmax);
-  printf("Min cumulative log probs = %f\n", checkmin);
-
   free(d_cum_log_probs, q);
   free(d_log_probs, q);
   free(d_logits, q);
@@ -308,7 +359,9 @@ int main(int argc, char* argv[])
   free(d_lengths, q);
 
   free(h_cum_log_probs);
+  free(h_cum_log_probs_ref);
   free(h_log_probs);
+  free(h_log_probs_ref);
   free(h_logits);
   free(h_ids);
   free(h_lengths);

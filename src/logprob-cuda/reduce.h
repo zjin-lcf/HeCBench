@@ -1,4 +1,3 @@
-static const float HALF_FLT_MAX = 65504.F;
 #define FINAL_MASK 0xffffffff
 
 template<typename T>

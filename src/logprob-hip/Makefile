@@ -24,10 +24,10 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -fopenmp -I../logprob-cuda/
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -37,7 +37,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3
+  CFLAGS += -O3 -ffast-math
 endif
 
 ifeq ($(WAVEFRONT), 64)
@@ -50,11 +50,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu reduce.h Makefile
+%.o: %.cu reduce.h ../logprob-cuda/reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 100 128 60000 100
+	$(LAUNCHER) ./$(program) 1024 8 50527 100
