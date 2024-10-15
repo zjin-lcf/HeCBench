@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <chrono>
 #include <cuda.h>
+#include "reference.h"
 
 #define NUM_THREADS 256
 #define GridDimMaxY 65536
@@ -120,6 +122,9 @@ int main(int argc, char* argv[])
   const int repeat = atoi(argv[4]);
 
   long time;
+  float *h_X, *h_Y, *h_Y_ref;
+  float *d_X, *d_Y;
+  int error;
 
   // limited by the global device memory
   for (int N = 1; N <= 64; N = N * 4) {
@@ -130,7 +135,6 @@ int main(int argc, char* argv[])
       const int numel = N * C * W * H; // assume no integer overflow
       size_t data_size_bytes = numel * sizeof(float);
 
-      float *d_X, *d_Y;
       auto errorX = cudaMalloc((void**)&d_X, data_size_bytes);
       auto errorY = cudaMalloc((void**)&d_Y, data_size_bytes);
       if (errorX != cudaSuccess || errorY != cudaSuccess) {
@@ -140,22 +144,39 @@ int main(int argc, char* argv[])
         goto end;
       }
 
-      auto ok = ChannelShuffleNHWC (d_X, N, C, G, numel, d_Y, time, repeat);
-      if (ok)
-        printf("Average time of channel shuffle (nhwc): %f (ms)\n", (time * 1e-6f) / repeat);
-      else
-        printf("Failed to execute channel shuffle (nhwc)\n");
+      h_X = (float*) malloc(data_size_bytes);
+      for (int i = 0; i < numel; i++) h_X[i] = (float) i / numel;
 
-      ok = ChannelShuffleNCHW (d_X, N, C, G, numel, d_Y, time, repeat);
-      if (ok)
-        printf("Average time of channel shuffle (nchw): %f (ms)\n", (time * 1e-6f) / repeat);
+      h_Y = (float*) malloc(data_size_bytes);
+      h_Y_ref = (float*) malloc(data_size_bytes);
+
+      cudaMemcpy(d_X, h_X, data_size_bytes, cudaMemcpyHostToDevice);
+
+      ChannelShuffleNHWC (d_X, N, C, G, numel, d_Y, time, repeat);
+      ChannelShuffleNHWC_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
+      cudaMemcpy(h_Y, d_Y, data_size_bytes, cudaMemcpyDeviceToHost);
+      error = memcmp(h_Y, h_Y_ref, data_size_bytes);
+      if (error)
+        printf("Failed to pass channel shuffle (NHWC) check\n");
       else
-        printf("Failed to execute channel shuffle (nchw)\n");
+        printf("Average time of channel shuffle (NHWC): %f (ms)\n", (time * 1e-6f) / repeat);
+
+      ChannelShuffleNCHW (d_X, N, C, G, numel, d_Y, time, repeat);
+      ChannelShuffleNCHW_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
+      cudaMemcpy(h_Y, d_Y, data_size_bytes, cudaMemcpyDeviceToHost);
+      error = memcmp(h_Y, h_Y_ref, data_size_bytes);
+      if (error)
+        printf("Failed to pass channel shuffle (NCHW) check\n");
+      else
+        printf("Average time of channel shuffle (NCHW): %f (ms)\n", (time * 1e-6f) / repeat);
 
       cudaFree(d_X);
       cudaFree(d_Y);
+      free(h_X);
+      free(h_Y);
+      free(h_Y_ref);
     }
   }
-  
+
   end: return 0;
 }

@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
+#include "reference.h"
 
 #define NUM_THREADS 256
 #define GridDimMaxY 65536
@@ -173,6 +175,9 @@ int main(int argc, char* argv[])
   const int repeat = atoi(argv[4]);
 
   long time;
+  float *h_X, *h_Y, *h_Y_ref;
+  float *d_X, *d_Y;
+  int error;
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -185,11 +190,12 @@ int main(int argc, char* argv[])
     for (int C = 32; C <= 512; C = C * 4) {
 
       printf("\n(N=%d C=%d W=%d H=%d)\n", N, C, W, H);
+      size_t data_size_bytes = sizeof(float) * N * C * W * H;
 
       const int numel = N * C * W * H; // assume no integer overflow
 
-      float *d_X = sycl::malloc_device<float>(numel, q);
-      float *d_Y = sycl::malloc_device<float>(numel, q);
+      d_X = sycl::malloc_device<float>(numel, q);
+      d_Y = sycl::malloc_device<float>(numel, q);
       if (d_X == nullptr || d_Y == nullptr) {
         if (d_X != nullptr) sycl::free(d_X, q);
         if (d_Y != nullptr) sycl::free(d_Y, q);
@@ -197,22 +203,39 @@ int main(int argc, char* argv[])
         goto end;
       }
 
-      auto ok = ChannelShuffleNHWC (q, d_X, N, C, G, numel, d_Y, time, repeat);
-      if (ok)
-        printf("Average time of channel shuffle (nhwc): %f (ms)\n", (time * 1e-6f) / repeat);
-      else
-        printf("Failed to execute channel shuffle (nhwc)\n");
+      h_X = (float*) malloc(data_size_bytes);
+      for (int i = 0; i < numel; i++) h_X[i] = (float) i / numel;
 
-      ok = ChannelShuffleNCHW (q, d_X, N, C, G, numel, d_Y, time, repeat);
-      if (ok)
-        printf("Average time of channel shuffle (nchw): %f (ms)\n", (time * 1e-6f) / repeat);
+      h_Y = (float*) malloc(data_size_bytes);
+      h_Y_ref = (float*) malloc(data_size_bytes);
+
+      q.memcpy(d_X, h_X, data_size_bytes);
+
+      ChannelShuffleNHWC (q, d_X, N, C, G, numel, d_Y, time, repeat);
+      ChannelShuffleNHWC_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
+      q.memcpy(h_Y, d_Y, data_size_bytes).wait();
+      error = memcmp(h_Y, h_Y_ref, data_size_bytes);
+      if (error)
+        printf("Failed to pass channel shuffle (NHWC) check\n");
       else
-        printf("Failed to execute channel shuffle (nchw)\n");
+        printf("Average time of channel shuffle (NHWC): %f (ms)\n", (time * 1e-6f) / repeat);
+
+      ChannelShuffleNCHW (q, d_X, N, C, G, numel, d_Y, time, repeat);
+      ChannelShuffleNCHW_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
+      q.memcpy(h_Y, d_Y, data_size_bytes).wait();
+      error = memcmp(h_Y, h_Y_ref, data_size_bytes);
+      if (error)
+        printf("Failed to pass channel shuffle (NCHW) check\n");
+      else
+        printf("Average time of channel shuffle (NCHW): %f (ms)\n", (time * 1e-6f) / repeat);
 
       sycl::free(d_X, q);
       sycl::free(d_Y, q);
+      free(h_X);
+      free(h_Y);
+      free(h_Y_ref);
     }
   }
-  
+
   end: return 0;
 }
