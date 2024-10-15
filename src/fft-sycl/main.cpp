@@ -26,14 +26,14 @@
 #define iexp_1_4   (T2){  0, 1 }
 #define iexp_3_8   (T2){ -1, 1 }//requires post-multiply by 1/sqrt(2)
 
-inline T2 exp_i( T phi ) {
+T2 exp_i( T phi ) {
   return (T2){ sycl::cos(phi), sycl::sin(phi) };
 }
 
-inline T2 cmplx_mul( T2 a, T2 b ) { return (T2){ a.x()*b.x()-a.y()*b.y(), a.x()*b.y()+a.y()*b.x() }; }
-inline T2 cm_fl_mul( T2 a, T  b ) { return (T2){ b*a.x(), b*a.y() }; }
-inline T2 cmplx_add( T2 a, T2 b ) { return (T2){ a.x() + b.x(), a.y() + b.y() }; }
-inline T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x() - b.x(), a.y() - b.y() }; }
+T2 cmplx_mul( T2 a, T2 b ) { return (T2){ a.x()*b.x()-a.y()*b.y(), a.x()*b.y()+a.y()*b.x() }; }
+T2 cm_fl_mul( T2 a, T  b ) { return (T2){ b*a.x(), b*a.y() }; }
+T2 cmplx_add( T2 a, T2 b ) { return (T2){ a.x() + b.x(), a.y() + b.y() }; }
+T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x() - b.x(), a.y() - b.y() }; }
 
 
 #define FFT2(a0, a1)                     \
