@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include "reference.h"
 
 /*
  * Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
@@ -24,9 +25,9 @@
 // width is hidden_dim and height is seq_len
 __global__ void gelu_bias_loop(__half* src, const __half* bias, int width, int height)
 {
-  int batch = blockIdx.x;
-  int x     = blockIdx.y;  // seq length
+  int x     = blockIdx.x;  // seq length
   int y     = threadIdx.x * 2;
+  int batch = blockIdx.y;
 
   if (x < height) {
     int    index = batch * width * height + x * width;
@@ -51,6 +52,7 @@ int main(int argc, char* argv[])
 {
   if (argc != 5) {
     printf("Usage: %s <batch> <sequence length> <hidden dimension> <repeat>\n", argv[0]);
+    printf("The hidden dimension is a multiple of two\n");
     return 1;
   }
 
@@ -66,8 +68,9 @@ int main(int argc, char* argv[])
 
   srand(123);
   __half* output = (__half*) malloc (src_size_bytes);
+  __half* output_ref = (__half*) malloc (src_size_bytes);
   for (size_t i = 0; i < src_size; i++) {
-    output[i] = __float2half(rand() / (float)RAND_MAX);
+    output_ref[i] = output[i] = __float2half(rand() / (float)RAND_MAX);
   }
 
   __half* bias = (__half*) malloc (bias_size_bytes);
@@ -84,7 +87,21 @@ int main(int argc, char* argv[])
   cudaMemcpy(d_bias, bias, bias_size_bytes, cudaMemcpyHostToDevice);
   
   dim3 block(1024, 1);
-  dim3 grid(batch_size, seq_len);
+  dim3 grid(seq_len, batch_size);
+
+  // warmup and verify
+  gelu_bias_loop <<<grid, block>>> (d_output, d_bias, hidden_dim, seq_len);
+  gelu_bias_loop_cpu (output_ref, bias, batch_size, hidden_dim, seq_len);
+  cudaMemcpy(output, d_output, src_size_bytes, cudaMemcpyDeviceToHost);
+
+  bool ok = true;
+  for (size_t i = 0; i < src_size; i++) {
+    if (fabsf(__half2float(output_ref[i]) - __half2float(output[i])) > 1e-3f) {
+      ok = false;
+      break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
@@ -98,17 +115,10 @@ int main(int argc, char* argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (ms)\n", (time * 1e-6f) / repeat);
 
-  cudaMemcpy(output, d_output, src_size_bytes, cudaMemcpyDeviceToHost);
-
-  float sum = 0;
-  for (size_t i = 0; i < src_size; i++) {
-    sum += __half2float(output[i]);
-  }
-  printf("Checksum = %f\n", sum / src_size);
-  
   cudaFree(d_output);
   cudaFree(d_bias);
   free(output);
+  free(output_ref);
   free(bias);
 
   return 0;
