@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <chrono>
 #include <vector>
 #include <sycl/sycl.hpp>
+#include "reference.h"
 
 // Example
 // https://pytorch.org/docs/stable/generated/torch.flip.html
@@ -18,7 +20,7 @@ void flip_kernel(
     const int64_t* strides,
     const int64_t* strides_contiguous,
     const int64_t* shape,
-    const int64_t  total_dims) 
+    const int64_t  total_dims)
 {
   int64_t linear_index = item.get_global_id(0);
 
@@ -99,6 +101,7 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
   }
 
   scalar_t *output = (scalar_t*) malloc(output_size_bytes);
+  scalar_t *output_ref = (scalar_t*) malloc(output_size_bytes);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -131,6 +134,38 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
   sycl::range<1> gws ((n + threadsPerBlock - 1) / threadsPerBlock * threadsPerBlock);
   sycl::range<1> lws (threadsPerBlock);
 
+  // warmup and verify
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      flip_kernel<scalar_t>(
+        item,
+        d_input,
+        d_output,
+        n,
+        d_flip_dims,
+        num_flip_dims,
+        d_strides,
+        d_strides_contiguous,
+        d_shape,
+        num_dims);
+    });
+  });
+
+  flip_kernel_cpu<scalar_t>(
+    input, output_ref, n, flip.data(), num_flip_dims,
+    stride.data(), stride.data(), shape.data(), num_dims);
+
+  q.memcpy(output, d_output, output_size_bytes).wait();
+  int error = memcmp(output, output_ref, output_size_bytes);
+  printf("%s\n", error ? "FAIL" : "PASS");
+
+#ifdef EXAMPLE
+  for (int i = 0; i < n; i++) {
+    printf("%f ", output[i]);
+  }
+  printf("\n");
+#endif
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
@@ -157,17 +192,9 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of the flip kernel: %f (ms)\n", (time * 1e-6f) / repeat);
 
-  q.memcpy(output, d_output, output_size_bytes).wait();
-
-#ifdef EXAMPLE
-  for (int i = 0; i < n; i++) {
-    printf("%f ", output[i]);
-  }
-  printf("\n");
-#endif
-
   free(input);
   free(output);
+  free(output_ref);
   sycl::free(d_input, q);
   sycl::free(d_output, q);
   sycl::free(d_flip_dims, q);
