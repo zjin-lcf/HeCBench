@@ -34,7 +34,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../blas-gemmBatched-cuda
 
 ifeq ($(CUDA), yes)
   ONEMKL = yes
@@ -79,7 +79,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp ../blas-gemmBatched-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

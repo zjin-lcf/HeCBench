@@ -2,13 +2,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <type_traits> // is_same
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 #include <hipblas/hipblas.h>
+#include "reference.h"
 
 using namespace std;
+
 
 template <typename T>
 void gemmBatched(
@@ -27,6 +30,12 @@ void gemmBatched(
 
   T *vectors = (T*)malloc(vectors_size);
   assert(vectors);
+
+  T *result = (T*)malloc(vectors_size);
+  assert(result);
+
+  T *result_ref = (T*)malloc(vectors_size);
+  assert(result_ref);
 
   srand48(48);
   for(int i = 0; i < num * upper * upper; i++)
@@ -165,6 +174,22 @@ void gemmBatched(
     }
     cout << "size " << size << " average execution time: " << sum/reps << " us; "
 	 << sum / reps / num << " us per operation" << endl;
+
+    // verify double precision operations 
+    if constexpr (std::is_same_v<T, double>) {
+      hipMemcpy(result, devResult, vectors_size, hipMemcpyDeviceToHost);
+      gemmBatched_ref (num, upper, upper, 1, m, k, n, alpha, beta,
+                       matrices, lda, vectors, ldb, result_ref, ldc);
+
+      for (int i = 0; i < num; i++) {
+      for (int j = 0; j < m; j++) {
+        if (abs(result[i*upper+j] - result_ref[i*upper+j]) > 1e-6) {
+          cout << "Mismatch at batch index " << i << ": " << result[i*upper+j] << "!="
+               << result_ref[i*upper+j] << endl;
+          break;
+        }
+      }}
+    }
   }
 
   hipFree(devMatrices);
@@ -173,6 +198,15 @@ void gemmBatched(
   hipFree(devAList);
   hipFree(devBList);
   hipFree(devCList);
+  hipblasDestroy(handle);
+
+  free(matrices);
+  free(vectors);
+  free(result);
+  free(result_ref);
+  free(AList);
+  free(BList);
+  free(CList);
 }
 
 int main(int argc, char ** argv){
