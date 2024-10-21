@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <type_traits> // is_same
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
+#include "reference.h"
 
 using namespace std;
 
@@ -27,6 +29,12 @@ void gemmBatched(
 
   T *vectors = (T*)malloc(vectors_size);
   assert(vectors);
+
+  T *result = (T*)malloc(vectors_size);
+  assert(result);
+
+  T *result_ref = (T*)malloc(vectors_size);
+  assert(result_ref);
 
   srand48(48);
   for(int i = 0; i < num * upper * upper; i++)
@@ -165,6 +173,22 @@ void gemmBatched(
     }
     cout << "size " << size << " average execution time: " << sum/reps << " us; "
 	 << sum / reps / num << " us per operation" << endl;
+
+    // verify double precision operations 
+    if constexpr (std::is_same_v<T, double>) {
+      cudaMemcpy(result, devResult, vectors_size, cudaMemcpyDeviceToHost);
+      gemmBatched_ref (num, upper, upper, 1, m, k, n, alpha, beta,
+                       matrices, lda, vectors, ldb, result_ref, ldc);
+
+      for (int i = 0; i < num; i++) {
+      for (int j = 0; j < m; j++) {
+        if (abs(result[i*upper+j] - result_ref[i*upper+j]) > 1e-6) {
+          cout << "Mismatch at batch index " << i << ": " << result[i*upper+j] << "!="
+               << result_ref[i*upper+j] << endl;
+          break;
+        }
+      }}
+    }
   }
 
   cudaFree(devMatrices);
@@ -173,9 +197,12 @@ void gemmBatched(
   cudaFree(devAList);
   cudaFree(devBList);
   cudaFree(devCList);
+  cublasDestroy(handle);
 
   free(matrices);
   free(vectors);
+  free(result);
+  free(result_ref);
   free(AList);
   free(BList);
   free(CList);

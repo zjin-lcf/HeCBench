@@ -23,7 +23,8 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -DHIPBLAS_USE_HIP_HALF
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -DHIPBLAS_USE_HIP_HALF \
+          -I../blas-gemmBatched-cuda
 
 # Linker Flags
 LDFLAGS = -lhipblas
@@ -45,11 +46,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+%.o: %.cu ../blas-gemmBatched-cuda/reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 4096 4096 4096 100
+	$(LAUNCHER) ./$(program)
