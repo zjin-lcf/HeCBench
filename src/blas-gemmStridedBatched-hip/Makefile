@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
 LAUNCHER  =
 
 #===============================================================================
@@ -24,11 +23,11 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall -arch=$(ARCH) \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -DHIPBLAS_USE_HIP_HALF \
           -I../blas-gemmBatched-cuda
 
 # Linker Flags
-LDFLAGS = -lcublas
+LDFLAGS = -lhipblas
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -47,7 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../blas-gemmBatched-cuda/reference.h  Makefile
+%.o: %.cu ../blas-gemmBatched-cuda/reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
