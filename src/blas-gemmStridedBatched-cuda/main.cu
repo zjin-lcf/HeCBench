@@ -139,7 +139,9 @@ void gemmBatched(
 	     << elapsed / num << " us per operation" << endl;
     }
     cout << "size " << size << " average execution time: " << sum/reps << " us; "
-	 << sum / reps / num << " us per operation" << endl;
+	 << sum / reps / num << " us per operation; "
+         << "floating-point operations per second: ";
+    performance(m, n, k, 1e3 * (sum / reps / num));
 
     // verify double precision operations 
     if constexpr (std::is_same_v<T, double>) {
