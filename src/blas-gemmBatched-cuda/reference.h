@@ -18,3 +18,17 @@ void gemmBatched_ref (int batchCount,
   }
 }
 
+void performance (int m, int n, int k, double avg_time, bool is_integer = false) {
+  double total_ops = double(m) * double(n) * double(k) * 2;
+  double perf = total_ops / avg_time;
+  auto scale_string = "G";
+  auto unit_string = is_integer ? "OP/s" : "FLOP/s";
+
+  if (perf >= 1000) {
+    perf /= 1000;
+    scale_string = "T";
+  }
+
+  std::cout << perf << " " << scale_string << unit_string << std::endl;
+}
+
