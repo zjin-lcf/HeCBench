@@ -19,7 +19,7 @@ void reference(
     for (int idx = 0; idx < embedding_dim; idx++) {
       const T dense_elem = dense[batch_idx * embedding_dim + idx];
       for (int nested_idx = idx; nested_idx < range; nested_idx += embedding_dim) {
-        output[offset[batch_idx] + nested_idx] = 
+        output[offset[batch_idx] + nested_idx] =
           input[offset[batch_idx] + nested_idx] + dense_elem;
       }
     }
@@ -83,14 +83,16 @@ int main(int argc, char* argv[])
   printf("Number of rows in the embedding table: %d\n", nrows);
   printf("Batch size: %d\n", batch_size);
 
+  const int embed_dims[] = {768, 2048, 12288};
+
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  for (int ncols = 64; ncols <= 2048; ncols = ncols * 2) {
-
+  for (size_t n = 0; n < sizeof(embed_dims)/sizeof(int); n++) {
+    int ncols = embed_dims[n];
     printf("\nEmbedding dimension: %d\n", ncols);
 
     int input_size = nrows * ncols;  // same as output size
@@ -101,10 +103,11 @@ int main(int argc, char* argv[])
 
     int batch_size_bytes = (batch_size + 1) * sizeof(float);
 
-    float *input, *dense, *output, *output_ref;
+    float *input, *dense, *output_k1, *output_k2, *output_ref;
     input = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     dense = (float*) malloc (dense_size_bytes); // [batch_size x embedding_dim]
-    output = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
+    output_k1 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
+    output_k2 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     output_ref = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     int *input_offset = (int*) malloc (batch_size_bytes);  // [batch_size]
 
@@ -133,7 +136,7 @@ int main(int argc, char* argv[])
     float *d_input, *d_dense, *d_output;
     d_input = sycl::malloc_device<float>(input_size, q);
     q.memcpy(d_input, input, input_size_bytes);
-    
+
     d_dense = sycl::malloc_device<float>(dense_size, q);
     q.memcpy(d_dense, dense, dense_size_bytes);
 
@@ -143,54 +146,60 @@ int main(int argc, char* argv[])
     int* d_input_offset;
     d_input_offset = sycl::malloc_device<int>(batch_size+1, q);
     q.memcpy(d_input_offset, input_offset, batch_size_bytes);
-    
-    sycl::range<1> gws (batch_size * 256);
-    sycl::range<1> lws (256);
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
+    for (int block_size = 128; block_size <= 1024; block_size = block_size * 2) {
+      printf("block size: %d\n", block_size);
 
-    for (int i = 0; i < repeat; i++) {
-      q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for<class de1>(
-          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-          dense_esuhm(item, d_input, d_dense, d_output, ncols, d_input_offset);
+      q.memset(d_output, 0, input_size_bytes);
+      q.wait();
+      auto start = std::chrono::steady_clock::now();
+
+      for (int i = 0; i < repeat; i++) {
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class de1>(
+            sycl::nd_range<1>(sycl::range<1>(batch_size * block_size),
+                              sycl::range<1>(block_size)), [=] (sycl::nd_item<1> item) {
+            dense_esuhm(item, d_input, d_dense, d_output, ncols, d_input_offset);
+          });
         });
-      });
-    }
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average execution time of dense embedding kernel (k1): %f (us)\n", (time * 1e-3f) / repeat);
-
-    q.wait();
-    start = std::chrono::steady_clock::now();
-
-    for (int i = 0; i < repeat; i++) {
-      q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for<class de2>(
-          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-          dense_esuhm2(item, d_input, d_dense, d_output, ncols, d_input_offset);
-        });
-      });
-    }
-
-    q.wait();
-    end = std::chrono::steady_clock::now();
-    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average execution time of dense embedding kernel (k2): %f (us)\n", (time * 1e-3f) / repeat);
-
-    q.memcpy(output, d_output, input_size_bytes).wait();
-
-    bool ok = true;
-    for (int i = 0; i < input_size; i++) {
-      if (fabsf(output[i] - output_ref[i]) > 1e-3f) {
-        ok = false;
-        break;
       }
+
+      q.wait();
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average execution time of dense embedding kernel (k1): %f (us)\n", (time * 1e-3f) / repeat);
+      q.memcpy(output_k1, d_output, input_size_bytes);
+
+      q.memset(d_output, 0, input_size_bytes);
+      q.wait();
+      start = std::chrono::steady_clock::now();
+
+      for (int i = 0; i < repeat; i++) {
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class de2>(
+            sycl::nd_range<1>(sycl::range<1>(batch_size * block_size),
+                              sycl::range<1>(block_size)), [=] (sycl::nd_item<1> item) {
+            dense_esuhm2(item, d_input, d_dense, d_output, ncols, d_input_offset);
+          });
+        });
+      }
+
+      q.wait();
+      end = std::chrono::steady_clock::now();
+      time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average execution time of dense embedding kernel (k2): %f (us)\n", (time * 1e-3f) / repeat);
+      q.memcpy(output_k2, d_output, input_size_bytes).wait();
+
+      bool ok = true;
+      for (int i = 0; i < input_size; i++) {
+        if (fabsf(output_k1[i] - output_ref[i]) > 1e-3f ||
+            fabsf(output_k2[i] - output_ref[i]) > 1e-3f) {
+          ok = false;
+          break;
+        }
+      }
+      printf("%s\n", ok ? "PASS" : "FAIL");
     }
-    printf("%s\n", ok ? "PASS" : "FAIL");
 
     sycl::free(d_input, q);
     sycl::free(d_dense, q);
@@ -199,7 +208,8 @@ int main(int argc, char* argv[])
 
     free(input);
     free(dense);
-    free(output);
+    free(output_k1);
+    free(output_k2);
     free(output_ref);
     free(input_offset);
   }
