@@ -28,7 +28,7 @@ Each benchmark falls into a single category. While such classification is not ac
     affine, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, colorwheel, convolution1D, convolution3D, convolutionDeformable, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, opticalFlow, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, ssim, stencil1d, stencil3d, surfel, zoom
     
 ### Cryptography
-    aes, bitcracker, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
+    aes, bitcracker, bitpermute, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
     atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fpc, histogram, lzss, minmax, mpc, mtf, rle, sc, scan, scan2, scan3, segment-reduce
@@ -316,6 +316,9 @@ Early results are shown [here](results/README.md)
 
 ### bitpacking (cuda)
   A bit-level operation that aims to reduce the number of bits required to store each value (https://github.com/NVIDIA/nvcomp)
+
+### bitpermute (cuda)
+  Permute the data using bit-level operations in an array (https://github.com/supranational/sppark)
 
 ### black-scholes (cuda)
   The Black-Scholes simulation (https://github.com/cavazos-lab/FinanceBench)
