@@ -121,7 +121,7 @@ void matmul_forward_kernel4(sycl::nd_item<2> id, float* out, const float* inp, c
 
     int si_start = 4*(16 * threadIdx_y + threadIdx_x);
     for (int so = 0; so < C; so += 32) {
-        id.barrier();
+        id.barrier(sycl::access::fence_space::local_space);
         int xmod8 = threadIdx_x % 8;
         int xby8 = threadIdx_x / 8;
         int xo = 4 * xmod8;
@@ -129,7 +129,7 @@ void matmul_forward_kernel4(sycl::nd_item<2> id, float* out, const float* inp, c
             st_vec(&lhs_s[y][xo], ld_vec(inp + y * C + so + xo));
             st_vec(&rhs_s[y][xo], ld_vec(weight + y * C + so + xo));
         }
-        id.barrier();
+        id.barrier(sycl::access::fence_space::local_space);
 
         for (int si = si_start; si < si_start + 32; si += 4) {
             sycl::float4 rhs[8];
@@ -165,7 +165,7 @@ void matmul_forward_kernel4(sycl::nd_item<2> id, float* out, const float* inp, c
 // kernel launcher
 
 // kernel 1 is the most naive matmul kernel
-void matmul_forward1(sycl::queue& q, float* out,
+void matmul_forward1(float* out,
                      const float* inp, const float* weight, const float* bias,
                      int B, int T, int C, int OC) {
     // out is (B,T,OC). OC is short for "output channels", e.g. OC = 4 * C
@@ -180,7 +180,7 @@ void matmul_forward1(sycl::queue& q, float* out,
 }
 
 // kernel 2 calls cuBLAS (oneMKL actually), which should be very efficient
-void matmul_forward2(sycl::queue &q, float* out,
+void matmul_forward2(float* out,
                      const float* inp, const float* weight, const float* bias,
                      int B, int T, int C, int OC) {
     // for reference API is:
@@ -230,15 +230,11 @@ void matmul_forward2(sycl::queue &q, float* out,
     q.wait();
 }
 
-void matmul_forward3(sycl::queue& queue, float* out,
+void matmul_forward3(float* out,
                      const float* inp, const float* weight, const float* bias,
                      int B, int T, int C, int OC) {
     bool has_bias = (bias != nullptr);
     bool has_gelu = false;
-
-    // Setup engine and stream
-    auto engine = dnnl::sycl_interop::make_engine(queue.get_device(), queue.get_context());
-    auto stream = dnnl::sycl_interop::make_stream(engine, queue);
 
     // Create memory descriptors
     auto inp_md = dnnl::memory::desc({B*T, C}, dnnl::memory::data_type::f32, dnnl::memory::format_tag::ab);
@@ -292,7 +288,7 @@ void matmul_forward3(sycl::queue& queue, float* out,
 }
 
 // handwritten, relatively efficient non-tensorcore matmul kernel
-void matmul_forward4(sycl::queue &q, float* out,
+void matmul_forward4(float* out,
                      const float* inp, const float* weight, const float* bias,
                      int B, int T, int C, int OC) {
     // out is (B,T,OC). OC is short for "output channels", e.g. OC = 4 * C
@@ -312,22 +308,21 @@ void matmul_forward4(sycl::queue &q, float* out,
 
 // kernel version dispatch
 void matmul_forward(int kernel_num,
-                    sycl::queue& q,
                     float* out,
                     const float* inp, const float* weight, const float* bias,
                     int B, int T, int C, int OC) {
     switch (kernel_num) {
         case 1:
-            matmul_forward1(q, out, inp, weight, bias, B, T, C, OC);
+            matmul_forward1(out, inp, weight, bias, B, T, C, OC);
             break;
         case 2:
-            matmul_forward2(q, out, inp, weight, bias, B, T, C, OC);
+            matmul_forward2(out, inp, weight, bias, B, T, C, OC);
             break;
         case 3:
-            matmul_forward3(q, out, inp, weight, bias, B, T, C, OC);
+            matmul_forward3(out, inp, weight, bias, B, T, C, OC);
             break;
         case 4:
-            matmul_forward4(q, out, inp, weight, bias, B, T, C, OC);
+            matmul_forward4(out, inp, weight, bias, B, T, C, OC);
             break;
         default:
             printf("Invalid kernel number\n");
@@ -346,9 +341,9 @@ int main(int argc, char **argv) {
     int OC = 768 * 3; // expansion of 4, e.g. in the MLP
 
 #ifdef USE_GPU
-    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+    q = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+    q = sycl::queue(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
     // create host memory of random numbers
@@ -382,11 +377,14 @@ int main(int argc, char **argv) {
     // first check the correctness of the kernel
     matmul_forward_cpu(out, inp, weight, bias, B, T, C, OC);
 
+    matmul_forward(kernel_num, d_out, d_inp, d_weight, d_bias, B, T, C, OC);
+    validate_result(d_out, out, "out", B * T * OC, 1e-1f);
+
     printf("All results match. Starting benchmarks.\n\n");
 
     int repeat_times = 100;
     float elapsed_time = benchmark_kernel(repeat_times, matmul_forward,
-                                          kernel_num, q, d_out, d_inp, d_weight, d_bias,
+                                          kernel_num, d_out, d_inp, d_weight, d_bias,
                                           B, T, C, OC);
 
     float tflops = (float)B * T * C * OC * 2 / elapsed_time * 1e3f / 1e12f;

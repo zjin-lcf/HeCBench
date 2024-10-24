@@ -5,6 +5,11 @@
 #include <iostream>
 #include <sycl/sycl.hpp>
 
+// Setup engine and stream in DNNL
+sycl::queue q;
+auto engine = dnnl::sycl_interop::make_engine(q.get_device(), q.get_context());
+auto stream = dnnl::sycl_interop::make_stream(engine, q);
+
 float* make_random_float(size_t N) {
     float* arr = (float*)malloc(N * sizeof(float));
     for (size_t i = 0; i < N; i++) {
@@ -15,7 +20,6 @@ float* make_random_float(size_t N) {
 
 template<class D, class T>
 void validate_result(D* device_result, const T* cpu_reference, const char* name, std::size_t num_elements, T tolerance = 1e-4) {
-    sycl::queue q(sycl::default_selector_v);
 
     D* out_gpu = (D*)malloc(num_elements * sizeof(D));
 

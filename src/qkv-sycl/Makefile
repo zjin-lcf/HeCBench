@@ -16,8 +16,8 @@ HIP_ARCH  = gfx908
 ONEMKL    = no
 GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
-# path to the install of the oneMKL interface
 ONEMKL_PATH   = /path/to/oneMKL
+ONEDNN_PATH   = /path/to/oneDNN
 
 #===============================================================================
 # Program name & source code list
@@ -53,7 +53,7 @@ ifeq ($(HIP), yes)
 endif
 
 ifeq ($(ONEMKL), yes)
-  CFLAGS += -I$(ONEMKL_PATH)/include
+  CFLAGS += -I$(ONEMKL_PATH)/include -I$(ONEDNN_PATH)/include
   LDFLAGS += -L$(ONEDNN_PATH)/lib -ldnnl
 else
   CFLAGS += -qmkl=parallel
@@ -81,7 +81,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp common.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
