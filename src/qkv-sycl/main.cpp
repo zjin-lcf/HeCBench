@@ -230,13 +230,9 @@ void matmul_forward2(sycl::queue &q, float* out,
     q.wait();
 }
 
-// uses cublasLt to fuse the bias and gelu
-// https://docs.nvidia.com/cuda/cublas/#cublasltmatmul
-// https://github.com/NVIDIA/CUDALibrarySamples/blob/master/cuBLASLt/LtSgemm/sample_cublasLt_LtSgemm.cu
 void matmul_forward3(sycl::queue& queue, float* out,
                      const float* inp, const float* weight, const float* bias,
                      int B, int T, int C, int OC) {
-/*
     bool has_bias = (bias != nullptr);
     bool has_gelu = false;
 
@@ -293,7 +289,6 @@ void matmul_forward3(sycl::queue& queue, float* out,
         });
     }
     stream.wait();
-*/
 }
 
 // handwritten, relatively efficient non-tensorcore matmul kernel
