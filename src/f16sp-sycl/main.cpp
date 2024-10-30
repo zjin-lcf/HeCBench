@@ -14,6 +14,7 @@
 #include <cmath>
 #include <chrono>
 #include <sycl/sycl.hpp>
+#include <oneapi/mkl.hpp>
 #include "kernels.h"
 
 void generateInput(sycl::half2 *a, size_t size)
@@ -21,8 +22,8 @@ void generateInput(sycl::half2 *a, size_t size)
   for (size_t i = 0; i < size; ++i)
   {
     sycl::half2 temp;
-    temp.x() = -1;
-    temp.y() = -1;
+    temp.x() = (sycl::half)(sqrt(32752.0/size));
+    temp.y() = (sycl::half)(sqrt(32752.0/size));
     a[i] = temp;
   }
 }
@@ -38,6 +39,7 @@ int main(int argc, char *argv[])
   const size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS;
   const size_t size_bytes = size * sizeof(sycl::half2);
   const size_t result_bytes = sizeof(float);
+  const size_t result2_bytes = sizeof(sycl::half);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -45,42 +47,44 @@ int main(int argc, char *argv[])
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  sycl::half2 *a = (sycl::half2 *) malloc (size_bytes);
-  sycl::half2 *b = (sycl::half2 *) malloc (size_bytes);
-  float r1, r2, r3;
+  sycl::half2 *a, *b;
+  sycl::half2 *d_a, *d_b;
 
-  float *d_r = sycl::malloc_device<float>(NUM_OF_BLOCKS, q);
+  float r, *d_r;
+  sycl::half r2, *d_r2;
+
+  a = (sycl::half2 *) malloc (size_bytes);
+  b = (sycl::half2 *) malloc (size_bytes);
+
+  d_a = sycl::malloc_device<sycl::half2>(size, q);
+  d_b = sycl::malloc_device<sycl::half2>(size, q);
+  d_r = sycl::malloc_device<float>(1, q);
+  d_r2 = sycl::malloc_device<sycl::half>(1, q);
 
   srand(123);
   generateInput(a, size);
-  sycl::half2 *d_a = sycl::malloc_device<sycl::half2>(size, q);
   q.memcpy(d_a, a, size_bytes);
 
   generateInput(b, size);
-  sycl::half2 *d_b = sycl::malloc_device<sycl::half2>(size, q);
   q.memcpy(d_b, b, size_bytes);
 
-  double result_ref = 0.f;
-  for (size_t i = 0; i < size; i++)
-  {
-    result_ref += (float)a[i].x() * (float)b[i].x() +
-                  (float)a[i].y() * (float)b[i].y();
-  }
+  printf("\nNumber of elements in the vectors is %zu\n", size * 2);
 
   // evaluate the grid sizes for performance optimization
   for (int grid = NUM_OF_BLOCKS; grid >= NUM_OF_BLOCKS / 16; grid = grid / 2) {
 
-    printf("GPU grid size is %d\n", grid);
+    printf("\nGPU grid size is %d\n", grid);
 
     // warmup
-    for (int i = 0; i < repeat; i++) {
+    for (int i = 0; i < 1000; i++) {
       q.submit([&](sycl::handler &cgh) {
-        sycl::local_accessor<sycl::half2> shArray(sycl::range<1>(NUM_OF_THREADS), cgh);
+        sycl::local_accessor<sycl::half2> sm(sycl::range<1>(NUM_OF_THREADS), cgh);
         cgh.parallel_for(
           sycl::nd_range<1>(sycl::range<1>(grid*NUM_OF_THREADS),
                             sycl::range<1>(NUM_OF_THREADS)),
           [=](sycl::nd_item<1> item) {
-          scalarProductKernel_native(d_a, d_b, d_r, shArray.get_pointer(),
+          scalarProductKernel_native(d_a, d_b, d_r,
+                                     sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                      size, item);
         });
       });
@@ -92,12 +96,13 @@ int main(int argc, char *argv[])
     for (int i = 0; i < repeat; i++) {
       q.memset(d_r, 0, result_bytes);
       q.submit([&](sycl::handler &cgh) {
-        sycl::local_accessor<sycl::half2> shArray(sycl::range<1>(NUM_OF_THREADS), cgh);
+        sycl::local_accessor<sycl::half2> sm(sycl::range<1>(NUM_OF_THREADS), cgh);
         cgh.parallel_for(
           sycl::nd_range<1>(sycl::range<1>(grid*NUM_OF_THREADS),
                             sycl::range<1>(NUM_OF_THREADS)),
           [=](sycl::nd_item<1> item) {
-          scalarProductKernel_native(d_a, d_b, d_r, shArray.get_pointer(),
+          scalarProductKernel_native(d_a, d_b, d_r,
+                                     sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                      size, item);
         });
       });
@@ -108,16 +113,58 @@ int main(int argc, char *argv[])
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-    q.memcpy(&r1, d_r, result_bytes).wait();
+    q.memcpy(&r, d_r, result_bytes).wait();
+    printf("Error rate: %e\n", fabsf(r - 65504.f)/65504.f);
 
     // warmup
+    for (int i = 0; i < 1000; i++) {
+      q.submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<sycl::float2> sm(sycl::range<1>(NUM_OF_THREADS), cgh);
+        cgh.parallel_for(
+          sycl::nd_range<1>(sycl::range<1>(grid*NUM_OF_THREADS),
+                            sycl::range<1>(NUM_OF_THREADS)),
+          [=](sycl::nd_item<1> item) {
+          scalarProductKernel_native_fp32(d_a, d_b, d_r,
+                                          sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                          size, item);
+        });
+      });
+    }
+    q.wait();
+
+    start = std::chrono::steady_clock::now();
+
     for (int i = 0; i < repeat; i++) {
+      q.memset(d_r, 0, result_bytes);
+      q.submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<sycl::float2> sm(sycl::range<1>(NUM_OF_THREADS), cgh);
+        cgh.parallel_for(
+          sycl::nd_range<1>(sycl::range<1>(grid*NUM_OF_THREADS),
+                            sycl::range<1>(NUM_OF_THREADS)),
+          [=](sycl::nd_item<1> item) {
+          scalarProductKernel_native_fp32(d_a, d_b, d_r,
+                                          sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                          size, item);
+        });
+      });
+    }
+
+    q.wait();
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
+
+    q.memcpy(&r, d_r, result_bytes).wait();
+    printf("Error rate: %e\n", fabsf(r - 65504.f)/65504.f);
+
+    // warmup
+    for (int i = 0; i < 1000; i++) {
       q.submit([&](sycl::handler &cgh) {
         cgh.parallel_for(
           sycl::nd_range<1>(sycl::range<1>(grid*NUM_OF_THREADS),
                             sycl::range<1>(NUM_OF_THREADS)),
           [=](sycl::nd_item<1> item) {
-          scalarProductKernel_native2(d_a, d_b, d_r, size, item);
+          scalarProductKernel_native2_fp32(d_a, d_b, d_r, size, item);
         });
       });
     }
@@ -132,7 +179,7 @@ int main(int argc, char *argv[])
           sycl::nd_range<1>(sycl::range<1>(grid*NUM_OF_THREADS),
                             sycl::range<1>(NUM_OF_THREADS)),
           [=](sycl::nd_item<1> item) {
-          scalarProductKernel_native2(d_a, d_b, d_r, size, item);
+          scalarProductKernel_native2_fp32(d_a, d_b, d_r, size, item);
         });
       });
     }
@@ -142,62 +189,32 @@ int main(int argc, char *argv[])
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-    q.memcpy(&r2, d_r, result_bytes).wait();
-
-    // warmup
-    for (int i = 0; i < repeat; i++) {
-      q.submit([&](sycl::handler &cgh) {
-        cgh.parallel_for(
-          sycl::nd_range<1>(sycl::range<1>(grid*NUM_OF_THREADS),
-                            sycl::range<1>(NUM_OF_THREADS)),
-          [=](sycl::nd_item<1> item) {
-          scalarProductKernel_native3(
-            reinterpret_cast<const sycl::float4*>(d_a),
-            reinterpret_cast<const sycl::float4*>(d_b),
-            d_r, size, item);
-        });
-      });
-    }
-    q.wait();
-
-    start = std::chrono::steady_clock::now();
-
-    for (int i = 0; i < repeat; i++) {
-      q.memset(d_r, 0, result_bytes);
-      q.submit([&](sycl::handler &cgh) {
-        cgh.parallel_for(
-          sycl::nd_range<1>(sycl::range<1>(grid*NUM_OF_THREADS),
-                            sycl::range<1>(NUM_OF_THREADS)),
-          [=](sycl::nd_item<1> item) {
-          scalarProductKernel_native3(
-            reinterpret_cast<const sycl::float4*>(d_a),
-            reinterpret_cast<const sycl::float4*>(d_b),
-            d_r, size, item);
-        });
-      });
-    }
-
-    q.wait();
-    end = std::chrono::steady_clock::now();
-    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
-
-    q.memcpy(&r3, d_r, result_bytes).wait();
-
-#ifdef DEBUG
-    printf("GPU Results: %f %f %f\n", r1, r2, r3);
-    printf("CPU Result: %f\n", (float)result_ref);
-#endif
-
-    bool ok = fabsf(r1 - (float)result_ref) < 0.00001f &&
-              fabsf(r2 - (float)result_ref) < 0.00001f &&
-              fabsf(r3 - (float)result_ref) < 0.00001f;
-    printf("fp16ScalarProduct %s\n\n", ok ?  "PASS" : "FAIL");
+    q.memcpy(&r, d_r, result_bytes).wait();
+    printf("Error rate: %e\n", fabsf(r - 65504.f)/65504.f);
   }
+
+  printf("\n");
+  // library-based dot product
+  for (int i = 0; i < 1000; i++) {
+    oneapi::mkl::blas::dot(q, size*2, (sycl::half*)d_a, 1, (sycl::half*)d_b, 1, d_r2);
+  }
+  q.wait();
+
+  auto start = std::chrono::steady_clock::now();
+  for (int i = 0; i < repeat; i++) {
+    oneapi::mkl::blas::dot(q, size*2, (sycl::half*)d_a, 1, (sycl::half*)d_b, 1, d_r2);
+  }
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (mkl::blas::dot) execution time %f (us)\n", (time * 1e-3f) / repeat);
+  q.memcpy(&r2, d_r2, result2_bytes).wait();
+  printf("Error rate: %e\n", fabsf((float)r2 - 65504.f)/65504.f);
 
   sycl::free(d_a, q);
   sycl::free(d_b, q);
   sycl::free(d_r, q);
+  sycl::free(d_r2, q);
   free(a);
   free(b);
 
