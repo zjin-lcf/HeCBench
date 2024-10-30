@@ -15,15 +15,17 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cub/cub.cuh>
+#include <cublas_v2.h>
 #include "kernels.h"
 
+// The analytical result of dot product is 65504
 void generateInput(half2 * a, size_t size)
 {
   for (size_t i = 0; i < size; ++i)
   {
     half2 temp;
-    temp.x = -1;
-    temp.y = -1;
+    temp.x = (half)(sqrt(32752.0/size));
+    temp.y = (half)(sqrt(32752.0/size));
     a[i] = temp;
   }
 }
@@ -39,11 +41,13 @@ int main(int argc, char *argv[])
   const size_t size = NUM_OF_BLOCKS*NUM_OF_THREADS;
   const size_t size_bytes = size * sizeof(half2);
   const size_t result_bytes = sizeof(float);
+  const size_t result2_bytes = sizeof(half);
 
   half2 *a, *b;
   half2 *d_a, *d_b;
 
-  float r1, r2, r3, r4, *d_r;
+  float r, *d_r;
+  half r2, *d_r2;
 
   a = (half2*) malloc (size_bytes);
   b = (half2*) malloc (size_bytes);
@@ -51,6 +55,7 @@ int main(int argc, char *argv[])
   cudaMalloc((void**)&d_b, size_bytes);
 
   cudaMalloc((void**)&d_r, result_bytes);
+  cudaMalloc((void**)&d_r2, result2_bytes);
 
   srand(123);
   generateInput(a, size);
@@ -59,20 +64,15 @@ int main(int argc, char *argv[])
   generateInput(b, size);
   cudaMemcpy(d_b, b, size_bytes, cudaMemcpyHostToDevice);
 
-  double result_ref = 0.f;
-  for (size_t i = 0; i < size; i++)
-  {
-    result_ref += (float)a[i].x * (float)b[i].x +
-                  (float)a[i].y * (float)b[i].y;
-  }
+  printf("\nNumber of elements in the vectors is %zu\n", size * 2);
 
-  // evaluate the grid sizes for performance optimization
+  // evaluate the impact of grid sizes on performance
   for (int grid = NUM_OF_BLOCKS; grid >= NUM_OF_BLOCKS / 16; grid = grid / 2) {
 
-    printf("GPU grid size is %d\n", grid);
+    printf("\nGPU grid size is %d\n", grid);
 
     // warmup
-    for (int i = 0; i < repeat; i++)
+    for (int i = 0; i < 1000; i++)
       scalarProductKernel_intrinsics<<<grid, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
 
     cudaDeviceSynchronize();
@@ -86,85 +86,86 @@ int main(int argc, char *argv[])
     cudaDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
+    printf("Average kernel1 execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-    cudaMemcpy(&r1, d_r, result_bytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(&r, d_r, result_bytes, cudaMemcpyDeviceToHost);
+    printf("Error rate: %e\n", fabsf(r - 65504.f)/65504.f);
 
     // warmup
-    for (int i = 0; i < repeat; i++)
-      scalarProductKernel_native<<<grid, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
+    for (int i = 0; i < 1000; i++)
+      scalarProductKernel_native_fp32<<<grid, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
 
     cudaDeviceSynchronize();
     start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
       cudaMemset(d_r, 0, result_bytes);
-      scalarProductKernel_native<<<grid, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
+      scalarProductKernel_native_fp32<<<grid, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
     }
 
     cudaDeviceSynchronize();
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
+    printf("Average kernel2 execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-    cudaMemcpy(&r2, d_r, result_bytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(&r, d_r, result_bytes, cudaMemcpyDeviceToHost);
+    printf("Error rate: %e\n", fabsf(r - 65504.f)/65504.f);
 
     // warmup
-    for (int i = 0; i < repeat; i++)
-      scalarProductKernel_intrinsics2<<<grid, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
+    for (int i = 0; i < 1000; i++)
+      scalarProductKernel_native2_fp32<<<grid, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
 
     cudaDeviceSynchronize();
     start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
       cudaMemset(d_r, 0, result_bytes);
-      scalarProductKernel_intrinsics2<<<grid, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
+      scalarProductKernel_native2_fp32<<<grid, NUM_OF_THREADS>>>(d_a, d_b, d_r, size);
     }
 
     cudaDeviceSynchronize();
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
-    cudaMemcpy(&r3, d_r, result_bytes, cudaMemcpyDeviceToHost);
+    printf("Average kernel3 execution time %f (us)\n", (time * 1e-3f) / repeat);
 
-    // warmup
-    for (int i = 0; i < repeat; i++)
-      scalarProductKernel_intrinsics3<<<grid, NUM_OF_THREADS>>>(
-        reinterpret_cast<const float4*>(d_a),
-        reinterpret_cast<const float4*>(d_b), d_r, size);
-
-    cudaDeviceSynchronize();
-    start = std::chrono::steady_clock::now();
-
-    for (int i = 0; i < repeat; i++) {
-      cudaMemset(d_r, 0, result_bytes);
-      scalarProductKernel_intrinsics3<<<grid, NUM_OF_THREADS>>>(
-        reinterpret_cast<const float4*>(d_a),
-        reinterpret_cast<const float4*>(d_b), d_r, size);
-    }
-
-    cudaDeviceSynchronize();
-    end = std::chrono::steady_clock::now();
-    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / repeat);
-
-    cudaMemcpy(&r4, d_r, result_bytes, cudaMemcpyDeviceToHost);
-
-#ifdef DEBUG
-    printf("GPU Results: %f %f %f %f\n", r1, r2, r3, r4);
-    printf("CPU Result: %f\n", (float)result_ref);
-#endif
-
-    bool ok = fabsf(r1 - (float)result_ref) < 0.00001f &&
-              fabsf(r2 - (float)result_ref) < 0.00001f &&
-              fabsf(r3 - (float)result_ref) < 0.00001f &&
-              fabsf(r4 - (float)result_ref) < 0.00001f ;
-    printf("fp16ScalarProduct %s\n\n", ok ? "PASS" : "FAIL");
+    cudaMemcpy(&r, d_r, result_bytes, cudaMemcpyDeviceToHost);
+    printf("Error rate: %e\n", fabsf(r - 65504.f)/65504.f);
   }
+
+  printf("\n");
+  // library-based dot product
+  cublasHandle_t h;
+  cublasCreate(&h);
+  cublasSetPointerMode(h, CUBLAS_POINTER_MODE_DEVICE);
+
+  cudaDataType xType, yType, rType, eType;
+  xType = yType = rType = CUDA_R_16F;
+  eType = CUDA_R_32F;
+
+  // warmup
+  for (int i = 0; i < 1000; i++) {
+    cublasDotEx(h, size*2, (half*)d_a, xType, 1, (half*)d_b,
+                yType, 1, d_r2, rType, eType);
+  }
+  cudaDeviceSynchronize();
+
+  auto start = std::chrono::steady_clock::now();
+  for (int i = 0; i < repeat; i++) {
+    cublasDotEx(h, size*2, (half*)d_a, xType, 1, (half*)d_b,
+                yType, 1, d_r2, rType, eType);
+  }
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel (cublasDot) execution time %f (us)\n", (time * 1e-3f) / repeat);
+  cudaMemcpy(&r2, d_r2, result2_bytes, cudaMemcpyDeviceToHost);
+  printf("Error rate: %e\n", fabsf((float)r2 - 65504.f)/65504.f);
 
   cudaFree(d_a);
   cudaFree(d_b);
   cudaFree(d_r);
+  cudaFree(d_r2);
+  cublasDestroy(h);
   free(a);
   free(b);
 
