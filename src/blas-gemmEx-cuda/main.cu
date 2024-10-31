@@ -80,7 +80,7 @@ void test_gemm(cublasHandle_t handle,
     cudaDeviceSynchronize();
     gettimeofday(&start, NULL);
     bool success = cublas_gemm_ex(handle,
-                                  CUBLAS_OP_T,
+                                  CUBLAS_OP_N,
                                   CUBLAS_OP_N,
                                   n, // number of rows of matrix A and C
                                   m, // number of columns of matrix B and C
@@ -88,7 +88,7 @@ void test_gemm(cublasHandle_t handle,
                                   B,
                                   A,
                                   C,
-                                  k, // lda
+                                  n, // lda
                                   k, // ldb
                                   n, // ldc
                                   alpha,
@@ -152,12 +152,11 @@ int main(int argc, char* argv[]) {
     iA[i] = float2int8(fA[i], 127);
   }
   for (int i = 0; i < k * n; ++i) {
-    int a = i%k * n + i/k;
-    dB[a] = double(i % 255 - 127) / 127;
-    fB[a] = float(i % 255 - 127) / 127;
-    hB[a] = __float2half_rn(fB[a]);
-    bfB[a] = __float2bfloat16_rn(fB[a]);
-    iB[a] = float2int8(fB[a], 127);
+    dB[i] = double(i % 255 - 127) / 127;
+    fB[i] = float(i % 255 - 127) / 127;
+    hB[i] = __float2half_rn(fB[i]);
+    bfB[i] = __float2bfloat16_rn(fB[i]);
+    iB[i] = float2int8(fB[i], 127);
   }
 
   cublasHandle_t handle;
@@ -165,7 +164,7 @@ int main(int argc, char* argv[]) {
 
   printf(">>>>>>>>>>>>>>>>> test fp64 >>>>>>>>>>>>>>>>>\n");
   for (int algo = start_algo; algo <= end_algo; ++algo)
-    test_gemm(handle, m, n, k, dA, dB, fC, &d_alpha, &d_beta, algo, iteration);
+    test_gemm(handle, m, n, k, dA, dB, dC, &d_alpha, &d_beta, algo, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
   for (int algo = start_algo; algo <= end_algo; ++algo)
