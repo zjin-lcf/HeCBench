@@ -40,7 +40,7 @@ of the IEEE International Conference on Cluster Computing, pp. 381-389.
 September 2015.
 */
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <cstdio>
 #include <cassert>
 #include <string>
@@ -394,11 +394,10 @@ int main(int argc, char *argv[])
   }
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   const int wgs = q.get_device().get_info<sycl::info::device::max_work_group_size>();
   if (wgs < TPB) {
