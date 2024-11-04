@@ -56,11 +56,10 @@ bool gpu_permutation_testing(double *gpu_runtime, uint32_t *counts, double *resu
   size_t Nblen = (size_t)N * blen;
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, sycl::property::queue::in_order());
 
   uint8_t *dev_bNdata;
 
