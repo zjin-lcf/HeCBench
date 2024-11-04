@@ -36,7 +36,7 @@ uint32_t LCG_random (uint64_t * seed)
 template<typename T, sycl::memory_scope MemoryScope = sycl::memory_scope::device>
 static inline void atomicAdd(T& val, const T delta)
 {
-  sycl::ext::oneapi::atomic_ref<T, sycl::memory_order::relaxed, 
+  sycl::atomic_ref<T, sycl::memory_order::relaxed,
      MemoryScope, sycl::access::address_space::global_space> ref(val);
   ref.fetch_add(delta);
 }
