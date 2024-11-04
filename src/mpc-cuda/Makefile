@@ -50,13 +50,15 @@ $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) *.mpc *.org fpc
+	rm -rf $(program) $(obj) *.txt fpc
 
 process: fpc.c
 	gcc -O3 fpc.c -o fpc
 	./fpc < msg_sp.trace.fpc > msg_sp.trace.out
 
 run: process $(program)
+        # compression
 	$(LAUNCHER) ./$(program) msg_sp.trace.out 1
-	./$(program) msg_sp.trace.out.mpc 
-	diff msg_sp.trace.out msg_sp.trace.out.mpc.org
+        # decompression
+	$(LAUNCHER) ./$(program) compression.txt
+	diff msg_sp.trace.out decompression.txt

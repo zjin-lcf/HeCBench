@@ -46,8 +46,6 @@ September 2015.
 #include <sys/time.h>
 #include "utils.h"
 
-using std::string;
-
 #define TPB 1024  /* do not change */
 
 #if (CUDART_VERSION >= 9000)
@@ -375,11 +373,12 @@ int main(int argc, char *argv[])
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, 0);
   const int blocks = deviceProp.multiProcessorCount * 2;
-  cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+  // deprecated API
+  //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
 
   int dim, insize, outsize;
 
-  string name = argv[1];
+  std::string name = argv[1];
   long* const input = readFile(name.c_str(), insize);
 
   if (argc == 3) {
@@ -419,7 +418,7 @@ int main(int argc, char *argv[])
     cudaMemcpy(output, d_out, outsize * sizeof(long), cudaMemcpyDeviceToHost);
     output[0] = (((long)insize) << 32) + (0x43504d00 - 1) + dim;
 
-    name += ".mpc";
+    name = "compression.txt";
 
   } else {
 
@@ -435,7 +434,7 @@ int main(int argc, char *argv[])
     printf("decompression time: %.2f ms\n", 1000.0 * dtime);
     printf("decompression throughput: %.3f GB/s\n\n", 0.000000001 * sizeof(long) * outsize / dtime);
 
-    name += ".org";
+    name = "decompression.txt";
   }
 
   writeFile(name.c_str(), output, outsize);
