@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 #include <algorithm>
 #include <random>
@@ -92,11 +92,10 @@ int main(int argc, char *argv[]) {
   std::shuffle(query_keys.begin(), query_keys.end(), g);
 
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel);
 
   GpuBTree::GpuBTreeMap<uint32_t, uint32_t, uint32_t, PoolAllocator> btree(q);
 

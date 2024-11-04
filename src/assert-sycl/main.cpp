@@ -13,7 +13,7 @@
 #include <iostream>
 #include <chrono>
 #include <exception>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 auto report_error = [] (sycl::exception_list elist) {
   for (auto &e : elist) {
@@ -59,11 +59,10 @@ bool runTest(sycl::queue &q, int argc, char **argv);
 int main(int argc, char **argv)
 {
 #ifdef USE_GPU
-  sycl::gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, report_error, sycl::property::queue::in_order());
 #else
-  sycl::cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, report_error, sycl::property::queue::in_order());
 #endif
-  sycl::queue q(dev_sel, report_error);
 
   // The test expects no assertError
   runPerf(q, argc, argv);

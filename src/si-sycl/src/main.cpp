@@ -1,6 +1,6 @@
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/algorithm>
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <oneapi/mkl/blas.hpp>
 #include <cxxopts.hpp>
 #include <fmt/core.h>
@@ -13,12 +13,13 @@ void populateBinaryTransposeMatrix(float* input, Dataset* dataset, unsigned int 
 
 int main(int argc, char **argv) {
   try {
+
+    // MKL blas gemm on host or device
 #ifdef USE_GPU
-    sycl::gpu_selector dev_sel;
+    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    sycl::cpu_selector dev_sel;
+    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    sycl::queue q(dev_sel); // MKL blas gemm on host or device
 
     sycl::queue host(sycl::cpu_selector{}); // exclusive scan on host
     auto policy = oneapi::dpl::execution::make_device_policy(host);
