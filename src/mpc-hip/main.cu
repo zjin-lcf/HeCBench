@@ -44,13 +44,10 @@ September 2015.
 #include <cassert>
 #include <string>
 #include <sys/time.h>
+#include <hip/hip_runtime.h>
 #include "utils.h"
 
 #define TPB 1024  /* do not change */
-
-#if (CUDART_VERSION >= 9000)
-#define __shfl_up(v, d) __shfl_up_sync(0xffffffff, v, d)
-#endif
 
 static inline __device__
 void prefixsum(int &val, int sbuf[TPB])
@@ -218,11 +215,7 @@ void MPCcompress(
     int loc = 0;
     if (v2 != 0) loc = 1;
 
-#if (CUDART_VERSION < 9000)
     unsigned int bitmap = __ballot(loc);
-#else
-    unsigned int bitmap = __ballot_sync(0xffffffff, loc);
-#endif
 
     if (lanex == 32) {
       sbuf2[tid] = bitmap;
@@ -370,11 +363,14 @@ int main(int argc, char *argv[])
     exit(-1);
   }
 
-  cudaDeviceProp deviceProp;
-  cudaGetDeviceProperties(&deviceProp, 0);
+  hipDeviceProp_t deviceProp;
+  hipGetDeviceProperties(&deviceProp, 0);
+  if (deviceProp.warpSize != 32) {
+    printf("Only a warp size of 32 is supported. Exit..\n");
+    exit(-1);
+  }
+
   const int blocks = deviceProp.multiProcessorCount * 2;
-  // deprecated API
-  //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
 
   int dim, insize, outsize;
 
@@ -394,20 +390,20 @@ int main(int argc, char *argv[])
 
   long *d_in, *d_out;
   int *d_offs;
-  cudaMalloc(&d_in, insize * sizeof(long));
-  cudaMalloc(&d_out, outsize * sizeof(long));
-  cudaMalloc(&d_offs, blocks * sizeof(int));
-  cudaMemcpy(d_in, input, insize * sizeof(long), cudaMemcpyHostToDevice);
+  hipMalloc(&d_in, insize * sizeof(long));
+  hipMalloc(&d_out, outsize * sizeof(long));
+  hipMalloc(&d_offs, blocks * sizeof(int));
+  hipMemcpy(d_in, input, insize * sizeof(long), hipMemcpyHostToDevice);
 
   struct timeval start, end;
   if (argc == 3) {
     gettimeofday(&start, NULL);
-    cudaMemset(d_offs, -1, blocks * sizeof(int));
+    hipMemset(d_offs, -1, blocks * sizeof(int));
     MPCcompress<<<blocks, TPB>>>(insize, d_in, d_out, d_offs, dim);
-    cudaDeviceSynchronize();
+    hipDeviceSynchronize();
     gettimeofday(&end, NULL);
 
-    cudaMemcpy(output, d_out, sizeof(long), cudaMemcpyDeviceToHost);
+    hipMemcpy(output, d_out, sizeof(long), hipMemcpyDeviceToHost);
     outsize = output[0] >> 32;
 
     double ctime = end.tv_sec + end.tv_usec / 1000000.0 - start.tv_sec - start.tv_usec / 1000000.0;
@@ -415,7 +411,7 @@ int main(int argc, char *argv[])
     printf("compression throughput: %.3f GB/s\n", 0.000000001 * sizeof(long) * insize / ctime);
     printf("compression ratio: %.3f\n\n", 1.0 * insize / outsize);
 
-    cudaMemcpy(output, d_out, outsize * sizeof(long), cudaMemcpyDeviceToHost);
+    hipMemcpy(output, d_out, outsize * sizeof(long), hipMemcpyDeviceToHost);
     output[0] = (((long)insize) << 32) + (0x43504d00 - 1) + dim;
 
     name = "compression.txt";
@@ -423,12 +419,12 @@ int main(int argc, char *argv[])
   } else {
 
     gettimeofday(&start, NULL);
-    cudaMemset(d_offs, -1, blocks * sizeof(int));
+    hipMemset(d_offs, -1, blocks * sizeof(int));
     MPCdecompress<<<blocks, TPB>>>(d_in, d_out, d_offs);
-    cudaDeviceSynchronize();
+    hipDeviceSynchronize();
     gettimeofday(&end, NULL);
 
-    cudaMemcpy(output, d_out, outsize * sizeof(long), cudaMemcpyDeviceToHost);
+    hipMemcpy(output, d_out, outsize * sizeof(long), hipMemcpyDeviceToHost);
 
     double dtime = end.tv_sec + end.tv_usec / 1000000.0 - start.tv_sec - start.tv_usec / 1000000.0;
     printf("decompression time: %.2f ms\n", 1000.0 * dtime);
@@ -442,9 +438,9 @@ int main(int argc, char *argv[])
   delete [] output;
   delete [] input;
 
-  cudaFree(d_offs);
-  cudaFree(d_out);
-  cudaFree(d_in);
+  hipFree(d_offs);
+  hipFree(d_out);
+  hipFree(d_in);
 
   return 0;
 }

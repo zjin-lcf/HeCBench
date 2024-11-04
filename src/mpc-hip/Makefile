@@ -3,10 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvcc
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
 LAUNCHER  =
 
 #===============================================================================
@@ -24,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../mpc-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -46,19 +45,15 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu utils.h Makefile
+%.o: %.cu ../mpc-cuda/utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj) *.txt fpc
 
-process: fpc.c
-	gcc -O3 fpc.c -o fpc
-	./fpc < msg_sp.trace.fpc > msg_sp.trace.out
-
-run: process $(program)
+run: $(program)
         # compression
-	$(LAUNCHER) ./$(program) msg_sp.trace.out 1
+	$(LAUNCHER) ./$(program) ../mpc-cuda/msg_sp.trace.out 1
         # decompression
 	$(LAUNCHER) ./$(program) compression.txt
-	diff msg_sp.trace.out decompression.txt
+	diff ../mpc-cuda/msg_sp.trace.out decompression.txt
