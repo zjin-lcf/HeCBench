@@ -240,7 +240,7 @@ __global__ void evalFactoredForm(const int * vResynRoots, const int * vCuts, con
     int coneIdx, rootId;
     int nVars, nSaved, nAdded, nOtherAdded, nNewLevel, nOtherNewLevel;
     int startIdx, endIdx;
-    unsigned warpMask;
+    unsigned long warpMask;
     int fSelectedSubg;
 
     for (; idx < 2 * nResyn; idx += nThreads) {
@@ -585,10 +585,10 @@ reorder(int * vFanin0New, int * vFanin1New, int * pOuts,
     int nNodesNew, nObjsNew;
 
     // copy fanin arrays to host
-    hipHostAlloc(&vhFanin0, nBufferLen * sizeof(int), hipHostMallocDefault);
-    hipHostAlloc(&vhFanin1, nBufferLen * sizeof(int), hipHostMallocDefault);
-    hipHostAlloc(&vhLevels, nBufferLen * sizeof(int), hipHostMallocDefault);
-    hipHostAlloc(&vhNewInd, nBufferLen * sizeof(int), hipHostMallocDefault);
+    hipHostAlloc((void**)&vhFanin0, nBufferLen * sizeof(int), hipHostMallocDefault);
+    hipHostAlloc((void**)&vhFanin1, nBufferLen * sizeof(int), hipHostMallocDefault);
+    hipHostAlloc((void**)&vhLevels, nBufferLen * sizeof(int), hipHostMallocDefault);
+    hipHostAlloc((void**)&vhNewInd, nBufferLen * sizeof(int), hipHostMallocDefault);
 
     hipMemcpy(vhFanin0, vFanin0New, nBufferLen * sizeof(int), hipMemcpyDeviceToHost);
     hipMemcpy(vhFanin1, vFanin1New, nBufferLen * sizeof(int), hipMemcpyDeviceToHost);

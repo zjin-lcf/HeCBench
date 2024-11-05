@@ -26,10 +26,10 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall #-DHIP_ENABLE_WARP_SYNC_BUILTINS=1
 
 # Linker Flags
-LDFLAGS =
+LDFLAGS = -lpthread
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
