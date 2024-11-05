@@ -259,7 +259,7 @@ __global__ void getCutTruthTableConsecutive(const int * pFanin0, const int * pFa
             vTruthMemAlloc[warpIdx] = (unsigned *) malloc(totalMemLen * sizeof(unsigned));
             assert(vTruthMemAlloc[warpIdx] != NULL); // if NULL, then not enough heap memory
         }
-        __syncwarp();
+        //__syncwarp();
         vTruthMem = vTruthMemAlloc[warpIdx] + startMemIdx;
         
 
@@ -284,7 +284,7 @@ __global__ void getCutTruthTableConsecutive(const int * pFanin0, const int * pFa
                 vTruth[startIdx + i] = vTruthMem[(visitedSize - 1) * nWords + i];
         }
 
-        __syncwarp();
+        //__syncwarp();
         if (laneIdx == 0)
             free(vTruthMemAlloc[warpIdx]);
     }
