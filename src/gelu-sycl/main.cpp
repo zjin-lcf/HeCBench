@@ -94,8 +94,16 @@ int main(int argc, char* argv[])
   d_bias = (sycl::half *)sycl::malloc_device(bias_size_bytes, q);
   q.memcpy(d_bias, bias, bias_size_bytes);
 
-  sycl::range<2> lws (1, 1024);
-  sycl::range<2> gws (batch_size, seq_len * 1024);
+  int block_size;
+  if (hidden_dim >= 4096)
+    block_size = 512;
+  else if (hidden_dim >= 2048)
+    block_size = 256;
+  else
+    block_size = 128;
+
+  sycl::range<2> lws (1, block_size);
+  sycl::range<2> gws (batch_size, seq_len * block_size);
 
   // warmup and verify
   q.submit([&] (sycl::handler &cgh) {
