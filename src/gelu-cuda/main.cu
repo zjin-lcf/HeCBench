@@ -86,7 +86,15 @@ int main(int argc, char* argv[])
   cudaMalloc((void**)&d_bias, bias_size_bytes);
   cudaMemcpy(d_bias, bias, bias_size_bytes, cudaMemcpyHostToDevice);
   
-  dim3 block(1024, 1);
+  int block_size;
+  if (hidden_dim >= 4096)
+    block_size = 512;
+  else if (hidden_dim >= 2048)
+    block_size = 256;
+  else
+    block_size = 128;
+ 
+  dim3 block(block_size, 1);
   dim3 grid(seq_len, batch_size);
 
   // warmup and verify
