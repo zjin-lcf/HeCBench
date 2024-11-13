@@ -9,13 +9,17 @@
 #define warpSize 32
 
 __device__ int atomicAggInc(int* ptr) {
-  int mask;
-  //mask = __match_any((unsigned long long)ptr);
+  unsigned mask;
+#ifdef HIP_ENABLE_WARP_SYNC_BUILTINS
+  unsigned long tmask = 0xFFFFFFFFFFFFFFFF;
+  mask = __match_any_sync(tmask, (unsigned long long)ptr);
+#else
   for (int i = 0; i < warpSize; i++){
     unsigned long long tptr = __shfl((unsigned long long)ptr, i);
     unsigned my_mask = __ballot((tptr == (unsigned long long)ptr));
     if (i == (threadIdx.x & (warpSize-1))) mask = my_mask;
   }
+#endif
   int leader = __ffs(mask) - 1;  // select a leader
   int res = 0;
   unsigned lane_id = threadIdx.x % warpSize;
