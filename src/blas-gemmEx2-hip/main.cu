@@ -43,7 +43,7 @@ bool hipblasLt_gemm(
     const int m, const int n, const int k,
     T *A, T *B, S *C,
     int lda, int ldb, int ldc,
-    const CT *alpha, const CT *beta)
+    const CT *alpha, const CT *beta, int compute32F_mode)
 {
   bool status = true;
   hipblasLtMatmulDesc_t operationDesc;
@@ -64,7 +64,13 @@ bool hipblasLt_gemm(
     ComputeType = HIPBLAS_COMPUTE_64F;
   } else if (std::is_same<T, float>::value) {
     AType = SType = CType = HIP_R_32F;
-    ComputeType = HIPBLAS_COMPUTE_32F;
+    switch (compute32F_mode) {
+      case 0: ComputeType = HIPBLAS_COMPUTE_32F;
+      case 1: ComputeType = HIPBLAS_COMPUTE_32F_FAST_16F;
+      case 2: ComputeType = HIPBLAS_COMPUTE_32F_FAST_16BF;
+      case 3: ComputeType = HIPBLAS_COMPUTE_32F_FAST_TF32;
+      default: ComputeType = HIPBLAS_COMPUTE_32F;
+    }
   } else if (std::is_same<T, __half>::value) {
     AType = CType = HIP_R_16F;
     SType = HIP_R_32F;
@@ -86,8 +92,8 @@ bool hipblasLt_gemm(
   hipblasCheck(hipblasLtMatmulDescCreate(&operationDesc, ComputeType, SType));
   hipblasCheck(hipblasLtMatmulDescSetAttribute(operationDesc,
               HIPBLASLT_MATMUL_DESC_TRANSA, &opNoTranspose, sizeof(opNoTranspose)));
-  hipblasCheck(hipblasLtMatmulDescSetAttribute(
-              operationDesc, HIPBLASLT_MATMUL_DESC_TRANSB, &opNoTranspose, sizeof(opNoTranspose)));
+  hipblasCheck(hipblasLtMatmulDescSetAttribute(operationDesc,
+              HIPBLASLT_MATMUL_DESC_TRANSB, &opNoTranspose, sizeof(opNoTranspose)));
 
   // define matrix layouts
   hipblasCheck(hipblasLtMatrixLayoutCreate(&ALayout, AType, m, k, lda));
@@ -131,10 +137,11 @@ bool hipblasLt_gemm(
 }
 
 template <typename T, typename S, typename CT>
-void test_gemm(//hipblasLtHandle_t handle,
+void test_gemm(
   const int m,  const int n,  const int k,
   T *A, T *B, S *C,
-  const CT *alpha, const CT *beta, const int iteration)
+  const CT *alpha, const CT *beta, const int iteration,
+  int compute32F_mode = 0)
 {
   double total_time = 0;
   struct timeval start, end;
@@ -152,7 +159,8 @@ void test_gemm(//hipblasLtHandle_t handle,
                                   k, // ldb
                                   n, // ldc
                                   alpha,
-                                  beta);
+                                  beta,
+                                  compute32F_mode);
     hipDeviceSynchronize();
     gettimeofday(&end, NULL);
 
@@ -233,7 +241,16 @@ int main(int argc, char* argv[]) {
   test_gemm(m, n, k, dA, dB, dC, &d_alpha, &d_beta, iteration);
 #endif
 
-  printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute type tf32) >>>>>>>>>>>>>>>>>\n");
+  test_gemm(m, n, k, fA, fB, fC, &f_alpha, &f_beta, iteration, 3);
+
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute type bf16) >>>>>>>>>>>>>>>>>\n");
+  test_gemm(m, n, k, fA, fB, fC, &f_alpha, &f_beta, iteration, 2);
+
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute type fp16) >>>>>>>>>>>>>>>>>\n");
+  test_gemm(m, n, k, fA, fB, fC, &f_alpha, &f_beta, iteration, 1);
+
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute type fp32) >>>>>>>>>>>>>>>>>\n");
   test_gemm(m, n, k, fA, fB, fC, &f_alpha, &f_beta, iteration);
 
   // unsupported
