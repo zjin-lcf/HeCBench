@@ -1212,7 +1212,7 @@ Early results are shown [here](results/README.md)
   A quartic equation minimizer (https://github.com/qureshizawar/CUDA-quartic-solver)
 
 ### qkv (cuda)
-  Generate query, key and value vectors over a batch of inputs (https://github.com/karpathy/llm.c)
+  Generate query, key and value vectors over a batch of inputs (https://github.com/karpathy/llm.c, https://github.com/mspronesti/llm.sycl)
 
 ### qrg (cuda)
   Niederreiter quasirandom number generator and Moro's Inverse Cumulative Normal Distribution generator (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
