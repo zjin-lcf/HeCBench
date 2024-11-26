@@ -29,7 +29,9 @@ bool mkl_gemm_ex(
     int m, int n, int k,
     Ta *A, Ta *B, Tc *C,
     int lda, int ldb, int ldc,
-    Ts alpha, Ts beta)
+    Ts alpha, Ts beta,
+    oneapi::mkl::blas::compute_mode mode =
+      oneapi::mkl::blas::compute_mode::standard)
 {
   sycl::event status;
   try {
@@ -53,7 +55,9 @@ template <typename Ta, typename Tc, typename Ts>
 void test_gemm(sycl::queue &q,
                const int m, const int n, const int k,
                Ta *A, Ta *B, Tc *C,
-               const Ts alpha, const Ts beta, int iteration)
+               const Ts alpha, const Ts beta, int iteration,
+               oneapi::mkl::blas::compute_mode mode =
+                 oneapi::mkl::blas::compute_mode::standard)
 {
   double total_time = 0;
   struct timeval start, end;
@@ -73,7 +77,8 @@ void test_gemm(sycl::queue &q,
                                k, // ldb
                                n, // ldc
                                alpha,
-                               beta);
+                               beta,
+                               mode);
     gettimeofday(&end, NULL);
     if (!success) break;
     else if (i > 0) {
@@ -147,6 +152,14 @@ int main(int argc, char* argv[]) {
   printf(">>>>>>>>>>>>>>>>> test fp64 >>>>>>>>>>>>>>>>>\n");
   test_gemm(q, m, n, k, dA, dB, dC, d_alpha, d_beta, iteration);
 
+  printf(">>>>>>>>>>>>>>>>> test fp32 (bf16) >>>>>>>>>>>>>>>>>\n");
+  test_gemm(q, m, n, k, fA, fB, fC, f_alpha, f_beta, iteration,
+            oneapi::mkl::blas::compute_mode::float_to_bf16);
+
+  printf(">>>>>>>>>>>>>>>>> test fp32 (tf32) >>>>>>>>>>>>>>>>>\n");
+  test_gemm(q, m, n, k, fA, fB, fC, f_alpha, f_beta, iteration,
+            oneapi::mkl::blas::compute_mode::float_to_tf32);
+
   printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
   test_gemm(q, m, n, k, fA, fB, fC, f_alpha, f_beta, iteration);
 
@@ -164,7 +177,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < 10; ++i)
     printf("%.5lf%c", dC[i], " \n"[i==9]);
 
-  printf("fp32: ");
+  printf("fp32: "); // fp32 (bf16 and tf32) are not compared
   for (int i = 0; i < 10; ++i)
     printf("%.5f%c", fC[i], " \n"[i==9]);
 
