@@ -330,7 +330,7 @@ Early results are shown [here](results/README.md)
   Scaled matrix-matrix multiplication in a 8-bit floating-point format
 
 ### blas-gemm (sycl) 
-  General matrix-matrix multiplication
+  General matrix-matrix multiplications (https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-dpcpp/2025-0/gemm.html)
 
 ### blas-gemmBatched (cuda)
   Batched general matrix-matrix multiplication (https://github.com/pyrovski/cublasSgemmBatched-example)
@@ -339,10 +339,10 @@ Early results are shown [here](results/README.md)
   Strided batched general matrix-matrix multiplication (https://github.com/pyrovski/cublasSgemmBatched-example)
 
 ### blas-gemmEx (cuda)
-  Extended general matrix-matrix multiplications (https://godweiyang.com/2021/08/24/gemm/)
+  Extended general matrix-matrix multiplications (https://godweiyang.com/2021/08/24/gemm/, https://github.com/UoB-HPC/abc-pvc-deepdive)
 
 ### blas-gemmEx2 (cuda)
-  Extended general matrix-matrix multiplications implemented using cuBLASLt, hipBLASLt, and oneDNN 
+  Extended general matrix-matrix multiplications using cuBLASLt, hipBLASLt, and oneDNN 
 
 ### blockAccess (cuda)
   Block access from the CUB's collective primitives (https://github.com/NVIDIA/cub)
