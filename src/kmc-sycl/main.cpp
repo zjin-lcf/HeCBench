@@ -43,6 +43,7 @@ void cal_km(struct svm_problem *pecm)
   }
 
   // offload
+  auto start_offload = std::chrono::steady_clock::now();
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v
@@ -105,7 +106,14 @@ void cal_km(struct svm_problem *pecm)
       pecm-> x[trvei].values[i_c + 1] = v_f_g[i_c];
   }
 
-  printf("Average kernel matrix offload time: %lf (us)\n", (time * 1e-3f) / ntv);
+  printf("Average kernel matrix offload time: %lf (us)\n", (time * 1e-3) / ntv);
+
+  sycl::free(g_tva, q);
+  sycl::free(g_vtm, q);
+  sycl::free(g_dp, q);
+  auto end_offload = std::chrono::steady_clock::now();
+  auto time_offload = std::chrono::duration_cast<std::chrono::nanoseconds>(end_offload - start_offload).count();
+  printf("Total kernel matrix execution time: %lf (us)\n", time_offload * 1e-3);
 
   free( tr_ar );
   free( tva );
@@ -113,8 +121,4 @@ void cal_km(struct svm_problem *pecm)
   free( dp  );
   free( v_f_g );
   free( tv_sq );
-
-  sycl::free(g_tva, q);
-  sycl::free(g_vtm, q);
-  sycl::free(g_dp, q);
 }

@@ -1,6 +1,6 @@
 #include <chrono>
 #include <hip/hip_runtime.h>
-#include <hipblas.h>
+#include <hipblas/hipblas.h>
 #include <math.h>
 #include "driver.c"
 
@@ -40,6 +40,7 @@ void cal_km(struct svm_problem *pecm)
   }
 
   // offload
+  auto start_offload = std::chrono::steady_clock::now();
   const float alpha = 1;
   const float beta = 0;
 
@@ -81,7 +82,15 @@ void cal_km(struct svm_problem *pecm)
       pecm-> x[trvei].values[i_c + 1] = v_f_g[i_c];
   }
 
-  printf("Average kernel matrix offload time: %lf (us)\n", (time * 1e-3f) / ntv);
+  printf("Average kernel matrix offload time: %lf (us)\n", (time * 1e-3) / ntv);
+
+  hipFree( g_tva );
+  hipFree( g_vtm );
+  hipFree( g_dp );
+  hipblasDestroy( handle );
+  auto end_offload = std::chrono::steady_clock::now();
+  auto time_offload = std::chrono::duration_cast<std::chrono::nanoseconds>(end_offload - start_offload).count();
+  printf("Total kernel matrix execution time: %lf (us)\n", time_offload * 1e-3);
 
   free( tr_ar );
   free( tva );
@@ -89,9 +98,4 @@ void cal_km(struct svm_problem *pecm)
   free( dp  );
   free( v_f_g );
   free( tv_sq );
-
-  hipFree( g_tva );
-  hipFree( g_vtm );
-  hipFree( g_dp );
-  hipblasDestroy( handle );
 }
