@@ -4,6 +4,7 @@
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
 #include <hip/hip_bfloat16.h>
+#define HIPBLAS_V2
 #include <hipblas/hipblas.h>
 #include "utils.h"
 
@@ -28,25 +29,35 @@ bool hipblas_gemm_ex(
     const int m, const int n, const int k,
     T *A, T *B, S *C,
     int lda, int ldb, int ldc,
-    const CT *alpha, const CT *beta, int algo)
+    const CT *alpha, const CT *beta, int algo, int compute32F_mode)
 {
-  hipblasDatatype_t AType, BType, CType, ComputeType;
+  hipblasDatatype_t AType, BType, CType;
+  hipblasComputeType_t ComputeType;
   if (std::is_same<T, double>::value) {
-    AType = BType = CType = ComputeType = HIPBLAS_R_64F;
+    AType = BType = CType = HIPBLAS_R_64F;
+    ComputeType = HIPBLAS_COMPUTE_64F;
   } else if (std::is_same<T, float>::value) {
-    AType = BType = CType = ComputeType = HIPBLAS_R_32F;
+    AType = BType = CType = HIPBLAS_R_32F;
+    switch (compute32F_mode) {
+      case 0: ComputeType = HIPBLAS_COMPUTE_32F;
+      case 1: ComputeType = HIPBLAS_COMPUTE_32F_FAST_16F;
+      case 2: ComputeType = HIPBLAS_COMPUTE_32F_FAST_16BF;
+      case 3: ComputeType = HIPBLAS_COMPUTE_32F_FAST_TF32;
+      default: ComputeType = HIPBLAS_COMPUTE_32F;
+    }
   } else if (std::is_same<T, __half>::value) {
     AType = BType = CType = HIPBLAS_R_16F;
     if (std::is_same<CT, __half>::value)
-      ComputeType = HIPBLAS_R_16F;
+      ComputeType = HIPBLAS_COMPUTE_16F;
     else
-      ComputeType = HIPBLAS_R_32F;
+      ComputeType = HIPBLAS_COMPUTE_32F;
   } else if (std::is_same<T, hip_bfloat16>::value) {
     AType = BType = CType = HIPBLAS_R_16B;
-    ComputeType = HIPBLAS_R_32F;
+    ComputeType = HIPBLAS_COMPUTE_32F;
   } else if (std::is_same<T, int8_t>::value) {
     AType = BType = HIPBLAS_R_8I;
-    CType = ComputeType = HIPBLAS_R_32I;
+    CType = HIPBLAS_R_32I;
+    ComputeType = HIPBLAS_COMPUTE_32I;
   } else {
     printf("Not supported data type.");
     return -1;
@@ -67,7 +78,9 @@ template <typename T, typename S, typename CT>
 void test_gemm(hipblasHandle_t handle,
   const int m,  const int n,  const int k,
   T *A, T *B, S *C,
-  const CT *alpha, const CT *beta, int algo, const int iteration)
+  const CT *alpha, const CT *beta,
+  int algo, const int iteration,
+  int compute32F_mode = 0)
 {
   double total_time = 0;
   struct timeval start, end;
@@ -89,7 +102,8 @@ void test_gemm(hipblasHandle_t handle,
                                    n, // ldc
                                    alpha,
                                    beta,
-                                   static_cast<hipblasGemmAlgo_t>(algo));
+                                   static_cast<hipblasGemmAlgo_t>(algo),
+                                   compute32F_mode);
     hipDeviceSynchronize();
     gettimeofday(&end, NULL);
     if (!success) break;
@@ -160,7 +174,19 @@ int main(int argc, char* argv[]) {
   for (int algo = start_algo; algo <= end_algo; ++algo)
     test_gemm(handle, m, n, k, dA, dB, dC, &d_alpha, &d_beta, algo, iteration);
 
-  printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>>>>>>>>>>>>>> test fp32 (tf32) >>>>>>>>>>>>>>>>>\n");
+  for (int algo = start_algo; algo <= end_algo; ++algo)
+    test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration, 3);
+
+  printf(">>>>>>>>>>>>>>>>> test fp32 (bf16) >>>>>>>>>>>>>>>>>\n");
+  for (int algo = start_algo; algo <= end_algo; ++algo)
+    test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration, 2);
+
+  printf(">>>>>>>>>>>>>>>>> test fp32 (fp16) >>>>>>>>>>>>>>>>>\n");
+  for (int algo = start_algo; algo <= end_algo; ++algo)
+    test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration, 1);
+
+  printf(">>>>>>>>>>>>>>>>> test fp32 (fp32) >>>>>>>>>>>>>>>>>\n");
   for (int algo = start_algo; algo <= end_algo; ++algo)
     test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration);
 
