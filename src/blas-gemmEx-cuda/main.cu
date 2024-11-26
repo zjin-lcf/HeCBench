@@ -176,19 +176,19 @@ int main(int argc, char* argv[]) {
   for (int algo = start_algo; algo <= end_algo; ++algo)
     test_gemm(handle, m, n, k, dA, dB, dC, &d_alpha, &d_beta, algo, iteration);
 
-  printf(">>>>>>>>>>>>>>>>> test fp32 (tf32) >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute type tf32) >>>>>>>>>>>>>>>>>\n");
   for (int algo = start_algo; algo <= end_algo; ++algo)
     test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration, 3);
 
-  printf(">>>>>>>>>>>>>>>>> test fp32 (bf16) >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute type bf16) >>>>>>>>>>>>>>>>>\n");
   for (int algo = start_algo; algo <= end_algo; ++algo)
     test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration, 2);
 
-  printf(">>>>>>>>>>>>>>>>> test fp32 (fp16) >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute type fp16) >>>>>>>>>>>>>>>>>\n");
   for (int algo = start_algo; algo <= end_algo; ++algo)
     test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration, 1);
 
-  printf(">>>>>>>>>>>>>>>>> test fp32 (fp32) >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute type fp32) >>>>>>>>>>>>>>>>>\n");
   for (int algo = start_algo; algo <= end_algo; ++algo)
     test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration);
 
