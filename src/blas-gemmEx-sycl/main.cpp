@@ -152,15 +152,15 @@ int main(int argc, char* argv[]) {
   printf(">>>>>>>>>>>>>>>>> test fp64 >>>>>>>>>>>>>>>>>\n");
   test_gemm(q, m, n, k, dA, dB, dC, d_alpha, d_beta, iteration);
 
-  printf(">>>>>>>>>>>>>>>>> test fp32 (bf16) >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute mode bf16) >>>>>>>>>>>>>>>>>\n");
   test_gemm(q, m, n, k, fA, fB, fC, f_alpha, f_beta, iteration,
             oneapi::mkl::blas::compute_mode::float_to_bf16);
 
-  printf(">>>>>>>>>>>>>>>>> test fp32 (tf32) >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute mode tf32) >>>>>>>>>>>>>>>>>\n");
   test_gemm(q, m, n, k, fA, fB, fC, f_alpha, f_beta, iteration,
             oneapi::mkl::blas::compute_mode::float_to_tf32);
 
-  printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>>>>>>>>>>>>>> test fp32 (compute mode fp32) >>>>>>>>>>>>>>>>>\n");
   test_gemm(q, m, n, k, fA, fB, fC, f_alpha, f_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
