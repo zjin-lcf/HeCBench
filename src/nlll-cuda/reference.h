@@ -17,8 +17,8 @@ void reference(
     if (t != ignore_index) {
       scalar_t cur_weight =
           weights != nullptr ? weights[t] : static_cast<scalar_t>(1);
-      output_acc -= input[i * kdim + t] * cur_weight;
-      total_weight_acc += cur_weight;
+      output_acc -= static_cast<accscalar_t>(input[i * kdim + t] * cur_weight);
+      total_weight_acc += static_cast<accscalar_t>(cur_weight);
     }
   }
   *total_weight = static_cast<scalar_t>(total_weight_acc);

@@ -37,8 +37,8 @@ void nll_loss_forward_reduce2d_kernel(
         if (t != ignore_index) {
           scalar_t cur_weight =
               weights != nullptr ? weights[t] : static_cast<scalar_t>(1);
-          sm_inputs[tid] -= input[i * kdim + t] * cur_weight;
-          acc_weight[tid] += cur_weight;
+          sm_inputs[tid] -= static_cast<accscalar_t>(input[i * kdim + t] * cur_weight);
+          acc_weight[tid] += static_cast<accscalar_t>(cur_weight);
         }
       }
 
@@ -65,7 +65,6 @@ void nll_loss_forward_reduce2d_kernel(
 
 template <typename scalar_t, typename index_t, int GPU_THREADS>
 void eval(const int64_t nframe,
-          const int64_t kdim,
           const int64_t n_classes,
           const bool size_average,
           const int64_t ignore_index,
@@ -76,7 +75,7 @@ void eval(const int64_t nframe,
            index_t *h_target,
           const int repeat)
 {
-  int64_t input_size = nframe * kdim * n_classes;
+  int64_t input_size = nframe * n_classes;
   int64_t weights_size = nframe;
   int64_t target_size = nframe;
 
@@ -100,14 +99,14 @@ void eval(const int64_t nframe,
         h_weights,
         size_average,
         nframe,
-        kdim,
+        n_classes,
         ignore_index);
     }
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     printf("\nThread block size: %d\n", GPU_THREADS);
-    printf("Average execution time of nll loss forward reduce 2D kernel: %f (us)\n",
+    printf("Average execution time of nll loss forward kernel: %f (us)\n",
            (time * 1e-3f) / repeat);
 
   }
@@ -125,11 +124,10 @@ void eval(const int64_t nframe,
 template <typename scalar_t, typename index_t>
 void driver(char** argv) {
   const int64_t nframe = atol(argv[1]);
-  const int64_t kdim = atol(argv[2]);
-  const int64_t n_classes = atol(argv[3]);
-  const int repeat = atoi(argv[4]);
+  const int64_t n_classes = atol(argv[2]);
+  const int repeat = atoi(argv[3]);
 
-  const int64_t input_size = nframe * kdim * n_classes;
+  const int64_t input_size = nframe * n_classes;
   const int64_t input_size_bytes = input_size * sizeof(scalar_t);
 
   const int64_t weights_size = nframe;
@@ -168,10 +166,10 @@ void driver(char** argv) {
   reference<scalar_t, scalar_t, index_t>(
     &r_output, &r_total_weight,
     h_input, h_target, h_weights,
-    size_average, nframe, kdim, ignore_index);
+    size_average, nframe, n_classes, ignore_index);
 
   #define EVAL(nThreads) \
-  eval<scalar_t, index_t, nThreads>(nframe, kdim, n_classes, \
+  eval<scalar_t, index_t, nThreads>(nframe, n_classes, \
                                     size_average, ignore_index, \
                                     r_output, r_total_weight, \
                                     h_input, h_weights, h_target, repeat)
@@ -188,8 +186,8 @@ void driver(char** argv) {
 
 int main(int argc, char* argv[])
 {
-  if (argc != 5) {
-    printf("Usage: %s <minibatch> <kdim> <classes> <repeat>\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <minibatch size> <number of classes> <repeat>\n", argv[0]);
     return 1;
   }
 
