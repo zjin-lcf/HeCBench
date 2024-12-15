@@ -99,17 +99,16 @@ int main(int argc, char** argv) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    /* Initialize main table */
+    /* initialize the table */
     #pragma omp target teams distribute parallel for thread_limit (256)
     for (i=0; i<TableSize; i++) {
       Table[i] = i;
     }
-    #pragma omp target teams distribute parallel for num_teams(1) thread_limit(128)
-    for (int j=0; j<128; j++)
-      ran[j] = HPCC_starts ((NUPDATE/128) * j);
 
+    /* update the table */
     #pragma omp target teams distribute parallel for num_teams(1) thread_limit(128)
     for (int j=0; j<128; j++) {
+      ran[j] = HPCC_starts ((NUPDATE/128) * j);
       for (u64Int i=0; i<NUPDATE/128; i++) {
         ran[j] = (ran[j] << 1) ^ ((s64Int) ran[j] < 0 ? POLY : 0);
         #pragma omp atomic update

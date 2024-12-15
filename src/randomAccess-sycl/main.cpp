@@ -14,7 +14,6 @@ typedef long long int s64Int;
 
 #define K1_BLOCKSIZE  256
 #define K2_BLOCKSIZE  128
-#define K3_BLOCKSIZE  128
 
 u64Int
 HPCC_starts(s64Int n)
@@ -111,9 +110,6 @@ int main(int argc, char** argv) {
   sycl::range<1> gws2 (K2_BLOCKSIZE);
   sycl::range<1> lws2 (K2_BLOCKSIZE);
 
-  sycl::range<1> gws3 (K3_BLOCKSIZE);
-  sycl::range<1> lws3 (K3_BLOCKSIZE);
-
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
@@ -126,20 +122,12 @@ int main(int argc, char** argv) {
       });
     });
 
-    /* initialize the ran structure */
-    q.submit([&](sycl::handler &h) {
-      h.parallel_for<class init_ranarray>(
-        sycl::nd_range<1>(gws2, lws2), [=](sycl::nd_item<1> item) {
-        int j = item.get_global_id(0);
-        d_ran[j] = HPCC_starts ((NUPDATE/128) * j);
-      });
-    });
-
     /* update the table */
     q.submit([&](sycl::handler &h) {
       h.parallel_for<class update>(
-        sycl::nd_range<1>(gws3, lws3), [=](sycl::nd_item<1> item) {
+        sycl::nd_range<1>(gws2, lws2), [=](sycl::nd_item<1> item) {
         int j = item.get_global_id(0);
+        d_ran[j] = HPCC_starts ((NUPDATE/128) * j);
         for (u64Int i=0; i<NUPDATE/128; i++) {
           d_ran[j] = (d_ran[j] << 1) ^ ((s64Int) d_ran[j] < 0 ? POLY : 0);
           auto atm = sycl::atomic_ref<u64Int,

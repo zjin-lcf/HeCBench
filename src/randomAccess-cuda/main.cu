@@ -15,7 +15,6 @@ typedef long long int s64Int;
 /* CUDA specific parameters */
 #define K1_BLOCKSIZE  256
 #define K2_BLOCKSIZE  128
-#define K3_BLOCKSIZE  128
 
 __device__
 u64Int HPCC_starts(s64Int n)
@@ -62,16 +61,12 @@ __global__ void initTable (u64Int* Table, const u64Int TableSize) {
   if (i < TableSize) Table[i] = i;
 }
 
-__global__ void initRan (u64Int* ran, const u64Int TableSize) {
-  int j = threadIdx.x;
-  ran[j] = HPCC_starts ((NUPDATE/128) * j);
-}
-
 __global__ void update (u64Int*__restrict__ Table,
                         u64Int*__restrict__ ran,
                         const u64Int TableSize)
 {
   int j = threadIdx.x;
+  ran[j] = HPCC_starts ((NUPDATE/128) * j);
   for (u64Int i=0; i<NUPDATE/128; i++) {
     ran[j] = (ran[j] << 1) ^ ((s64Int) ran[j] < 0 ? POLY : 0);
     atomicXor(&Table[ran[j] & (TableSize-1)], ran[j]);
@@ -127,11 +122,8 @@ int main(int argc, char** argv) {
     /* initialize the table */
     initTable<<<(TableSize+K1_BLOCKSIZE-1) / K1_BLOCKSIZE, K1_BLOCKSIZE>>>(d_Table, TableSize);
 
-    /* initialize the ran structure */
-    initRan<<<1, K2_BLOCKSIZE>>>(d_ran, TableSize);
-
     /* update the table */
-    update<<<1, K3_BLOCKSIZE>>>(d_Table, d_ran, TableSize);
+    update<<<1, K2_BLOCKSIZE>>>(d_Table, d_ran, TableSize);
   }
 
   cudaDeviceSynchronize();
