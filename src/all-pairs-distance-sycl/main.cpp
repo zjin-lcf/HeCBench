@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     q.submit([&] (sycl::handler &h) {
-      h.parallel_for<class GPUregister>(
+      h.parallel_for<class k1>(
         sycl::nd_range<2> (gws, lws), [=] (sycl::nd_item<2> item) {
         int idx = item.get_local_id(1);
         int gx = item.get_group(1);
@@ -159,7 +159,7 @@ int main(int argc, char **argv) {
     q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
   }
 
-  printf("Average kernel execution time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
+  printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
         character data types, registers, and shared memory */
     q.submit([&] (sycl::handler &h) {
       sycl::local_accessor<int, 1> dist(sycl::range<1>(THREADS), h); 
-      h.parallel_for<class GPUshared>(
+      h.parallel_for<class k2>(
         sycl::nd_range<2> (gws, lws), [=] (sycl::nd_item<2> item) {
         int idx = item.get_local_id(1);
         int gx = item.get_group(1);
@@ -242,7 +242,64 @@ int main(int argc, char **argv) {
     q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
   }
 
-  printf("Average kernel execution time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
+  printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
+  status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
+  if (status != 0) printf("FAIL\n");
+  else printf("PASS\n");
+
+  elapsedTime = 0; 
+  for (int n = 0; n < iterations; n++) {
+    /* shared memory GPU kernel */
+    bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
+
+    q.memcpy(d_distance, gpu_distance, distance_bytes).wait();
+
+    gettimeofday(&tp, &tzp);
+    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
+
+    q.submit([&] (sycl::handler &h) {
+      h.parallel_for<class k3>(
+        sycl::nd_range<2> (gws, lws), [=] (sycl::nd_item<2> item) {
+        int idx = item.get_local_id(1);
+        int gx = item.get_group(1);
+        int gy = item.get_group(0);
+
+        int dist = 0;
+
+        for(int i = idx*4; i < ATTRIBUTES; i+=THREADS*4) {
+          sycl::char4 j = ldg((sycl::char4 *)(d_data + i + ATTRIBUTES*gx));
+          sycl::char4 k = ldg((sycl::char4 *)(d_data + i + ATTRIBUTES*gy));
+
+          char count = 0;
+          if(j.x() ^ k.x()) 
+            count++; 
+          if(j.y() ^ k.y())
+            count++;
+          if(j.z() ^ k.z())
+            count++;
+          if(j.w() ^ k.w())
+            count++;
+
+          /* Increment shared array */
+          dist += count;
+        }
+
+        int sum = sycl::reduce_over_group(item.get_group(), dist, std::plus<>());
+        
+        if(idx == 0) {
+          d_distance[INSTANCES*gy + gx] = sum;
+        }
+      });
+    }).wait();
+
+    gettimeofday(&tp, &tzp);
+    stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
+    elapsedTime += stop_gpu - start_gpu;
+
+    q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
+  }
+
+  printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
