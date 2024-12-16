@@ -13,31 +13,42 @@ __global__ void reference (const float * __restrict__ A,
                            unsigned char *out, const unsigned int n)
 {
   for (unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-       idx < n; idx += gridDim.x * blockDim.x) {
-    out[idx] = int(A[idx]);
+       idx < n/4; idx += gridDim.x * blockDim.x) {
+    const float4 v = reinterpret_cast<const float4*>(A)[idx];
+    uchar4 o;
+    o.x = (int)v.x;
+    o.y = (int)v.y;
+    o.z = (int)v.z;
+    o.w = (int)v.w;
+    reinterpret_cast<uchar4*>(out)[idx] = o;
   }
 }
 
-template<int TH, int NUM_BLOCK>
+template<int TH, int ITEMS_TO_LOAD>
 __global__ void kernel (const float * __restrict__ A,
                         unsigned char *out, const unsigned int n)
 {
   const int bid = blockIdx.x;
-  const int base_idx = (bid * NUM_BLOCK);
+  const int base_idx = (bid * ITEMS_TO_LOAD);
 
   float vals[NUM];
   unsigned char qvals[NUM];
 
+  // 1D block of TH threads owning NUM integer items each
   typedef BlockLoad<float, TH, NUM> LoadFloat;
   typedef BlockStore<unsigned char, TH, NUM> StoreChar;
 
   __shared__ typename LoadFloat::TempStorage loadf;
   __shared__ typename StoreChar::TempStorage storec;
 
-  for (unsigned int i = base_idx; i < n; i += gridDim.x*NUM_BLOCK)
+  for (unsigned int i = base_idx; i < n; i += gridDim.x*ITEMS_TO_LOAD)
   {
-      unsigned int valid_items = n - i > NUM_BLOCK ? NUM_BLOCK : n - i;
+      unsigned int valid_items = n - i > ITEMS_TO_LOAD ? ITEMS_TO_LOAD : n - i;
 
+      // Parameters:
+      // block_src_it – [in] The thread block's base iterator for loading from
+      // dst_items – [out] Destination to load data into
+      // block_items_end – [in] Number of valid items to load
       LoadFloat(loadf).Load(&(A[i]), vals, valid_items);
 
       #pragma unroll

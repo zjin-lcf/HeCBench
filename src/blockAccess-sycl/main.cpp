@@ -16,18 +16,24 @@ void reference (const float * __restrict__ A,
                 const sycl::nd_item<3> &item)
 {
   for (unsigned int idx = item.get_global_id(2);
-       idx < n; idx += item.get_local_range(2) * item.get_group_range(2)) {
-    out[idx] = int(A[idx]);
+       idx < n/4; idx += item.get_local_range(2) * item.get_group_range(2)) {
+    const sycl::float4 v = reinterpret_cast<const sycl::float4*>(A)[idx];
+    sycl::uchar4 o;
+    o.x() = (int)v.x();
+    o.y() = (int)v.y();
+    o.z() = (int)v.z();
+    o.w() = (int)v.w();
+    reinterpret_cast<sycl::uchar4*>(out)[idx] = o;
   }
 }
 
-template<int TH, int NUM_BLOCK>
+template<int TH, int ITEMS_TO_LOAD>
 void kernel(const float * __restrict__ A,
             unsigned char *out, const int n,
             const sycl::nd_item<3> &item)
 {
   const int bid = item.get_group(2);
-  const int base_idx = (bid * NUM_BLOCK);
+  const int base_idx = (bid * ITEMS_TO_LOAD);
 
   float vals[NUM];
   unsigned char qvals[NUM];
@@ -43,10 +49,14 @@ void kernel(const float * __restrict__ A,
       sycl::ext::oneapi::group_local_memory_for_overwrite<typename StoreChar::TempStorage[1]>(item.get_group());
   typename StoreChar::TempStorage *storec = *p2;
 
-  for (unsigned int i = base_idx; i < n; i += item.get_group_range(2)*NUM_BLOCK)
+  for (unsigned int i = base_idx; i < n; i += item.get_group_range(2)*ITEMS_TO_LOAD)
   {
-      unsigned int valid_items = n - i > NUM_BLOCK ? NUM_BLOCK : n - i;
+      unsigned int valid_items = n - i > ITEMS_TO_LOAD ? ITEMS_TO_LOAD : n - i;
 
+      // Parameters:
+      // block_src_it – [in] The thread block's base iterator for loading from
+      // dst_items – [out] Destination to load data into
+      // block_items_end – [in] Number of valid items to load
       LoadFloat(*loadf, item).Load(&(A[i]), vals, valid_items);
 
       #pragma unroll
