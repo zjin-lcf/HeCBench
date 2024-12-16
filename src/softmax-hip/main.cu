@@ -44,15 +44,15 @@ void softMax (const int numSlice, const int sliceSize,
   }
 }
 
-__device__ inline float warpReduceSum(cooperative_groups::thread_block_tile<32> &warp, float val) {
-    for (int offset = 16; offset > 0; offset /= 2) {
+__device__ inline float warpReduceSum(cooperative_groups::thread_block_tile<warpSize> &warp, float val) {
+    for (int offset = warpSize/2; offset > 0; offset /= 2) {
         val += warp.shfl_xor(val, offset);
     }
     return val;
 }
 
-__device__ inline float warpReduceMax(cooperative_groups::thread_block_tile<32> &warp, float val) {
-    for (int offset = 16; offset > 0; offset /= 2) {
+__device__ inline float warpReduceMax(cooperative_groups::thread_block_tile<warpSize> &warp, float val) {
+    for (int offset = warpSize/2; offset > 0; offset /= 2) {
         val = max(val, warp.shfl_xor(val, offset));
     }
     return val;
@@ -64,7 +64,7 @@ void softMax2 (const int numSlice, const int sliceSize,
 {
   namespace cg = cooperative_groups;
   cg::thread_block block = cg::this_thread_block();
-  cg::thread_block_tile<32> warp = cg::tiled_partition<32>(block);
+  cg::thread_block_tile<warpSize> warp = cg::tiled_partition<warpSize>(block);
   int i = blockIdx.x * warp.meta_group_size() + warp.meta_group_rank();
   if (i >= numSlice) return;
   float max_ = src[i * sliceSize];
@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
   hipMemcpy(d_input, input, sizeof(float) * numElem, hipMemcpyHostToDevice);
 
   if (kernel == 1) {
-    dim3 grids ((numSlice+BLOCK_SIZE/32-1)/(BLOCK_SIZE/32));
+    dim3 grids ((numSlice+BLOCK_SIZE/warpSize-1)/(BLOCK_SIZE/warpSize));
     dim3 blocks (BLOCK_SIZE);
 
     hipDeviceSynchronize();
