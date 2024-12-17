@@ -1,9 +1,14 @@
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <cstdio>
 #include <sycl/sycl.hpp>
 
 #define BLOCK_SIZE 256
+
+// adjust the warpsize for the warning: attribute argument 32 is invalid 
+// and will be ignored; amdgcn requires sub_group size 64 
+constexpr int warpSize = 32;
 
 // A C model derived from the OpenCL kernel
 void softMax_cpu(const int numSlice, const int sliceSize, const float* src, float* dest) {
@@ -53,13 +58,21 @@ int main(int argc, char* argv[]) {
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
+  auto sg_sizes = q.get_device().get_info<sycl::info::device::sub_group_sizes>();
+  auto r = std::max_element(sg_sizes.begin(), sg_sizes.end());
+  int max_warp_size = *r;
+  if (max_warp_size != warpSize) {
+    printf("Please set the warp size in the main.cpp to %d\n.", max_warp_size);
+    return 1;
+  }
+
   float *d_input = sycl::malloc_device<float>(numElem, q);
   q.memcpy(d_input, input, sizeof(float) * numElem);
 
   float *d_output = sycl::malloc_device<float>(numElem, q);
 
   if (kernel == 1) {
-    sycl::range<1> gws ((numSlice+BLOCK_SIZE/32-1)/(BLOCK_SIZE/32)*BLOCK_SIZE);
+    sycl::range<1> gws ((numSlice+BLOCK_SIZE/warpSize-1)/(BLOCK_SIZE/warpSize)*BLOCK_SIZE);
     sycl::range<1> lws (BLOCK_SIZE);
 
     q.wait();
@@ -69,7 +82,7 @@ int main(int argc, char* argv[]) {
       q.submit([&](sycl::handler &h) {
         h.parallel_for<class sm2>(
           sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
-          [[sycl::reqd_sub_group_size(32)]] {
+          [[sycl::reqd_sub_group_size(warpSize)]] {
           sycl::sub_group warp = item.get_sub_group();
           int i = item.get_group(0) * warp.get_group_linear_range() + warp.get_group_linear_id();
           if (i >= numSlice) return;
