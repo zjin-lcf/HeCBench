@@ -1,7 +1,4 @@
 
-#define __syncthreads() \
-  item.barrier(sycl::access::fence_space::local_space)
-
 static const uint8_t _bitmask(15);
 static const uint8_t _right_pack_bitmask(_bitmask << 4);
 
@@ -115,42 +112,6 @@ float q_mapping(const float *__restrict__ qmap,
 
 }
 
-
-// multi-warp shuffle down synch parallel reduction to determine max value for each block for exp and sq
-inline void seq_threads_max_reducer(int tid, float *local_val,
-                                    const sycl::nd_item<1> &item,
-                                    float *_exp_reducer) {
-
-        int lane = tid % 32;
-        int warpId = tid / 32;
-        float val = *local_val;
-        int offset = 16;
-        auto sg = item.get_sub_group();
-        for (offset = 16; offset > 0; offset >>=1) {
-            val = sycl::max(val, sycl::shift_group_left(sg, val, offset));
-        }
-
-        if (lane==0) {
-            _exp_reducer[warpId] = val;
-        }
-        __syncthreads();
-        // final warp reduction with warp 0 only
-
-        // careful - this assumes q block size of 128...expand to loop if larger
-        if (warpId ==0) {
-            if (tid < 2) val = _exp_reducer[lane];
-
-            offset = 1;
-            val = sycl::max(val, sycl::shift_group_left(sg, val, offset));
-
-            if (tid==0) {
-                *local_val = val;
-            }
-        }
-
-}
-
-
 template <typename T>
 void fused_4bit_kernel(
     T* __restrict__ p,
@@ -173,7 +134,6 @@ void fused_4bit_kernel(
     const float resid_beta1,
     const float resid_beta2,
     const sycl::nd_item<1> &item,
-    float *_exp_reducer,
     float &absmax_exp,
     float &absmax_sq)
 {
@@ -181,7 +141,10 @@ void fused_4bit_kernel(
     int64_t global_id = item.get_global_id(0);
     if (global_id < total_size) {
 
-      if (item.get_local_id(0) == 0) {
+      int64_t group_id = item.get_group(0);
+      int local_id = item.get_local_id(0);
+
+      if (local_id == 0) {
           absmax_exp = 0;
           absmax_sq = 0;
       }
@@ -200,12 +163,12 @@ void fused_4bit_kernel(
       p2.x() = p2.x() * weight_decay_update;
 
       // left exp and sq updates
-      float exp_avg_qscale = exp_qscale[item.get_group(0)];
+      float exp_avg_qscale = exp_qscale[group_id];
 
       float exp_left = _exp_qmap[exp_left_index] * exp_avg_qscale;
       exp_left = beta1 * exp_left + resid_beta1 * g2.x();
 
-      float sq_left = _sq_qmap[sq_left_index] * sq_qscale[item.get_group(0)];
+      float sq_left = _sq_qmap[sq_left_index] * sq_qscale[group_id];
       sq_left = beta2 * sq_left + resid_beta2 * (g2.x() * g2.x());
 
       // param update
@@ -223,7 +186,7 @@ void fused_4bit_kernel(
       exp_right = beta1 * exp_right + resid_beta1 * g2.y();
 
       float sq_right =
-          _sq_qmap[sq_right_index] * sq_qscale[item.get_group(0)];
+          _sq_qmap[sq_right_index] * sq_qscale[group_id];
       sq_right = beta2 * sq_right + resid_beta2 * (g2.y() * g2.y());
 
       // param update
@@ -235,21 +198,20 @@ void fused_4bit_kernel(
 
       // --- sequential threads parallel reduction to
       // determine global absmax for exp
-      seq_threads_max_reducer(item.get_local_id(0), &local_absmax_exp,
-                              item, _exp_reducer);
-      if (item.get_local_id(0) == 0) {
-          exp_qscale[item.get_group(0)] = local_absmax_exp;
+      auto g = item.get_group();
+      local_absmax_exp = sycl::reduce_over_group(g, local_absmax_exp, sycl::maximum<float>{});
+      if (local_id == 0) {
+          exp_qscale[group_id] = local_absmax_exp;
           absmax_exp = local_absmax_exp;
       }
 
       // same for sq
-      seq_threads_max_reducer(item.get_local_id(0), &local_absmax_sq,
-                              item, _exp_reducer);
-      if (item.get_local_id(0) == 0) {
-          sq_qscale[item.get_group(0)] = local_absmax_sq;
+      local_absmax_sq = sycl::reduce_over_group(g, local_absmax_sq, sycl::maximum<float>{});
+      if (local_id == 0) {
+          sq_qscale[group_id] = local_absmax_sq;
           absmax_sq = local_absmax_sq;
       }
-      __syncthreads();
+      sycl::group_barrier(g);
 
       int8_t local_packed_exp = 0;
       int8_t local_packed_sq = 0;
@@ -269,6 +231,6 @@ void fused_4bit_kernel(
       exp[global_id] = local_packed_exp;
       sq[global_id] = local_packed_sq;
 
-      __syncthreads();
+      sycl::group_barrier(g);
    }
 }
