@@ -94,18 +94,14 @@ int main(int argc, char* argv[])
 
       sycl::local_accessor<float, 0> absmax_exp_acc(cgh);
       sycl::local_accessor<float, 0> absmax_sq_acc(cgh);
-      sycl::local_accessor<float, 1> _exp_reducer_acc(sycl::range<1>(64), cgh);
       cgh.parallel_for(
           sycl::nd_range<1>(gws, lws),
-          [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<1> item) {
             fused_4bit_kernel<float>(
                 d_p, d_g, d_m_qscale, d_v_qscale, d_m, d_v, beta1, beta2, lr,
                 weight_decay, eps, step, vector_size, correction1,
                 correction2_sqrt, step_size, weight_decay_update, resid_beta1,
-                resid_beta2, item,
-                _exp_reducer_acc
-                    .get_multi_ptr<sycl::access::decorated::no>()
-                    .get(), absmax_exp_acc, absmax_sq_acc);
+                resid_beta2, item, absmax_exp_acc, absmax_sq_acc);
           });
     });
     
