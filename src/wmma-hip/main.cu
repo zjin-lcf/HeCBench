@@ -23,6 +23,7 @@
  * SOFTWARE.
  *
  *******************************************************************************/
+#include <cmath>
 #include <chrono>
 #include <iostream>
 #include <limits> // std::numeric_limits
@@ -31,8 +32,8 @@
 #include <hip/hip_runtime.h>
 #include <rocwmma/rocwmma.hpp>
 
-typedef half fp16_t;
-typedef float fp32_t;
+typedef half fp16;
+typedef float fp32;
 
 #include "reference.h"
 
@@ -71,7 +72,7 @@ const int WMMA_N = 16;
 const int WMMA_K = 16;
 
 // Device warp size
-const uint32_t WAVE_SIZE = 64;
+const uint32_t WAVE_SIZE = warpSize;
 
 // Thread block
 // : T_BLOCK_X must be multiple of WAVE_SIZE.
@@ -97,19 +98,19 @@ const int T_BLOCK_Y = NUM_WAVES_Y;
 //
 // Note: demonstrate API usage in context of wave-level GEMM computation, and is not optimized.
 __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
-                     fp16_t const *__restrict__ a,
-                     fp16_t const *__restrict__ b,
-                     fp32_t const *c,
-                     fp32_t *d, const uint32_t lda, const uint32_t ldb,
+                     fp16 const *__restrict__ a,
+                     fp16 const *__restrict__ b,
+                     fp32 const *c,
+                     fp32 *d, const uint32_t lda, const uint32_t ldb,
                      const uint32_t ldc, const uint32_t ldd,
-                     const fp32_t alpha, const fp32_t beta) {
+                     const fp32 alpha, const fp32 beta) {
   // Create frags
-  auto fragA = rocwmma::fragment<rocwmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, fp16_t,
+  auto fragA = rocwmma::fragment<rocwmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, fp16,
                                  rocwmma::row_major>();
-  auto fragB = rocwmma::fragment<rocwmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, fp16_t,
+  auto fragB = rocwmma::fragment<rocwmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, fp16,
                                  rocwmma::col_major>();
-  auto fragC = rocwmma::fragment<rocwmma::accumulator, WMMA_M, WMMA_N, WMMA_K, fp32_t>();
-  auto fragAcc = rocwmma::fragment<rocwmma::accumulator, WMMA_M, WMMA_N, WMMA_K, fp32_t>();
+  auto fragC = rocwmma::fragment<rocwmma::accumulator, WMMA_M, WMMA_N, WMMA_K, fp32>();
+  auto fragAcc = rocwmma::fragment<rocwmma::accumulator, WMMA_M, WMMA_N, WMMA_K, fp32>();
 
   rocwmma::fill_fragment(fragAcc, 0.0f);
 
@@ -147,10 +148,10 @@ __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
   }
 }
 
-__host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32_t alpha,
-                        fp32_t beta, int32_t repeat, int32_t verify) {
+__host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32 alpha,
+                        fp32 beta, int32_t repeat, int32_t verify) {
   // Bounds check
-  if ((m < (WMMA_M * T_BLOCK_X / WAVE_SIZE) || n < (WMMA_N * T_BLOCK_Y) ||
+  if ((m < (WMMA_M * NUM_WAVES_X) || n < (WMMA_N * NUM_WAVES_Y) ||
        k < WMMA_K) || (m % WMMA_M || n % WMMA_N || k % WMMA_K)) {
     std::cout << "Unsupported size!\n";
     return;
@@ -164,13 +165,13 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32_t alpha,
   std::cout << "Initializing host data..." << std::endl;
 
   // Initialize input matrices
-  std::vector<fp16_t> matrixA(m * k);
-  std::vector<fp16_t> matrixB(k * n);
-  std::vector<fp32_t> matrixC(m * n);
+  std::vector<fp16> matrixA(m * k);
+  std::vector<fp16> matrixB(k * n);
+  std::vector<fp32> matrixC(m * n);
 
   // Fill outputs with NaN to catch contamination
-  std::vector<fp32_t> matrixD(
-      m * n, std::numeric_limits<fp32_t>::signaling_NaN());
+  std::vector<fp32> matrixD(
+      m * n, std::numeric_limits<fp32>::signaling_NaN());
 
   fill(matrixA.data(), m, k);
   fill(matrixB.data(), k, n);
@@ -179,13 +180,13 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32_t alpha,
   std::cout << "Initializing device data..." << std::endl;
 
   // Allocate and copy device memory
-  fp16_t *d_a, *d_b;
-  fp32_t *d_c, *d_d;
+  fp16 *d_a, *d_b;
+  fp32 *d_c, *d_d;
 
-  const size_t bytesA = matrixA.size() * sizeof(fp16_t);
-  const size_t bytesB = matrixB.size() * sizeof(fp16_t);
-  const size_t bytesC = matrixC.size() * sizeof(fp32_t);
-  const size_t bytesD = matrixD.size() * sizeof(fp32_t);
+  const size_t bytesA = matrixA.size() * sizeof(fp16);
+  const size_t bytesB = matrixB.size() * sizeof(fp16);
+  const size_t bytesC = matrixC.size() * sizeof(fp32);
+  const size_t bytesD = matrixD.size() * sizeof(fp32);
 
   CHECK_HIP_ERROR(hipMalloc((void**)&d_a, bytesA));
   CHECK_HIP_ERROR(hipMalloc((void**)&d_b, bytesB));
@@ -213,7 +214,7 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32_t alpha,
 
   for (int32_t w = 0; w <= repeat; w++) {
     if (w == 1) {
-      hipDeviceSynchronize();
+      CHECK_HIP_ERROR(hipDeviceSynchronize());
       start = std::chrono::steady_clock::now();
     }
 
@@ -221,7 +222,7 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32_t alpha,
                                       ldc, ldd, alpha, beta);
 
     if (w == repeat) {
-      hipDeviceSynchronize(); // throughput
+      CHECK_HIP_ERROR(hipDeviceSynchronize()); // throughput
       end = std::chrono::steady_clock::now();
       auto time =
           std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
@@ -255,12 +256,12 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32_t alpha,
         hipMemcpy(matrixD.data(), d_d, bytesD, hipMemcpyDeviceToHost));
 
     // Setup and run reference computation
-    std::vector<fp32_t> matrixD_ref(
-        m * n, std::numeric_limits<fp32_t>::signaling_NaN());
+    std::vector<fp32> matrixD_ref(
+        m * n, std::numeric_limits<fp32>::signaling_NaN());
     gemm_cpu_h(m, n, k, matrixA.data(), matrixB.data(), matrixC.data(),
                matrixD_ref.data(), lda, ldb, ldc, ldd, alpha, beta);
 
-    compareEqual<fp32_t>(matrixD.data(), matrixD_ref.data(), m * n);
+    compareEqual<fp32>(matrixD.data(), matrixD_ref.data(), m * n);
   }
 
   // Release device memory
