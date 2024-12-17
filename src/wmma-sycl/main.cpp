@@ -1,10 +1,13 @@
+#include <chrono>
+#include <cmath>
 #include <iostream>
 #include <limits>  // std::numeric_limits
+#include <string>
 #include <vector>
 #include <sycl/sycl.hpp>
 
-typedef sycl::half float16_t;
-typedef float float32_t;
+typedef sycl::half fp16;
+typedef float fp32;
 
 using namespace sycl::ext::oneapi::experimental::matrix;
 
@@ -36,16 +39,16 @@ void compareEqual(T const *a, T const *b, uint32_t size,
 }
 
 // Host GEMM validation
-void gemm_cpu_h(uint32_t m, uint32_t n, uint32_t k, float16_t const *a,
-                float16_t const *b, float32_t const *c, float32_t *d,
+void gemm_cpu_h(uint32_t m, uint32_t n, uint32_t k, fp16 const *a,
+                fp16 const *b, fp32 const *c, fp32 *d,
                 uint32_t lda, uint32_t ldb, uint32_t ldc, uint32_t ldd,
-                float32_t alpha, float32_t beta) {
+                fp32 alpha, fp32 beta) {
   for (uint32_t i = 0; i < m; ++i) {
     for (uint32_t j = 0; j < n; ++j) {
-      float32_t accum = 0.0f;
+      fp32 accum = 0.0f;
       for (uint32_t h = 0; h < k; ++h) {
-        accum += static_cast<float32_t>(a[i * lda + h]) *
-                 static_cast<float32_t>(b[j * ldb + h]);
+        accum += static_cast<fp32>(a[i * lda + h]) *
+                 static_cast<fp32>(b[j * ldb + h]);
       }
       d[i * ldd + j] = alpha * accum + beta * c[i * ldc + j];
     }
@@ -76,15 +79,15 @@ const int WMMA_N = 16;
 const int WMMA_K = 16;
 
 // Device warp size
-const uint32_t WAVE_SIZE = 32;  // 64
+const uint32_t WAVE_SIZE = 32;
 
 const int NUM_WAVES_X = 4;
 const int NUM_WAVES_Y = 4;
 const int T_BLOCK_X = NUM_WAVES_X * WAVE_SIZE;
 const int T_BLOCK_Y = NUM_WAVES_Y;
 
-void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
-               float32_t beta, int32_t repeat, int32_t verify)
+void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32 alpha,
+               fp32 beta, int32_t repeat, int32_t verify)
 {
     // Bounds check
     if((m < (WMMA_M * NUM_WAVES_X) || n < (WMMA_N * NUM_WAVES_Y) || k < WMMA_K)
@@ -102,11 +105,11 @@ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
     std::cout << "Initializing host data..." << std::endl;
 
     // Initialize input matrices
-    std::vector<float16_t> matrixA(m * k);
-    std::vector<float16_t> matrixB(k * n);
-    std::vector<float32_t> matrixC(m * n);
+    std::vector<fp16> matrixA(m * k);
+    std::vector<fp16> matrixB(k * n);
+    std::vector<fp32> matrixC(m * n);
     // Fill outputs with NaN to catch contamination
-    std::vector<float32_t> matrixD(m * n, std::numeric_limits<float32_t>::signaling_NaN());
+    std::vector<fp32> matrixD(m * n, std::numeric_limits<fp32>::signaling_NaN());
 
     fill(matrixA.data(), m, k);
     fill(matrixB.data(), k, n);
@@ -114,23 +117,23 @@ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
 
     std::cout << "Initializing device data..." << std::endl;
 
-    const size_t bytesA = matrixA.size() * sizeof(float16_t);
-    const size_t bytesB = matrixB.size() * sizeof(float16_t);
-    const size_t bytesC = matrixC.size() * sizeof(float32_t);
-    const size_t bytesD = matrixD.size() * sizeof(float32_t);
+    const size_t bytesA = matrixA.size() * sizeof(fp16);
+    const size_t bytesB = matrixB.size() * sizeof(fp16);
+    const size_t bytesC = matrixC.size() * sizeof(fp32);
+    const size_t bytesD = matrixD.size() * sizeof(fp32);
 
     sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 
-    float16_t* d_a = sycl::malloc_device<float16_t>(matrixA.size(), q);
+    fp16* d_a = sycl::malloc_device<fp16>(matrixA.size(), q);
     q.memcpy(d_a, matrixA.data(), bytesA);
 
-    float16_t* d_b = sycl::malloc_device<float16_t>(matrixB.size(), q);
+    fp16* d_b = sycl::malloc_device<fp16>(matrixB.size(), q);
     q.memcpy(d_b, matrixB.data(), bytesB);
 
-    float32_t* d_c = sycl::malloc_device<float32_t>(matrixC.size(), q);
+    fp32* d_c = sycl::malloc_device<fp32>(matrixC.size(), q);
     q.memcpy(d_c, matrixC.data(), bytesC);
 
-    float32_t* d_d = sycl::malloc_device<float32_t>(matrixD.size(), q);
+    fp32* d_d = sycl::malloc_device<fp32>(matrixD.size(), q);
     q.memcpy(d_d, matrixD.data(), bytesD);
 
     std::cout << "Launching GEMM kernel..." << std::endl;
@@ -151,11 +154,8 @@ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
       }
     
       q.submit([&](sycl::handler &cgh) {
-        cgh.parallel_for<class mma>(sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item)
-          [[sycl::reqd_sub_group_size(WAVE_SIZE)]] {
+        cgh.parallel_for<class mma>(sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item) {
             sycl::sub_group sg = item.get_sub_group();
-            uint32_t majorWarp = item.get_global_id(1) / WAVE_SIZE;
-            uint32_t minorWarp = item.get_global_id(0);
 
             auto p_a = sycl::address_space_cast<sycl::access::address_space::global_space,
                                                 sycl::access::decorated::no>(d_a);
@@ -166,12 +166,15 @@ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
             auto p_d = sycl::address_space_cast<sycl::access::address_space::global_space,
                                                 sycl::access::decorated::no>(d_d);
 
-            joint_matrix<sycl::sub_group, float16_t, use::a, WMMA_M, WMMA_K, layout::row_major> sub_a;
-            joint_matrix<sycl::sub_group, float16_t, use::b, WMMA_K, WMMA_N, layout::col_major> sub_b;
-            joint_matrix<sycl::sub_group, float32_t, use::accumulator, WMMA_M, WMMA_N> sub_c;
-            joint_matrix<sycl::sub_group, float32_t, use::accumulator, WMMA_M, WMMA_N> sub_acc;
+            joint_matrix<sycl::sub_group, fp16, use::a, WMMA_M, WMMA_K, layout::row_major> sub_a;
+            joint_matrix<sycl::sub_group, fp16, use::b, WMMA_K, WMMA_N, layout::col_major> sub_b;
+            joint_matrix<sycl::sub_group, fp32, use::accumulator, WMMA_M, WMMA_N> sub_c;
+            joint_matrix<sycl::sub_group, fp32, use::accumulator, WMMA_M, WMMA_N> sub_acc;
 
             joint_matrix_fill(sg, sub_acc, 0.0f);
+
+            uint32_t majorWarp = item.get_global_id(1) / WAVE_SIZE;
+            uint32_t minorWarp = item.get_global_id(0);
 
             uint32_t cRow = majorWarp * WMMA_M;
             uint32_t cCol = minorWarp * WMMA_N;
@@ -185,7 +188,7 @@ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
 
               joint_matrix_load(sg, sub_c, p_c + cRow * ldc + cCol, ldc, layout::row_major);
               
-              joint_matrix_apply(sg, sub_acc, sub_c, [=] (const float32_t &acc, float32_t &c) 
+              joint_matrix_apply(sg, sub_acc, sub_c, [=] (const fp32 &acc, fp32 &c) 
                                                          {c = alpha * acc + beta * c;});
 
               joint_matrix_store(sg, sub_c, p_d + cRow * ldd + cCol, ldd, layout::row_major);
@@ -223,7 +226,7 @@ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
     q.memcpy(matrixD.data(), d_d, bytesD).wait();
 
     // Setup and run reference computation
-    std::vector<float32_t> matrixD_ref(m * n, std::numeric_limits<float32_t>::signaling_NaN());
+    std::vector<fp32> matrixD_ref(m * n, std::numeric_limits<fp32>::signaling_NaN());
     gemm_cpu_h(m,
                n,
                k,
@@ -238,7 +241,7 @@ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
                alpha,
                beta);
 
-    compareEqual<float32_t>(matrixD.data(), matrixD_ref.data(), m * n);
+    compareEqual<fp32>(matrixD.data(), matrixD_ref.data(), m * n);
   }
 
   sycl::free(d_a, q);

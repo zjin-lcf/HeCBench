@@ -24,15 +24,16 @@
  *
  *******************************************************************************/
 #include <chrono>
-#include <cuda.h>
+#include <cmath>
 #include <iostream>
 #include <limits> // std::numeric_limits
-#include <mma.h>
 #include <string>
 #include <vector>
+#include <cuda.h>
+#include <mma.h>
 
-typedef half float16_t;
-typedef float float32_t;
+typedef half fp16;
+typedef float fp32;
 
 #include "reference.h"
 
@@ -96,19 +97,19 @@ const int T_BLOCK_Y = NUM_WAVES_Y;
 //
 // Note: demonstrate API usage in context of wave-level GEMM computation, and is not optimized.
 __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
-                     float16_t const *__restrict__ a,
-                     float16_t const *__restrict__ b,
-                     float32_t const *c,
-                     float32_t *d, const uint32_t lda, const uint32_t ldb,
+                     fp16 const *__restrict__ a,
+                     fp16 const *__restrict__ b,
+                     fp32 const *c,
+                     fp32 *d, const uint32_t lda, const uint32_t ldb,
                      const uint32_t ldc, const uint32_t ldd,
-                     const float32_t alpha, const float32_t beta) {
+                     const fp32 alpha, const fp32 beta) {
   // Create frags
-  auto fragA = wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, float16_t,
+  auto fragA = wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, fp16,
                               wmma::row_major>();
-  auto fragB = wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, float16_t,
+  auto fragB = wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, fp16,
                               wmma::col_major>();
-  auto fragC = wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float32_t>();
-  auto fragAcc = wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float32_t>();
+  auto fragC = wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, fp32>();
+  auto fragAcc = wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, fp32>();
 
   wmma::fill_fragment(fragAcc, 0.0f);
 
@@ -146,8 +147,8 @@ __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
   }
 }
 
-__host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
-                        float32_t beta, int32_t repeat, int32_t verify) {
+__host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32 alpha,
+                        fp32 beta, int32_t repeat, int32_t verify) {
   // Bounds check
   if ((m < (WMMA_M * NUM_WAVES_X) || n < (WMMA_N * NUM_WAVES_Y) ||
        k < WMMA_K) || (m % WMMA_M || n % WMMA_N || k % WMMA_K)) {
@@ -163,13 +164,13 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
   std::cout << "Initializing host data..." << std::endl;
 
   // Initialize input matrices
-  std::vector<float16_t> matrixA(m * k);
-  std::vector<float16_t> matrixB(k * n);
-  std::vector<float32_t> matrixC(m * n);
+  std::vector<fp16> matrixA(m * k);
+  std::vector<fp16> matrixB(k * n);
+  std::vector<fp32> matrixC(m * n);
 
   // Fill outputs with NaN to catch contamination
-  std::vector<float32_t> matrixD(
-      m * n, std::numeric_limits<float32_t>::signaling_NaN());
+  std::vector<fp32> matrixD(
+      m * n, std::numeric_limits<fp32>::signaling_NaN());
 
   fill(matrixA.data(), m, k);
   fill(matrixB.data(), k, n);
@@ -178,13 +179,13 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
   std::cout << "Initializing device data..." << std::endl;
 
   // Allocate and copy device memory
-  float16_t *d_a, *d_b;
-  float32_t *d_c, *d_d;
+  fp16 *d_a, *d_b;
+  fp32 *d_c, *d_d;
 
-  const size_t bytesA = matrixA.size() * sizeof(float16_t);
-  const size_t bytesB = matrixB.size() * sizeof(float16_t);
-  const size_t bytesC = matrixC.size() * sizeof(float32_t);
-  const size_t bytesD = matrixD.size() * sizeof(float32_t);
+  const size_t bytesA = matrixA.size() * sizeof(fp16);
+  const size_t bytesB = matrixB.size() * sizeof(fp16);
+  const size_t bytesC = matrixC.size() * sizeof(fp32);
+  const size_t bytesD = matrixD.size() * sizeof(fp32);
 
   CHECK_CUDA_ERROR(cudaMalloc((void**)&d_a, bytesA));
   CHECK_CUDA_ERROR(cudaMalloc((void**)&d_b, bytesB));
@@ -254,12 +255,12 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, float32_t alpha,
         cudaMemcpy(matrixD.data(), d_d, bytesD, cudaMemcpyDeviceToHost));
 
     // Setup and run reference computation
-    std::vector<float32_t> matrixD_ref(
-        m * n, std::numeric_limits<float32_t>::signaling_NaN());
+    std::vector<fp32> matrixD_ref(
+        m * n, std::numeric_limits<fp32>::signaling_NaN());
     gemm_cpu_h(m, n, k, matrixA.data(), matrixB.data(), matrixC.data(),
                matrixD_ref.data(), lda, ldb, ldc, ldd, alpha, beta);
 
-    compareEqual<float32_t>(matrixD.data(), matrixD_ref.data(), m * n);
+    compareEqual<fp32>(matrixD.data(), matrixD_ref.data(), m * n);
   }
 
   // Release device memory
