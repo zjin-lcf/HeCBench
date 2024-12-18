@@ -9,8 +9,8 @@
 #include <random>
 #include <sycl/sycl.hpp>
 
-#define __syncthreads() \
-  item.barrier(sycl::access::fence_space::local_space)
+#define __syncthreads() item.barrier(sycl::access::fence_space::local_space)
+#define get_pointer get_multi_ptr<sycl::access::decorated::no>().get
 
 // When compiling with C++20, constant compile-time initialization for device_globals is supported
 sycl::ext::oneapi::experimental::device_global<const double[512]> D3 {
