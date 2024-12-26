@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
+#include <cmath>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include "reference.h"
