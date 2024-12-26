@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <chrono>
+#include <cmath>
 #include <cuda.h>
 
 #define USE_MNIST_LOADER
