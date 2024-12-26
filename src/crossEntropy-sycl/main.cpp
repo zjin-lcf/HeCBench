@@ -257,6 +257,23 @@ void LossNLL_BWD(sycl::queue& q, int iterations) {
                   + static_cast<double>(sizeof(int64_t)) * static_cast<double>(TargetShape * 2.0);
 
   printf("BandWidth = %lf (GB / s)\n", allBytes / (durations[1] / iterations / 1000) / 1e9);
+
+  sycl::free(grad_predict_device, q);
+  sycl::free(weight_device, q);
+  sycl::free(target_device, q);
+  sycl::free(mask_device, q);
+  sycl::free(log_softmax_device, q);
+  sycl::free(grad_output_device, q);
+  sycl::free(grad_output_neg_device, q);
+
+  sycl::free(grad_predict, q);
+  sycl::free(grad_predict_device_host, q);
+  sycl::free(weight, q);
+  sycl::free(target, q);
+  sycl::free(mask, q);
+  sycl::free(log_softmax, q);
+  sycl::free(grad_output, q);
+  sycl::free(grad_output_neg, q);
 }
 
 int main(int argc, char** argv) {
