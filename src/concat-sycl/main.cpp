@@ -144,5 +144,6 @@ int main(int argc, char* argv[])
     free(inp1);
     free(inp2);
     free(outp);
+    free(outp_ref);
   }
 }
