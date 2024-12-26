@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
+#include <cmath>
 #include <sycl/sycl.hpp>
 #include "reference.h"
 
