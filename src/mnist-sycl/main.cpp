@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <chrono>
+#include <cmath>
 #include <sycl/sycl.hpp>
 
 #define USE_MNIST_LOADER
