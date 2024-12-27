@@ -2,7 +2,7 @@
 static const uint8_t _bitmask(15);
 static const uint8_t _right_pack_bitmask(_bitmask << 4);
 
-static
+//static
 sycl::ext::oneapi::experimental::device_global<const float[16]> _exp_qmap {
                                                          -0.8875,
                                                          -0.6625,
@@ -22,7 +22,7 @@ sycl::ext::oneapi::experimental::device_global<const float[16]> _exp_qmap {
                                                          1.0000
                                                      };
 
-static
+//static
 sycl::ext::oneapi::experimental::device_global<const float[15]> _exp_qmidpt {
 
                                                            -0.775,
@@ -42,7 +42,7 @@ sycl::ext::oneapi::experimental::device_global<const float[15]> _exp_qmidpt {
                                                            0.94375,
                                                        };
 
-static
+//static
 sycl::ext::oneapi::experimental::device_global<const float[16]> _sq_qmap {
                                                         0.0625,
                                                         0.1250,
@@ -62,7 +62,7 @@ sycl::ext::oneapi::experimental::device_global<const float[16]> _sq_qmap {
                                                         1.0000,
                                                     };
 
-static
+//static
 sycl::ext::oneapi::experimental::device_global<const float[15]> _sq_qmidpt {
                                                           0.09375,
                                                           0.15625,
