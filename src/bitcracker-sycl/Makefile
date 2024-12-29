@@ -30,8 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl 
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 # Linker Flags
 LDFLAGS = 

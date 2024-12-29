@@ -13,7 +13,7 @@ CUDA      = no
 CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -30,22 +30,20 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../marchingCubes-cuda -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../marchingCubes-cuda -fsycl \
+          --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 # Linker Flags
 LDFLAGS = 
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN) \
-            -DSYCL_USE_NATIVE_FP_ATOMICS
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
 endif
 
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) \
-            -DSYCL_USE_NATIVE_FP_ATOMICS
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH)
 endif
 
 # Debug Flags

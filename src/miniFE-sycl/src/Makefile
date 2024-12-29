@@ -24,12 +24,11 @@ HIP_ARCH  = gfx908
 LAUNCHER       =
 
 CPPFLAGS = -I. -I../utils -I../fem $(MINIFE_TYPES) $(MINIFE_MATRIX_TYPE) \
-           -std=c++17 -Wall -fsycl
+           -std=c++17 -Wall -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(CUDA), yes)
   CPPFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
-              -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-              --gcc-toolchain=$(GCC_TOOLCHAIN)
+              -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
 endif
 
 ifeq ($(HIP), yes)
