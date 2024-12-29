@@ -83,10 +83,12 @@ Each benchmark falls into a single category. While such classification is not ac
       `make run`
       
       Navigate to a benchmark in SYCL (benchmark-sycl) and type   
-     `make CUDA=yes CUDA_ARCH=sm_70 GCC_TOOLCHAIN="" run` (targeting an NVIDIA GPU)
-     `make HIP=yes HIP_ARCH=gfx908 run`                   (targeting an AMD GPU)  
-     `make run` or `make CC=icpx run`                     (targeting an Intel GPU)
-      NOTE: `--gcc-toolchain` may be required for the SYCL compiler to select the proper GNU toolchain; otherwise unset GCC_TOOLCHAIN
+      `make CUDA=yes CUDA_ARCH=sm_70 run`       (targeting an NVIDIA GPU)
+      `make HIP=yes HIP_ARCH=gfx908 run`        (targeting an AMD GPU)
+      `make run` or `make CC=icpx run`          (targeting an Intel GPU)
+
+      NOTE: GCC_TOOLCHAIN may be set to select a specific version of GNU toolchain for the SYCL compiler
+      `make CUDA=yes CUDA_ARCH=sm_70 GCC_TOOLCHAIN=/path/to/x86_64/gcc-9.1.0 run`
      
       Navigate to a benchmark in OpenMP (benchmark-omp) and type  
       `make -f Makefile.nvc run`  (targeting NVIDIA GPUs)
