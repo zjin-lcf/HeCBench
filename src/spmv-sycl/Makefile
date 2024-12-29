@@ -31,6 +31,7 @@ obj = main.o kernels.o utils.o
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -qmkl=parallel \
+           --gcc-toolchain=$(GCC_TOOLCHAIN) \
            -I../spmv-cuda -fsycl
 
 # Linker Flags
@@ -39,8 +40,7 @@ LDFLAGS =
 # sparse functions not supported
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
 endif
 
 # sparse functions not supported

@@ -14,7 +14,7 @@ CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
 ONEMKL    = no
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 # path to the install of the oneMKL interface
 ONEMKL_PATH   = /path/to/oneMKL
@@ -35,15 +35,15 @@ obj = $(source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl \
-          -I ./oneDPL/include -I ./oneTBB/include
+          -I ./oneDPL/include -I ./oneTBB/include \
+          --gcc-toolchain=$(GCC_TOOLCHAIN) 
 
 # Linker Flags
 LDFLAGS = -ltbb
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN) 
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
   LDFLAGS = -L$(ONEMKL_PATH)/lib -lonemkl -lonemkl_blas_cublas
 endif
 

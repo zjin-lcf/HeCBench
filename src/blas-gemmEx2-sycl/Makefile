@@ -14,7 +14,7 @@ CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
 ONEDNN    = no
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 # path to the install of the oneDNN interface
 ONEDNN_PATH   = /path/to/oneDNN
@@ -34,21 +34,20 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../blas-gemmEx-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../blas-gemmEx-cuda \
+          --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(CUDA), yes)
   ONEDNN = yes
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
   LDFLAGS = -L$(ONEDNN_PATH)/lib -lonemkl -lonemkl_blas_cublas
 endif
 
 ifeq ($(HIP), yes)
   ONEDNN = yes
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH)
   LDFLAGS = -L$(ONEDNN_PATH)/lib -lonemkl -lonemkl_blas_rocblas
 endif
 

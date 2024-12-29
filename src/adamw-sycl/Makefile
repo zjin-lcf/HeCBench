@@ -15,7 +15,7 @@ HIP       = no
 HIP_ARCH  = gfx908
 
 # specify the path to gcc if needed
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list

@@ -33,6 +33,7 @@ obj = $(source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall \
+          --gcc-toolchain=$(GCC_TOOLCHAIN) \
           -Isrc -I$(OPENMP_INCLUDE) \
           -fopenmp -fsycl
 
@@ -41,8 +42,7 @@ LDFLAGS = -L$(OPENMP_LIB) -lomp
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
 endif
 
 ifeq ($(HIP), yes)

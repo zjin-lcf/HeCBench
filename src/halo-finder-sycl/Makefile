@@ -5,6 +5,7 @@ CUDA         = no
 CUDA_ARCH    = sm_70
 HIP          = no
 HIP_ARCH     = gfx908
+#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 ifeq ($(GPU),yes)
   CXXFLAGS +=-DUSE_GPU
@@ -27,7 +28,7 @@ MPI_INCLUDE=/usr/lib/x86_64-linux-gnu/openmpi/include
 OPT=-O3 -DRCB_UNTHREADED_BUILD -DUSE_SERIAL_COSMO
 
 #SYCL_FLAGS=-use_fast_math -DINLINE_FORCE -I${MPI_INCLUDE}
-SYCL_FLAGS=-fsycl -I${MPI_INCLUDE}
+SYCL_FLAGS=-fsycl -I${MPI_INCLUDE} --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 HACC_PLATFORM=sycl
 HACC_OBJDIR=${HACC_PLATFORM}

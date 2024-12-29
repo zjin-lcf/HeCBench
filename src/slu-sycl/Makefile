@@ -14,7 +14,7 @@ CUDA      = no
 CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -36,15 +36,15 @@ SLU_INC = -I$(SLU_PATH)/../include \
           -I$(SLU_PATH)/nicslu/util
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall $(SLU_INC) -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall $(SLU_INC) -fsycl \
+          --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 # Linker Flags
 LDFLAGS = -lpthread
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
 endif
 
 ifeq ($(HIP), yes)

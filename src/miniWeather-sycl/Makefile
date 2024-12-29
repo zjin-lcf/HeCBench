@@ -13,7 +13,7 @@ CUDA      = no
 CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 ifeq ($(CUDA), yes)
   MPI_INCLUDE = "/opt/nvidia/hpc_sdk/Linux_x86_64/22.11/comm_libs/mpi/include"
@@ -44,15 +44,15 @@ CFLAGS := $(EXTRA_CFLAGS) \
 	  -DSIM_TIME=600 \
 	  -DDATA_SPEC=DATA_SPEC_THERMAL \
           -I$(MPI_INCLUDE) \
-          -std=c++17 -Wall -fsycl
+          -std=c++17 -Wall -fsycl \
+          --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 # Linker Flags
 LDFLAGS = -L$(MPI_LIB_DIR) -lmpi
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH) \
-            --gcc-toolchain=$(GCC_TOOLCHAIN)
+            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
 endif
 
 ifeq ($(HIP), yes)
