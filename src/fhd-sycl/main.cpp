@@ -13,10 +13,11 @@
   #define ldg(a) (*(a))
 #endif
 
-
 typedef struct {
   float x, y, z;
 } kdata;
+
+sycl::ext::oneapi::experimental::device_global<const kdata[CHUNK_S]> k;
 
 void cmpfhd(const float*__restrict rmu,
             const float*__restrict imu,
@@ -25,7 +26,6 @@ void cmpfhd(const float*__restrict rmu,
             const float*__restrict x,
             const float*__restrict y,
             const float*__restrict z,
-            const kdata*__restrict k,
             const int samples,
             const int voxels,
             sycl::nd_item<1> &item )
@@ -120,8 +120,6 @@ int main(int argc, char* argv[]) {
   float *d_z = sycl::malloc_device<float>(samples, q);
   q.memcpy(d_z, h_z, sampleSize);
 
-  kdata *d_k = sycl::malloc_device<kdata>(CHUNK_S, q);
-
   const int ntpb = 256;
   const int nblks = (samples + ntpb - 1) / ntpb * ntpb;
   sycl::range<1> gws (nblks);
@@ -140,7 +138,7 @@ int main(int argc, char* argv[]) {
       s = sizeof(kdata) * c;
     }
 
-    q.memcpy(d_k, &h_k[i * CHUNK_S], s);
+    q.memcpy(k, &h_k[i * CHUNK_S], s);
 
     q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class fhd>(
@@ -148,7 +146,7 @@ int main(int argc, char* argv[]) {
         cmpfhd( d_rmu + i*CHUNK_S,
                 d_imu + i*CHUNK_S,
                 d_rfhd, d_ifhd,
-                d_x, d_y, d_z, d_k,
+                d_x, d_y, d_z,
                 samples, c, item);
       });
     });
