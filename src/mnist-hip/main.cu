@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <chrono>
+#include <cmath>
 #include <hip/hip_runtime.h>
 
 #define USE_MNIST_LOADER

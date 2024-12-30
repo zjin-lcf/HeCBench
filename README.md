@@ -46,7 +46,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, floydwarshall2, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    aligned-types, asta, blockAccess, blockexchange, collision, concurrentKernels, conversion, copy, dispatch, graphExecution, ert, interleave, intrinsics-cast, kernelLaunch, layout, mallocFree, maxFlops, mixbench, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamCreateCopyDestroy, streamOrderedAllocation, streamPriority, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy 
+    aligned-types, asta, blockAccess, blockexchange, collision, concurrentKernels, conversion, dispatch, graphExecution, ert, interleave, intrinsics-cast, kernelLaunch, layout, mallocFree, maxFlops, mixbench, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamCreateCopyDestroy, streamOrderedAllocation, streamPriority, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy 
 
 ### Machine learning  
     accuracy, adam, adamw, addBiasQKV, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, dwconv1d, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, layernorm, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, permute, perplexity, pointwise, pool, qkv, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, rotary, sampling, scel, snicit, softmax, softmax-fused, softmax-online, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
@@ -495,9 +495,6 @@ Early results are shown [here](results/README.md)
 
 ### coordinates (cuda)
   Coordinates(latitude and longitude) transformation using the STL transform (https://github.com/rapidsai/cuspatial)
-
-### copy (cuda)
-  Memory copies using direct, zero, and managed memory accesses
 
 ### crc64 (openmp)
   64-bit cyclic-redundancy check (https://trac.alcf.anl.gov/projects/hpcrc64/)
