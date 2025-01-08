@@ -44,7 +44,7 @@ ifeq ($(CUDA), yes)
 endif
 
 ifeq ($(HIP), yes)
-  CFLAGS += -DWARPSIZE=64 -fsycl-targets=amdgcn-amd-amdhsa \
+  CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
 	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
 endif
 

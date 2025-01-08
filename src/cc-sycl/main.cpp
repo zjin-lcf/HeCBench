@@ -49,10 +49,6 @@ June 2018.
 
 static const int ThreadsPerBlock = 256;
 
-#ifndef WARPSIZE
-#define WARPSIZE 32
-#endif
-
 inline int atomicCAS(int &val, int expected, int desired) 
 {
   int expected_value = expected;
@@ -192,15 +188,16 @@ void compute2(sycl::nd_item<1> &item,
               const int *const __restrict topL,
                     int *const __restrict posL)
 {
-  const int lane = item.get_local_id(0) % WARPSIZE;
+  auto sg = item.get_sub_group();
+  const int lane = sg.get_local_linear_id();
 
   int idx;
   if (lane == 0) idx = atomicAdd(posL, 1);
-  idx = sycl::select_from_group(item.get_sub_group(), idx, 0);
+  idx = sycl::select_from_group(sg, idx, 0);
   while (idx < *topL) {
     const int v = wl[idx];
     int vstat = representative(v, nstat);
-    for (int i = nidx[v] + lane; i < nidx[v + 1]; i += WARPSIZE) {
+    for (int i = nidx[v] + lane; i < nidx[v + 1]; i += sg.get_max_local_range()[0]) {
       const int nli = nlist[i];
       if (v > nli) {
         int ostat = representative(nli, nstat);
@@ -225,7 +222,7 @@ void compute2(sycl::nd_item<1> &item,
       }
     }
     if (lane == 0) idx = atomicAdd(posL, 1);
-    idx = sycl::select_from_group(item.get_sub_group(), idx, 0);
+    idx = sycl::select_from_group(sg, idx, 0);
   }
 }
 
@@ -372,7 +369,7 @@ static void computeCC(const int repeat,
     q.submit([&](sycl::handler &cgh) {
       cgh.parallel_for<class compute_med>(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
-          [[sycl::reqd_sub_group_size(WARPSIZE)]] {
+      {
         compute2(item, nodes, nidx_d, nlist_d,
                  nstat_d, wl_d, topL_d, posL_d);
       });
