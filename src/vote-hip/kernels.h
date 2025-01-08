@@ -1,8 +1,6 @@
 #ifndef SIMPLEVOTE_KERNEL_CU
 #define SIMPLEVOTE_KERNEL_CU
 
-#define MASK 0xffffffff
-
 ////////////////////////////////////////////////////////////////////////////////
 // Vote Any/All intrinsic kernel function tests are supported only by CUDA
 // capable devices that are CUDA hardware that has SM1.2 or later
