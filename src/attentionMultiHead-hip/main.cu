@@ -3,66 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <hip/hip_runtime.h>
-
-__inline__ __device__
-float warpReduceSum(float val)
-{
-  for(int mask = 16; mask > 0; mask >>= 1)
-    val += __shfl_xor(val, mask, 32);
-  return val;
-}
-
-// Calculate the sum of all elements in a block
-__inline__ __device__
-float blockReduceSum(float val)
-{
-  static __shared__ float shared[32]; 
-  int lane = threadIdx.x & 0x1f; 
-  int wid = threadIdx.x >> 5;  
-
-  val = warpReduceSum(val);
-
-  if(lane == 0)
-    shared[wid] = val;
-
-  __syncthreads();
-
-
-  val = (threadIdx.x < (blockDim.x >> 5 )) ? shared[lane] : 0;
-  val = warpReduceSum(val);
-
-  return val;
-}
-
-__inline__ __device__
-float warpReduceMax(float val)
-{
-  for(int mask = 16; mask > 0; mask >>= 1)
-    val = max(val, __shfl_xor(val, mask, 32));
-  return val;
-}
-
-// Calculate the maximum of all elements in a block
-__inline__ __device__
-float blockReduceMax(float val)
-{
-  static __shared__ float shared[32]; 
-  int lane = threadIdx.x & 0x1f; // in-warp idx
-  int wid = threadIdx.x >> 5;  // warp idx
-
-  val = warpReduceMax(val); // get max in each warp
-
-  if(lane == 0) // record in-warp max by warp Idx
-    shared[wid] = val;
-
-  __syncthreads();
-
-  val = (threadIdx.x < (blockDim.x >> 5)) ? shared[lane] : 0;
-  val = warpReduceMax(val);
-
-  return val;
-}
-
+#include <hipcub/hipcub.hpp>
 
 __global__
 void mha (
@@ -93,6 +34,8 @@ void mha (
   int candidate_id = blockIdx.x / nhead;
   int head_id = blockIdx.x % nhead;
 
+  typedef hipcub::BlockReduce<float, 256> BlockReduce;
+  __shared__ typename BlockReduce::TempStorage temp_storage;
   /*
      sq is the query vector shared by all threads inside the same block.
 
@@ -129,7 +72,7 @@ void mha (
   float local_i = threadIdx.x < n_steps ? summ : -1e-20f;
   float local_o;
 
-  float max_val = blockReduceMax(local_i);
+  float max_val = BlockReduce(temp_storage).Reduce(local_i, hipcub::Max());
 
   if(threadIdx.x == 0)
     s_max_val = max_val;
@@ -142,7 +85,7 @@ void mha (
   local_o = expf(local_i);
 
   float val = (threadIdx.x < n_steps) ? local_o : 0.f;
-  val = blockReduceSum(val);
+  val = BlockReduce(temp_storage).Sum(val);
   if(threadIdx.x == 0) s_sum = val;
   __syncthreads();
 
