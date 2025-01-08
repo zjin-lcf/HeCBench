@@ -131,3 +131,26 @@ void kernel2_blockReduce (
   if (item.get_local_id(0) == 0)
     output[j] = sum;
 }
+
+void kernel2_warpReduce (
+    const float*__restrict__ exp_sum,
+    const float*__restrict__ dot_product,
+    const float*__restrict__ value,
+    float*__restrict__ output,
+    const int n,
+    const int d,
+    const sycl::nd_item<1> &item)
+{
+  sycl::sub_group warp = item.get_sub_group();
+  int j = item.get_group(0) * warp.get_group_linear_range() + warp.get_group_linear_id();
+  if (j < d) {
+    float sum = 0;
+      for (int i = warp.get_local_linear_id(); i < n; i += warp.get_max_local_range()[0]) {
+      float score = sycl::native::exp(dot_product[i]) / exp_sum[0];
+      sum += score * value[i * d + j];
+    }
+    sum = sycl::reduce_over_group(warp, sum, sycl::plus<float>{});
+    if (warp.leader())
+      output[j] = sum;
+  }
+}
