@@ -1,4 +1,4 @@
-#include <sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "utils.hpp"
 #include "kernel.cpp"
 
@@ -168,7 +168,8 @@ void kernel_driver_aa(std::string filename,
 
       cgh.parallel_for<class aa>(
         sycl::nd_range<1>(gws_aa, lws_aa), [=] (sycl::nd_item<1> item)
-        [[intel::reqd_sub_group_size(32)]] {
+        [[intel::reqd_sub_group_size(32)]]
+        {
         sequence_aa_kernel(
            d_strA,
            d_strB,
@@ -226,7 +227,8 @@ void kernel_driver_aa(std::string filename,
       sycl::local_accessor<short, 1> locInds2(32, cgh);
       cgh.parallel_for<class aa_r>(
         sycl::nd_range<1>(gws_aa_r, lws_aa_r), [=] (sycl::nd_item<1> item)
-        [[intel::reqd_sub_group_size(32)]] {
+        [[intel::reqd_sub_group_size(32)]]
+        {
         sequence_aa_kernel(
            d_strA,
            d_strB,
