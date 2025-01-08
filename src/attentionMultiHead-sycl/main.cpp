@@ -4,66 +4,6 @@
 #include <cmath>
 #include <sycl/sycl.hpp>
 
-inline
-float warpReduceSum(float val, sycl::nd_item<1> &item)
-{
-  auto sg = item.get_sub_group();
-  for(int mask = 16; mask > 0; mask >>= 1)
-    val += sg.shuffle_xor(val, mask);
-  return val;
-}
-
-// Calculate the sum of all elements in a block
-inline
-float blockReduceSum(float val, sycl::nd_item<1> &item, float *shared)
-{
-  int lid = item.get_local_id(0);
-  int lane = lid & 0x1f;
-  int wid = lid >> 5;
-
-  val = warpReduceSum(val, item);
-
-  if(lane == 0)
-    shared[wid] = val;
-
-  item.barrier(sycl::access::fence_space::local_space);
-
-  val = (lid < (item.get_local_range(0) >> 5)) ? shared[lane] : 0;
-  val = warpReduceSum(val, item);
-
-  return val;
-}
-
-inline
-float warpReduceMax(float val, sycl::nd_item<1> &item)
-{
-  auto sg = item.get_sub_group();
-  for(int mask = 16; mask > 0; mask >>= 1)
-    val = sycl::max(val, sg.shuffle_xor(val, mask));
-  return val;
-}
-
-// Calculate the maximum of all elements in a block
-inline
-float blockReduceMax(float val, sycl::nd_item<1> &item, float *shared)
-{
-  int lid = item.get_local_id(0);
-  int lane = lid & 0x1f; // in-warp idx
-  int wid = lid >> 5;    // warp idx
-
-  val = warpReduceMax(val, item); // get max in each warp
-
-  if(lane == 0) // record in-warp max by warp Idx
-    shared[wid] = val;
-
-  item.barrier(sycl::access::fence_space::local_space);
-
-  val = (lid < (item.get_local_range(0) >> 5)) ? shared[lane] : 0;
-  val = warpReduceMax(val, item);
-
-  return val;
-}
-
 void mha (
    const float *__restrict q, 
    const float *__restrict k, 
@@ -92,6 +32,7 @@ void mha (
      head_id is the index of head processed by this block.
 
    */
+  auto g = item.get_group();
   int gid = item.get_group(0);
   int lid = item.get_local_id(0);
   int dim_per_head = qk_col / nhead;
@@ -129,7 +70,7 @@ void mha (
   float local_i = lid < n_steps ? summ : -1e-20f;
   float local_o;
 
-  float max_val = blockReduceMax(local_i, item, shared);
+  float max_val = sycl::reduce_over_group(g, local_i, sycl::maximum<float>());
 
   if (lid == 0)
     s_max_val = max_val;
@@ -142,7 +83,7 @@ void mha (
   local_o = sycl::exp(local_i);
 
   float val = (lid < n_steps) ? local_o : 0.f;
-  val = blockReduceSum(val, item, shared);
+  val = sycl::reduce_over_group(g, val, sycl::plus<float>());
   if (lid == 0) s_sum = val;
   item.barrier(sycl::access::fence_space::local_space);
 
@@ -256,7 +197,8 @@ int main(int argc, char* argv[])
       sycl::local_accessor<float, 0> s_max_val(cgh);
       sycl::local_accessor<float, 0> s_sum(cgh);
       cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
-        [[sycl::reqd_sub_group_size(32)]] {
+        //[[sycl::reqd_sub_group_size(32)]] 
+        {
         mha(dq, dk, dv, beamsize, n_steps, qk_col, v_col, nhead, scaler,
             THRESHOLD, dst, item, shared.get_pointer(), s_max_val, s_sum);
         });
