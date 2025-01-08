@@ -49,7 +49,6 @@ June 2018.
 #include "graph.h"
 
 static const int ThreadsPerBlock = 256;
-static const int warpsize = 32;
 
 static __device__ int topL, posL, topH, posH;
 
@@ -161,7 +160,7 @@ void compute2(const int nodes,
                     int* const __restrict__ nstat,
               const int* const __restrict__ wl)
 {
-  const int lane = threadIdx.x % warpsize;
+  const int lane = threadIdx.x % warpSize;
 
   int idx;
   if (lane == 0) idx = atomicAdd(&posL, 1);
@@ -169,7 +168,7 @@ void compute2(const int nodes,
   while (idx < topL) {
     const int v = wl[idx];
     int vstat = representative(v, nstat);
-    for (int i = nidx[v] + lane; i < nidx[v + 1]; i += warpsize) {
+    for (int i = nidx[v] + lane; i < nidx[v + 1]; i += warpSize) {
       const int nli = nlist[i];
       if (v > nli) {
         int ostat = representative(nli, nstat);
