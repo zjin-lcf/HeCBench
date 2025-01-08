@@ -6,12 +6,11 @@
 #include "kernels.h"
 
 int main(int argc, char **argv) {
-  if (argc != 3) {
-    printf("Usage: %s <warp_size> <repeat>\n", argv[0]);
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
     return 1;
   }
-  const int warp_size = atoi(argv[1]);
-  const int repeat = atoi(argv[2]);
+  const int repeat = atoi(argv[1]);
 
   bool *dinfo = NULL, *hinfo = NULL;
   unsigned int *h_input, *h_result;
@@ -19,6 +18,7 @@ int main(int argc, char **argv) {
 
   int error_count[3] = {0, 0, 0};
 
+  const int warp_size = 32;
   h_input = (unsigned int *)malloc(VOTE_DATA_GROUP * warp_size *
                                    sizeof(unsigned int));
   h_result = (unsigned int *)malloc(VOTE_DATA_GROUP * warp_size *
