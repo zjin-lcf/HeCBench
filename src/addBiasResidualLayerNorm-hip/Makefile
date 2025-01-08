@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../addBiasResidualLayerNorm-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -45,7 +45,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../addBiasResidualLayerNorm-cuda/kernels.h Makefile
+%.o: %.cu kernels.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
