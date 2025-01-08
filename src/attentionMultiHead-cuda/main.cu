@@ -169,6 +169,7 @@ int main(int argc, char* argv[])
   float *h_dst = (float*)malloc(q_size_bytes);
 
   // Initialize query, key and value matrices
+  srand(123);
   for(int i = 0; i < q_size; ++i)
     hq[i] = rand() / (float)RAND_MAX;
 
