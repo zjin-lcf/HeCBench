@@ -4,6 +4,8 @@
 // Harris, M. and Garland, M., 2012.
 // Optimizing parallel prefix operations for the Fermi architecture.
 // In GPU Computing Gems Jade Edition (pp. 29-38). Morgan Kaufmann.
+//
+// The wavefront size is 64 on MI-series GPUs
 //-----------------------------------------------------------------------
 
 #include <cstdio>
@@ -22,22 +24,21 @@ __device__ __inline__ int warp_scan(int val, volatile int *s_data)
   s_data[idx] = t += s_data[idx - 2];
   s_data[idx] = t += s_data[idx - 4];
   s_data[idx] = t += s_data[idx - 8];
-  s_data[idx] = t += s_data[idx -16];
   return s_data[idx-1];
 }
 
-__device__ __inline__ unsigned int lanemask_lt()
+__device__ __inline__ size_t lanemask_lt()
 {
   const unsigned int lane = threadIdx.x & (warpSize-1);
-  return (1 << (lane)) - 1;
+  return (1UL << (lane)) - 1UL;
 }
 
 // warp scan optimized for binary
 __device__ __inline__ unsigned int binary_warp_scan(bool p)
 {
-  const unsigned int mask = lanemask_lt();
-  unsigned int b = __ballot(p);
-  return __popc(b & mask);
+  const size_t mask = lanemask_lt();
+  size_t b = __ballot(p);
+  return __popcll(b & mask);
 }
 
 // positive numbers
@@ -48,8 +49,7 @@ bool valid(int x) {
 
 __device__ __inline__ int block_binary_prefix_sums(int x)
 {
-  // 2 x warpIdx's upper bound (1024/32)
-  __shared__ int sdata[64];
+  __shared__ int sdata[80];
 
   bool predicate = valid(x);
 
@@ -125,7 +125,7 @@ void bscan (const int repeat)
     hipDeviceSynchronize();
     auto start = std::chrono::steady_clock::now();
 
-    binary_scan<<<grids, blocks>>>(d_out, d_in);
+    hipLaunchKernelGGL(binary_scan, grids, blocks, 0, 0, d_out, d_in);
 
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
@@ -164,8 +164,7 @@ int main(int argc, char* argv[])
   }
   const int repeat = atoi(argv[1]);
     
-  // scan over N elements (N = [32, 1024])
-  bscan<32>(repeat);
+  // scan over N elements (N = [64, 1024])
   bscan<64>(repeat);
   bscan<128>(repeat);
   bscan<256>(repeat);
