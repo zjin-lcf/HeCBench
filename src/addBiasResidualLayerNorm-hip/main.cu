@@ -61,7 +61,7 @@ void layer(int repeat) {
 
   const int m = 4096;  // batch size
 
-  int dim[] = {256, 512, 768, 1024, 2048, 4096, 8192};
+  int dim[] = {512, 1024, 2048, 4096, 8192};
 
   for (int i = 0; i < sizeof(dim) / sizeof(int); i++) {
 
@@ -129,7 +129,7 @@ void layer(int repeat) {
     for (int i = 0; i < output_size; i++)
       s += typeToFloat(h_output[i]);
 
-    printf("Checksum = %f\n", s / (n * n));
+    printf("Checksum = %f\n", s / (m * n));
     
     hipFree(d_input);
     hipFree(d_output);
