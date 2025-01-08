@@ -73,8 +73,8 @@ void kernel1_blockReduce (
   }
 }
 
-__device__ inline float warpReduceSum(cooperative_groups::thread_block_tile<32> &warp, float val) {
-    for (int offset = 16; offset > 0; offset /= 2) {
+__device__ inline float warpReduceSum(cooperative_groups::thread_block_tile<warpSize> &warp, float val) {
+    for (int offset = warpSize/2; offset > 0; offset /= 2) {
         val += warp.shfl_xor(val, offset);
     }
     return val;
@@ -91,7 +91,7 @@ void kernel1_warpReduce (
 {
   namespace cg = cooperative_groups;
   cg::thread_block block = cg::this_thread_block();
-  cg::thread_block_tile<32> warp = cg::tiled_partition<32>(block);
+  cg::thread_block_tile<warpSize> warp = cg::tiled_partition<warpSize>(block);
   // each i iteration is assigned to a warp
   // meta_group_size is the number of warps in a block, and meta_group_rank is the warp index
   int i = blockIdx.x * warp.meta_group_size() + warp.meta_group_rank();
@@ -129,4 +129,29 @@ void kernel2_blockReduce (
   sum = BlockReduce(temp_storage).Sum(sum);
   if (threadIdx.x == 0)
     output[j] = sum;
+}
+
+__global__
+void kernel2_warpReduce (
+    const float*__restrict__ exp_sum,
+    const float*__restrict__ dot_product,
+    const float*__restrict__ value,
+    float*__restrict__ output,
+    const int n,
+    const int d)
+{
+  namespace cg = cooperative_groups;
+  cg::thread_block block = cg::this_thread_block();
+  cg::thread_block_tile<warpSize> warp = cg::tiled_partition<warpSize>(block);
+  int j = blockIdx.x * warp.meta_group_size() + warp.meta_group_rank();
+  if (j < d) {
+    float sum = 0;
+    for (int i = warp.thread_rank(); i < n; i += warp.size()) {
+      float score = expf(dot_product[i]) / exp_sum[0];
+      sum += score * value[i * d + j];
+    }
+    sum = warpReduceSum(warp, sum);
+    if (warp.thread_rank() == 0)
+      output[j] = sum;
+  }
 }

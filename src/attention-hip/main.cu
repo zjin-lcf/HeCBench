@@ -7,6 +7,11 @@
 #include "kernels.h"
 #include "reference.h"
 
+inline int grids(int p, int b) {
+  int waves = b / warpSize;
+  return (p + waves - 1) / waves;
+}
+
 float* attention_device(const float* key, const float* value, const float* query,
                         const int n, const int d, const int impl_num, const int repeat)
 {
@@ -37,14 +42,31 @@ float* attention_device(const float* key, const float* value, const float* query
 
   hipDeviceSynchronize();
 
-  if (impl_num == 2) {
+
+  if (impl_num == 3) {
 
     auto start = std::chrono::steady_clock::now();
 
     for (int k = 0; k < repeat; k++) {
       hipMemset(d_exp_sum, 0, 4);
-      kernel1_warpReduce<<<(n+7)/8, 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      kernel1_warpReduce<<<grids(n, 256), 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
       kernel2_blockReduce<<<d, 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
+    }
+
+    hipDeviceSynchronize();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of kernels %f (ms)\n", time * 1e-6f / repeat);
+  }
+
+  else if (impl_num == 2) {
+
+    auto start = std::chrono::steady_clock::now();
+
+    for (int k = 0; k < repeat; k++) {
+      hipMemset(d_exp_sum, 0, 4);
+      kernel1_warpReduce<<<grids(n, 256), 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      kernel2_warpReduce<<<grids(d, 256), 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
     hipDeviceSynchronize();
@@ -102,8 +124,9 @@ int main(int argc, char* argv[]) {
   if (argc != 5) {
     printf("Usage: %s <rows> <columns> <implementation> <repeat>\n", argv[0]);
     printf("implementation 0: naive\n");
-    printf("implementation 1: fused kernels with warp reduce\n");
-    printf("implementation 2: fused kernels with block reduce\n");
+    printf("implementation 1: fused kernels with block reduce\n");
+    printf("implementation 2: fused kernels with warp reduce\n");
+    printf("implementation 3: fused kernels with mixed reduce\n");
     return 1;
   }
   const int n = atoi(argv[1]);
