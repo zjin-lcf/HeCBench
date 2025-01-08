@@ -38,15 +38,14 @@ void invokeAddBiasResidualLayerNorm(
     sycl::range<1> lws (n / 8);
 
     q.submit([&](sycl::handler &cgh) {
-      sycl::local_accessor<float, 1> shared(sycl::range<1>(32), cgh);
       sycl::local_accessor<float, 0> s_mean(cgh);
       sycl::local_accessor<float, 0> s_variance(cgh);
       cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
-        [[intel::reqd_sub_group_size(32)]] {
+        //[[intel::reqd_sub_group_size(32)]] 
+       {
         addBiasResidualPostLayerNormV2<T>(
           out, input, bias, gamma, beta, layernorm_eps,
-          n, item, shared.get_pointer(),
-          s_mean, s_variance);
+          n, item, s_mean, s_variance);
       });
     });
   }
@@ -57,46 +56,43 @@ void invokeAddBiasResidualLayerNorm(
     int num_trips = (n + lws[0] - 1) / lws[0];
     if (num_trips == 1) {
       q.submit([&](sycl::handler &cgh) {
-        sycl::local_accessor<float, 1> shared(sycl::range<1>(32), cgh);
         sycl::local_accessor<float, 0> s_mean(cgh);
         sycl::local_accessor<float, 0> s_variance(cgh);
 
         cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
-          [[intel::reqd_sub_group_size(32)]] {
+          //[[intel::reqd_sub_group_size(32)]] 
+        {
           addBiasResidualPostLayerNorm<T, 1>(
             out, input, bias, gamma, beta, layernorm_eps,
-            n, item, shared.get_pointer(),
-            s_mean, s_variance);
+            n, item, s_mean, s_variance);
         });
       });
     }
     else if (num_trips == 2) {
       q.submit([&](sycl::handler &cgh) {
-        sycl::local_accessor<float, 1> shared(sycl::range<1>(32), cgh);
         sycl::local_accessor<float, 0> s_mean(cgh);
         sycl::local_accessor<float, 0> s_variance(cgh);
 
         cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
-          [[intel::reqd_sub_group_size(32)]] {
+          //[[intel::reqd_sub_group_size(32)]] 
+        {
           addBiasResidualPostLayerNorm<T, 2>(
             out, input, bias, gamma, beta, layernorm_eps,
-            n, item, shared.get_pointer(),
-            s_mean, s_variance);
+            n, item, s_mean, s_variance);
         });
       });
     }
     else {
       q.submit([&](sycl::handler &cgh) {
-        sycl::local_accessor<float, 1> shared(sycl::range<1>(32), cgh);
         sycl::local_accessor<float, 0> s_mean(cgh);
         sycl::local_accessor<float, 0> s_variance(cgh);
 
         cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
-          [[intel::reqd_sub_group_size(32)]] {
+          //[[intel::reqd_sub_group_size(32)]] 
+        {
           generalAddBiasResidualPostLayerNorm<T>(
             out, input, bias, gamma, beta, layernorm_eps,
-            n, item, shared.get_pointer(),
-            s_mean, s_variance);
+            n, item, s_mean, s_variance);
         });
       });
     }
