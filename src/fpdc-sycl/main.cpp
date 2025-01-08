@@ -144,7 +144,8 @@ static void Compress(sycl::queue &q, int blocks, int warpsperblock, int repeat, 
     q.submit([&](sycl::handler &cgh) {
       sycl::local_accessor<int, 1> ibufs (sycl::range<1>(32 * (3 * WARPSIZE / 2)), cgh);
       cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
-        [[sycl::reqd_sub_group_size(WARPSIZE)]] {
+        //[[sycl::reqd_sub_group_size(WARPSIZE)]]
+      {
         CompressionKernel(item, dimensionality, cbufd, dbufd, cutd, offd,
                           ibufs.get_pointer());
       });
