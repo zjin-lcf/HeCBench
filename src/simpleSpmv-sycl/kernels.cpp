@@ -232,7 +232,11 @@ long vector_mv_csr_parallel(const int repeat,
 
   int nnz_per_row = nnz / num_rows;
   int threads_per_row = prevPowerOf2(nnz_per_row);
-  const int warpSize = 32;
+
+  auto sg_sizes = q.get_device().get_info<sycl::info::device::sub_group_sizes>();
+  auto r = std::max_element(sg_sizes.begin(), sg_sizes.end());
+  const int warpSize = *r;
+
   threads_per_row = threads_per_row > warpSize ? warpSize : threads_per_row;
   int rows_per_block = bs / threads_per_row;
   if (rows_per_block == 0) rows_per_block = 1;
@@ -248,42 +252,48 @@ long vector_mv_csr_parallel(const int repeat,
     if (threads_per_row <= 2)
       q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item)
-           [[sycl::reqd_sub_group_size(warpSize)]] {
+        //   [[sycl::reqd_sub_group_size(warpSize)]]
+        {
            vector_mv_csr<2>(item, num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
         });
       });
     else if (threads_per_row <= 4)
       q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item)
-           [[sycl::reqd_sub_group_size(warpSize)]] {
+        //   [[sycl::reqd_sub_group_size(warpSize)]]
+        {
            vector_mv_csr<4>(item, num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
         });
       });
     else if (threads_per_row <= 8)
       q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item)
-           [[sycl::reqd_sub_group_size(warpSize)]] {
+        //   [[sycl::reqd_sub_group_size(warpSize)]]
+        {
            vector_mv_csr<8>(item, num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
         });
       });
     else if (threads_per_row <= 16)
       q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item)
-           [[sycl::reqd_sub_group_size(warpSize)]] {
+        //   [[sycl::reqd_sub_group_size(warpSize)]]
+        {
            vector_mv_csr<16>(item, num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
         });
       });
     else if (threads_per_row <= 32)
       q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item)
-           [[sycl::reqd_sub_group_size(warpSize)]] {
+        //   [[sycl::reqd_sub_group_size(warpSize)]]
+        {
            vector_mv_csr<32>(item, num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
         });
       });
     else
       q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item)
-           [[sycl::reqd_sub_group_size(warpSize)]] {
+        //   [[sycl::reqd_sub_group_size(warpSize)]]
+        {
            vector_mv_csr<64>(item, num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
         });
       });
