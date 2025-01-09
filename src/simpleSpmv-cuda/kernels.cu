@@ -216,8 +216,6 @@ long vector_mv_csr_parallel(const int repeat,
       vector_mv_csr<16><<<grid, block>>>(num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
     else if (threads_per_row <= 32)
       vector_mv_csr<32><<<grid, block>>>(num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
-    else
-      vector_mv_csr<64><<<grid, block>>>(num_rows, d_row_indices, d_col_indices, d_values, d_x, d_y);
   }
 
   cudaDeviceSynchronize();
