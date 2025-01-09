@@ -8,12 +8,21 @@
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
 
+#define HIP_CHECK(condition)         \
+  {                                  \
+    hipError_t error = condition;    \
+    if(error != hipSuccess){         \
+        std::cout << "HIP error: " << error << " line: " << __LINE__ << std::endl; \
+        exit(error); \
+    } \
+  }
+
 template <typename T>
 class SimpleTensor {
  public:
   SimpleTensor(unsigned height, unsigned width)
       : height_(height), width_(width) {
-    hipMalloc((void**)&data_, height_ * width_ * sizeof(T));
+    HIP_CHECK(hipMalloc((void**)&data_, height_ * width_ * sizeof(T)));
   }
   T* device_data() const { return data_; }
   /**
@@ -41,7 +50,7 @@ class SimpleTensor {
       width_ = other.width_;
 
       // Deallocate existing data
-      hipFree(data_);
+      HIP_CHECK(hipFree(data_));
 
       // Take ownership of the new data
       data_ = other.data_;
@@ -50,10 +59,10 @@ class SimpleTensor {
 
     return *this;
   }
-  ~SimpleTensor() { hipFree(data_); }
+  ~SimpleTensor() { HIP_CHECK(hipFree(data_)); }
 
-  unsigned int width_;
   unsigned int height_;
+  unsigned int width_;
   // device data
   T* data_;
 };
@@ -67,19 +76,19 @@ void SimpleTensor<T>::reset() {
     std::uniform_real_distribution<float> dis(0.0, 1.0);
     for (unsigned n = 0; n < total_elements; ++n)
       rng[n] = __float2half(dis(gen));
-    hipMemcpy(data_, rng.data(), total_elements * sizeof(T), hipMemcpyHostToDevice);
+    HIP_CHECK(hipMemcpy(data_, rng.data(), total_elements * sizeof(T), hipMemcpyHostToDevice));
   } else if constexpr (std::is_same<T, int8_t>::value) {
     std::uniform_int_distribution<int> dis(-128, 127);
     for (unsigned n = 0; n < total_elements; ++n)
       rng[n] = dis(gen);
-    hipMemcpy(data_, rng.data(), total_elements * sizeof(T), hipMemcpyHostToDevice);
+    HIP_CHECK(hipMemcpy(data_, rng.data(), total_elements * sizeof(T), hipMemcpyHostToDevice));
   } else if constexpr (std::is_same<T, uint4_2>::value) {
     std::uniform_int_distribution<int> dis(0, 15);
     for (unsigned n = 0; n < total_elements; ++n) {
       rng[n].setX(dis(gen));
       rng[n].setY(dis(gen));
     }
-    hipMemcpy(data_, rng.data(), total_elements * sizeof(T), hipMemcpyHostToDevice);
+    HIP_CHECK(hipMemcpy(data_, rng.data(), total_elements * sizeof(T), hipMemcpyHostToDevice));
   }
 }
 
@@ -87,7 +96,7 @@ template <typename T>
 void SimpleTensor<T>::to_host(T* host_data, unsigned n) {
   unsigned int total_elements = height_ * width_;
   assert(n <= total_elements);
-  hipMemcpy(host_data, data_, n * sizeof(T), hipMemcpyDeviceToHost);
+  HIP_CHECK(hipMemcpy(host_data, data_, n * sizeof(T), hipMemcpyDeviceToHost));
 }
 
 #endif  // SIMPLE_TENSOR_H_
