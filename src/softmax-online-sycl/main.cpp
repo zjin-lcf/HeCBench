@@ -13,8 +13,6 @@
 // online softmax reduces loops from 3 to 2
 // which is done by calculating sumval and maxval in one loop
 
-constexpr int warp_size = 32;
-
 /*
 // struct for the reduction operation, guarantees 8-byte alignment
 struct alignas(8) SumMax
@@ -151,11 +149,11 @@ void softmax_forward_online(sycl::queue &q, float* out, const float* inp, int N,
 */
 
 void softmax_forward_online2(sycl::queue &q, float* out, const float* inp, int N, int C,
-                             int block_size) {
+                             int block_size, int warp_size) {
   const int grid_size = ceil_div(N * warp_size, block_size);
   q.parallel_for(
       sycl::nd_range<1>(grid_size * block_size, block_size),
-      [=](sycl::nd_item<1> item) [[intel::reqd_sub_group_size(warp_size)]] {
+      [=](sycl::nd_item<1> item) { //[[intel::reqd_sub_group_size(warp_size)]] {
         softmax_forward_online_kernel2(out, inp, N, C, item);
       }).wait();
 }
@@ -163,14 +161,14 @@ void softmax_forward_online2(sycl::queue &q, float* out, const float* inp, int N
 // kernel version dispatch
 void softmax_forward(int kernel_num, sycl::queue &q,
                      float* out, const float* inp, int N, int C,
-                     const int block_size) {
+                     const int block_size, const int warp_size) {
   switch (kernel_num) {
     case 1:
       printf("kernel 1 not supported\n");
       //softmax_forward_online(q, out, inp, N, C, block_size);
       break;
     case 2:
-      softmax_forward_online2(q, out, inp, N, C, block_size);
+      softmax_forward_online2(q, out, inp, N, C, block_size, warp_size);
       break;
     default:
       printf("Invalid kernel number\n");
@@ -190,11 +188,7 @@ int main(int argc, char **argv) {
   // query the warp size
   auto sg_sizes = q.get_device().get_info<sycl::info::device::sub_group_sizes>();
   auto r = std::max_element(sg_sizes.begin(), sg_sizes.end());
-  int max_warp_size = *r;
-  if (max_warp_size != warp_size) {
-    printf("Please set the warp size in the main.cpp to %d\n.", max_warp_size);
-    return 1;
-  }
+  int warp_size = *r;
 
   srand(0);
 
@@ -242,7 +236,7 @@ int main(int argc, char **argv) {
   for (int j = warp_size; j <= 1024; j = j * 2) {
     int block_size = j;
     printf("Checking block size %d.\n", block_size);
-    softmax_forward(kernel_num, q, d_out, d_inp, B * T, V, block_size);
+    softmax_forward(kernel_num, q, d_out, d_inp, B * T, V, block_size, warp_size);
     validate_result(d_out, out, "out", B * T * V, 1e-4f);
   }
 
@@ -254,7 +248,7 @@ int main(int argc, char **argv) {
     int repeat_times = 100;
     float elapsed_time = benchmark_kernel(repeat_times, softmax_forward,
                                           kernel_num, q, d_out, d_inp, B * T, V,
-                                          block_size);
+                                          block_size, warp_size);
     printf("block_size %4d | time %.4f ms | per token %.2f µs\n", block_size, elapsed_time, elapsed_time * 1'000 / (B*T));
   }
 
