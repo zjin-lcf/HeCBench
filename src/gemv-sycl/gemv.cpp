@@ -42,7 +42,7 @@ SimpleTensor<sycl::half> solve_gemv_int4_quantized_with_params(
 
       cgh.parallel_for(
           sycl::nd_range<3>(gws, lws),
-          [=](sycl::nd_item<3> item) [[sycl::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item) { //[[sycl::reqd_sub_group_size(32)]] {
             gemv_quantized_int4(mat_data_, vec_data_, result_data_,
                                 vec_height_, scale, zero_point,
                                 num_per_thread, item,
@@ -94,7 +94,7 @@ SimpleTensor<sycl::half> solve_gemv_int8_quantized_with_params(
 
       cgh.parallel_for(
           sycl::nd_range<3>(gws, lws),
-          [=](sycl::nd_item<3> item) [[sycl::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item) { //[[sycl::reqd_sub_group_size(32)]] {
             gemv_quantized_int8(mat_data_, vec_data_, result_data_,
                                 mat_width_, scale, zero_point,
                                 num_per_thread, item,
@@ -139,7 +139,7 @@ solve_gemv_with_params(sycl::queue &q,
 
       cgh.parallel_for(
           sycl::nd_range<3>(gws, lws),
-          [=](sycl::nd_item<3> item) [[sycl::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item) { //[[sycl::reqd_sub_group_size(32)]] {
             gemv_fp16(mat_data_, vec_data_, result_data_,
                       mat_width_, num_per_thread, item,
                       warpLevelSums_acc);
