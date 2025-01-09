@@ -27,9 +27,9 @@ void warp_reduce_mean_m2n(sycl::nd_item<2> &item, T &mean, T &m2n, int &num)
   auto sg = item.get_sub_group();
   #pragma unroll
   for(int i = WARP_SIZE/2; i > 0; i >>= 1) {
-    auto num_new = sg.shuffle_down(num, i);
-    auto mean_new = sg.shuffle_down(mean, i);
-    auto m2n_new = sg.shuffle_down(m2n, i);
+    auto num_new = sycl::shift_group_left(sg, num, i);
+    auto mean_new = sycl::shift_group_left(sg, mean, i);
+    auto m2n_new = sycl::shift_group_left(sg, m2n, i);
     welford_merge_element(num, mean, m2n, num_new, mean_new, m2n_new);
   }
 }
@@ -169,7 +169,8 @@ int main(int argc, char* argv[])
     q.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class welford>(
         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item)
-        [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+        //[[intel::reqd_sub_group_size(WARP_SIZE)]] 
+      {
         welford_kernel<float, float, float>(
           item, d_input, d_mean, d_var, batch_size, feature_size, spatial_size);
       });
