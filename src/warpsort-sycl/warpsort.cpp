@@ -408,7 +408,7 @@ std::vector<float> sort(sycl::queue &q,
   auto start = std::chrono::steady_clock::now();
 
   q.parallel_for(
-    sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+    sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) { //[[sycl::reqd_sub_group_size(WARP_SIZE)]] {
       sortDevice(DeviceTensor<float, 1>(devFloat, dataSizes),
                  DeviceTensor<float, 1>(devResult, outSizes), item);
   });
@@ -456,7 +456,7 @@ sortWithIndices(sycl::queue &q,
   auto start = std::chrono::steady_clock::now();
 
   q.parallel_for(
-    sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+    sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) { //[[sycl::reqd_sub_group_size(WARP_SIZE)]] {
       sortDevice(DeviceTensor<float, 1>(devFloat, dataSizes),
                  DeviceTensor<float, 1>(devResult, outSizes),
                  DeviceTensor<int, 1>(devIndices, outSizes), item);
