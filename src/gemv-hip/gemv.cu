@@ -24,14 +24,14 @@ SimpleTensor<__half> solve_gemv_int4_quantized_with_params(
   dim3 grid_dim(1, mat.height_ / block_dim_y);
   dim3 block_dim(block_dim_x, block_dim_y);
 
-  hipDeviceSynchronize();
+  HIP_CHECK(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; ++i) {
     gemv_quantized_int4<<<grid_dim, block_dim>>>(
       mat.data_, vec.data_, result.data_, vec.height_, scale,
       zero_point, num_per_thread);
   }
-  hipDeviceSynchronize();
+  HIP_CHECK(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
@@ -56,14 +56,14 @@ SimpleTensor<__half> solve_gemv_int8_quantized_with_params(
   dim3 grid_dim(1, mat.height_ / block_dim_y);
   dim3 block_dim(block_dim_x, block_dim_y);
 
-  hipDeviceSynchronize();
+  HIP_CHECK(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; ++i) {
     gemv_quantized_int8<<<grid_dim, block_dim>>>(
       mat.data_, vec.data_, result.data_, mat.width_, scale,
       zero_point, num_per_thread);
   }
-  hipDeviceSynchronize();
+  HIP_CHECK(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
@@ -87,13 +87,13 @@ SimpleTensor<__half> solve_gemv_with_params(
   dim3 grid_dim(1, mat.height_ / block_dim_y);
   dim3 block_dim(block_dim_x, block_dim_y);
 
-  hipDeviceSynchronize();
+  HIP_CHECK(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; ++i) {
     gemv_fp16<<<grid_dim, block_dim>>>(
       mat.data_, vec.data_, result.data_, mat.width_, num_per_thread);
   }
-  hipDeviceSynchronize();
+  HIP_CHECK(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
@@ -191,7 +191,7 @@ void test_gemv_int4_quantized_with_params(unsigned int size, unsigned int repeat
   check_int4_quantized_correctness<<<num_blocks, threads_per_block>>>(
       mat.device_data(), vec.device_data(), res.device_data(), scale,
       zero_point, mat_width);
-  hipDeviceSynchronize();
+  HIP_CHECK(hipDeviceSynchronize());
 }
 
 void test_gemv_int8_quantized_with_params(unsigned int size, unsigned int repeat,
@@ -218,7 +218,7 @@ void test_gemv_int8_quantized_with_params(unsigned int size, unsigned int repeat
   check_int8_quantized_correctness<<<num_blocks, threads_per_block>>>(
       mat.device_data(), vec.device_data(), res.device_data(), scale,
       zero_point, size);
-  hipDeviceSynchronize();
+  HIP_CHECK(hipDeviceSynchronize());
 }
 
 void test_gemv_with_params(unsigned int size, unsigned int repeat,
@@ -241,5 +241,5 @@ void test_gemv_with_params(unsigned int size, unsigned int repeat,
   int num_blocks = (size + threads_per_block - 1) / threads_per_block;
   check_correctness<<<num_blocks, threads_per_block>>>(
       mat.device_data(), vec.device_data(), res.device_data(), size);
-  hipDeviceSynchronize();
+  HIP_CHECK(hipDeviceSynchronize());
 }
