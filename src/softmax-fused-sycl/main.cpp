@@ -223,8 +223,7 @@ void scaled_masked_softmax_warp_forward(output_t *dst, const input_t *src,
     q.submit([&](sycl::handler &cgh) {                                         \
       cgh.parallel_for(                                                        \
           sycl::nd_range<3>(blocks * threads, threads),                        \
-          [=](sycl::nd_item<3> item) [[sycl::reqd_sub_group_size(              \
-              C10_WARP_SIZE)]] {                                               \
+          [=](sycl::nd_item<3> item) {                                         \
             scaled_masked_softmax_warp_forward<input_t, output_t, acc_t, n>(   \
                 dst, src, mask, scale, batch_count, key_seq_len, pad_batches,  \
                 item);                                                         \
