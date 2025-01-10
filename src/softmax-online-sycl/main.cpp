@@ -75,31 +75,27 @@ void softmax_forward_online_kernel(float* out, const float* inp, int N, int C,
 
 void softmax_forward_online_kernel2(float* out, const float* inp, int N, int C,
                                     const sycl::nd_item<1> &item) {
-  sycl::sub_group warp = item.get_sub_group();
-  const int warpsPerBlock = item.get_local_range(0) /
-                            warp.get_local_linear_range();
   int tid = item.get_local_id(0);
+  if (tid >= C) return;
 
-  if (tid >= C) {
-    return;
-  }
+  sycl::sub_group warp = item.get_sub_group();
+  const int warpsPerBlock = warp.get_group_range()[0];
 
-  int warpId = tid / warp.get_local_linear_range();
-  int laneId = tid % warp.get_local_linear_range();
+  int warpId = warp.get_group_id()[0];
   int row = item.get_group(0) * warpsPerBlock + warpId;
 
   if (row >= N) {
     return;
   }
 
+  int laneId = warp.get_local_id()[0];
   const float* x = inp + row * C;
   float* const y = out + row * C;
 
   // merge calculating maxval and sumval in one loop
   // which is an arithmetic improvment from online softmax over normal softmax
   float maxval = -INFINITY, sumval = 0.0f, bigger;
-  for (int i = laneId; i < C;
-       i += warp.get_local_linear_range()) {
+  for (int i = laneId; i < C; i += warp.get_max_local_range()[0]) {
     // when updating the maxval, dynamically updates the previous sumval by
     // multiplying e^{previous_maxval - current_maxval}
     bigger = sycl::fmax(maxval, (float)(x[i]));
@@ -111,7 +107,7 @@ void softmax_forward_online_kernel2(float* out, const float* inp, int N, int C,
   // use warp functions instead of cooperative groups for better readibility
   // calculate the warp wised maxval and sumval
   float offsetMaxval, offsetSumval;
-  for (int offset = warp.get_local_linear_range() / 2;
+  for (int offset = warp.get_max_local_range()[0] / 2;
        offset > 0; offset >>= 1) {
     sycl::group_barrier(warp);
     offsetMaxval = sycl::shift_group_left(warp, maxval, offset);
@@ -131,11 +127,59 @@ void softmax_forward_online_kernel2(float* out, const float* inp, int N, int C,
   sumval = sycl::select_from_group(warp, sumval, 0);
 
   for (int i = laneId; i < C;
-       i += warp.get_local_linear_range()) {
+       i += warp.get_max_local_range()[0]) {
     y[i] = sycl::native::exp(x[i] - maxval) / sumval;
   }
 }
 
+void softmax_forward_baseline_kernel(float* out, const float* inp, int N, int C,
+                                     const sycl::nd_item<1> &item) {
+  int tid = item.get_local_id(0);
+  if (tid >= C) return;
+
+  sycl::sub_group warp = item.get_sub_group();
+  const int warpsPerBlock = warp.get_group_range()[0];
+
+  int warpId = warp.get_group_id()[0];
+  int row = item.get_group(0) * warpsPerBlock + warpId;
+
+  if (row >= N) return;
+
+  int laneId = warp.get_local_id()[0];
+
+  const float* x = inp + row * C;
+  float* const y = out + row * C;
+
+  float maxval = -INFINITY;
+  for (int i = laneId; i < C; i += warp.get_max_local_range()[0]) {
+    maxval = sycl::fmax(x[i], maxval);
+  }
+  maxval = sycl::reduce_over_group(warp, maxval, sycl::maximum<float>{});
+
+  maxval = sycl::select_from_group(warp, maxval, 0);
+
+  float sumval = 0;
+  for (int i = laneId; i < C; i += warp.get_max_local_range()[0]) {
+    sumval += sycl::exp(x[i] - maxval);
+  }
+  sumval = sycl::reduce_over_group(warp, sumval, sycl::plus<float>{});
+
+  sumval = sycl::select_from_group(warp, sumval, 0);
+
+  for (int i = laneId; i < C; i += warp.get_max_local_range()[0]) {
+    y[i] = sycl::native::exp(x[i] - maxval) / sumval;
+  }
+}
+
+void softmax_forward_baseline(sycl::queue &q, float* out, const float* inp, int N, int C,
+                              int warp_size, int block_size) {
+  const int grid_size = ceil_div(N * warp_size, block_size);
+  q.parallel_for(
+      sycl::nd_range<1>(grid_size * block_size, block_size),
+      [=](sycl::nd_item<1> item) { //[[sycl::reqd_sub_group_size(warp_size)]] {
+        softmax_forward_baseline_kernel(out, inp, N, C, item);
+      }).wait();
+}
 /*
 void softmax_forward_online(sycl::queue &q, float* out, const float* inp, int N, int C,
                             int block_size) {
@@ -149,7 +193,7 @@ void softmax_forward_online(sycl::queue &q, float* out, const float* inp, int N,
 */
 
 void softmax_forward_online2(sycl::queue &q, float* out, const float* inp, int N, int C,
-                             int block_size, int warp_size) {
+                             int warp_size, int block_size) {
   const int grid_size = ceil_div(N * warp_size, block_size);
   q.parallel_for(
       sycl::nd_range<1>(grid_size * block_size, block_size),
@@ -164,11 +208,14 @@ void softmax_forward(int kernel_num, sycl::queue &q,
                      const int block_size, const int warp_size) {
   switch (kernel_num) {
     case 1:
-      printf("kernel 1 not supported\n");
-      //softmax_forward_online(q, out, inp, N, C, block_size);
+      softmax_forward_baseline(q, out, inp, N, C, warp_size, block_size);
       break;
     case 2:
-      softmax_forward_online2(q, out, inp, N, C, block_size, warp_size);
+      printf("kernel 2 not supported\n");
+      //softmax_forward_online(q, out, inp, N, C, warp_size, block_size);
+      break;
+    case 3:
+      softmax_forward_online2(q, out, inp, N, C, warp_size, block_size);
       break;
     default:
       printf("Invalid kernel number\n");
@@ -219,7 +266,10 @@ int main(int argc, char **argv) {
   if (argc > 1) {
     kernel_num = atoi(argv[1]);
   }
-  printf("Using kernel %d\n", kernel_num);
+  if (kernel_num > 1)
+    printf("Using kernel online %d\n", kernel_num);
+  else
+    printf("Using kernel baseline %d\n", kernel_num);
 
   
   softmax_forward_cpu(out, inp, B * T, V);
