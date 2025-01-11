@@ -6,7 +6,6 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-WAVE      = 64
 LAUNCHER  =
 
 #===============================================================================
@@ -24,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -DWAVEFRONT_SIZE=$(WAVE) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../score-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -47,7 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu
+%.o: %.cu ../score-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
