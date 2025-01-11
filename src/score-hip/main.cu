@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <chrono>
 #include <hip/hip_runtime.h>
 
-#ifndef WAVEFRONT_SIZE
-#define WAVEFRONT_SIZE 64
-#endif
+#include "reference.h"
 
 template <class T>
 __device__ T clamp(T value, T lower, T upper) { return min(max(value, lower), upper); }
@@ -18,8 +17,8 @@ void findTopK(int*__restrict__ indices_,
               const T*__restrict__ scores_,
               const float threshold,
               const int classwise_topK,
-              const int num_classes,
-              const int num_priors)
+              const size_t num_classes,
+              const size_t num_priors)
 {
   /* We need to sort boxes based on their confidence scores. The confidence scores fall in
    * the range [0.0, 1.0]. We break the range into bins and perform count sort. This is an
@@ -53,7 +52,7 @@ void findTopK(int*__restrict__ indices_,
 
   __syncthreads();
 
-  for (int i = 0; i < num_priors; i = i + BLOCK_SIZE)
+  for (int i = threadIdx.x; i < num_priors; i = i + BLOCK_SIZE)
   {
     const float confidence = scores[i];
     if (confidence > threshold)
@@ -78,7 +77,7 @@ void findTopK(int*__restrict__ indices_,
 
   __syncthreads();
 
-  constexpr int WARP_SIZE = WAVEFRONT_SIZE; /* must be equal to warpSize */
+  constexpr int WARP_SIZE = warpSize; /* must be equal to warpSize */
 
   if (threadIdx.x < WARP_SIZE)
   {
@@ -148,7 +147,7 @@ void findTopK(int*__restrict__ indices_,
 
   __syncthreads();
 
-  for (int i = 0; i < num_priors; i = i + BLOCK_SIZE)
+  for (int i = threadIdx.x; i < num_priors; i = i + BLOCK_SIZE)
   {
     const float confidence = scores[i];
     if (confidence > threshold)
@@ -204,9 +203,9 @@ int main(int argc, char* argv[])
 
   const float threshold = 0.4f;
   const int classwise_topK = 10;
-  const int num_classes = 1000;
-  const int num_priors = 1024;
-  const int batch_size = 512;
+  const size_t num_classes = 1000;
+  const size_t num_priors = 4096;
+  const int batch_size = 128;
   const int block_size = 256; 
   
   dim3 grids (num_classes, batch_size);
@@ -223,18 +222,28 @@ int main(int argc, char* argv[])
 
   float *scores = (float*) malloc (scores_size_bytes);
   int *count = (int*) malloc (count_size_bytes);
+  int *count_ref = (int*) malloc (count_size_bytes);
+  memset(count_ref, 0, count_size_bytes);
   int *indices = (int*) malloc (indices_size_bytes);
+  int *indices_ref = (int*) malloc (indices_size_bytes);
 
   float *d_scores;
   int *d_count;
   int *d_indices; 
   hipMalloc((void**)&d_indices, indices_size_bytes);
+  hipMemset(d_indices, 0, indices_size_bytes);
   hipMalloc((void**)&d_count, count_size_bytes);
   hipMalloc((void**)&d_scores, scores_size_bytes);
 
   srand(123);
-  for (size_t i = 0; i < scores_size; i++) {
-    scores[i] = rand() / (float) RAND_MAX; 
+  for (int b = 0; b < batch_size; b++) {
+    for (size_t c = 0; c < num_classes; c++) {
+      float *s = scores + b * num_classes * num_priors + c * num_priors;
+      for (size_t p = 0; p < num_priors; p++)
+        s[p] = p * 1.0 / num_priors;
+      for (int i = num_priors-1; i > 0; i--)
+        std::swap(s[i], s[rand() % (i+1)]);
+    }
   }
   hipMemcpy(d_scores, scores, scores_size_bytes, hipMemcpyHostToDevice);
 
@@ -242,7 +251,7 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(findTopK<float, 2048, block_size>), grids, blocks, 0, 0, 
+    findTopK<float, 2048, block_size> <<<grids, blocks>>> (
       d_indices, d_count, d_scores, threshold, classwise_topK, num_classes, num_priors);
   }
 
@@ -254,17 +263,29 @@ int main(int argc, char* argv[])
   hipMemcpy(indices, d_indices, indices_size_bytes, hipMemcpyDeviceToHost);
   hipMemcpy(count, d_count, count_size_bytes, hipMemcpyDeviceToHost);
 
-  long checksum = 0; 
-  for (int b = 0; b < batch_size; b++)
-    for (int c = 0; c < num_classes; c++)
-      checksum += count[b * num_classes + c];
-  printf("Checksum (count) = %ld\n", checksum);
+  reference<float, 2048>(indices_ref, count_ref, scores, threshold, classwise_topK, batch_size, num_classes, num_priors);
+
+  unsigned checksum = 0; 
+  for (int b = 0; b < batch_size; b++) {
+    for (size_t c = 0; c < num_classes; c++) {
+      size_t offset = b * num_classes * classwise_topK + c * classwise_topK;
+      auto topK = indices + offset; 
+      auto topK_ref = indices_ref + offset;
+      std::sort(topK, topK+classwise_topK);
+      std::sort(topK_ref, topK_ref+classwise_topK);
+      checksum += memcmp(topK, topK_ref, sizeof(int)*classwise_topK);
+    }
+  }
+  checksum += memcmp(count, count_ref, count_size_bytes);
+  printf("%s\n", checksum == 0 ? "PASS" : "FAIL");
 
   hipFree(d_indices);
   hipFree(d_count);
   hipFree(d_scores);
   free(indices);
+  free(indices_ref);
   free(count);
+  free(count_ref);
   free(scores);
 
   return 0;
