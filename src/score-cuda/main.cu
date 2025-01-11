@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <chrono>
 #include <cuda.h>
+
+#include "reference.h"
 
 template <class T>
 __device__ T clamp(T value, T lower, T upper) { return min(max(value, lower), upper); }
@@ -14,8 +17,8 @@ void findTopK(int*__restrict__ indices_,
               const T*__restrict__ scores_,
               const float threshold,
               const int classwise_topK,
-              const int num_classes,
-              const int num_priors)
+              const size_t num_classes,
+              const size_t num_priors)
 {
   /* We need to sort boxes based on their confidence scores. The confidence scores fall in
    * the range [0.0, 1.0]. We break the range into bins and perform count sort. This is an
@@ -200,9 +203,9 @@ int main(int argc, char* argv[])
 
   const float threshold = 0.4f;
   const int classwise_topK = 10;
-  const int num_classes = 1000;
-  const int num_priors = 1024;
-  const int batch_size = 512;
+  const size_t num_classes = 1000;
+  const size_t num_priors = 4096;
+  const int batch_size = 128;
   const int block_size = 256; 
   
   dim3 grids (num_classes, batch_size);
@@ -219,18 +222,28 @@ int main(int argc, char* argv[])
 
   float *scores = (float*) malloc (scores_size_bytes);
   int *count = (int*) malloc (count_size_bytes);
+  int *count_ref = (int*) malloc (count_size_bytes);
+  memset(count_ref, 0, count_size_bytes);
   int *indices = (int*) malloc (indices_size_bytes);
+  int *indices_ref = (int*) malloc (indices_size_bytes);
 
   float *d_scores;
   int *d_count;
   int *d_indices; 
   cudaMalloc((void**)&d_indices, indices_size_bytes);
+  cudaMemset(d_indices, 0, indices_size_bytes);
   cudaMalloc((void**)&d_count, count_size_bytes);
   cudaMalloc((void**)&d_scores, scores_size_bytes);
 
   srand(123);
-  for (size_t i = 0; i < scores_size; i++) {
-    scores[i] = rand() / (float) RAND_MAX; 
+  for (int b = 0; b < batch_size; b++) {
+    for (size_t c = 0; c < num_classes; c++) {
+      float *s = scores + b * num_classes * num_priors + c * num_priors;
+      for (size_t p = 0; p < num_priors; p++)
+        s[p] = p * 1.0 / num_priors;
+      for (int i = num_priors-1; i > 0; i--)
+        std::swap(s[i], s[rand() % (i+1)]);
+    }
   }
   cudaMemcpy(d_scores, scores, scores_size_bytes, cudaMemcpyHostToDevice);
 
@@ -250,17 +263,29 @@ int main(int argc, char* argv[])
   cudaMemcpy(indices, d_indices, indices_size_bytes, cudaMemcpyDeviceToHost);
   cudaMemcpy(count, d_count, count_size_bytes, cudaMemcpyDeviceToHost);
 
-  long checksum = 0; 
-  for (int b = 0; b < batch_size; b++)
-    for (int c = 0; c < num_classes; c++)
-      checksum += count[b * num_classes + c];
-  printf("Checksum (count) = %ld\n", checksum);
+  reference<float, 2048>(indices_ref, count_ref, scores, threshold, classwise_topK, batch_size, num_classes, num_priors);
+
+  unsigned checksum = 0; 
+  for (int b = 0; b < batch_size; b++) {
+    for (size_t c = 0; c < num_classes; c++) {
+      size_t offset = b * num_classes * classwise_topK + c * classwise_topK;
+      auto topK = indices + offset; 
+      auto topK_ref = indices_ref + offset;
+      std::sort(topK, topK+classwise_topK);
+      std::sort(topK_ref, topK_ref+classwise_topK);
+      checksum += memcmp(topK, topK_ref, sizeof(int)*classwise_topK);
+    }
+  }
+  checksum += memcmp(count, count_ref, count_size_bytes);
+  printf("%s\n", checksum == 0 ? "PASS" : "FAIL");
 
   cudaFree(d_indices);
   cudaFree(d_count);
   cudaFree(d_scores);
   free(indices);
+  free(indices_ref);
   free(count);
+  free(count_ref);
   free(scores);
 
   return 0;
