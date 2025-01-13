@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
 
-#ifndef SUB_GROUP_SIZE
-#define SUB_GROUP_SIZE 32
-#endif
+#include "reference.h"
 
 template <class T, int BINS, int BLOCK_SIZE>
 void findTopK(int*__restrict indices_,
@@ -13,8 +12,8 @@ void findTopK(int*__restrict indices_,
               const T*__restrict scores_,
               const float threshold,
               const int classwise_topK,
-              const int num_classes,
-              const int num_priors,
+              const size_t num_classes,
+              const size_t num_priors,
               sycl::nd_item<3> &item,
               int *__restrict bins)
 {
@@ -81,7 +80,9 @@ void findTopK(int*__restrict indices_,
 
   item.barrier(sycl::access::fence_space::local_space);
 
-  constexpr int WARP_SIZE = SUB_GROUP_SIZE; /* must be equal to warpSize */
+  auto sg = item.get_sub_group();
+
+  int WARP_SIZE = sg.get_max_local_range()[0]; /* must be equal to warpSize */
 
   if (threadIdx_x < WARP_SIZE)
   {
@@ -122,9 +123,9 @@ void findTopK(int*__restrict indices_,
      * instructions cannot be used in warp-divergent code. If the bins are a multiple of
      * the warpSize, all the threads in the warp will participate.
      */
-    static_assert(BINS % WARP_SIZE == 0, "number of bins must be a multiple of warp size");
 
-    auto sg = item.get_sub_group();
+    //static_assert(BINS % WARP_SIZE == 0, "number of bins must be a multiple of warp size");
+
     const int thread_id = threadIdx_x;
     const int inverse_lane_id = WARP_SIZE - thread_id - 1;
 
@@ -217,9 +218,9 @@ int main(int argc, char* argv[])
 
   const float threshold = 0.4f;
   const int classwise_topK = 10;
-  const int num_classes = 1000;
-  const int num_priors = 1024;
-  const int batch_size = 512;
+  const size_t num_classes = 1000;
+  const size_t num_priors = 4096;
+  const int batch_size = 128;
   const int block_size = 256;
 
   size_t indices_size = batch_size * num_classes * classwise_topK;
@@ -233,7 +234,10 @@ int main(int argc, char* argv[])
 
   float *scores = (float*) malloc (scores_size_bytes);
   int *count = (int*) malloc (count_size_bytes);
+  int *count_ref = (int*) malloc (count_size_bytes);
+  memset(count_ref, 0, count_size_bytes);
   int *indices = (int*) malloc (indices_size_bytes);
+  int *indices_ref = (int*) malloc (indices_size_bytes);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -249,8 +253,14 @@ int main(int argc, char* argv[])
   int *d_indices = sycl::malloc_device<int>(indices_size, q);
 
   srand(123);
-  for (size_t i = 0; i < scores_size; i++) {
-    scores[i] = rand() / (float) RAND_MAX;
+  for (int b = 0; b < batch_size; b++) {
+    for (size_t c = 0; c < num_classes; c++) {
+      float *s = scores + b * num_classes * num_priors + c * num_priors;
+      for (size_t p = 0; p < num_priors; p++)
+        s[p] = p * 1.0 / num_priors;
+      for (int i = num_priors-1; i > 0; i--)
+        std::swap(s[i], s[rand() % (i+1)]);
+    }
   }
   q.memcpy(d_scores, scores, scores_size_bytes);
 
@@ -261,7 +271,8 @@ int main(int argc, char* argv[])
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<int, 1> bins (sycl::range<1>(2048), cgh);
       cgh.parallel_for(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item)
-        [[intel::reqd_sub_group_size(SUB_GROUP_SIZE)]] {
+       // [[intel::reqd_sub_group_size(SUB_GROUP_SIZE)]] 
+      {
         findTopK<float, 2048, block_size>(
           d_indices, d_count, d_scores, threshold, classwise_topK, num_classes, num_priors,
           item, bins.get_pointer());
@@ -278,17 +289,30 @@ int main(int argc, char* argv[])
   q.memcpy(count, d_count, count_size_bytes);
   q.wait();
 
-  long checksum = 0;
-  for (int b = 0; b < batch_size; b++)
-    for (int c = 0; c < num_classes; c++)
-      checksum += count[b * num_classes + c];
-  printf("Checksum (count) = %ld\n", checksum);
+  reference<float, 2048>(indices_ref, count_ref, scores, threshold, classwise_topK, batch_size, num_classes, num_priors);
+
+  unsigned checksum = 0; 
+  for (int b = 0; b < batch_size; b++) {
+    for (size_t c = 0; c < num_classes; c++) {
+      size_t offset = b * num_classes * classwise_topK + c * classwise_topK;
+      auto topK = indices + offset;
+      auto topK_ref = indices_ref + offset;
+      std::sort(topK, topK+classwise_topK);
+      std::sort(topK_ref, topK_ref+classwise_topK);
+      checksum += memcmp(topK, topK_ref, sizeof(int)*classwise_topK);
+    }
+  }
+  checksum += memcmp(count, count_ref, count_size_bytes);
+  printf("%s\n", checksum == 0 ? "PASS" : "FAIL");
+
 
   sycl::free(d_indices, q);
   sycl::free(d_count, q);
   sycl::free(d_scores, q);
   free(indices);
+  free(indices_ref);
   free(count);
+  free(count_ref);
   free(scores);
 
   return 0;
