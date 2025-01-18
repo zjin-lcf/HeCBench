@@ -31,7 +31,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, bitcracker, bitpermute, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fpc, histogram, lzss, minmax, mpc, mtf, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, segment-reduce
+    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fpc, histogram, lzss, minmax, mpc, mtf, quantAQLM, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3
@@ -1224,6 +1224,9 @@ Early results are shown [here](results/README.md)
 
 ### qtclustering (opencl)
   Quality threshold clustering (https://github.com/vetter/shoc/)
+
+### quantAQLM (cuda)
+  Additive quantization (https://github.com/vllm-project/vllm/tree/main)
 
 ### quantBnB (cuda)
   8-bit quantization from bitsandbytes (https://github.com/bitsandbytes-foundation/bitsandbytes/tree/main)
