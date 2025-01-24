@@ -38,24 +38,24 @@ __global__ void kernel (const float * __restrict__ A,
   typedef BlockLoad<float, TH, NUM> LoadFloat;
   typedef BlockStore<unsigned char, TH, NUM> StoreChar;
 
-  __shared__ typename LoadFloat::TempStorage loadf;
-  __shared__ typename StoreChar::TempStorage storec;
+  __shared__ typename LoadFloat::TempStorage loadf_storage;
+  __shared__ typename StoreChar::TempStorage storec_storage;
 
-  for (unsigned int i = base_idx; i < n; i += gridDim.x*ITEMS_TO_LOAD)
+  for (int i = base_idx; i < n; i += gridDim.x*ITEMS_TO_LOAD)
   {
-      unsigned int valid_items = n - i > ITEMS_TO_LOAD ? ITEMS_TO_LOAD : n - i;
+      int valid_items = min(n - i, ITEMS_TO_LOAD);
 
       // Parameters:
       // block_src_it – [in] The thread block's base iterator for loading from
       // dst_items – [out] Destination to load data into
       // block_items_end – [in] Number of valid items to load
-      LoadFloat(loadf).Load(&(A[i]), vals, valid_items);
+      LoadFloat(loadf_storage).Load(&(A[i]), vals, valid_items);
 
       #pragma unroll
       for(int j = 0; j < NUM; j++)
           qvals[j] = int(vals[j]);
 
-      StoreChar(storec).Store(&(out[i]), qvals, valid_items);
+      StoreChar(storec_storage).Store(&(out[i]), qvals, valid_items);
   }
 }
 
