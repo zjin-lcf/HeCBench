@@ -30,7 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../quant-cuda  -fsycl \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../quantBnB-cuda  -fsycl \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 # Linker Flags
@@ -67,7 +67,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../quant-cuda/code.h block_load.h block_store.h
+%.o: %.cpp ../quantBnB-cuda/code.h block_load.h block_store.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
