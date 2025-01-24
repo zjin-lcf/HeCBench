@@ -94,11 +94,10 @@ void kQuantize(const float *__restrict__ code,
                uint8_t *out, const int n,
                const sycl::nd_item<3> &item)
 {
-  const int bid = item.get_group(2);
+  const size_t bid = item.get_group(2);
   const int tid = item.get_local_id(2);
-  const int dim = item.get_group_range(2);
-  const int n_full = dim * NUM_BLOCK;
-  const int base_idx = (bid * NUM_BLOCK);
+  const int n_full = item.get_group_range(2) * NUM_BLOCK;
+  const int base_idx = bid * NUM_BLOCK;
 
   float vals[NUM];
   uint8_t qvals[NUM];
@@ -112,22 +111,22 @@ void kQuantize(const float *__restrict__ code,
 
   sycl::multi_ptr<typename LoadFloat::TempStorage, sycl::access::address_space::local_space> p2 =
       sycl::ext::oneapi::group_local_memory_for_overwrite<typename LoadFloat::TempStorage>(item.get_group());
-  typename LoadFloat::TempStorage loadf = *p2;
+  typename LoadFloat::TempStorage loadf_storage = *p2;
 
   sycl::multi_ptr<typename StoreChar::TempStorage, sycl::access::address_space::local_space> p3 =
       sycl::ext::oneapi::group_local_memory_for_overwrite<typename StoreChar::TempStorage>(item.get_group());
-  typename StoreChar::TempStorage storec = *p3;
+  typename StoreChar::TempStorage storec_storage = *p3;
 
   for (int i = tid; i < 256; i += item.get_local_range(2))
   {
     smem_code[i] = code[i];
   }
 
-  for (unsigned int i = base_idx; i < n_full; i += dim*NUM_BLOCK)
+  for (int i = base_idx; i < n; i += n_full)
   {
-      int valid_items = n - i > NUM_BLOCK ? NUM_BLOCK : n - i;
+      int valid_items = sycl::min(n - i, NUM_BLOCK);
 
-      LoadFloat(loadf, item).Load(&(A[i]), vals, valid_items);
+      LoadFloat(loadf_storage, item).Load(&(A[i]), vals, valid_items);
 
       item.barrier(sycl::access::fence_space::local_space);
 
@@ -135,7 +134,7 @@ void kQuantize(const float *__restrict__ code,
       for(int j = 0; j < NUM; j++)
           qvals[j] = dQuantize<0>(smem_code, 0.0f, vals[j]);
 
-      StoreChar(storec, item).Store(&(out[i]), qvals, valid_items);
+      StoreChar(storec_storage, item).Store(&(out[i]), qvals, valid_items);
   }
 }
 
