@@ -43,27 +43,27 @@ void kernel(const float * __restrict__ A,
 
   sycl::multi_ptr<typename LoadFloat::TempStorage[1], sycl::access::address_space::local_space> p1 =
       sycl::ext::oneapi::group_local_memory_for_overwrite<typename LoadFloat::TempStorage[1]>(item.get_group());
-  typename LoadFloat::TempStorage *loadf = *p1;
+  typename LoadFloat::TempStorage *loadf_storage = *p1;
 
   sycl::multi_ptr<typename StoreChar::TempStorage[1], sycl::access::address_space::local_space> p2 =
       sycl::ext::oneapi::group_local_memory_for_overwrite<typename StoreChar::TempStorage[1]>(item.get_group());
-  typename StoreChar::TempStorage *storec = *p2;
+  typename StoreChar::TempStorage *storec_storage = *p2;
 
-  for (unsigned int i = base_idx; i < n; i += item.get_group_range(2)*ITEMS_TO_LOAD)
+  for (int i = base_idx; i < n; i += item.get_group_range(2)*ITEMS_TO_LOAD)
   {
-      unsigned int valid_items = n - i > ITEMS_TO_LOAD ? ITEMS_TO_LOAD : n - i;
+      int valid_items = sycl::min(n - i, ITEMS_TO_LOAD);
 
       // Parameters:
       // block_src_it – [in] The thread block's base iterator for loading from
       // dst_items – [out] Destination to load data into
       // block_items_end – [in] Number of valid items to load
-      LoadFloat(*loadf, item).Load(&(A[i]), vals, valid_items);
+      LoadFloat(*loadf_storage, item).Load(&(A[i]), vals, valid_items);
 
       #pragma unroll
       for(int j = 0; j < NUM; j++)
           qvals[j] = (int)vals[j];
 
-      StoreChar(*storec, item).Store(&(out[i]), qvals, valid_items);
+      StoreChar(*storec_storage, item).Store(&(out[i]), qvals, valid_items);
   }
 }
 
