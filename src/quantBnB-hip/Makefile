@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../quant-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../quantBnB-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -45,13 +45,13 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../quant-cuda/block_load.h\
-          ../quant-cuda/block_store.h\
-          ../quant-cuda/utils.h Makefile
+%.o: %.cu ../quantBnB-cuda/block_load.h\
+          ../quantBnB-cuda/block_store.h\
+          ../quantBnB-cuda/utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 16777216 100
+	$(LAUNCHER) ./$(program) 100000000 100

@@ -87,25 +87,25 @@ dQuantize(float* smem_code, const float rand, float x)
 
 #define NUM 4
 
-template<int TH, int NUM_BLOCK>
+template<int TH, int BLOCK_SIZE>
 __global__ void kQuantize(const float *__restrict__ code,
                           const float * __restrict__ A,
                           uint8_t *out, const int n)
 {
   const int bid = blockIdx.x;
   const int tid = threadIdx.x;
-  const int dim = gridDim.x;
-  const int n_full = dim * NUM_BLOCK;
-  const int base_idx = bid * NUM_BLOCK;
+  const int n_full = gridDim.x * BLOCK_SIZE;
+  const int base_idx = bid * BLOCK_SIZE;
 
   float vals[NUM];
   uint8_t qvals[NUM];
 
+  // 1D block of TH threads owning NUM items each
   typedef BlockLoad<float, TH, NUM> LoadFloat;
   typedef BlockStore<uint8_t, TH, NUM> StoreChar;
 
-  __shared__ typename LoadFloat::TempStorage loadf;
-  __shared__ typename StoreChar::TempStorage storec;
+  __shared__ typename LoadFloat::TempStorage loadf_storage;
+  __shared__ typename StoreChar::TempStorage storec_storage;
   __shared__ float smem_code[256];
 
   for (int i = tid; i < 256; i += blockDim.x)
@@ -113,11 +113,11 @@ __global__ void kQuantize(const float *__restrict__ code,
     smem_code[i] = code[i];
   }
 
-  for (unsigned int i = base_idx; i < n_full; i += dim*NUM_BLOCK)
+  for (int i = base_idx; i < n; i += n_full)
   {
-      int valid_items = n - i > NUM_BLOCK ? NUM_BLOCK : n - i;
+      int valid_items = min(n - i, BLOCK_SIZE);
 
-      LoadFloat(loadf).Load(&(A[i]), vals, valid_items);
+      LoadFloat(loadf_storage).Load(&(A[i]), vals, valid_items);
 
       __syncthreads();
 
@@ -125,7 +125,7 @@ __global__ void kQuantize(const float *__restrict__ code,
       for(int j = 0; j < NUM; j++)
           qvals[j] = dQuantize<0>(smem_code, 0.0f, vals[j]);
 
-      StoreChar(storec).Store(&(out[i]), qvals, valid_items);
+      StoreChar(storec_storage).Store(&(out[i]), qvals, valid_items);
   }
 }
 
