@@ -34,7 +34,7 @@ Each benchmark falls into a single category. While such classification is not ac
     atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fpc, histogram, lzss, minmax, mpc, mtf, quantAQLM, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, scatter, segment-reduce
 
 ### Data encoding, decoding, or verification
-    ans, crc64, crs, entropy, jenkins-hash, ldpc, md5hash, murmurhash3
+    ans, crc64, crs, entropy, jenkins-hash, kiss, ldpc, md5hash, murmurhash3
 
 ### Finance
     aop, black-scholes, binomial, bonds, libor
@@ -840,6 +840,9 @@ Early results are shown [here](results/README.md)
 
 ### kernelLaunch (hip)
   Kernel launch with small, medium and large kernel arguments (https://github.com/ROCm/hip-tests)
+
+### kiss (cuda)
+  Fast random number generator for C++ and CUDA (https://github.com/sleeepyjack/kiss_rng/tree/master)
 
 ### kmc (cuda)
   Kernel matrix compute (https://github.com/MKLab-ITI/CUDA)
