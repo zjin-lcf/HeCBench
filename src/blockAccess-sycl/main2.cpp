@@ -11,6 +11,7 @@
 
 namespace sycl_exp = sycl::ext::oneapi::experimental;
 
+
 void reference (const float * __restrict__ A,
                 unsigned char *out, const unsigned int n,
                 const sycl::nd_item<3> &item)
@@ -38,19 +39,22 @@ void kernel(const float * __restrict__ A,
 
   float vals[NUM];
   unsigned char qvals[NUM];
-  auto blocked = sycl_exp::properties{sycl_exp::data_placement_blocked};
+  auto props = sycl_exp::properties{sycl_exp::data_placement_blocked,
+                                    sycl_exp::contiguous_memory,
+                                    sycl_exp::full_group
+                                   };
 
   for (int i = base_idx; i < n; i += item.get_group_range(2)*ITEMS_TO_LOAD)
   {
     //int valid_items = sycl::min(n - i, ITEMS_TO_LOAD);
 
-    sycl_exp::group_load(g, A+i, sycl::span{vals}, blocked);
+    sycl_exp::group_load(g, A+i, sycl::span{vals}, props);
 
     #pragma unroll
     for(int j = 0; j < NUM; j++)
         qvals[j] = (int)vals[j];
 
-    sycl_exp::group_store(g, sycl::span{qvals}, out + i);
+    sycl_exp::group_store(g, sycl::span{qvals}, out + i, props);
   }
 }
 
