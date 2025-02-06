@@ -16,7 +16,7 @@ void kernel1 (
     for (int j = 0; j < d; j++)
       sum += key[i * d + j] * query[j];
     dot_product[i] = sum;
-    atomicAdd(exp_sum, expf(sum));
+    atomicAdd(exp_sum, __expf(sum));
   }
 }
 
@@ -29,7 +29,7 @@ void kernel2 (
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n)
-    score[i] = expf(dot_product[i]) / exp_sum[0];
+    score[i] = __expf(dot_product[i]) / exp_sum[0];
 }
 
 __global__
@@ -69,7 +69,7 @@ void kernel1_blockReduce (
   sum = BlockReduce(temp_storage).Sum(sum);
   if (threadIdx.x == 0) {
     dot_product[i] = sum;
-    atomicAdd(exp_sum, expf(sum));
+    atomicAdd(exp_sum, __expf(sum));
   }
 }
 
@@ -104,7 +104,7 @@ void kernel1_warpReduce (
     sum = warpReduceSum(warp, sum);
     if (warp.thread_rank() == 0) {
       dot_product[i] = sum;
-      atomicAdd(exp_sum, expf(sum));
+      atomicAdd(exp_sum, __expf(sum));
     }
   }
 }
@@ -121,7 +121,7 @@ void kernel2_blockReduce (
   int j = blockIdx.x;
   float sum = 0;
   for (int i = threadIdx.x; i < n; i += blockDim.x) {
-    float score = expf(dot_product[i]) / exp_sum[0];
+    float score = __expf(dot_product[i]) / exp_sum[0];
     sum += score * value[i * d + j];
   }
   using BlockReduce = hipcub::BlockReduce<float, 256>;
@@ -147,7 +147,7 @@ void kernel2_warpReduce (
   if (j < d) {
     float sum = 0;
     for (int i = warp.thread_rank(); i < n; i += warp.size()) {
-      float score = expf(dot_product[i]) / exp_sum[0];
+      float score = __expf(dot_product[i]) / exp_sum[0];
       sum += score * value[i * d + j];
     }
     sum = warpReduceSum(warp, sum);
