@@ -28,16 +28,76 @@
 template <typename value_idx, typename value_t>
 class search;
 
+template <typename value_idx, typename value_t>
+void sigmas_kernel(const value_t* __restrict__ distances,
+                         value_t* __restrict__ P,
+                   const float perplexity,
+                   const float desired_entropy,
+                   const int epochs,
+                   const float tol,
+                   const value_idx n,
+                   const int k,
+                   sycl::nd_item<1> &item)
+{
+  // For every item in row
+  const int i = item.get_global_id(0);
+  if (i >= n) return;
+
+  value_t beta_min = -INFINITY, beta_max = INFINITY;
+  value_t beta = 1;
+  const int ik = i * k;
+  int step;
+
+  for (step = 0; step < epochs; step++) {
+    value_t sum_Pi = FLT_EPSILON;
+
+    // Exponentiate to get Gaussian
+    for (int j = 0; j < k; j++) {
+      P[ik + j] = sycl::native::exp(-distances[ik + j] * beta);
+      sum_Pi += P[ik + j];
+    }
+
+    // Normalize
+    value_t sum_dist_Pi = 0;
+    const value_t div    = sycl::native::divide(1.0f, sum_Pi);
+    for (int j = 0; j < k; j++) {
+      P[ik + j] *= div;
+      sum_dist_Pi += distances[ik + j] * P[ik + j];
+    }
+
+    const value_t entropy      = sycl::native::log(sum_Pi) + beta * sum_dist_Pi;
+    const value_t entropy_diff = entropy - desired_entropy;
+    if (sycl::fabs(entropy_diff) <= tol) {
+      break;
+    }
+
+    // Bisection search
+    if (entropy_diff > 0) {
+      beta_min = beta;
+      if (sycl::isinf(beta_max))
+        beta *= 2.0f;
+      else
+        beta = (beta + beta_max) * 0.5f;
+    } else {
+      beta_max = beta;
+      if (sycl::isinf(beta_min))
+        beta *= 0.5f;
+      else
+        beta = (beta + beta_min) * 0.5f;
+    }
+  }
+}
+
 // Find the best Gaussian bandwidth for each row in the dataset
 template <typename value_idx, typename value_t>
 void perplexity_search(sycl::queue &q,
-                       const value_t *d_distances,
-                       value_t *d_data,
+                       const value_t *__restrict__ distances,
+                       value_t *__restrict__ P,
                        const float perplexity,
                        const int epochs,
                        const float tol,
                        const value_idx n,
-                       const int k,
+                       const int dim,
                        double &time)
 {
   const float desired_entropy = logf(perplexity);
@@ -49,53 +109,8 @@ void perplexity_search(sycl::queue &q,
   q.submit([&] (sycl::handler &cgh) {
     cgh.parallel_for<class search<value_idx, value_t>>(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-      // For every item in row
-      const int i = item.get_global_id(0);
-      if (i >= n) return;
-
-      value_t beta_min = -INFINITY, beta_max = INFINITY;
-      value_t beta = 1;
-      const int ik = i * k;
-      int step;
-
-      for (step = 0; step < epochs; step++) {
-        value_t sum = FLT_EPSILON;
-
-        // Exponentiate to get Gaussian
-        for (int j = 0; j < k; j++) {
-          d_data[ik + j] = sycl::native::exp(-d_distances[ik + j] * beta);
-          sum += d_data[ik + j];
-        }
-
-        // Normalize
-        value_t sum_dist = 0;
-        const value_t div    = sycl::native::divide(1.0f, sum);
-        for (int j = 0; j < k; j++) {
-          d_data[ik + j] *= div;
-          sum_dist += d_distances[ik + j] * d_data[ik + j];
-        }
-
-        const value_t entropy      = sycl::native::log(sum) + beta * sum_dist;
-        const value_t entropy_diff = entropy - desired_entropy;
-        if (sycl::fabs(entropy_diff) <= tol) {
-          break;
-        }
-
-        // Bisection search
-        if (entropy_diff > 0) {
-          beta_min = beta;
-          if (sycl::isinf(beta_max))
-            beta *= 2.0f;
-          else
-            beta = (beta + beta_max) * 0.5f;
-        } else {
-          beta_max = beta;
-          if (sycl::isinf(beta_min))
-            beta *= 0.5f;
-          else
-            beta = (beta + beta_min) * 0.5f;
-        }
-      }
+        sigmas_kernel(distances, P, perplexity, desired_entropy, epochs,
+                      tol, n, dim, item);
     });
   });
 
