@@ -49,7 +49,6 @@ dev_lapl_iter(float *out, const float *in, const float delta, const float norm, 
   int vm0 = ((ly+y-1)%ly)*lx + x;
   out[v00] = norm*in[v00]
     + delta*(in[v0p] + in[v0m] + in[vp0] + in[vm0]);
-  return;
 }
 
 
