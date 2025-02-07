@@ -28,6 +28,24 @@ usage(char *argv[]) {
   return;
 }
 
+/*
+ * Naive implementation of a single iteration of the lapl
+ * equation. Each thread takes one site of the output array
+ */
+void dev_lapl_iter(float *out, const float *in, const float delta, const float norm, const int lx, const int ly, sycl::nd_item<1> &item)
+{
+  int i = item.get_global_id(0);
+  int x = i % lx;
+  int y = i / lx;
+  int v00 = y*lx + x;
+  int v0p = y*lx + (x + 1)%lx;
+  int v0m = y*lx + (lx + x - 1)%lx;
+  int vp0 = ((y+1)%ly)*lx + x;
+  int vm0 = ((ly+y-1)%ly)*lx + x;
+  out[v00] = norm*in[v00]
+    + delta*(in[v0p] + in[v0m] + in[vp0] + in[vm0]);
+}
+
 int Lx, Ly;
 
 int main(int argc, char *argv[]) {
@@ -106,14 +124,12 @@ int main(int argc, char *argv[]) {
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
   
-  int lx = Lx;
-  int ly = Ly;
-  float* in = sycl::malloc_device<float>(lx*ly, q);
-  q.memcpy(in, gpu_arr, sizeof(float) * lx * ly);
+  float* in = sycl::malloc_device<float>(Lx*Ly, q);
+  q.memcpy(in, gpu_arr, sizeof(float) * Lx * Ly);
 
-  float* out = sycl::malloc_device<float>(lx*ly, q);
+  float* out = sycl::malloc_device<float>(Lx*Ly, q);
 
-  sycl::range<1> gws (ly*lx);
+  sycl::range<1> gws (Ly*Lx);
   sycl::range<1> lws (NTY*NTX);
 
   // start timer
@@ -122,17 +138,11 @@ int main(int argc, char *argv[]) {
 
   for(int i=0; i<niter; i++) {
     q.submit([&](auto &h) {
+      int lx = Lx;
+      int ly = Ly;
       h.template parallel_for<class stencil>(
         sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        int idx = item.get_global_id(0);
-        int x = idx % lx; 
-        int y = idx / lx;
-        int v00 = y*lx + x;
-        int v0p = y*lx + (x + 1)%lx;
-        int v0m = y*lx + (lx + x - 1)%lx;
-        int vp0 = ((y+1)%ly)*lx + x;
-        int vm0 = ((ly+y-1)%ly)*lx + x;
-        out[v00] = xnorm*in[v00] + xdelta*(in[v0p] + in[v0m] + in[vp0] + in[vm0]);
+          dev_lapl_iter(out, in, xdelta, xnorm, lx, ly, item);
       });
     });
     // Pointer swap
@@ -144,7 +154,7 @@ int main(int argc, char *argv[]) {
   q.wait();
   t0 = stop_watch(t0)/(double)niter;
 
-  q.memcpy(gpu_arr, in, sizeof(float) * lx * ly).wait();
+  q.memcpy(gpu_arr, in, sizeof(float) * Lx * Ly).wait();
   sycl::free(in, q);
   sycl::free(out, q);
 
