@@ -7,7 +7,8 @@ CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
 WAVEFRONT = 32
-SYCL_REDUCE = yes   # invoke sycl::reduce_over_group()
+# invoke sycl::reduce_over_group()
+SYCL_REDUCE = yes
 LAUNCHER    =
 
 GPU       = yes
