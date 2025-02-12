@@ -28,8 +28,8 @@ ifdef TIMER
 override TIMER = -DTIMER
 endif
 
-hybridsort: hybridsort.o bucketsort.o mergesort.o
-	$(CC) $(CFLAGS) -o hybridsort $(VERIFY) $(OUTPUT) $(TIMER) \
+main: hybridsort.o bucketsort.o mergesort.o
+	$(CC) $(CFLAGS) -o main $(VERIFY) $(OUTPUT) $(TIMER) \
 		hybridsort.o bucketsort.o mergesort.o $(LDFLAGS)
 
 hybridsort.o: hybridsort.cu bucketsort.h mergesort.h
@@ -46,7 +46,7 @@ mergesort.o: mergesort.cu mergesort.h kernel_mergeSortPass.h
 	$(CC) $(CFLAGS) -o mergesort.o -c mergesort.cu
 
 run: hybridsort
-	$(LAUNCHER) ./hybridsort r
+	$(LAUNCHER) ./main r
 
 clean:
-	rm -f *.o hybridsort
+	rm -f *.o main
