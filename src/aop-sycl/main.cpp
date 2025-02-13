@@ -155,7 +155,7 @@ static inline void assemble_R(int m, sycl::double4 &sums, double *smem_svds)
   x0 = x1-c1;
   x0_sq = x0*x0;
   sigma = sum2 - 2.0*c1*sum1 + (m_as_dbl-2.0)*c1*c1;
-  if( sycl::abs(sigma) < 1.0e-16 )
+  if( sycl::fabs(sigma) < 1.0e-16 )
     beta = 0.0;
   else
   {
@@ -193,7 +193,7 @@ static inline void assemble_R(int m, sycl::double4 &sums, double *smem_svds)
   
   x0 = x2_sq-c4*x2+c5;
   sigma = sum4 - 2.0*c4*sum3 + (c4*c4 + 2.0*c5)*sum2 - 2.0*c4*c5*sum1 + (m_as_dbl-3.0)*c5*c5;
-  if( sycl::abs(sigma) < 1.0e-12 )
+  if( sycl::fabs(sigma) < 1.0e-12 )
     beta = 0.0;
   else
   {
@@ -404,9 +404,9 @@ static inline void svd_3x3(int m, sycl::double4 &sums, double *smem_svds)
   
   // Invert the diagonal terms and compute V*S^-1.
   
-  double inv_S0 = sycl::abs(A00) < 1.0e-12 ? 0.0 : 1.0 / A00;
-  double inv_S1 = sycl::abs(A11) < 1.0e-12 ? 0.0 : 1.0 / A11;
-  double inv_S2 = sycl::abs(A22) < 1.0e-12 ? 0.0 : 1.0 / A22;
+  double inv_S0 = sycl::fabs(A00) < 1.0e-12 ? 0.0 : 1.0 / A00;
+  double inv_S1 = sycl::fabs(A11) < 1.0e-12 ? 0.0 : 1.0 / A11;
+  double inv_S2 = sycl::fabs(A22) < 1.0e-12 ? 0.0 : 1.0 / A22;
 
   // printf("SVD: timestep=%3d %12.8lf %12.8lf %12.8lf\n", blockIdx.x, sqrt(A00), sqrt(A11), sqrt(A22));
   
