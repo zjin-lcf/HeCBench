@@ -35,6 +35,11 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -DMAX_GPU_COUNT=$(MAX_GPU) \
           --gcc-toolchain=$(GCC_TOOLCHAIN) \
           -Wall -fsycl
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = 
 

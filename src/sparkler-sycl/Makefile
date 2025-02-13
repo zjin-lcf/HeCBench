@@ -35,6 +35,11 @@ CFLAGS := $(EXTRA_CFLAGS) -cxx=${CXX} -std=c++17 -Wall \
           --gcc-toolchain=$(GCC_TOOLCHAIN) \
           -fsycl -I${MKLROOT}/include -DMKL_ILP64 
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = -fsycl ${MKLROOT}/lib/intel64/libmkl_sycl.a \
           -fsycl-device-code-split=per_kernel \
@@ -43,6 +48,11 @@ LDFLAGS = -fsycl ${MKLROOT}/lib/intel64/libmkl_sycl.a \
           ${MKLROOT}/lib/intel64/libmkl_tbb_thread.a \
           ${MKLROOT}/lib/intel64/libmkl_core.a \
           -Wl,--end-group -ltbb -lsycl -lOpenCL -lpthread -lm -ldl 
+
+ifeq ($(VENDOR), AdaptiveCpp)
+    LDFLAGS_TMP := $(LDFLAGS)
+    LDFLAGS = $(filter-out -fsycl, $(LDFLAGS_TMP))
+endif
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \

@@ -33,6 +33,11 @@ obj = main.o kernel_gpu.o kernel_cpu.o
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../pso-cuda -fsycl \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = 
 

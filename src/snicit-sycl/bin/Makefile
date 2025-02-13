@@ -33,6 +33,11 @@ obj = beyond.o
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -lstdc++fs \
           -I../../snicit-cuda/3rd-party -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = 
 

@@ -34,6 +34,11 @@ obj = $(c_source:.c=.o) $(sycl_source:.cpp=.o)
 CFLAGS := $(EXTRA_CFLAGS) -D__CUDACC__ -DFLOAT \
           -std=c++17 -Wall -fsycl
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = 
 
