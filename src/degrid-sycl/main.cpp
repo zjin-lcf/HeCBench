@@ -10,7 +10,7 @@ void init_gcf(PRECISION2 *gcf, size_t size) {
     for (size_t sub_y=0; sub_y<GCF_GRID; sub_y++ )
       for(size_t x=0; x<size; x++)
         for(size_t y=0; y<size; y++) {
-          PRECISION tmp = sin(6.28*x/size/GCF_GRID)*exp(-(1.0*x*x+1.0*y*y*sub_y)/size/size/2);
+          PRECISION tmp = sycl::sin(6.28*x/size/GCF_GRID)*sycl::exp(-(1.0*x*x+1.0*y*y*sub_y)/size/size/2);
           gcf[size*size*(sub_x+sub_y*GCF_GRID)+x+y*size].x() = tmp*sin(1.0*x*sub_x/(y+1));
           gcf[size*size*(sub_x+sub_y*GCF_GRID)+x+y*size].y() = tmp*cos(1.0*x*sub_x/(y+1));
         }
@@ -117,8 +117,8 @@ int main(void) {
 
   bool ok = true;
   for (size_t n = 0; n < NPOINTS; n++) {
-    if (fabs(out[n].x()-out_cpu[n].x()) > EPS ||
-        fabs(out[n].y()-out_cpu[n].y()) > EPS ) {
+    if (sycl::fabs(out[n].x()-out_cpu[n].x()) > EPS ||
+        sycl::fabs(out[n].y()-out_cpu[n].y()) > EPS ) {
       ok = false;
       std::cout << n << ": F(" << in[n].x() << ", " << in[n].y() << ") = " 
         << out[n].x() << ", " << out[n].y() 
