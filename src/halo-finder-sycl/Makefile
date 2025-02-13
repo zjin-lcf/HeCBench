@@ -30,6 +30,11 @@ OPT=-O3 -DRCB_UNTHREADED_BUILD -DUSE_SERIAL_COSMO
 #SYCL_FLAGS=-use_fast_math -DINLINE_FORCE -I${MPI_INCLUDE}
 SYCL_FLAGS=-fsycl -I${MPI_INCLUDE} --gcc-toolchain=$(GCC_TOOLCHAIN)
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    SYCL_FLAGS_TMP := $(SYCL_FLAGS)
+    SYCL_FLAGS = $(filter-out -fsycl, $(SYCL_FLAGS_TMP))
+endif
+
 HACC_PLATFORM=sycl
 HACC_OBJDIR=${HACC_PLATFORM}
 
@@ -50,6 +55,11 @@ HACC_MPI_CXX=${CXX_COMPILER}
 HACC_MPI_LD=${CXX_COMPILER}
 
 HACC_MPI_LDFLAGS=-fsycl -lm -lrt
+
+ifeq ($(VENDOR), AdaptiveCpp)
+    HACC_MPI_LDFLAGS_TMP := $(HACC_MPI_LDFLAGS)
+    HACC_MPI_LDFLAGS = $(filter-out -fsycl, $(HACC_MPI_LDFLAGS_TMP))
+endif
 
 OBJDIR = ${HACC_OBJDIR}
 #SOBJDIR = ${HACC_OBJDIR}_serial

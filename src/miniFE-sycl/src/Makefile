@@ -26,6 +26,11 @@ LAUNCHER       =
 CPPFLAGS = -I. -I../utils -I../fem $(MINIFE_TYPES) $(MINIFE_MATRIX_TYPE) \
            -std=c++17 -Wall -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CPPFLAGS_TMP := $(CPPFLAGS)
+    CPPFLAGS = $(filter-out -fsycl, $(CPPFLAGS_TMP))
+endif
+
 ifeq ($(CUDA), yes)
   CPPFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
               -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)

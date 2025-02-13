@@ -37,6 +37,11 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall \
           -Isrc -I$(OPENMP_INCLUDE) \
           -fopenmp -fsycl
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = -L$(OPENMP_LIB) -lomp
 
