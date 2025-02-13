@@ -145,7 +145,7 @@ int main () {
         // so that all threads participate
         auto sg = item.get_sub_group();
         for (int offset = 8; offset > 0; offset /= 2) {
-          err += sg.shuffle_down(err, offset);
+          err += sycl::shift_group_left(sg, err,offset);
         }
 
         // If we're thread 0 in the warp, update our value to shared memory
@@ -164,7 +164,7 @@ int main () {
         if (ty == 0) {
           err = reduction_array[tx];
           for (int offset = 8; offset > 0; offset /= 2) {
-            err += sg.shuffle_down(err, offset);
+            err += sycl::shift_group_left(sg, err,offset);
           }
           if (tx == 0) {
             auto ao = sycl::atomic_ref<float,
