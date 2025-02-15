@@ -19,16 +19,10 @@
 
 #define BLOCK_X 32
 #define BLOCK_Y 8
-
 #define IOFF  1
 #define JOFF (BLOCK_X+2)
 #define KOFF (BLOCK_X+2)*(BLOCK_Y+2)
-
-// definition to use efficient __mul24 intrinsic
-
 #define INDEX(i,j,j_off)  (i + sycl::mul24(j,j_off))
-
-#define syncthreads() item.barrier(sycl::access::fence_space::local_space)
 
 // device code
 
@@ -123,7 +117,7 @@ void laplace3d(
         u1[ind_h+KOFF] = d_u1[indg_h];
     }
 
-    syncthreads();
+    item.barrier(sycl::access::fence_space::local_space);
 
   //
   // perform Jacobi iteration to set values in u2
@@ -141,7 +135,7 @@ void laplace3d(
       d_u2[indg0] = u2;
     }
 
-    syncthreads();
+    item.barrier(sycl::access::fence_space::local_space);
 
   }
 }

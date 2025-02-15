@@ -19,11 +19,9 @@
 
 #define BLOCK_X 32
 #define BLOCK_Y 8
-
 #define IOFF  1
 #define JOFF (BLOCK_X+2)
 #define KOFF (BLOCK_X+2)*(BLOCK_Y+2)
-
 #define INDEX(i,j,j_off)  (i + (j) * (j_off))
 
 // device code
