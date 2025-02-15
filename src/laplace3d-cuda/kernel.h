@@ -19,12 +19,10 @@
 
 #define BLOCK_X 32
 #define BLOCK_Y 8
-
-
-// definition to use efficient __mul24 intrinsic
-
+#define IOFF  1
+#define JOFF (BLOCK_X+2)
+#define KOFF (BLOCK_X+2)*(BLOCK_Y+2)
 #define INDEX(i,j,j_off)  (i +__mul24(j,j_off))
-
 
 // device code
 
@@ -44,22 +42,23 @@ __global__ void laplace3d(int NX, int NY, int NZ, int pitch,
   // define local array offsets
   //
 
-#define IOFF  1
-#define JOFF (BLOCK_X+2)
-#define KOFF (BLOCK_X+2)*(BLOCK_Y+2)
   __shared__ float u1[3*KOFF];
 
   //
   // first set up indices for halos
   //
+  const int threadIdx_x = threadIdx.x;
+  const int threadIdx_y = threadIdx.y;
+  const int blockIdx_x = blockIdx.x;
+  const int blockIdx_y = blockIdx.y;
 
-  k    = threadIdx.x + threadIdx.y*BLOCK_X;
+  k    = threadIdx_x + threadIdx_y*BLOCK_X;
   halo = k < 2*(BLOCK_X+BLOCK_Y+2);
 
   if (halo) {
-    if (threadIdx.y<2) {               // y-halos (coalesced)
-      i = threadIdx.x;
-      j = threadIdx.y*(BLOCK_Y+1) - 1;
+    if (threadIdx_y<2) {               // y-halos (coalesced)
+      i = threadIdx_x;
+      j = threadIdx_y*(BLOCK_Y+1) - 1;
     }
     else {                             // x-halos (not coalesced)
       i = (k%2)*(BLOCK_X+1) - 1;
@@ -68,8 +67,8 @@ __global__ void laplace3d(int NX, int NY, int NZ, int pitch,
 
     ind_h  = INDEX(i+1,j+1,JOFF) + KOFF;
 
-    i      = INDEX(i,blockIdx.x,BLOCK_X);   // global indices
-    j      = INDEX(j,blockIdx.y,BLOCK_Y);
+    i      = INDEX(i,blockIdx_x,BLOCK_X);   // global indices
+    j      = INDEX(j,blockIdx_y,BLOCK_Y);
     indg_h = INDEX(i,j,pitch);
 
     halo   =  (i>=0) && (i<NX) && (j>=0) && (j<NY);
@@ -79,12 +78,12 @@ __global__ void laplace3d(int NX, int NY, int NZ, int pitch,
   // then set up indices for main block
   //
 
-  i    = threadIdx.x;
-  j    = threadIdx.y;
+  i    = threadIdx_x;
+  j    = threadIdx_y;
   ind  = INDEX(i+1,j+1,JOFF) + KOFF;
 
-  i    = INDEX(i,blockIdx.x,BLOCK_X);     // global indices
-  j    = INDEX(j,blockIdx.y,BLOCK_Y);
+  i    = INDEX(i,blockIdx_x,BLOCK_X);     // global indices
+  j    = INDEX(j,blockIdx_y,BLOCK_Y);
   indg = INDEX(i,j,pitch);
 
   active = (i<NX) && (j<NY);
