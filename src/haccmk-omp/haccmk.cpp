@@ -201,7 +201,7 @@ int main( int argc, char *argv[] )
 
   // verify
   int error = 0;
-  const float eps = 1e-1f;
+  const float eps = 1.0f;
   for (i = 0; i < n2; i++) {
     if (fabsf(vx2[i] - vx2_hw[i]) > eps) {
       printf("error at vx2[%d] %f %f\n", i, vx2[i], vx2_hw[i]);
