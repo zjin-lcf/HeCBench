@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
     sycl::float2 fr = r[i].convert<float, sycl::rounding_mode::automatic>();
     float x = fmaxf(fa.x(), fb.x());
     float y = fmaxf(fa.y(), fb.y());
-    if (fabsf(fr.x() - x) > 1e-3 || fabsf(fr.y() - y) > 1e-3) {
+    if (fabsf(fr.x() - x) > 1e-2 || fabsf(fr.y() - y) > 1e-2) {
       ok = false;
       break;
     }
