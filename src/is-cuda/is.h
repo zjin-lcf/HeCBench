@@ -2,7 +2,7 @@
 /* default values */
 /******************/
 #ifndef CLASS
-#define CLASS 'C'
+#define CLASS 'S'
 #endif
 
 /*************/
