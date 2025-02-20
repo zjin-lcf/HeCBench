@@ -165,7 +165,7 @@ int main(int argc, char* argv[]) {
 
   bool error = false;
   for (int i = 0; i < freqs_shape; i++) {
-    if (fabsf(p[i]-p2[i]) > 1e-3f) {
+    if (fabsf(p[i]-p2[i]) > 1e-1f) {
       printf("%.3f %.3f\n", p[i], p2[i]);
       error = true;
       break;

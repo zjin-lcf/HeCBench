@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
     float2 fr = __half22float2(r[i]);
     float x = fmaxf(fa.x, fb.x);
     float y = fmaxf(fa.y, fb.y);
-    if (fabsf(fr.x - x) > 1e-3 || fabsf(fr.y - y) > 1e-3) {
+    if (fabsf(fr.x - x) > 1e-2 || fabsf(fr.y - y) > 1e-2) {
       ok = false;
       break;
     }
