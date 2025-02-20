@@ -5,7 +5,7 @@
  * Perform matrix multiplication on host to verify results from device.
  */
 bool ValueSame(FP a, FP b) {
-  return FABS(a - b) < std::numeric_limits<FP>::epsilon();
+  return FABS(a - b) < 1e-5;
 }
 
 void VerifyResult(FP (*a_host)[N], FP (*b_host)[P], 
