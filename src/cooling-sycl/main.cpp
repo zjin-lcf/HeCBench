@@ -28,14 +28,14 @@ Real primordial_cool(Real n, Real T, int heat_flag)
   // calculate the recombination and collisional ionization rates
   // (Table 2 from Katz 1996)
   alpha_hp = (8.4e-11) * (1.0 / sycl::sqrt(T)) *
-             sycl::pow<double>((T / 1e3), (-0.2)) *
-             (1.0 / (1.0 + sycl::pow<double>((T / 1e6), (0.7))));
-  alpha_hep = (1.5e-10) * (sycl::pow<double>(T, (-0.6353)));
-  alpha_d = (1.9e-3) * (sycl::pow<double>(T, (-1.5))) *
+             sycl::pow((T / 1e3), (-0.2)) *
+             (1.0 / (1.0 + sycl::pow((T / 1e6), (0.7))));
+  alpha_hep = (1.5e-10) * (sycl::pow(T, (-0.6353)));
+  alpha_d = (1.9e-3) * (sycl::pow(T, (-1.5))) *
             sycl::exp(-470000.0 / T) * (1.0 + 0.3 * sycl::exp(-94000.0 / T));
   alpha_hepp = (3.36e-10) * (1.0 / sycl::sqrt(T)) *
-               sycl::pow<double>((T / 1e3), (-0.2)) *
-               (1.0 / (1.0 + sycl::pow<double>((T / 1e6), (0.7))));
+               sycl::pow((T / 1e3), (-0.2)) *
+               (1.0 / (1.0 + sycl::pow((T / 1e6), (0.7))));
   gamma_eh0 = (5.85e-11) * sycl::sqrt(T) * sycl::exp(-157809.1 / T) *
               (1.0 / (1.0 + sycl::sqrt(T / 1e5)));
   gamma_ehe0 = (2.38e-11) * sycl::sqrt(T) * sycl::exp(-285335.4 / T) *
@@ -84,7 +84,7 @@ Real primordial_cool(Real n, Real T, int heat_flag)
   // various processes (Table 1 from Katz 1996)
   le_h0 = (7.50e-19) * sycl::exp(-118348.0 / T) *
           (1.0 / (1.0 + sycl::sqrt(T / 1e5))) * n_e * n_h0;
-  le_hep = (5.54e-17) * sycl::pow<double>(T, (-0.397)) *
+  le_hep = (5.54e-17) * sycl::pow(T, (-0.397)) *
            sycl::exp(-473638.0 / T) * (1.0 / (1.0 + sycl::sqrt(T / 1e5))) *
            n_e * n_hep;
   li_h0 = (1.27e-21) * sycl::sqrt(T) * sycl::exp(-157809.1 / T) *
@@ -93,12 +93,12 @@ Real primordial_cool(Real n, Real T, int heat_flag)
            (1.0 / (1.0 + sycl::sqrt(T / 1e5))) * n_e * n_he0;
   li_hep = (4.95e-22) * sycl::sqrt(T) * sycl::exp(-631515.0 / T) *
            (1.0 / (1.0 + sycl::sqrt(T / 1e5))) * n_e * n_hep;
-  lr_hp = (8.70e-27) * sycl::sqrt(T) * sycl::pow<double>((T / 1e3), (-0.2)) *
-          (1.0 / (1.0 + sycl::pow<double>((T / 1e6), (0.7)))) * n_e * n_hp;
-  lr_hep = (1.55e-26) * sycl::pow<double>(T, (0.3647)) * n_e * n_hep;
-  lr_hepp = (3.48e-26) * sycl::sqrt(T) * sycl::pow<double>((T / 1e3), (-0.2)) *
-            (1.0 / (1.0 + sycl::pow<double>((T / 1e6), (0.7)))) * n_e * n_hepp;
-  ld_hep = (1.24e-13) * sycl::pow<double>(T, (-1.5)) *
+  lr_hp = (8.70e-27) * sycl::sqrt(T) * sycl::pow((T / 1e3), (-0.2)) *
+          (1.0 / (1.0 + sycl::pow((T / 1e6), (0.7)))) * n_e * n_hp;
+  lr_hep = (1.55e-26) * sycl::pow(T, (0.3647)) * n_e * n_hep;
+  lr_hepp = (3.48e-26) * sycl::sqrt(T) * sycl::pow((T / 1e3), (-0.2)) *
+            (1.0 / (1.0 + sycl::pow((T / 1e6), (0.7)))) * n_e * n_hepp;
+  ld_hep = (1.24e-13) * sycl::pow(T, (-1.5)) *
            sycl::exp(-470000.0 / T) * (1.0 + 0.3 * sycl::exp(-94000.0 / T)) *
            n_e * n_hep;
   g_ff = 1.1 + 0.34 * sycl::exp(-(5.5 - sycl::log(T)) * (5.5 - sycl::log(T)) /
