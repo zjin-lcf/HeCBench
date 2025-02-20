@@ -33,6 +33,11 @@ obj = kernel.o fim.o timer.o main.o StructuredEikonal.o
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../eikonal-cuda -fsycl \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = 
 

@@ -38,6 +38,11 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../pcc-cuda \
           --gcc-toolchain=$(GCC_TOOLCHAIN) \
           -fno-sycl-id-queries-fit-in-int
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 ifeq ($(CUDA), yes)
   ONEMKL = yes
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \

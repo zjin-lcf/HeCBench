@@ -34,6 +34,11 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../lzss-cuda  -fsycl \
           -I ./oneDPL/include -I ./oneTBB/include \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = 
 

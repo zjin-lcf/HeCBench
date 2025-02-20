@@ -35,6 +35,11 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -fsycl \
           -DWARP_PER_BLOCK=8 \
           -DVALUE_TYPE=double -DBENCH_REPEAT=100 
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = 
 

@@ -37,6 +37,11 @@ obj = $(source:.cpp=.o)
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../blas-gemmEx-cuda \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 ifeq ($(CUDA), yes)
   ONEDNN = yes
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
