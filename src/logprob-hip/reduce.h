@@ -1,4 +1,3 @@
-static const float HALF_FLT_MAX = 65504.F;
 
 template<typename T>
 __inline__ __device__ T warpReduceSum(T val)
