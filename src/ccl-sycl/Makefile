@@ -29,6 +29,11 @@ obj = $(source:.cpp=.o)
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -fsycl -std=c++17 -I$(MPI_ROOT)/include -Wall
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lccl
 

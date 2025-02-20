@@ -30,6 +30,11 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -fsycl -Wall \
           -I. -I./util/num -I./util/timer -I./kernel \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
+ifeq ($(VENDOR), AdaptiveCpp)
+    CFLAGS_TMP := $(CFLAGS)
+    CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+endif
+
 # Linker Flags
 LDFLAGS = 
 
