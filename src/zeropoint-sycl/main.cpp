@@ -27,7 +27,7 @@ void zero_point (
       int symmetric_qmin = -((qmax - qmin) / 2 + 1);
       int symmetric_qmax = (qmax - qmin) / 2;
       double max_scale = sycl::fmax(
-          sycl::fabs(min_val / symmetric_qmin), sycl::fabs(max_val / symmetric_qmax));
+          sycl::fabs(min_val / static_cast<double>(symmetric_qmin)), sycl::fabs(max_val / static_cast<double>(symmetric_qmin)));
       min_val = max_scale * symmetric_qmin;
       max_val = max_scale * symmetric_qmax;
     }
@@ -47,8 +47,8 @@ void zero_point (
 
     double zero_point_from_min = qmin - min_val / static_cast<double>(scale[i]);
     double zero_point_from_max = qmax - max_val / static_cast<double>(scale[i]);
-    double zero_point_from_min_error = sycl::abs(qmin) + sycl::abs(min_val / static_cast<double>(scale[i]));
-    double zero_point_from_max_error = sycl::abs(qmax) + sycl::abs(max_val / static_cast<double>(scale[i]));
+    double zero_point_from_min_error = sycl::abs(qmin) + sycl::fabs(min_val / static_cast<double>(scale[i]));
+    double zero_point_from_max_error = sycl::abs(qmax) + sycl::fabs(max_val / static_cast<double>(scale[i]));
     double initial_zero_point = zero_point_from_min_error < zero_point_from_max_error
                                 ? zero_point_from_min
                                 : zero_point_from_max;
