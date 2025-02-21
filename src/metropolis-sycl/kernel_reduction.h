@@ -28,7 +28,7 @@ inline float warp_reduce(T val, sycl::nd_item<3> &item)
 {
   auto sg = item.get_sub_group();
   for (int offset = WARPSIZE >> 1; offset > 0; offset >>= 1)
-    val += sg.shuffle_down(val, offset);
+    val += sycl::shift_group_left(sg, val, offset);
   return val;
 }
 

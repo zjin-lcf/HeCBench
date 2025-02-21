@@ -40,7 +40,7 @@ float ReduceSum(sycl::nd_item<1> &item,
   //val = warp_reduce_sum(val);
   #pragma unroll
   for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
-    val += sg.shuffle_down(val, offset);
+    val += sycl::shift_group_left(sg, val, offset);
   }
 
   // write out the partial reduction to shared memory if appropiate
@@ -60,7 +60,7 @@ float ReduceSum(sycl::nd_item<1> &item,
     // val = warp_reduce_sum(val);
     #pragma unroll
     for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
-      val += sg.shuffle_down(val, offset);
+      val += sycl::shift_group_left(sg, val, offset);
     }
     // broadcast back to shared memory
     if (threadIdx_x == 0) {
