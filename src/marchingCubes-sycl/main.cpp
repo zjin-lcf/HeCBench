@@ -95,8 +95,8 @@ void computeMinMaxLv1(float*__restrict minMax, float *__restrict sminMax, sycl::
   for (int c0(16); c0 > 0; c0 /= 2)
   {
     float t0, t1;
-    t0 = sg.shuffle_down(minV, c0);
-    t1 = sg.shuffle_down(maxV, c0);
+    t0 = sycl::shift_group_left(sg, minV, c0);
+    t1 = sycl::shift_group_left(sg, maxV, c0);
     if (t0 < minV)minV = t0;
     if (t1 > maxV)maxV = t1;
   }
@@ -114,8 +114,8 @@ void computeMinMaxLv1(float*__restrict minMax, float *__restrict sminMax, sycl::
     for (int c0(warpNum / 2); c0 > 0; c0 /= 2)
     {
       float t0, t1;
-      t0 = sg.shuffle_down(minV, c0);
-      t1 = sg.shuffle_down(maxV, c0);
+      t0 = sycl::shift_group_left(sg, minV, c0);
+      t1 = sycl::shift_group_left(sg, maxV, c0);
       if (t0 < minV)minV = t0;
       if (t1 > maxV)maxV = t1;
     }
@@ -148,7 +148,7 @@ void compactLv1(
 #pragma unroll
   for (int c0(1); c0 < 32; c0 *= 2)
   {
-    unsigned int tp(sg.shuffle_up(testSum, c0));
+    unsigned int tp(sycl::shift_group_right(sg, testSum, c0));
     if (laneid >= c0) testSum += tp;
   }
   if (laneid == 31)sums[warpid] = testSum;
@@ -159,7 +159,7 @@ void compactLv1(
 #pragma unroll
     for (int c0(1); c0 < warpNum; c0 *= 2)
     {
-      unsigned int tp(sg.shuffle_up(warpSum, c0));
+      unsigned int tp(sycl::shift_group_right(sg, warpSum, c0));
       if (laneid >= c0) warpSum += tp;
     }
     sums[laneid] = warpSum;
@@ -205,8 +205,8 @@ void computeMinMaxLv2(
     for (int c1(8); c1 > 0; c1 /= 2)
     {
       float t0, t1;
-      t0 = sg.shuffle_down(minV, c1);
-      t1 = sg.shuffle_down(maxV, c1);
+      t0 = sycl::shift_group_left(sg, minV, c1);
+      t1 = sycl::shift_group_left(sg, maxV, c1);
       if (t0 < minV)minV = t0;
       if (t1 > maxV)maxV = t1;
     }
@@ -252,7 +252,7 @@ void compactLv2(
 #pragma unroll
   for (int c0(1); c0 < 32; c0 *= 2)
   {
-    unsigned int tp(sg.shuffle_up(testSum, c0));
+    unsigned int tp(sycl::shift_group_right(sg, testSum, c0));
     if (laneid >= c0) testSum += tp;
   }
   if (laneid == 31) sums[warpid] = testSum;
@@ -263,7 +263,7 @@ void compactLv2(
 #pragma unroll
     for (int c0(1); c0 < warpNum; c0 *= 2)
     {
-      unsigned int tp(sg.shuffle_up(warpSum, c0));
+      unsigned int tp(sycl::shift_group_right(sg, warpSum, c0));
       if (laneid >= c0)warpSum += tp;
     }
     sums[laneid] = warpSum;
@@ -491,8 +491,8 @@ int main(int argc, char* argv[])
         #pragma unroll
         for (int c0(1); c0 < 32; c0 *= 2)
         {
-          unsigned int tp0(sg.shuffle_up(sumVertices, c0));
-          unsigned int tp1(sg.shuffle_up(sumTriangles, c0));
+          unsigned int tp0(sycl::shift_group_right(sg, sumVertices, c0));
+          unsigned int tp1(sycl::shift_group_right(sg, sumTriangles, c0));
           if (laneid >= c0)
           {
             sumVertices += tp0;
@@ -512,8 +512,8 @@ int main(int argc, char* argv[])
           #pragma unroll
           for (int c0(1); c0 < warpNum; c0 *= 2)
           {
-            unsigned int tp0(sg.shuffle_up(warpSumVertices, c0));
-            unsigned int tp1(sg.shuffle_up(warpSumTriangles, c0));
+            unsigned int tp0(sycl::shift_group_right(sg, warpSumVertices, c0));
+            unsigned int tp1(sycl::shift_group_right(sg, warpSumTriangles, c0));
             if (laneid >= c0)
             {
               warpSumVertices += tp0;

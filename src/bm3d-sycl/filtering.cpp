@@ -14,7 +14,7 @@ inline T warpReduceSum(sycl::nd_item<2> &item, T val)
 {
   auto sg = item.get_sub_group();
   for (int offset = warpSize/2; offset > 0; offset /= 2)
-    val += sg.shuffle_down(val, offset);
+    val += sycl::shift_group_left(sg, val, offset);
   return val;
 }
 
