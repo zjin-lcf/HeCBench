@@ -44,9 +44,10 @@ degrid_kernel(CmplxType *out,
           sum.y() += r1*i2 + r2*i1;
         }
 
+      auto sg = item.get_sub_group();
       for(int s = blockDim_x < 16 ? blockDim_x : 16; s>0;s/=2) {
-        sum.x() += item.get_sub_group().shuffle_down(sum.x(),s);
-        sum.y() += item.get_sub_group().shuffle_down(sum.y(),s);
+        sum.x() += sycl::shift_group_left(sg, sum.x(),s);
+        sum.y() += sycl::shift_group_left(sg, sum.y(),s);
       }
       if (threadIdx_x == 0) {
         out[n+q] = sum;
