@@ -9,7 +9,7 @@
 
 #include <mpi.h>
 #include <hip/hip_runtime.h>
-#include <hipblas.h>
+#include <hipblas/hipblas.h>
 
 //=============================================================================
 

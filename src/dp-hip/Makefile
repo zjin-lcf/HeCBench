@@ -25,6 +25,7 @@ obj = $(source:.cu=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall \
+          -I/opt/rocm/include/hipblas \
           --hipstdpar --hipstdpar-path=/opt/rocm/include/thrust/system/hip/hipstdpar \
           --offload-arch=$(HIP_ARCH)
 

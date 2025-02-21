@@ -23,7 +23,8 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -fopenmp -std=c++14 -Wall -I../spaxpby-cuda -I/opt/rocm/include/hipsparse
+CFLAGS := $(EXTRA_CFLAGS) -fopenmp -std=c++14 -Wall -I../spaxpby-cuda \
+          -I/opt/rocm/include/hipsparse
 
 # Linker Flags
 LDFLAGS = -lhipsparse

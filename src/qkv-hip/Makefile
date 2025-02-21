@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -fopenmp -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -fopenmp -Wall -I/opt/rocm/include/hipblas
 
 # Linker Flags
 LDFLAGS = -lhipblas -lhipblaslt
