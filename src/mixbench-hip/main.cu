@@ -63,14 +63,14 @@ void mixbenchGPU(long size, int repeat) {
 
   // warmup
   for (int i = 0; i < repeat; i++) {
-    hipLaunchKernelGGL(benchmark_func, grid_dim, block_dim, 0, 0, d_cd, i);
+    benchmark_func<<<grid_dim, block_dim>>>(d_cd, i);
   }
 
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    hipLaunchKernelGGL(benchmark_func, grid_dim, block_dim, 0, 0, d_cd, i);
+    benchmark_func<<<grid_dim, block_dim>>>(d_cd, i);
   }
 
   hipDeviceSynchronize();
