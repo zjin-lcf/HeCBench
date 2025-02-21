@@ -241,14 +241,14 @@ double gpu_BiCGStab(
                                            &one, matM_lower, d_P.vec, d_tmp.vec,
                                            HIP_R_64F,
                                            HIPSPARSE_SPSV_ALG_DEFAULT,
-                                           spsvDescrL, d_bufferL) )
+                                           spsvDescrL) )
         //    (b) M_U^-1 tmp => P_aux    (triangular solver)
         CHECK_HIPSPARSE( hipsparseSpSV_solve(hipsparseHandle,
                                            HIPSPARSE_OPERATION_NON_TRANSPOSE,
                                            &one, matM_upper, d_tmp.vec,
                                            d_P_aux.vec, HIP_R_64F,
                                            HIPSPARSE_SPSV_ALG_DEFAULT,
-                                           spsvDescrU, d_bufferU) )
+                                           spsvDescrU) )
         //----------------------------------------------------------------------
         // ### 10 ### alpha = (R'0, R_i-1) / (R'0, A * P_aux)
         //    (a) V = A * P_aux
@@ -294,14 +294,14 @@ double gpu_BiCGStab(
                                            &one, matM_lower, d_S.vec, d_tmp.vec,
                                            HIP_R_64F,
                                            HIPSPARSE_SPSV_ALG_DEFAULT,
-                                           spsvDescrL, d_bufferL) )
+                                           spsvDescrL) )
         //    (b) M_U^-1 tmp => S_aux    (triangular solver)
         CHECK_HIPSPARSE( hipsparseSpSV_solve(hipsparseHandle,
                                            HIPSPARSE_OPERATION_NON_TRANSPOSE,
                                            &one, matM_upper, d_tmp.vec,
                                            d_S_aux.vec, HIP_R_64F,
                                            HIPSPARSE_SPSV_ALG_DEFAULT,
-                                           spsvDescrU, d_bufferU) )
+                                           spsvDescrU) )
         //----------------------------------------------------------------------
         // ### 15 ### omega = (A * S_aux, s) / (A * S_aux, A * S_aux)
         //    (a) T = A * S_aux
