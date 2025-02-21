@@ -1,6 +1,6 @@
+#include <cmath>
+#include <cstdlib>
 #include <iostream>
-#include <math.h>
-#include <stdlib.h>
 #include <cuda.h>
 #include "degrid.h"
 
@@ -12,9 +12,9 @@ void init_gcf(PRECISION2 *gcf, size_t size) {
     for (size_t sub_y=0; sub_y<GCF_GRID; sub_y++ )
       for(size_t x=0; x<size; x++)
         for(size_t y=0; y<size; y++) {
-          PRECISION tmp = sin(6.28*x/size/GCF_GRID)*exp(-(1.0*x*x+1.0*y*y*sub_y)/size/size/2);
-          gcf[size*size*(sub_x+sub_y*GCF_GRID)+x+y*size].x = tmp*sin(1.0*x*sub_x/(y+1));
-          gcf[size*size*(sub_x+sub_y*GCF_GRID)+x+y*size].y = tmp*cos(1.0*x*sub_x/(y+1));
+          PRECISION tmp = std::sin(6.28*x/size/GCF_GRID)*exp(-(1.0*x*x+1.0*y*y*sub_y)/size/size/2);
+          gcf[size*size*(sub_x+sub_y*GCF_GRID)+x+y*size].x = tmp*std::sin(1.0*x*sub_x/(y+1));
+          gcf[size*size*(sub_x+sub_y*GCF_GRID)+x+y*size].y = tmp*std::cos(1.0*x*sub_x/(y+1));
         }
 
 }
@@ -29,10 +29,10 @@ void degridCPU(PRECISION2 *out, PRECISION2 *in, PRECISION2 *img, PRECISION2 *gcf
   //offset gcf to point to the middle for cleaner code later
   gcf += GCF_DIM*(GCF_DIM+1)/2;
   for(size_t n=0; n<NPOINTS; n++) {
-    int sub_x = floorf(GCF_GRID*(in[n].x-floorf(in[n].x)));
-    int sub_y = floorf(GCF_GRID*(in[n].y-floorf(in[n].y)));
-    int main_x = floor(in[n].x); 
-    int main_y = floor(in[n].y); 
+    int sub_x = std::floor(GCF_GRID*(in[n].x-std::floor(in[n].x)));
+    int sub_y = std::floor(GCF_GRID*(in[n].y-std::floor(in[n].y)));
+    int main_x = std::floor(in[n].x);
+    int main_y = std::floor(in[n].y);
     PRECISION sum_r = 0.0;
     PRECISION sum_i = 0.0;
     for (int a=-GCF_DIM/2; a<GCF_DIM/2 ;a++)
@@ -119,8 +119,8 @@ int main(void) {
 
   bool ok = true;
   for (size_t n = 0; n < NPOINTS; n++) {
-    if (fabs(out[n].x-out_cpu[n].x) > EPS ||
-        fabs(out[n].y-out_cpu[n].y) > EPS ) {
+    if (std::fabs(out[n].x-out_cpu[n].x) > EPS ||
+        std::fabs(out[n].y-out_cpu[n].y) > EPS ) {
       ok = false;
       std::cout << n << ": F(" << in[n].x << ", " << in[n].y << ") = " 
         << out[n].x << ", " << out[n].y 
@@ -130,10 +130,7 @@ int main(void) {
     }
   }
 
-  if (ok)
-    std::cout << "PASS\n";
-  else
-    std::cout << "FAIL\n";
+  std::cout << (ok ? "PASS" : "FAIL") << std::endl;
 
   img -= GCF_DIM + IMG_SIZE*GCF_DIM;
 
