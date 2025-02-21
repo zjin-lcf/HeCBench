@@ -129,8 +129,8 @@ static __attribute__((always_inline))
            * but it is unlikely to make a big difference and thus was not evaluated.
            */
           auto sg = itemIdx.get_sub_group();
-          fShiftBuf += sg.shuffle_down(fShiftBuf, 1);
-          fShiftBuf += sg.shuffle_down(fShiftBuf, 2);
+          fShiftBuf += sycl::shift_group_left(sg,fShiftBuf, 1);
+          fShiftBuf += sycl::shift_group_left(sg,fShiftBuf, 2);
           if (tidxi == 0)
           {
             atomicAdd(a_fShift[shift][tidxj], fShiftBuf);
@@ -153,16 +153,16 @@ static __attribute__((always_inline)) void reduceForceJShuffle(Float3           
   static_assert(c_clSize == 8 || c_clSize == 4);
   auto sg = itemIdx.get_sub_group();
 
-  f[0] += sg.shuffle_down(f[0], 1);
-  f[1] += sg.shuffle_up(f[1], 1);
-  f[2] += sg.shuffle_down(f[2], 1);
+  f[0] += sycl::shift_group_left(sg,f[0], 1);
+  f[1] += sycl::shift_group_right(sg,f[1], 1);
+  f[2] += sycl::shift_group_left(sg,f[2], 1);
   if (tidxi & 1)
   {
     f[0] = f[1];
   }
 
-  f[0] += sg.shuffle_down(f[0], 2);
-  f[2] += sg.shuffle_up(f[2], 2);
+  f[0] += sycl::shift_group_left(sg,f[0], 2);
+  f[2] += sycl::shift_group_right(sg,f[2], 2);
   if (tidxi & 2)
   {
     f[0] = f[2];
@@ -170,7 +170,7 @@ static __attribute__((always_inline)) void reduceForceJShuffle(Float3           
 
   if constexpr (c_clSize == 8)
   {
-    f[0] += sg.shuffle_down(f[0], 4);
+    f[0] += sycl::shift_group_left(sg,f[0], 4);
   }
 
   if (tidxi < 3)
