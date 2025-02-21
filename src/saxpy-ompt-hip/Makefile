@@ -25,10 +25,11 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -Wall -D__HIP_PLATFORM_AMD__ -I/opt/rocm/hipblas/include
+CFLAGS := $(EXTRA_CFLAGS) -Wall -D__HIP_PLATFORM_AMD__ \
+          -I/opt/rocm/include -I/opt/rocm/hipblas/include
 
 # Linker Flags
-LDFLAGS = -L/opt/rocm/hipblas/lib -lhipblas -lamdhip64
+LDFLAGS = -L/opt/rocm/hipblas/lib -lhipblas -L/opt/rocm/lib -lamdhip64
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
