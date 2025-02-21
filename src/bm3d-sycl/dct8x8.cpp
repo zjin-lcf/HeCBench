@@ -253,7 +253,8 @@ void run_DCT2D8x8(
       lmem(sycl::range<1>(KER2_BLOCK_HEIGHT * KER2_SMEMBLOCK_STRIDE), cgh);
     cgh.parallel_for<class dct>(
       sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-      DCT2D8x8(item, lmem.get_pointer(), transformed_stacks, gathered_stacks, size);
+      DCT2D8x8(item, lmem.get_multi_ptr<sycl::access::decorated::no>().get(),
+               transformed_stacks, gathered_stacks, size);
     });
   });
 }
@@ -271,7 +272,8 @@ void run_IDCT2D8x8(
       lmem(sycl::range<1>(KER2_BLOCK_HEIGHT * KER2_SMEMBLOCK_STRIDE), cgh);
     cgh.parallel_for<class idct>(
       sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-      IDCT2D8x8 (item, lmem.get_pointer(), gathered_stacks, transformed_stacks, size);
+      IDCT2D8x8(item, lmem.get_multi_ptr<sycl::access::decorated::no>().get(),
+                gathered_stacks, transformed_stacks, size);
     });
   });
 }

@@ -116,7 +116,7 @@ Division: One block handles one patch_stack, threads match to the pixels of a pa
 void get_block(
     sycl::nd_item<2> &item,
     const sycl::uint2 start_point,         //IN: first reference patch of a batch
-    const sycl::uchar* __restrict image,        //IN: image
+    const unsigned char* __restrict image,        //IN: image
     const ushort* __restrict stacks,        //IN: array of adresses of similar patches
     const uint* __restrict g_num_patches_in_stack,    //IN: numbers of patches in 3D groups
     float* patch_stack,          //OUT: assembled 3D groups
@@ -315,7 +315,7 @@ void aggregate_final(
   const float* __restrict numerator,  //IN: numerator aggregation buffer
   const float* __restrict denominator,  //IN: denominator aggregation buffer
   const sycl::uint2 image_dim,      //IN: image dimensions
-  sycl::uchar*__restrict result)        //OUT: image estimate
+  unsigned char*__restrict result)        //OUT: image estimate
 {
   uint idx = item.get_global_id(1);
   uint idy = item.get_global_id(0);
@@ -325,14 +325,14 @@ void aggregate_final(
                          denominator[ idx2(idx,idy,image_dim.x()) ]);
   if (value < 0) value = 0;
   if (value > 255) value = 255;
-  result[ idx2(idx,idy,image_dim.x()) ] = (sycl::uchar)value;
+  result[ idx2(idx,idy,image_dim.x()) ] = (unsigned char)value;
 }
 
 
 void run_get_block(
   sycl::queue &q,
   const sycl::uint2 start_point,
-  sycl::uchar *image,
+  unsigned char *image,
   ushort *stacks,
   uint *num_patches_in_stack,
   float *patch_stack,
@@ -380,7 +380,7 @@ void run_hard_treshold_block(
       sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       hard_treshold_block(
         item,
-        lmem.get_pointer(),
+        lmem.get_multi_ptr<sycl::access::decorated::no>().get(),
         start_point,
         patch_stack,
         w_P,
@@ -435,7 +435,7 @@ void run_aggregate_final(
   float *numerator,
   float *denominator,
   const sycl::uint2 image_dim,
-  sycl::uchar *denoised_image,
+  unsigned char *denoised_image,
   const sycl::range<2> lws,  
   const sycl::range<2> gws)
 {
