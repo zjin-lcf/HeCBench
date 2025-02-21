@@ -224,8 +224,8 @@ sycl::float4* runMergeSort(sycl::queue &q, int listsize, int divisions,
       cgh.copy(orig_acc, d_origList);
       });
 
-  free(startaddr);
   q.wait();
+  free(startaddr);
 
   return d_origList;
 }
