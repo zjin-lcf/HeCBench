@@ -20,7 +20,7 @@
 
 void run_block_matching(
   sycl::queue &q,
-  sycl::uchar *image,
+  unsigned char *image,
   ushort *stacks,
   uint *num_patches_in_stack,
   const sycl::uint2 image_dim,
@@ -35,7 +35,7 @@ void run_block_matching(
 void run_get_block(
   sycl::queue &q,
   const sycl::uint2 start_point,
-  sycl::uchar *image,
+  unsigned char *image,
   ushort *stacks,
   uint *num_patches_in_stack,
   float *patch_stack,
@@ -100,7 +100,7 @@ void run_aggregate_final(
   float *numerator,
   float *denominator,
   const sycl::uint2 image_dim,
-  sycl::uchar *denoised_image,
+  unsigned char *denoised_image,
   const sycl::range<2> lws,
   const sycl::range<2> gws
 );

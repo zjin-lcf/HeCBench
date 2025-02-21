@@ -23,7 +23,7 @@ Note: Stack is just an array, not FIFO
  */
 void add_to_matched_image(
     uint *stack,         //IN/OUT: Stack of N patches matched to current reference patch
-    sycl::uchar *num_patches_in_stack,//IN/OUT: Number of patches in stack
+    unsigned char *num_patches_in_stack,//IN/OUT: Number of patches in stack
     const uint value,       //IN: [..DIFF(ushort)..|..LOC_Y(sbyte)..|..LOC_X(sbyte)..]
     const Params & params    //IN: Denoising parameters
     )
@@ -31,7 +31,7 @@ void add_to_matched_image(
   //stack[*num_patches_in_stack-1] is most similar (lowest number)
   int k;
 
-  sycl::uchar num = (*num_patches_in_stack);
+  unsigned char num = (*num_patches_in_stack);
   if (num < params.N) //add new value
   {
     k = num++;
@@ -69,7 +69,7 @@ Each thread process one reference patch. All the warps of a block process the sa
 void block_matching(
     sycl::nd_item<2> item,
     uint* __restrict s_data,
-    const  sycl::uchar* __restrict image, //IN: Original image
+    const  unsigned char* __restrict image, //IN: Original image
     ushort* __restrict g_stacks,         //OUT: For each reference patch contains addresses of similar patches (patch is adressed by top left corner) [..LOC_Y(sbyte)..|..LOC_X(sbyte)..]
     uint* __restrict g_num_patches_in_stack,  //OUT: For each reference patch contains number of similar patches
     const sycl::uint2 image_dim,      //IN: Image dimensions
@@ -95,8 +95,8 @@ void block_matching(
   //Shared arrays
   uint *s_diff = s_data; //SIZE: p_rectangle_width*num_warps
   uint *s_stacks = &s_data[p_rectangle_width*num_warps]; //SIZE: params.N*num_warps*warpSize
-  sycl::uchar *s_patches_in_stack = (sycl::uchar*)&s_data[num_warps*(p_rectangle_width + params.N*warpSize)]; //SIZE: num_warps*warpSize
-  sycl::uchar *s_image_p = (sycl::uchar*)&s_patches_in_stack[num_warps*warpSize]; //SIZE: p_rectangle_width*params.k
+  unsigned char *s_patches_in_stack = (unsigned char*)&s_data[num_warps*(p_rectangle_width + params.N*warpSize)]; //SIZE: num_warps*warpSize
+  unsigned char *s_image_p = (unsigned char*)&s_patches_in_stack[num_warps*warpSize]; //SIZE: p_rectangle_width*params.k
 
   s_diff += idx2(0, wid, p_rectangle_width);
 
@@ -249,7 +249,7 @@ void block_matching(
 
 void run_block_matching(
     sycl::queue &q,
-    sycl::uchar *image, //Original image
+    unsigned char *image, //Original image
     ushort *stacks, //For each reference patch contains addresses of similar patches (patch is adressed by top left corner)
     uint *num_patches_in_stack, //For each reference patch contains number of similar patches
     const sycl::uint2 image_dim,  //Image dimensions
@@ -266,7 +266,7 @@ void run_block_matching(
     cgh.parallel_for<class bm>(
       sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       block_matching(item,
-                     lmem.get_pointer(),
+                     lmem.get_multi_ptr<sycl::access::decorated::no>().get(),
                      image,
                      stacks,
                      num_patches_in_stack,

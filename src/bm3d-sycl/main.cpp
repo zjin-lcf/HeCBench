@@ -78,8 +78,8 @@ int main(int argc, char** argv)
   CImg<unsigned char> dst_image(image.width(), image.height(), 1, channels, 0);
 
   // Vector of image channels
-  std::vector<sycl::uchar*> d_noisy_image;
-  std::vector<sycl::uchar*> d_denoised_image;
+  std::vector<unsigned char*> d_noisy_image;
+  std::vector<unsigned char*> d_denoised_image;
   //Numerator and denominator used for aggregation
   std::vector<float*> d_numerator;  
   std::vector<float*> d_denominator;
@@ -109,11 +109,11 @@ int main(int argc, char** argv)
   d_denominator.resize(channels);
 
   for(auto & it : d_noisy_image) {
-    it = sycl::malloc_device<sycl::uchar>(image_size, q);
+    it = sycl::malloc_device<unsigned char>(image_size, q);
   }
   
   for(auto & it : d_denoised_image)
-    it = sycl::malloc_device<sycl::uchar>(image_size, q);
+    it = sycl::malloc_device<unsigned char>(image_size, q);
 
   for(auto & it : d_numerator) 
     it = sycl::malloc_device<float>(image_size, q);
@@ -144,13 +144,13 @@ int main(int argc, char** argv)
   int paramN1 = N + 1; //maximal size of a stack with a reference patch
 
   const uint p_block_width = (warpSize-1) * p + k;
-  const uint s_image_p_size = p_block_width * k * sizeof(sycl::uchar);
+  const uint s_image_p_size = p_block_width * k * sizeof(unsigned char);
 
   const uint shared_mem_available = TOTAL_SLM - s_image_p_size;
 
   //Block-matching shared memory sizes per warp
   const uint s_diff_size = p_block_width * sizeof(uint);
-  const uint s_patches_in_stack_size = warpSize * sizeof(sycl::uchar);
+  const uint s_patches_in_stack_size = warpSize * sizeof(unsigned char);
   const uint s_patch_stacks_size = N * warpSize * sizeof(uint);
 
   const uint num_warps = std::min(shared_mem_available / 
@@ -217,7 +217,7 @@ int main(int argc, char** argv)
 
   // Copy images to device
   for(uint i = 0; i < channels; ++i) 
-    q.memcpy(d_noisy_image[i], image.data()+i*image_size, image_size * sizeof(sycl::uchar));
+    q.memcpy(d_noisy_image[i], image.data()+i*image_size, image_size * sizeof(unsigned char));
 
   q.wait();
 
@@ -345,7 +345,7 @@ int main(int argc, char** argv)
   for (uint channel = 0; channel < channels; ++channel) {
     q.memcpy(dst_image.data()+channel*image_size,
              d_denoised_image[channel],
-            image_size*sizeof(sycl::uchar)).wait();
+            image_size*sizeof(unsigned char)).wait();
   }
 
   if (channels == 3) 
