@@ -93,6 +93,7 @@ int ViterbiGPU(float &viterbiProb,
 
   q.memcpy(maxProbNew, d_maxProbNew, sizeof(float)*nState);
   q.memcpy(path, d_path, sizeof(int)*(nObs-1)*nState);
+  q.wait();
 
   // find the final most probable state
   float maxProb = 0.0;
