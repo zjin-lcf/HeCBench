@@ -48,9 +48,7 @@ __device__ inline uint32_t lookupHashTable(const uint32_t key, const uint32_t ha
   uint64_t hash_value = hash(key);
   uint32_t slot = hash_value % (hash_size / 2) /*key, value*/;
   uint32_t empty_key = UINT32_MAX;
-  int cnt = 0;
   while (true /* need to be adjusted according to data*/) {
-    cnt++;
     if (hash_table[slot] == key) {
       return hash_table[slot + hash_size / 2];
     } else if (hash_table[slot] == empty_key) {
@@ -97,8 +95,8 @@ __global__ void voxelizationKernel(const float *points, size_t points_size, floa
                                    int grid_y_size, int grid_x_size, int feature_num,
                                    int max_voxels, int max_points_per_voxel,
                                    unsigned int *hash_table, unsigned int *num_points_per_voxel,
-                                   float *voxels_temp, unsigned int *voxel_indices,
-                                   unsigned int *real_voxel_num) {
+                                   float *voxels_temp, unsigned int *voxel_indices)
+{
   int point_idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (point_idx >= points_size) {
     return;
@@ -219,7 +217,7 @@ cudaError_t voxelizationLaunch(const float *points, size_t points_size,
       points, points_size, min_x_range, max_x_range, min_y_range, max_y_range, min_z_range,
       max_z_range, voxel_x_size, voxel_y_size, voxel_z_size, grid_z_size, grid_y_size, grid_x_size,
       feature_num, max_voxels, max_points_per_voxel, hash_table, num_points_per_voxel,
-      voxel_features, voxel_indices, real_voxel_num);
+      voxel_features, voxel_indices);
   cudaError_t err = cudaGetLastError();
   return err;
 }

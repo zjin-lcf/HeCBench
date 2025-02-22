@@ -57,9 +57,7 @@ inline uint32_t lookupHashTable(const uint32_t key, const uint32_t hash_size,
   uint64_t hash_value = hash(key);
   uint32_t slot = hash_value % (hash_size / 2) /*key, value*/;
   uint32_t empty_key = UINT32_MAX;
-  int cnt = 0;
   while (true /* need to be adjusted according to data*/) {
-    cnt++;
     if (hash_table[slot] == key) {
       return hash_table[slot + hash_size / 2];
     } else if (hash_table[slot] == empty_key) {
@@ -108,7 +106,6 @@ void voxelizationKernel(const float *points, size_t points_size, float min_x_ran
                         int max_voxels, int max_points_per_voxel,
                         unsigned int *hash_table, unsigned int *num_points_per_voxel,
                         float *voxels_temp, unsigned int *voxel_indices,
-                        unsigned int *real_voxel_num,
                         const sycl::nd_item<1> &item) {
   int point_idx = item.get_global_id(0);
   if (point_idx >= points_size) {
@@ -248,7 +245,7 @@ voxelizationLaunch(sycl::queue &q,
           max_y_range, min_z_range, max_z_range, voxel_x_size, voxel_y_size,
           voxel_z_size, grid_z_size, grid_y_size, grid_x_size, feature_num,
           max_voxels, max_points_per_voxel, hash_table, num_points_per_voxel,
-          voxel_features, voxel_indices, real_voxel_num, item);
+          voxel_features, voxel_indices, item);
   });
 }
 

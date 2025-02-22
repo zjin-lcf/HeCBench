@@ -21,7 +21,6 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <sycl/sycl.hpp>
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
@@ -29,6 +28,7 @@
 #include <memory>
 #include <chrono>
 #include <dirent.h>
+#include <sycl/sycl.hpp>
 #include "kernels.h"
 
 void generateVoxels(sycl::queue &q, const float *points, size_t points_size,
@@ -64,8 +64,6 @@ void generateVoxels(sycl::queue &q, const float *points, size_t points_size,
   d_voxel_indices_ = (unsigned int *)sycl::malloc_device(voxel_idxs_size_, q);
   d_real_num_voxels_ = sycl::malloc_device<unsigned int>(1, q);
 
-  h_real_num_voxels_ = sycl::malloc_host<unsigned int>(1, q);
-
   q.memset(d_voxel_num_, 0, voxel_num_size_);
   q.memset(d_voxel_features_, 0, voxel_features_size_);
   q.memset(d_voxel_indices_, 0, voxel_idxs_size_);
@@ -93,13 +91,13 @@ void generateVoxels(sycl::queue &q, const float *points, size_t points_size,
           d_voxel_num_, voxels_temp_, d_voxel_indices_,
           d_real_num_voxels_);
   }
-
-  q.memcpy(h_real_num_voxels_, d_real_num_voxels_, sizeof(int));
   q.wait();
-
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of the voxelization kernel: %f (us)\n", (time * 1e-3f) / repeat);
+
+  h_real_num_voxels_ = sycl::malloc_host<unsigned int>(1, q);
+  q.memcpy(h_real_num_voxels_, d_real_num_voxels_, sizeof(int)).wait();
 
   std::cout << "valid_num: " << *h_real_num_voxels_ <<std::endl;
 
@@ -118,11 +116,9 @@ void generateVoxels(sycl::queue &q, const float *points, size_t points_size,
 
   sycl::free(hash_table_, q);
   sycl::free(voxels_temp_, q);
-
   sycl::free(d_voxel_features_, q);
   sycl::free(d_voxel_num_, q);
   sycl::free(d_voxel_indices_, q);
-
   sycl::free(d_real_num_voxels_, q);
   sycl::free(h_real_num_voxels_, q);
 }
@@ -202,7 +198,7 @@ int main(int argc, const char **argv)
   std::vector<std::string> files;
   getFolderFile(data_folder, files);
 
-  std::cout << "Total " << files.size() << std::endl;
+  std::cout << "Number of files: " << files.size() << std::endl;
 
   Params params;
 

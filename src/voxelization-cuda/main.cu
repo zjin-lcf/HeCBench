@@ -62,8 +62,6 @@ void generateVoxels(const float *points, size_t points_size, const int repeat)
   checkCudaErrors(cudaMalloc((void **)&d_voxel_indices_, voxel_idxs_size_));
   checkCudaErrors(cudaMalloc((void **)&d_real_num_voxels_, sizeof(unsigned int)));
 
-  checkCudaErrors(cudaMallocHost((void **)&h_real_num_voxels_, sizeof(unsigned int)));
-
   checkCudaErrors(cudaMemset(d_voxel_num_, 0, voxel_num_size_));
   checkCudaErrors(cudaMemset(d_voxel_features_, 0, voxel_features_size_));
   checkCudaErrors(cudaMemset(d_voxel_indices_, 0, voxel_idxs_size_));
@@ -90,14 +88,13 @@ void generateVoxels(const float *points, size_t points_size, const int repeat)
           d_voxel_num_, voxels_temp_, d_voxel_indices_,
           d_real_num_voxels_));
   }
-
-  checkCudaErrors(cudaMemcpy(h_real_num_voxels_, d_real_num_voxels_, sizeof(int), cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaDeviceSynchronize());
-
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of the voxelization kernel: %f (us)\n", (time * 1e-3f) / repeat);
+  checkCudaErrors(cudaDeviceSynchronize());
 
+  checkCudaErrors(cudaMallocHost((void **)&h_real_num_voxels_, sizeof(unsigned int)));
+  checkCudaErrors(cudaMemcpy(h_real_num_voxels_, d_real_num_voxels_, sizeof(int), cudaMemcpyDeviceToHost));
   std::cout << "valid_num: " << *h_real_num_voxels_ <<std::endl;
 
   start = std::chrono::steady_clock::now();
@@ -115,11 +112,9 @@ void generateVoxels(const float *points, size_t points_size, const int repeat)
 
   checkCudaErrors(cudaFree(hash_table_));
   checkCudaErrors(cudaFree(voxels_temp_));
-
   checkCudaErrors(cudaFree(d_voxel_features_));
   checkCudaErrors(cudaFree(d_voxel_num_));
   checkCudaErrors(cudaFree(d_voxel_indices_));
-
   checkCudaErrors(cudaFree(d_real_num_voxels_));
   checkCudaErrors(cudaFreeHost(h_real_num_voxels_));
 }
@@ -199,7 +194,7 @@ int main(int argc, const char **argv)
   std::vector<std::string> files;
   getFolderFile(data_folder, files);
 
-  std::cout << "Total " << files.size() << std::endl;
+  std::cout << "Number of files: " << files.size() << std::endl;
 
   Params params;
 

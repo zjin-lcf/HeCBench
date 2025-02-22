@@ -62,8 +62,6 @@ void generateVoxels(const float *points, size_t points_size, const int repeat)
   checkHipErrors(hipMalloc((void **)&d_voxel_indices_, voxel_idxs_size_));
   checkHipErrors(hipMalloc((void **)&d_real_num_voxels_, sizeof(unsigned int)));
 
-  checkHipErrors(hipHostMalloc((void **)&h_real_num_voxels_, sizeof(unsigned int)));
-
   checkHipErrors(hipMemset(d_voxel_num_, 0, voxel_num_size_));
   checkHipErrors(hipMemset(d_voxel_features_, 0, voxel_features_size_));
   checkHipErrors(hipMemset(d_voxel_indices_, 0, voxel_idxs_size_));
@@ -91,12 +89,14 @@ void generateVoxels(const float *points, size_t points_size, const int repeat)
           d_real_num_voxels_));
   }
 
-  checkHipErrors(hipMemcpy(h_real_num_voxels_, d_real_num_voxels_, sizeof(int), hipMemcpyDeviceToHost));
   checkHipErrors(hipDeviceSynchronize());
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of the voxelization kernel: %f (us)\n", (time * 1e-3f) / repeat);
+
+  checkHipErrors(hipHostMalloc((void **)&h_real_num_voxels_, sizeof(unsigned int)));
+  checkHipErrors(hipMemcpy(h_real_num_voxels_, d_real_num_voxels_, sizeof(int), hipMemcpyDeviceToHost));
 
   std::cout << "valid_num: " << *h_real_num_voxels_ <<std::endl;
 
@@ -115,11 +115,9 @@ void generateVoxels(const float *points, size_t points_size, const int repeat)
 
   checkHipErrors(hipFree(hash_table_));
   checkHipErrors(hipFree(voxels_temp_));
-
   checkHipErrors(hipFree(d_voxel_features_));
   checkHipErrors(hipFree(d_voxel_num_));
   checkHipErrors(hipFree(d_voxel_indices_));
-
   checkHipErrors(hipFree(d_real_num_voxels_));
   checkHipErrors(hipHostFree(h_real_num_voxels_));
 }
@@ -199,7 +197,7 @@ int main(int argc, const char **argv)
   std::vector<std::string> files;
   getFolderFile(data_folder, files);
 
-  std::cout << "Total " << files.size() << std::endl;
+  std::cout << "Number of files: " << files.size() << std::endl;
 
   Params params;
 
