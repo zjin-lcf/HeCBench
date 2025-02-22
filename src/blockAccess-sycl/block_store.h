@@ -201,8 +201,8 @@ public:
     /**
      * \brief Collective constructor using a private static allocation of shared memory as temporary storage.
      */
-    inline BlockStore(const sycl::nd_item<3> &item,
-                               _TempStorage &private_storage)
+    inline BlockStore(_TempStorage &private_storage,
+                      const sycl::nd_item<3> &item)
         : temp_storage(PrivateStorage(private_storage)),
           linear_tid(
               RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z, item))
@@ -214,9 +214,8 @@ public:
      */
     inline
     BlockStore(TempStorage &temp_storage,
-               const sycl::nd_item<3>
-                   &item) ///< [in] Reference to memory allocation having
-                              ///< layout type TempStorage
+               const sycl::nd_item<3> &item) ///< [in] Reference to memory allocation having
+                                             ///< layout type TempStorage
         : temp_storage(temp_storage.Alias()),
           linear_tid(
               RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z, item))
