@@ -32,7 +32,8 @@ void kernel(const float * __restrict__ A,
             unsigned char *out, const int n,
             const sycl::nd_item<3> &item)
 {
-  const int bid = item.get_group(2);
+  auto g = item.get_group();
+  const int bid = g.get_group_id(2);
   const int base_idx = (bid * ITEMS_TO_LOAD);
 
   float vals[NUM];
@@ -42,14 +43,14 @@ void kernel(const float * __restrict__ A,
   typedef BlockStore<unsigned char, TH, NUM> StoreChar;
 
   sycl::multi_ptr<typename LoadFloat::TempStorage[1], sycl::access::address_space::local_space> p1 =
-      sycl::ext::oneapi::group_local_memory_for_overwrite<typename LoadFloat::TempStorage[1]>(item.get_group());
-  typename LoadFloat::TempStorage *loadf_storage = *p1;
+      sycl::ext::oneapi::group_local_memory_for_overwrite<typename LoadFloat::TempStorage[1]>(g);
+  auto &loadf_storage = *p1;
 
   sycl::multi_ptr<typename StoreChar::TempStorage[1], sycl::access::address_space::local_space> p2 =
-      sycl::ext::oneapi::group_local_memory_for_overwrite<typename StoreChar::TempStorage[1]>(item.get_group());
-  typename StoreChar::TempStorage *storec_storage = *p2;
+      sycl::ext::oneapi::group_local_memory_for_overwrite<typename StoreChar::TempStorage[1]>(g);
+  auto &storec_storage = *p2;
 
-  for (int i = base_idx; i < n; i += item.get_group_range(2)*ITEMS_TO_LOAD)
+  for (int i = base_idx; i < n; i += g.get_group_range(2)*ITEMS_TO_LOAD)
   {
       int valid_items = sycl::min(n - i, ITEMS_TO_LOAD);
 
