@@ -38,32 +38,32 @@ inline uint64_t hash(uint64_t k) {
 inline void insertHashTable(const uint32_t key, uint32_t *value,
                             const uint32_t hash_size, uint32_t *hash_table) {
   uint64_t hash_value = hash(key);
-  uint32_t slot = hash_value % (hash_size / 2) /*key, value*/;
+  uint32_t slot = hash_value % hash_size /*key, value*/;
   uint32_t empty_key = UINT32_MAX;
   while (true) {
     uint32_t pre_key = atomicCAS(hash_table[slot], empty_key, key);
     if (pre_key == empty_key) {
-      hash_table[slot + hash_size / 2 /*offset*/] = atomicAdd(value, 1);
+      hash_table[slot + hash_size /*offset*/] = atomicAdd(value, 1);
       break;
     } else if (pre_key == key) {
       break;
     }
-    slot = (slot + 1) % (hash_size / 2);
+    slot = (slot + 1) % hash_size;
   }
 }
 
 inline uint32_t lookupHashTable(const uint32_t key, const uint32_t hash_size,
                                            const uint32_t *hash_table) {
   uint64_t hash_value = hash(key);
-  uint32_t slot = hash_value % (hash_size / 2) /*key, value*/;
+  uint32_t slot = hash_value % hash_size /*key, value*/;
   uint32_t empty_key = UINT32_MAX;
   while (true /* need to be adjusted according to data*/) {
     if (hash_table[slot] == key) {
-      return hash_table[slot + hash_size / 2];
+      return hash_table[slot + hash_size];
     } else if (hash_table[slot] == empty_key) {
       return empty_key;
     } else {
-      slot = (slot + 1) % (hash_size / 2);
+      slot = (slot + 1) % hash_size;
     }
   }
   return empty_key;
@@ -95,7 +95,7 @@ void buildHashKernel(const float *points, size_t points_size, float min_x_range,
   if (voxel_idz < 0 || voxel_idz >= grid_z_size) return;
   unsigned int voxel_offset =
       voxel_idz * grid_y_size * grid_x_size + voxel_idy * grid_x_size + voxel_idx;
-  insertHashTable(voxel_offset, real_voxel_num, points_size * 2 * 2, hash_table);
+  insertHashTable(voxel_offset, real_voxel_num, points_size * 2, hash_table);
 }
 
 void voxelizationKernel(const float *points, size_t points_size, float min_x_range,
@@ -123,15 +123,15 @@ void voxelizationKernel(const float *points, size_t points_size, float min_x_ran
   }
 
   int voxel_idx = sycl::floor((px - min_x_range) / voxel_x_size);
+  if (voxel_idx >= grid_x_size) {
+    return;
+  }
   int voxel_idy = sycl::floor((py - min_y_range) / voxel_y_size);
+  if (voxel_idy >= grid_y_size) {
+    return;
+  }
   int voxel_idz = sycl::floor((pz - min_z_range) / voxel_z_size);
-  if ((voxel_idx < 0 || voxel_idx >= grid_x_size)) {
-    return;
-  }
-  if ((voxel_idy < 0 || voxel_idy >= grid_y_size)) {
-    return;
-  }
-  if ((voxel_idz < 0 || voxel_idz >= grid_z_size)) {
+  if (voxel_idz >= grid_z_size) {
     return;
   }
 
@@ -139,7 +139,7 @@ void voxelizationKernel(const float *points, size_t points_size, float min_x_ran
       voxel_idz * grid_y_size * grid_x_size + voxel_idy * grid_x_size + voxel_idx;
 
   // scatter to voxels
-  unsigned int voxel_id = lookupHashTable(voxel_offset, points_size * 2 * 2, hash_table);
+  unsigned int voxel_id = lookupHashTable(voxel_offset, points_size * 2, hash_table);
   if (voxel_id >= max_voxels) {
     return;
   }
