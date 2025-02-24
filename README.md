@@ -49,7 +49,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aligned-types, asta, blockAccess, blockexchange, collision, concurrentKernels, conversion, dispatch, graphExecution, ert, interleave, intrinsics-cast, kernelLaunch, layout, mallocFree, maxFlops, mixbench, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamCreateCopyDestroy, streamOrderedAllocation, streamPriority, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy 
 
 ### Machine learning  
-    accuracy, adam, adamw, addBiasQKV, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, dwconv1d, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, layernorm, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, permute, perplexity, pointwise, pool, qkv, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, rotary, sampling, scel, snicit, softmax, softmax-fused, softmax-online, stddev, streamcluster, swish, unfold, vol2col, wedford, winograd, word2vec
+    accuracy, adam, adamw, addBiasQKV, addBiasResidualLayerNorm, attention, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, dwconv1d, expdist, flip, gd, gelu, ge-spmm, glu, gmm, gru, kalman, kmc, kmeans, knn, layernorm, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, permute, perplexity, pointwise, pool, qkv, qtclustering, remap, relu, resnet-kernels, rowwiseMoments, rotary, sampling, scel, snicit, softmax, softmax-fused, softmax-online, stddev, streamcluster, swish, tsne, unfold, vol2col, wedford, winograd, word2vec
 
 ### Math
     atan2, blas-dot, blas-fp8gemm, blas-gemm, blas-gemmBatched, blas-gemmStridedBatched, blas-gemmEx, blas-gemmEx2, complex, cross, determinant, divergence, dp, eigenvalue, f16max, f16sp, frechet, fresnel, fwt, gaussian, geam, gels, gemv, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, ludb, michalewicz, matrix-rotate, matrixT, minkowski, mr, mrg32k3a, norm2, nqueen, ntt, phmm, pnpoly, reverse2D, rfs, romberg, rsc, sddmm-batch, secp256k1, simpleSpmv, slu, spd2s, spgeam, spgemm, spmm, spmv, spnnz, sps2d, spsort, sptrsv, thomas, wyllie, zeropoint
@@ -1561,6 +1561,9 @@ Early results are shown [here](results/README.md)
 
 ### tsa (cuda)
   Trotter-Suzuki approximation (https://bitbucket.org/zzzoom/trottersuzuki/src/master/)
+
+### tsne (cuda)
+  FFT-accelerated Interpolation-based t-SNE (https://github.com/oneapi-src/Velocity-Bench/tree/main/tsne)
 
 ### tsp (cuda)
   Solving the symmetric traveling salesman problem with iterative hill climbing (https://userweb.cs.txstate.edu/~burtscher/research/TSP_GPU/) 
