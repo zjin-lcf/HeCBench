@@ -167,12 +167,9 @@ int main(int argc, char** argv) {
     wkf_timer_start(runtimer);
     q.submit([&](auto &h) {
       h.parallel_for(sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
-        unsigned int xindex = sycl::mul24(unsigned(item.get_group(2)),
-                              unsigned(item.get_local_range(2))) * UNROLLX + item.get_local_id(2); 
-        unsigned int yindex = sycl::mul24(unsigned(item.get_group(1)),
-                              unsigned(item.get_local_range(1))) + item.get_local_id(1); 
-        unsigned int outaddr = (sycl::mul24(unsigned(item.get_group_range(2)),
-                               unsigned(item.get_local_range(2))) * UNROLLX) * yindex + xindex;
+        unsigned int xindex = item.get_group(2) * item.get_local_range(2) * UNROLLX + item.get_local_id(2);
+        unsigned int yindex = item.get_group(1) * item.get_local_range(1) + item.get_local_id(1);
+        unsigned int outaddr = item.get_group_range(2) * item.get_local_range(2) * UNROLLX * yindex + xindex;
 
         float coory = gridspacing * yindex;
         float coorx = gridspacing * xindex;
