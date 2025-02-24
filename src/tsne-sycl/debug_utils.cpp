@@ -36,7 +36,7 @@
  * @date 2018-05-05
  * 
  */
-
+#include <complex>
 #include <sycl/sycl.hpp>
 #include "debug_utils.h"
 

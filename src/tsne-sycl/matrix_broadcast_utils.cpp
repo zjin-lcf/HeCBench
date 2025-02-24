@@ -36,7 +36,7 @@
  * @date 2018-04-04
  * Copyright (c) 2018, Regents of the University of California
  */
-
+#include <complex>
 #include <sycl/sycl.hpp>
 #include "matrix_broadcast_utils.h"
 
