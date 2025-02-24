@@ -32,11 +32,9 @@
 __global__ void cenergy(const int numatoms, const float gridspacing, 
                         float *energygrid, const float4 *atominfo) 
 {
-  unsigned int xindex  = __umul24((unsigned)blockIdx.x, (unsigned)blockDim.x) * UNROLLX
-                         + threadIdx.x;
-  unsigned int yindex  = __umul24((unsigned)blockIdx.y, (unsigned)blockDim.y) + threadIdx.y;
-  unsigned int outaddr = (__umul24((unsigned)gridDim.x, (unsigned)blockDim.x) * UNROLLX) * yindex
-                         + xindex;
+  unsigned int xindex  = blockIdx.x * blockDim.x * UNROLLX + threadIdx.x;
+  unsigned int yindex  = blockIdx.y * blockDim.y + threadIdx.y;
+  unsigned int outaddr = gridDim.x * blockDim.x * UNROLLX * yindex + xindex;
 
   float coory = gridspacing * yindex;
   float coorx = gridspacing * xindex;
