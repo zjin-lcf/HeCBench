@@ -63,12 +63,12 @@ lstm_inference(
       for (i = 0; i < 5; ++i)
         g_state[j] += h_state[i] * d_intW[75+j*5+i];
       g_state[j] += d_intB[15+j];
-      g_state[j] = tanh(g_state[j]);
+      g_state[j] = tanhf(g_state[j]);
     }
 
     for (j = 0; j < 5; ++j) {
       c_state[j] = c_state[j] * f_state[j] + g_state[j] * i_state[j];
-      h_state[j] = tanh(c_state[j]) * o_state[j];
+      h_state[j] = tanhf(c_state[j]) * o_state[j];
     }
 
     float y = d_outB[0];
