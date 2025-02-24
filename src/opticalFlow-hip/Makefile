@@ -53,4 +53,4 @@ clean:
 	rm -rf $(program) $(obj) *.flo
 
 run: $(program)
-	$(LAUNCHER) ./$(program)
+	$(LAUNCHER) ./$(program) ../opticalFlow-cuda/data/frame10.ppm ../opticalFlow-cuda/data/frame11.ppm

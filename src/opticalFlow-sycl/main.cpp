@@ -136,8 +136,8 @@ int main(int argc, char **argv) {
   printf("%s Starting...\n\n", sSDKsample);
 
   // find images
-  const char *const sourceFrameName = "frame10.ppm";
-  const char *const targetFrameName = "frame11.ppm";
+  const char *const sourceFrameName = argv[1];
+  const char *const targetFrameName = argv[2];
 
   // image dimensions
   int width;
