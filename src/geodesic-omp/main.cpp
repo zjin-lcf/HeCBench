@@ -154,7 +154,7 @@ void distance_device(const float4* VA, float* VC, const size_t N, const int iter
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / iteration);
+    printf("Average kernel execution time %f (us)\n", (time * 1e-3f) / iteration);
   }
 }
 
