@@ -1,6 +1,5 @@
 #pragma once
 
-#include <sycl/sycl.hpp>
 #include <limits>
 #include <map>
 #include <string>
@@ -24,16 +23,16 @@ template <typename scalar_t, ReductionType REDUCE> struct Reducer {
       return (scalar_t)0;
   }
 
-  static inline void update(scalar_t *val, scalar_t new_val) {
+  static inline void update(scalar_t &val, scalar_t new_val) {
     if (REDUCE == SUM)
-      *val = *val + new_val;
+      val += new_val;
     else if (REDUCE == MUL)
-      *val = *val * new_val;
+      val *= new_val;
     else if (REDUCE == DIV)
-      *val = *val / new_val;
-    else if ((REDUCE == MIN && new_val < *val) ||
-             (REDUCE == MAX && new_val > *val)) {
-      *val = new_val;
+      val /= new_val;
+    else if ((REDUCE == MIN && new_val < val) ||
+             (REDUCE == MAX && new_val > val)) {
+      val = new_val;
     }
   }
 

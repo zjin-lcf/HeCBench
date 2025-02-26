@@ -96,7 +96,7 @@ void scatter(int64_t num_elems, int repeat) {
   CHECK_HIP( hipMemcpy(h_out, d_out, out_size_bytes, hipMemcpyDeviceToHost) )
 
   for (int64_t i = 0; i < num_elems; i++) {
-    Reducer<scalar_t, REDUCE>::update(h_ref+h_idx[i], h_src[i]);
+    Reducer<scalar_t, REDUCE>::update(h_ref[h_idx[i]], h_src[i]);
   }
 
   bool ok = true;

@@ -23,17 +23,17 @@ template <typename scalar_t, ReductionType REDUCE> struct Reducer {
       return (scalar_t)0;
   }
 
-  static inline __host__ __device__ void update(scalar_t *val,
+  static inline __host__ __device__ void update(scalar_t &val,
                                                 scalar_t new_val) {
     if (REDUCE == SUM)
-      *val = *val + new_val;
+      val += new_val;
     else if (REDUCE == MUL)
-      *val = *val * new_val;
+      val *= new_val;
     else if (REDUCE == DIV)
-      *val = *val / new_val;
-    else if ((REDUCE == MIN && new_val < *val) ||
-             (REDUCE == MAX && new_val > *val)) {
-      *val = new_val;
+      val /= new_val;
+    else if ((REDUCE == MIN && new_val < val) ||
+             (REDUCE == MAX && new_val > val)) {
+      val = new_val;
     }
   }
 

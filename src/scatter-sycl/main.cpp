@@ -89,7 +89,7 @@ void scatter(sycl::queue &q, int64_t num_elems, int repeat) {
   q.memcpy(h_out, d_out, out_size_bytes).wait();
 
   for (int64_t i = 0; i < num_elems; i++) {
-    Reducer<scalar_t, REDUCE>::update(h_ref+h_idx[i], h_src[i]);
+    Reducer<scalar_t, REDUCE>::update(h_ref[h_idx[i]], h_src[i]);
   }
 
   bool ok = true;
