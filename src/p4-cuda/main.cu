@@ -22,7 +22,7 @@
 #include "params.h"
 
 __device__
-float sigmoid(const float x) { return 1.0f / (1.0f + expf(-x)); }
+float sigmoidf(const float x) { return 1.0f / (1.0f + expf(-x)); }
 
 __global__
 void postprocess (
@@ -57,10 +57,10 @@ void postprocess (
   float dev_cls[2] = {-1.f, 0.f};
 
   const float *scores = cls_input + cls_offset;
-  float max_score = sigmoid(scores[0]);
+  float max_score = sigmoidf(scores[0]);
   int cls_id = 0;
   for (int i = 1; i < num_classes; i++) {
-    float cls_score = sigmoid(scores[i]);
+    float cls_score = sigmoidf(scores[i]);
     if (cls_score > max_score) {
       max_score = cls_score;
       cls_id = i;
