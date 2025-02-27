@@ -32,23 +32,23 @@ void vanGenuchten(
 
     theta[i] = _theta;
 
-   // Compute the effective saturation [eqn 2]
-   Se = (_theta - theta_R)/(theta_S - theta_R);
+    // Compute the effective saturation [eqn 2]
+    Se = (_theta - theta_R)/(theta_S - theta_R);
 
-   // Compute the hydraulic conductivity [eqn 8]
-   double t = 1.0 - sycl::pow(1.0 - sycl::pow(Se, 1.0 / m), m);
-   K[i] = Ksat[i] * sycl::sqrt(Se) * t * t;
+    // Compute the hydraulic conductivity [eqn 8]
+    double t = 1.0 - sycl::pow(1.0 - sycl::pow(Se, 1.0 / m), m);
+    K[i] = Ksat[i] * sycl::sqrt(Se) * t * t;
 
-   // Compute the specific moisture storage derivative of eqn (21).
-   // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
-   if (_psi < 0.0)
-     C[i] = 100.0 * alpha * n * (1.0 / n - 1.0) *
-            sycl::pow(alpha * sycl::fabs(_psi), n - 1.0) *
-            (theta_R - theta_S) *
-            sycl::pow(sycl::pow(alpha * sycl::fabs(_psi), n) + 1.0,
-                           1.0 / n - 2.0);
-   else
-     C[i] = 0.0;
+    // Compute the specific moisture storage derivative of eqn (21).
+    // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
+    if (_psi < 0.0)
+      C[i] = 100.0 * alpha * n * (1.0 / n - 1.0) *
+             sycl::pow(alpha * sycl::fabs(_psi), n - 1.0) *
+             (theta_R - theta_S) *
+             sycl::pow(sycl::pow(alpha * sycl::fabs(_psi), n) + 1.0,
+                            1.0 / n - 2.0);
+    else
+      C[i] = 0.0;
   }
 }
 
@@ -147,14 +147,14 @@ int main(int argc, char* argv[])
   sycl::free(d_theta, q);
   sycl::free(d_K, q);
 
-  delete(Ksat);
-  delete(psi);
-  delete(C);
-  delete(theta);
-  delete(K);
-  delete(C_ref);
-  delete(theta_ref);
-  delete(K_ref);
+  delete[] Ksat;
+  delete[] psi;
+  delete[] C;
+  delete[] theta;
+  delete[] K;
+  delete[] C_ref;
+  delete[] theta_ref;
+  delete[] K_ref;
 
   return 0;
 }

@@ -25,24 +25,24 @@ void vanGenuchten(
     // Compute the volumetric moisture content [eqn 21]
     _psi = psi[i] * 100.0;
     if ( _psi < 0.0 )
-      _theta = (theta_S - theta_R) / pow(1.0 + pow((alpha*(-_psi)),n), m) + theta_R;
+      _theta = (theta_S - theta_R) / pow(1.0 + pow((alpha * (-_psi)), n), m) + theta_R;
     else
       _theta = theta_S;
 
     theta[i] = _theta;
 
     // Compute the effective saturation [eqn 2]
-    Se = (_theta - theta_R)/(theta_S - theta_R);
+    Se = (_theta - theta_R) / (theta_S - theta_R);
 
     // Compute the hydraulic conductivity [eqn 8]
-    t = 1.0 - pow(1.0-pow(Se,1.0/m), m);
+    t = 1.0 - pow(1.0 - pow(Se, 1.0 / m), m);
     K[i] = Ksat[i] * sqrt(Se) * t * t;
 
     // Compute the specific moisture storage derivative of eqn (21).
     // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
     if (_psi < 0.0)
-      C[i] = 100.0 * alpha * n * (1.0/n-1.0)*pow(alpha*abs(_psi), n-1.0)
-        * (theta_R-theta_S) * pow(pow(alpha*abs(_psi), n)+1.0, 1.0/n-2.0);
+      C[i] = 100.0 * alpha * n * (1.0 /n - 1.0) * pow(alpha * fabs(_psi), n - 1.0)
+        * (theta_R - theta_S) * pow(pow(alpha * fabs(_psi), n) + 1.0, 1.0 / n - 2.0);
     else
       C[i] = 0.0;
   }
@@ -102,7 +102,7 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(vanGenuchten, grids, blocks , 0, 0, d_Ksat, d_psi, d_C, d_theta, d_K, size);
+    vanGenuchten <<< grids, blocks >>> (d_Ksat, d_psi, d_C, d_theta, d_K, size);
 
   hipDeviceSynchronize();
 
@@ -131,14 +131,14 @@ int main(int argc, char* argv[])
   hipFree(d_theta);
   hipFree(d_K);
 
-  delete(Ksat);
-  delete(psi);
-  delete(C);
-  delete(theta);
-  delete(K);
-  delete(C_ref);
-  delete(theta_ref);
-  delete(K_ref);
+  delete[] Ksat;
+  delete[] psi;
+  delete[] C;
+  delete[] theta;
+  delete[] K;
+  delete[] C_ref;
+  delete[] theta_ref;
+  delete[] K_ref;
 
   return 0;
 }
