@@ -82,8 +82,8 @@ void test (
     mult *= -1.f / dt;
     mult += 1.f;
 
-    mult = mult > 1.f ? 1.f : mult;
-    mult = mult < 0.f ? 0.f : mult;
+    mult = fminf(mult, 1.f);
+    mult = fmaxf(mult, 0.f);
 
     voltage *= mult;
 
