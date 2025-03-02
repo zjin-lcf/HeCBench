@@ -27,6 +27,27 @@ typedef int scalar_t;
 
 
 template <typename T, int kBlockDimX, int kBlockDimY>
+__device__ void BlockReduce(T &input1, T &input2) {
+  using BlockReduce = cub::BlockReduce<T,
+                                       kBlockDimX,
+                                       cub::BLOCK_REDUCE_WARP_REDUCTIONS,
+                                       kBlockDimY>;
+  __shared__ typename BlockReduce::TempStorage temp_storage1;
+  __shared__ typename BlockReduce::TempStorage temp_storage2;
+  input1 = BlockReduce(temp_storage1).Sum(input1);
+  input2 = BlockReduce(temp_storage2).Sum(input2);
+}
+
+template <typename T>
+__device__ void BlockReduce(T &input1, T &input2) {
+  using BlockReduce = cub::BlockReduce<T, NUM_THREADS>;
+  __shared__ typename BlockReduce::TempStorage temp_storage1;
+  __shared__ typename BlockReduce::TempStorage temp_storage2;
+  input1 = BlockReduce(temp_storage1).Sum(input1);
+  input2 = BlockReduce(temp_storage2).Sum(input2);
+}
+
+template <typename T, int kBlockDimX, int kBlockDimY>
 __global__
 void ChannelSumNCHW(
     const int N,
@@ -36,16 +57,9 @@ void ChannelSumNCHW(
     T*__restrict__ sum,
     T*__restrict__ sumsq)
 {
-  using BlockReduce = cub::BlockReduce<T,
-                                       kBlockDimX,
-                                       cub::BLOCK_REDUCE_WARP_REDUCTIONS,
-                                       kBlockDimY>;
-  __shared__ typename BlockReduce::TempStorage m_storage;
-  __shared__ typename BlockReduce::TempStorage v_storage;
 
   T m_val = 0;
   T v_val = 0;
-
   const int c = blockIdx.x;
 
   // sum batches from different channels
@@ -56,9 +70,7 @@ void ChannelSumNCHW(
       v_val += __ldg(X + index) * __ldg(X + index);
     }
   }
-  m_val = BlockReduce(m_storage).Sum(m_val);
-  v_val = BlockReduce(v_storage).Sum(v_val);
-
+  BlockReduce<T, kBlockDimX, kBlockDimY>(m_val, v_val);
   if (threadIdx.x == 0 && threadIdx.y == 0) {
     sum[c] = m_val;
     sumsq[c] = v_val;
@@ -75,10 +87,6 @@ void ChannelSumNHWC(
     T*__restrict__ sum,
     T*__restrict__ sumsq)
 {
-  using BlockReduce = cub::BlockReduce<T, NUM_THREADS>;
-  __shared__ typename BlockReduce::TempStorage m_storage;
-  __shared__ typename BlockReduce::TempStorage v_storage;
-
   const int inner_size = N * HxW;
   const int c = blockIdx.x;
   T m_val = 0;
@@ -88,8 +96,7 @@ void ChannelSumNHWC(
     m_val += __ldg(X + index);
     v_val += __ldg(X + index) * __ldg(X + index);
   }
-  m_val = BlockReduce(m_storage).Sum(m_val);
-  v_val = BlockReduce(v_storage).Sum(v_val);
+  BlockReduce<T>(m_val, v_val);
   if (threadIdx.x == 0) {
     sum[c] = m_val;
     sumsq[c] = v_val;
