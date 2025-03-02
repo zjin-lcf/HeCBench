@@ -8,6 +8,13 @@
 
 #define GPU_NUM_THREADS 256
 
+template <typename T>
+__device__ void BlockReduce(T &input) {
+  typedef hipcub::BlockReduce<T, GPU_NUM_THREADS> BlockReduce;
+  __shared__ typename BlockReduce::TempStorage temp_storage;
+  input = BlockReduce(temp_storage).Sum(input);
+}
+
 __global__
 void accuracy_kernel(
     const int N,
@@ -17,8 +24,6 @@ void accuracy_kernel(
     const int* labelData,
     int* accuracy)
 {
-  typedef hipcub::BlockReduce<int, GPU_NUM_THREADS> BlockReduce;
-  __shared__ typename BlockReduce::TempStorage temp_storage;
   int count = 0;
 
   for (int row = blockIdx.x; row < N; row += gridDim.x) {
@@ -31,7 +36,7 @@ void accuracy_kernel(
         ++ngt;
       }
     }
-    ngt = BlockReduce(temp_storage).Sum(ngt);
+    BlockReduce(ngt);
     if (ngt <= top_k) {
       ++count;
     }

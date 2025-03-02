@@ -7,6 +7,11 @@
 
 #define GPU_NUM_THREADS 256
 
+template <typename T>
+void BlockReduce(T &input, sycl::nd_item<1> &item) {
+  input = sycl::reduce_over_group(item.get_group(), input, sycl::plus<>());
+}
+
 void accuracy_kernel(
     sycl::nd_item<1> &item,
     const int N,
@@ -28,7 +33,7 @@ void accuracy_kernel(
         ++ngt;
       }
     }
-    ngt = sycl::reduce_over_group(item.get_group(), ngt, std::plus<>());
+    BlockReduce(ngt, item);
     if (ngt <= top_k) {
       ++count;
     }
