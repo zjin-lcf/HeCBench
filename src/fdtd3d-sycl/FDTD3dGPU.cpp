@@ -87,12 +87,12 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
         cgh.parallel_for<class finite_difference>(
           sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
           bool valid = true;
-          const int gtidx = item.get_global_id(1);
-          const int gtidy = item.get_global_id(0);
           const int ltidx = item.get_local_id(1);
           const int ltidy = item.get_local_id(0);
           const int workx = item.get_local_range(1);
           const int worky = item.get_local_range(0);
+          const int gtidx = item.get_global_id(1);
+          const int gtidy = item.get_global_id(0);
           
           const int stride_y = dimx + 2 * k_radius_default;
           const int stride_z = stride_y * (dimy + 2 * k_radius_default);
