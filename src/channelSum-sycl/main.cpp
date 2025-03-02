@@ -55,6 +55,12 @@ typedef int scalar_t;
 
 
 template <typename T>
+void BlockReduce(T &input1, T &input2, sycl::nd_item<2> &item) {
+  input1 = sycl::reduce_over_group(item.get_group(), input1, sycl::plus<>());
+  input2 = sycl::reduce_over_group(item.get_group(), input2, sycl::plus<>());
+}
+
+template <typename T>
 void ChannelSumNCHW(
     sycl::nd_item<2> item,
     const int N,
@@ -79,10 +85,8 @@ void ChannelSumNCHW(
       v_val += *(X + index) * *(X + index);
     }
   }
-  auto g = item.get_group();
-  m_val = sycl::reduce_over_group(g, m_val, std::plus<>());
-  v_val = sycl::reduce_over_group(g, v_val, std::plus<>());
 
+  BlockReduce<T>(m_val, v_val, item);
   if (item.get_local_id(1) == 0 && item.get_local_id(0) == 0) {
     sum[c] = m_val;
     sumsq[c] = v_val;
@@ -91,7 +95,7 @@ void ChannelSumNCHW(
 
 template <typename T>
 void ChannelSumNHWC(
-    sycl::nd_item<1> &item,
+    sycl::nd_item<2> &item,
     const int N,
     const int C,
     const int HxW,
@@ -100,20 +104,18 @@ void ChannelSumNHWC(
     T*__restrict__ sumsq)
 {
   const int inner_size = N * HxW;
-  const int c = item.get_group(0);
+  const int c = item.get_group(1);
   T m_val = 0;
   T v_val = 0;
-  for (int i = item.get_local_id(0); i < inner_size;
-       i += item.get_local_range(0)) {
+  for (int i = item.get_local_id(1); i < inner_size;
+       i += item.get_local_range(1)) {
     const int index = i * C + c;
     m_val += *(X + index);
     v_val += *(X + index) * *(X + index);
   }
 
-  auto g = item.get_group();
-  m_val = sycl::reduce_over_group(g, m_val, std::plus<>());
-  v_val = sycl::reduce_over_group(g, v_val, std::plus<>());
-  if (item.get_local_id(0) == 0) {
+  BlockReduce<T>(m_val, v_val, item);
+  if (item.get_local_id(1) == 0) {
     sum[c] = m_val;
     sumsq[c] = v_val;
   }
@@ -153,14 +155,14 @@ void ComputeChannelSumNHWC (
     long &time,
     int repeat)
 {
-  sycl::range<1> lws (NUM_THREADS);
-  sycl::range<1> gws (C * NUM_THREADS);
+  sycl::range<2> lws (1, NUM_THREADS);
+  sycl::range<2> gws (1, C * NUM_THREADS);
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         ChannelSumNHWC<scalar_t>(item, N, C, HxW, X, sum, sumsq);
       });
     });
