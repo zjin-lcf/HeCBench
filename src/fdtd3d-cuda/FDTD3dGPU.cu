@@ -23,18 +23,18 @@ __global__ void finite_difference(
   const int dimx, const int dimy, const int dimz,
   const int padding)
 {
+  __shared__ float tile[k_blockDimMaxY + 2 * k_radius_default][k_blockDimMaxX + 2 * k_radius_default];
+
   bool valid = true;
-  const int gtidx = blockIdx.x * blockDim.x + threadIdx.x;
-  const int gtidy = blockIdx.y * blockDim.y + threadIdx.y;
   const int ltidx = threadIdx.x;
   const int ltidy = threadIdx.y;
   const int workx = blockDim.x;
   const int worky = blockDim.y;
+  const int gtidx = blockIdx.x * workx + ltidx;
+  const int gtidy = blockIdx.y * worky + ltidy;
 
   const int stride_y = dimx + 2 * k_radius_default;
   const int stride_z = stride_y * (dimy + 2 * k_radius_default);
-
-  __shared__ float tile[k_blockDimMaxY + 2 * k_radius_default][k_blockDimMaxX + 2 * k_radius_default];
 
   int inputIndex  = 0;
   int outputIndex = 0;
