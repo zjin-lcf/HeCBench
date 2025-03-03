@@ -17,7 +17,7 @@ void reference (
   for (int i = 0; i < numNeurons; i++)
   {
     int neuron_index = i % neurons_per_item;
-    int item_index = (int)(i / neurons_per_item);
+    int item_index = i / neurons_per_item;
 
     float voltage = voltage_array[i];
     float ref_time = reftime_array[i];
@@ -66,7 +66,7 @@ void test (
   for (int i = 0; i < numNeurons; i++)
   {
     int neuron_index = i % neurons_per_item;
-    int item_index = (int)(i / neurons_per_item);
+    int item_index = i / neurons_per_item;
 
     float voltage = voltage_array[i];
     float ref_time = reftime_array[i];
