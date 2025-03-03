@@ -18,7 +18,7 @@ void reference (
   for (int i = 0; i < numNeurons; i++)
   {
     int neuron_index = i % neurons_per_item;
-    int item_index = (int)(i / neurons_per_item);
+    int item_index = i / neurons_per_item;
 
     float voltage = voltage_array[i];
     float ref_time = reftime_array[i];
@@ -34,8 +34,8 @@ void reference (
     mult *= -1.f / dt;
     mult += 1.f;
 
-    mult = fminf(mult, 1.f);
-    mult = fmaxf(mult, 0.f);
+    mult = mult > 1.f ? 1.f : mult;
+    mult = mult < 0.f ? 0.f : mult;
 
     voltage *= mult;
 
@@ -64,11 +64,11 @@ __global__ void lif (
     const float*__restrict__ gain,
           float*__restrict__ spikes)
 {
-  int i = threadIdx.x + blockDim.x * blockIdx.x;
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < numNeurons)
   {
     int neuron_index = i % neurons_per_item;
-    int item_index = (int)(i / neurons_per_item);
+    int item_index = i / neurons_per_item;
 
     float voltage = voltage_array[i];
     float ref_time = reftime_array[i];
@@ -84,8 +84,8 @@ __global__ void lif (
     mult *= -1.f / dt;
     mult += 1.f;
 
-    mult = mult > 1.f ? 1.f : mult;
-    mult = mult < 0.f ? 0.f : mult;
+    mult = fminf(mult, 1.f);
+    mult = fmaxf(mult, 0.f);
     
     voltage *= mult;
 
