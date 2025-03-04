@@ -115,6 +115,57 @@ __global__ void softmax_forward_online_kernel2(float* out, const float* inp, int
   }
 }
 
+__global__ void softmax_forward_online_kernel3(float* __restrict__ out, const float* __restrict__ inp, int N, int C) {
+  __shared__ float smem[1024];
+
+  int row = blockIdx.x;
+  if (row >= N) return;
+
+  const float* x = inp + row * C;
+  float* y = out + row * C;
+  float maxval = -INFINITY;
+  float sumval = 0.0f;
+
+  int tid = threadIdx.x;
+  for (int i = tid; i < C; i += blockDim.x) {
+      float v = x[i];
+      if (v > maxval) {
+          sumval *= expf(maxval - v);
+          maxval = v;
+      }
+      sumval += expf(v - maxval);
+  }
+
+  smem[tid] = maxval;
+  __syncthreads();
+
+  for (int stride = blockDim.x / 2; stride > 0; stride /= 2) {
+      if (tid < stride) {
+          smem[tid] = fmaxf(smem[tid], smem[tid + stride]);
+      }
+      __syncthreads();
+  }
+
+  float row_max = smem[0];
+  __syncthreads();
+
+  smem[tid] = sumval * expf(maxval - row_max);
+  __syncthreads();
+
+  for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+      if (tid < stride) {
+          smem[tid] += smem[tid + stride];
+      }
+      __syncthreads();
+  }
+  float row_sum = smem[0];
+  __syncthreads();
+
+  for (int i = tid; i < C; i += blockDim.x) {
+      y[i] = expf(x[i] - row_max) / row_sum;
+  }
+}
+
 // Baseline softmax
 __global__ void softmax_forward_baseline_kernel(float* out, const float* inp, int N, int C) {
   int tid = threadIdx.x;
@@ -177,6 +228,13 @@ void softmax_forward_online2(float* out, const float* inp, int N, int C,
   hipCheck(hipDeviceSynchronize());
 }
 
+void softmax_forward_online3(float* out, const float* inp, int N, int C,
+                             int warp_size, int block_size) {
+  const int grid_size = N;
+  softmax_forward_online_kernel3 <<<grid_size, block_size >>> (out, inp, N, C);
+  hipCheck(hipDeviceSynchronize());
+}
+
 // kernel version dispatch
 void softmax_forward(int kernel_num, float* out, const float* inp, int N, int C,
                      const int warp_size, const int block_size) {
@@ -190,6 +248,9 @@ void softmax_forward(int kernel_num, float* out, const float* inp, int N, int C,
       break;
     case 3:
       softmax_forward_online2(out, inp, N, C, warp_size, block_size);
+      break;
+    case 4:
+      softmax_forward_online3(out, inp, N, C, warp_size, block_size);
       break;
     default:
       printf("Invalid kernel number\n");

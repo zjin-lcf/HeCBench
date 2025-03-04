@@ -30,7 +30,7 @@ inline SumMax reduce_sum_max_op(SumMax a, SumMax b) {
     res.maxval = bigger_m.maxval;
     res.sum =
         bigger_m.sum +
-        smaller_m.sum * sycl::native::exp(smaller_m.maxval - bigger_m.maxval);
+        smaller_m.sum * sycl::exp(smaller_m.maxval - bigger_m.maxval);
     return res;
 }
 
@@ -68,7 +68,7 @@ void softmax_forward_online_kernel(float* out, const float* inp, int N, int C,
   // divide the whole row by the sum
   for (int i = warp.get_local_linear_id(); i < C;
        i += warp.get_local_linear_range()) {
-    y[i] = sycl::native::exp(x[i] - sm_total.maxval) / sm_total.sum;
+    y[i] = sycl::exp(x[i] - sm_total.maxval) / sm_total.sum;
   }
 }
 */
@@ -99,8 +99,8 @@ void softmax_forward_online_kernel2(float* out, const float* inp, int N, int C,
     // when updating the maxval, dynamically updates the previous sumval by
     // multiplying e^{previous_maxval - current_maxval}
     bigger = sycl::fmax(maxval, (float)(x[i]));
-    sumval = sumval * sycl::native::exp(maxval - bigger) +
-             sycl::native::exp(x[i] - bigger);
+    sumval = sumval * sycl::exp(maxval - bigger) +
+             sycl::exp(x[i] - bigger);
     maxval = bigger;
   }
 
@@ -113,10 +113,10 @@ void softmax_forward_online_kernel2(float* out, const float* inp, int N, int C,
     offsetMaxval = sycl::shift_group_left(warp, maxval, offset);
     offsetSumval = sycl::shift_group_left(warp, sumval, offset);
     if (offsetMaxval > maxval) {
-      sumval *= sycl::native::exp(maxval - offsetMaxval);
+      sumval *= sycl::exp(maxval - offsetMaxval);
       maxval = offsetMaxval;
     } else {
-      offsetSumval *= sycl::native::exp(offsetMaxval - maxval);
+      offsetSumval *= sycl::exp(offsetMaxval - maxval);
     }
     sumval += offsetSumval;
   }
@@ -128,7 +128,58 @@ void softmax_forward_online_kernel2(float* out, const float* inp, int N, int C,
 
   for (int i = laneId; i < C;
        i += warp.get_max_local_range()[0]) {
-    y[i] = sycl::native::exp(x[i] - maxval) / sumval;
+    y[i] = sycl::exp(x[i] - maxval) / sumval;
+  }
+}
+
+void softmax_forward_online_kernel3(float* __restrict__ out, const float* __restrict__ inp, int N, int C,
+                                    float* __restrict__ smem, sycl::nd_item<1> &item) {
+  int row = item.get_group(0);
+  if (row >= N) return;
+
+  const float* x = inp + row * C;
+  float* y = out + row * C;
+  float maxval = -INFINITY;
+  float sumval = 0.0f;
+
+  int tid = item.get_local_id(0); 
+  int block_size = item.get_local_range(0);
+  for (int i = tid; i < C; i += block_size) {
+      float v = x[i];
+      if (v > maxval) {
+          sumval *= sycl::exp(maxval - v);
+          maxval = v;
+      }
+      sumval += sycl::exp(v - maxval);
+  }
+
+  smem[tid] = maxval;
+  item.barrier(sycl::access::fence_space::local_space);
+
+  for (int stride = block_size / 2; stride > 0; stride /= 2) {
+      if (tid < stride) {
+          smem[tid] = sycl::fmax(smem[tid], smem[tid + stride]);
+      }
+      item.barrier(sycl::access::fence_space::local_space);
+  }
+
+  float row_max = smem[0];
+  item.barrier(sycl::access::fence_space::local_space);
+
+  smem[tid] = sumval * sycl::exp(maxval - row_max);
+  item.barrier(sycl::access::fence_space::local_space);
+
+  for (int stride = block_size / 2; stride > 0; stride >>= 1) {
+      if (tid < stride) {
+          smem[tid] += smem[tid + stride];
+      }
+      item.barrier(sycl::access::fence_space::local_space);
+  }
+  float row_sum = smem[0];
+  item.barrier(sycl::access::fence_space::local_space);
+
+  for (int i = tid; i < C; i += block_size) {
+      y[i] = sycl::exp(x[i] - row_max) / row_sum;
   }
 }
 
@@ -167,7 +218,7 @@ void softmax_forward_baseline_kernel(float* out, const float* inp, int N, int C,
   sumval = sycl::select_from_group(warp, sumval, 0);
 
   for (int i = laneId; i < C; i += warp.get_max_local_range()[0]) {
-    y[i] = sycl::native::exp(x[i] - maxval) / sumval;
+    y[i] = sycl::exp(x[i] - maxval) / sumval;
   }
 }
 
@@ -199,7 +250,20 @@ void softmax_forward_online2(sycl::queue &q, float* out, const float* inp, int N
       sycl::nd_range<1>(grid_size * block_size, block_size),
       [=](sycl::nd_item<1> item) { //[[intel::reqd_sub_group_size(warp_size)]] {
         softmax_forward_online_kernel2(out, inp, N, C, item);
-      }).wait();
+  }).wait();
+}
+
+void softmax_forward_online3(sycl::queue &q, float* out, const float* inp, int N, int C,
+                             int warp_size, int block_size) {
+  const int grid_size = N;
+  q.submit([&] (sycl::handler &h) {
+    sycl::local_accessor<float, 1> smem (sycl::range<1>{1024}, h);
+    h.parallel_for(sycl::nd_range<1>(grid_size * block_size, block_size),
+      [=](sycl::nd_item<1> item) { //[[intel::reqd_sub_group_size(warp_size)]] {
+        softmax_forward_online_kernel3(out, inp, N, C,
+                                       smem.get_multi_ptr<sycl::access::decorated::no>().get(),item);
+    });
+  }).wait();
 }
 
 // kernel version dispatch
@@ -216,6 +280,9 @@ void softmax_forward(int kernel_num, sycl::queue &q,
       break;
     case 3:
       softmax_forward_online2(q, out, inp, N, C, warp_size, block_size);
+      break;
+    case 4:
+      softmax_forward_online3(q, out, inp, N, C, warp_size, block_size);
       break;
     default:
       printf("Invalid kernel number\n");
