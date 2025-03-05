@@ -36,7 +36,7 @@ int main (int argc, char *argv[]) {
   }
 
   // Start to measure the processing time
-  clock_t startTime = clock();
+  auto startTime = std::chrono::steady_clock::now();
 
   // Change to the queries sub-directory and get a list of the query files
   if (changeToSubDirectory(basePath, subDirQueries) != 0) {
@@ -132,8 +132,9 @@ int main (int argc, char *argv[]) {
   }
 
   // Output the total processing time
-  clock_t totalTime = clock() - startTime;
-  std::cout << "Time in taken in seconds :"<< (double)totalTime / ((double)CLOCKS_PER_SEC)<< std::endl;
+  auto endTime = std::chrono::steady_clock::now();
+  auto totalTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+  std::cout << "Time in taken in seconds :"<< (double)totalTime * 1e-9f<< std::endl;
 
   // Output a friendly message, unless everything failed
   if (success)

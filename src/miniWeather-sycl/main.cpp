@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <mpi.h>
-#include <time.h>
+#include <chrono>
 #include <sycl/sycl.hpp>
 
 const double pi        = 3.14159265358979323846264338327;   //Pi
@@ -965,7 +965,7 @@ int main(int argc, char **argv) {
   ////////////////////////////////////////////////////
   // MAIN TIME STEP LOOP
   ////////////////////////////////////////////////////
-  auto c_start = clock();
+  auto c_start = std::chrono::steady_clock::now();
 
   while (etime < sim_time) {
     //If the time step leads to exceeding the simulation time, shorten it for the last step
@@ -992,9 +992,10 @@ int main(int argc, char **argv) {
     etime = etime + dt;
   }
 
-  auto c_end = clock();
+  auto c_end =  std::chrono::steady_clock::now();
+  auto c_time = std::chrono::duration_cast<std::chrono::nanoseconds>(c_end - c_start).count();
   if (masterproc)
-    printf("Total main time step loop: %lf sec\n", ( (double) (c_end-c_start) ) / CLOCKS_PER_SEC);
+    printf("Total main time step loop: %lf sec\n", c_time * 1e-9f );
 
   //Final reductions for mass, kinetic energy, and total energy
   reductions(mass, te, hs, nx, nz, dx, dz, d_state, d_hy_dens_cell, d_hy_dens_theta_cell, q);

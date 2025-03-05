@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <chrono>
 #include <sycl/sycl.hpp>
 
 
@@ -144,12 +145,14 @@ int main(int argc, char* argv[])
     for (int j=1; j<=nocc; j++) {
       for (int i=1; i<=nocc; i++) {
         for (int k=klo; k<=MIN(khi,i); k++) {
-          clock_t t0 = clock();
+          auto t0 = std::chrono::steady_clock::now();
           ccsd_trpdrv(q, f1n, f1t, f2n, f2t, f3n, f3t, f4n, f4t, eorb,
               &ncor, &nocc, &nvir, &emp4, &emp5, &a, &i, &j, &k, &klo,
               Tij, Tkj, Tia, Tka, Xia, Xka, Jia, Jka, Kia, Kka, Jij, Jkj, Kij, Kkj,
               dintc1, dintx1, t1v1, dintc2, dintx2, t1v2);
-          timers[iter] = (double)(clock()-t0) / CLOCKS_PER_SEC;
+          auto t1 = std::chrono::steady_clock::now();
+          auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+          timers[iter] = time * 1e-9f;
 
           iter++;
           if (iter==maxiter) {
