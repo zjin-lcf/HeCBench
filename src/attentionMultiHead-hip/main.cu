@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <hip/hip_runtime.h>
 #include <hipcub/hipcub.hpp>
+#include "reference.h"
 
 __global__
 void mha (
@@ -165,6 +166,7 @@ int main(int argc, char* argv[])
   float *hk = (float*)malloc(k_size_bytes);
   float *hv = (float*)malloc(v_size_bytes);
   float *h_dst = (float*)malloc(q_size_bytes);
+  float *r_dst = (float*)malloc(q_size_bytes);
 
   // Initialize query, key and value matrices
   srand(123);
@@ -206,21 +208,24 @@ int main(int argc, char* argv[])
   hipFree(dv);
   hipFree(dst);
 
-  // compute distances as simple checksums
-  for (int i = 0; i < beamsize - 1; i++) {
-    float sum = 0.f;
-    for (int j = 0; j < dim_feature; j++) {
-       float d = h_dst[i * dim_feature + j] -
-                 h_dst[(i + 1) * dim_feature + j];
-       sum += d * d;
-    }
-    printf("Distance between beams %d and %d: %f\n", i, i+1, sqrtf(sum));
-  }
+  mha_reference(hq, hk, hv, beamsize, n_steps, qk_col, v_col, nhead, scaler, THRESHOLD, r_dst);
 
+  bool ok = true;
+  for (int i = 0; i < beamsize; i++) {
+    for (int j = 0; j < dim_feature; j++) {
+      if (fabsf(h_dst[i*dim_feature+j] - r_dst[i*dim_feature+j]) > 1e-3f) {
+        ok = false;
+        break;
+      }
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");    
+  
   free(hq);
   free(hk);
   free(hv);
   free(h_dst);
+  free(r_dst);
 
   return 0;
 }
