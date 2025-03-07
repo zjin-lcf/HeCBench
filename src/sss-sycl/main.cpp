@@ -132,7 +132,6 @@ int main(int argc, char *argv[]) {
   long int k;
   Real score;
   char initID[] = {'1', '2', '3'};
-  double wall_time;
 
   // Initializing gsl random variate generators and integration tools
   const gsl_rng_type *T;
@@ -464,7 +463,7 @@ int main(int argc, char *argv[]) {
       score += state->pll[l];
     }
     auto now = std::chrono::steady_clock::now();
-    wall_time =  std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
+    auto wall_time =  std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
     wall_time = wall_time * 1e-9;
     num_allModels += num_cases;
     printf("k=%ld L=%d score=%.4f localBestScore=%.4f globalBestScore=%.4f "

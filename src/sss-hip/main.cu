@@ -6,7 +6,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
+#include <chrono>
 
 #define SSS     // Runs the Stochastic Shotgun Search
 #define USE_GPU // If uncommented, runs kernels on GPU
@@ -132,8 +132,6 @@ int main(int argc, char *argv[]) {
   long int k;
   Real score;
   char initID[] = {'1', '2', '3'};
-  clock_t start, now;
-  double cpu_time;
 
   // Initializing gsl random variate generators and integration tools
   const gsl_rng_type *T;
@@ -280,7 +278,7 @@ int main(int argc, char *argv[]) {
          num_cases, num_allModels);
 
   // start the stopwatch
-  start = clock();
+  auto start = std::chrono::steady_clock::now();
   while (nmodes <= maxNmodes) {
     k++;
     num_cases = 0;
@@ -464,13 +462,14 @@ int main(int argc, char *argv[]) {
     for (l = 0; l < L; l++) {
       score += state->pll[l];
     }
-    now = clock();
-    cpu_time = ((double)(now - start)) / CLOCKS_PER_SEC;
+    auto now = std::chrono::steady_clock::now();
+    auto wall_time =  std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
+    wall_time = wall_time * 1e-9;
     num_allModels += num_cases;
     printf("k=%ld L=%d score=%.4f localBestScore=%.4f globalBestScore=%.4f "
-           "nmodes=%d cpu_time=%.4f num_cases=%d num_allModels=%ld\n",
+           "nmodes=%d wall_time=%.4f num_cases=%d num_allModels=%ld\n",
            k, state->L, score, localBestScore, globalBestScore, nmodes,
-           cpu_time, num_cases, num_allModels);
+           wall_time, num_cases, num_allModels);
 
     if (score > localBestScore) {
       localBestScore = score;
