@@ -9,7 +9,7 @@
 #include <vector>
 #include <algorithm>
 #include <random>
-#include <ctime>
+#include <chrono>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
