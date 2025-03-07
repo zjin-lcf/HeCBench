@@ -134,7 +134,7 @@ int main (int argc, char *argv[]) {
   // Output the total processing time
   auto endTime = std::chrono::steady_clock::now();
   auto totalTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
-  std::cout << "Time in taken in seconds :"<< (double)totalTime * 1e-9f<< std::endl;
+  std::cout << "Time in taken in seconds :"<< (double)totalTime * 1e-9 << std::endl;
 
   // Output a friendly message, unless everything failed
   if (success)
