@@ -1,7 +1,6 @@
 #ifndef LINEAR_H__
 #define LINEAR_H__
 
-#include <time.h>
 #include <math.h>
 #include <omp.h>
 
@@ -11,10 +10,6 @@
 #define TEMP_SIZE 96453
 #define TEMP_WORKGROUP_SIZE 63
 #define TEMP_WORKGROUP_NBR (TEMP_SIZE / TEMP_WORKGROUP_SIZE)
-
-#define CALC_TIME (((double)(end - start)) / CLOCKS_PER_SEC) * 1000
-#define START_TIME start = clock();
-#define END_TIME end = clock();
 
 #define LOG_DATASET() \
   for (int i = 0; i < DATASET_SIZE; i++) \
@@ -74,8 +69,6 @@ typedef struct {
 } results_t;
 
 typedef float2 rsquared_t;
-
-extern clock_t start, end;
 
 void parallelized_regression(linear_param_t *, data_t *, result_t *);
 void iterative_regression(linear_param_t *, data_t *, result_t *);
