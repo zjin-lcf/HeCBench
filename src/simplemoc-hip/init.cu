@@ -109,10 +109,9 @@ double get_time(void)
   return omp_get_wtime();
 #endif
 
-  time_t time;
-  time = clock();
-
-  return (double) time / (double) CLOCKS_PER_SEC;
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (double) tv.tv_usec * 1e-6f + tv.tv_sec;
 }
 
 Source* copy_sources( Input * I, Source *S ) 
