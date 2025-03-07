@@ -995,7 +995,7 @@ int main(int argc, char **argv) {
   auto c_end =  std::chrono::steady_clock::now();
   auto c_time = std::chrono::duration_cast<std::chrono::nanoseconds>(c_end - c_start).count();
   if (masterproc)
-    printf("Total main time step loop: %lf sec\n", c_time * 1e-9f );
+    printf("Total main time step loop: %lf sec\n", c_time * 1e-9);
 
   //Final reductions for mass, kinetic energy, and total energy
   reductions(mass, te, hs, nx, nz, dx, dz, d_state, d_hy_dens_cell, d_hy_dens_theta_cell, q);

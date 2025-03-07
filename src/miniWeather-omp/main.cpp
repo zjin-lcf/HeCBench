@@ -11,7 +11,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <mpi.h>
-#include <time.h>
+#include <chrono>
+#include <omp.h>
 
 const double pi        = 3.14159265358979323846264338327;   //Pi
 const double grav      = 9.8;                               //Gravitational acceleration (m / s^2)
@@ -148,10 +149,9 @@ int main(int argc, char **argv) {
   //Initial reductions for mass, kinetic energy, and total energy
   reductions(mass0,te0);
 
-  ////////////////////////////////////////////////////
   // MAIN TIME STEP LOOP
-  ////////////////////////////////////////////////////
-  auto c_start = clock();
+  auto c_start = std::chrono::steady_clock::now();
+
   while (etime < sim_time) {
     //If the time step leads to exceeding the simulation time, shorten it for the last step
     if (etime + dt > sim_time) { dt = sim_time - etime; }
@@ -160,10 +160,11 @@ int main(int argc, char **argv) {
     //Update the elapsed time and output counter
     etime = etime + dt;
   }
-  auto c_end = clock();
-  if (masterproc) {
-     printf("CPU Time: %lf sec\n",( (double) (c_end-c_start) ) / CLOCKS_PER_SEC);
-  }
+
+  auto c_end =  std::chrono::steady_clock::now();
+  auto c_time = std::chrono::duration_cast<std::chrono::nanoseconds>(c_end - c_start).count();
+  if (masterproc)
+    printf("Total main time step loop: %lf sec\n", c_time * 1e-9);
 
   //Final reductions for mass, kinetic energy, and total energy
   reductions(mass,te);
