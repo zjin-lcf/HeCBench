@@ -44,7 +44,7 @@ void initialize_data (float* f) {
 
 int main () {
   // Begin wall timing
-  std::clock_t start_time = std::clock();
+  auto start_time = std::chrono::steady_clock::now();
 
   // Reserve space for the scalar field and the "old" copy of the data
   float* f = (float*) aligned_alloc(64, N * N * sizeof(float));
@@ -233,7 +233,9 @@ int main () {
   free(f_old);
 
   // End wall timing
-  double duration = (std::clock() - start_time) / (double) CLOCKS_PER_SEC;
+  auto end_time = std::chrono::steady_clock::now();
+  auto total_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
+  double duration = total_time * 1e-9;
   std::cout << "Total elapsed time: " << std::setprecision(4) << duration << " seconds" << std::endl;
 
   return 0;
