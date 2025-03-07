@@ -139,7 +139,7 @@ __global__ void swap_data (const float*__restrict__ f,
 
 int main () {
   // Begin wall timing
-  std::clock_t start_time = std::clock();
+  auto start_time = std::chrono::steady_clock::now();
 
   float* d_f;
   float* d_f_old;
@@ -228,7 +228,8 @@ int main () {
   free(f_old);
 
   // End wall timing
-  double duration = (std::clock() - start_time) / (double) CLOCKS_PER_SEC;
+  auto total_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
+  double duration = total_time * 1e-9;
   std::cout << "Total elapsed time: " << std::setprecision(4) << duration << " seconds" << std::endl;
 
   return 0;
