@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <math.h>
+#include <chrono>
 #include <cuda.h>
 #include "kernels.h"
 
@@ -125,8 +125,9 @@ double run_benchmark(BoxCU &domain, lbm_vars h_vars, lbm_vars d_vars) {
                       d_vars, domain, domain, domain.nz, 0, 0, 0, 1.));
   int iter = 0;
   int num_bench_iter = 0;
-  clock_t start = clock();
-  clock_t end = 0;
+
+  auto start = std::chrono::steady_clock::now();
+  auto end = std::chrono::steady_clock::now();
 
   printf("Starting %d warmup iterations\n", bench_ini_iter);
   // Main time loop of the simulation.
@@ -135,7 +136,7 @@ double run_benchmark(BoxCU &domain, lbm_vars h_vars, lbm_vars d_vars) {
     bool do_output = iter < bench_ini_iter && iter > 0 && (iter % output_frame == 0 || iter == 149);
     if (iter == bench_ini_iter) {
       printf("Starting %d benchmark iterations\n", bench_max_iter - bench_ini_iter);
-      start = clock();
+      start = std::chrono::steady_clock::now();
     }
     if (iter >= bench_ini_iter) {
       ++num_bench_iter;
@@ -185,9 +186,9 @@ double run_benchmark(BoxCU &domain, lbm_vars h_vars, lbm_vars d_vars) {
       }
     }
   }
-  end = clock();
-  double elapsed = ((double)(end - start)) / CLOCKS_PER_SEC;
-  double mlups = ((double)nl*(double)num_bench_iter / elapsed) / 1.e6;
+  end = std::chrono::steady_clock::now();
+  auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  double mlups = ((double)nl*(double)num_bench_iter / (elapsed * 1e-9f)) / 1.e6;
   return mlups;
 }
 
