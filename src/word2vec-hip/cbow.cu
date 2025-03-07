@@ -211,7 +211,7 @@ void initializeGPU(){
   hipCheck(hipMalloc((void**) &d_syn0, syn0_size * sizeof(real)));
   hipCheck(hipMemcpy(d_syn0, syn0, syn0_size * sizeof(real), hipMemcpyHostToDevice));
 
-  hipCheck(hipMallocHost((void**)&sen, (MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM) * sizeof(int) ));
+  hipCheck(hipHostMalloc((void**)&sen, (MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM) * sizeof(int) ));
   hipCheck(hipMalloc((void**)&d_sen, (MAX_SENTENCE_NUM * MAX_SENTENCE_LENGTH + MAX_SENTENCE_NUM) * sizeof(int) ));
 
   hipCheck(hipMalloc((void**) &d_random, MAX_SENTENCE_LENGTH * sizeof(unsigned int)));
