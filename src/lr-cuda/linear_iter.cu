@@ -26,7 +26,6 @@ void iterative_regression(
   data_t * dataset, 
   result_t * response) 
 {
-  START_TIME
   sum_t sumset = {0, 0, 0, 0};
 
   for (size_t i = 0; i < params->size; i++) {
