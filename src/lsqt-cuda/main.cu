@@ -45,10 +45,11 @@ int main(int argc, char* argv[])
       continue;
     }
     print_start(directory);
-    clock_t time_begin = clock();
+    auto time_begin = std::chrono::steady_clock::now();
     lsqt(directory);
-    clock_t time_finish = clock();
-    real time_used = real(time_finish - time_begin) / CLOCKS_PER_SEC;
+    auto time_finish = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(time_finish - time_begin).count();
+    real time_used = time * 1e-9f;
     print_finish(directory, time_used);
   }
   return 0;
