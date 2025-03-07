@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
-#include <time.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 
 #define WIDTH        256
@@ -396,14 +396,12 @@ int main(int argc, char **argv)
 
   unsigned char *img = ( unsigned char * )malloc( WIDTH * HEIGHT * 3 );
 
-  clock_t start;
-  start = clock();
+  auto start = std::chrono::steady_clock::now();
   for( int i = 0; i < LOOPMAX; ++i ){
     render( img, WIDTH, HEIGHT, NSUBSAMPLES, spheres, plane );
   }
-  clock_t end = clock();
-  float delta = ( float )end - ( float )start;
-  float msec = delta * 1000.0 / ( float )CLOCKS_PER_SEC;
+  auto end = std::chrono::steady_clock::now();
+  auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
   printf( "Total render time (%d iterations): %f sec.\n", LOOPMAX, msec / 1000.0 );
   printf( "Average render time: %f sec.\n", msec / 1000.0 / (float)LOOPMAX );
