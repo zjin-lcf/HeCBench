@@ -352,7 +352,7 @@ int main(int argc, char *argv[]) {
       modesList->UpdateList(globalBestState);
       nmodes++;
       gsl_rng_set(rnd, seedset[nmodes - 1]);
-      start = clock();
+      start = std::chrono::steady_clock::now();
       k = 0;
       localBestScore = NEG_INF;
       globalBestScore = NEG_INF;
