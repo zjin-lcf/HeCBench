@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
+#include <chrono>
+#include <math.h>
 #include <sycl/sycl.hpp>
-
-#define WARP_SIZE 32
+#include "reference.h"
 
 template<typename T, typename C>
 inline
@@ -22,11 +23,10 @@ void welford_merge_element(C& count,
 
 template<typename T>
 inline
-void warp_reduce_mean_m2n(sycl::nd_item<2> &item, T &mean, T &m2n, int &num)
+void warp_reduce_mean_m2n(sycl::sub_group &sg, T &mean, T &m2n, int &num)
 {
-  auto sg = item.get_sub_group();
   #pragma unroll
-  for(int i = WARP_SIZE/2; i > 0; i >>= 1) {
+  for(int i = sg.get_max_local_range()[0] / 2; i > 0; i >>= 1) {
     auto num_new = sycl::shift_group_left(sg, num, i);
     auto mean_new = sycl::shift_group_left(sg, mean, i);
     auto m2n_new = sycl::shift_group_left(sg, m2n, i);
@@ -45,11 +45,12 @@ void welford_reduce_mean_m2n(
       int block_size,
       int thread_id)
 {
-  int lane = thread_id % WARP_SIZE;
-  int wid = thread_id / WARP_SIZE;
+  sycl::sub_group warp = item.get_sub_group();
+  int lane = warp.get_local_linear_id();
+  int wid = warp.get_group_linear_id();
 
-  if (block_size > 32) {
-    warp_reduce_mean_m2n(item, mean, m2n, num);
+  if (block_size > warp.get_max_local_range()[0]) {
+    warp_reduce_mean_m2n(warp, mean, m2n, num);
     if (lane == 0) {
       x[wid*2] = mean;
       x[wid*2+1] = m2n;
@@ -59,13 +60,13 @@ void welford_reduce_mean_m2n(
     item.barrier(sycl::access::fence_space::local_space);
 
     if (wid == 0) {
-      mean = (thread_id < block_size / WARP_SIZE)? x[lane*2] : T(0);
-      m2n = (thread_id < block_size / WARP_SIZE)? x[lane*2+1] : T(0);
-      num = (thread_id < block_size / WARP_SIZE)? count[lane] : int(0);
+      mean = (thread_id < warp.get_group_linear_range()) ? x[lane*2] : T(0);
+      m2n = (thread_id < warp.get_group_linear_range()) ? x[lane*2+1] : T(0);
+      num = (thread_id < warp.get_group_linear_range()) ? count[lane] : int(0);
     }
   }
 
-  if (wid==0) warp_reduce_mean_m2n(item, mean, m2n, num);
+  if (wid==0) warp_reduce_mean_m2n(warp, mean, m2n, num);
 }
 
 template <typename scalar_t, typename accscalar_t, typename outscalar_t>
@@ -74,6 +75,7 @@ void welford_kernel(
       const scalar_t* __restrict input,
       outscalar_t* __restrict out_mean,
       outscalar_t* __restrict out_var_biased,
+      int *s_mem,
       const int bs,
       const int fs,
       const int ss)
@@ -103,10 +105,8 @@ void welford_kernel(
     }
   }
 
-  sycl::multi_ptr<int[160], sycl::access::address_space::local_space> localPtr =
-      sycl::ext::oneapi::group_local_memory_for_overwrite<int[160]>(item.get_group());
-  int* s_mem = *localPtr;
-  accscalar_t* s_mem_ac = (accscalar_t*) &s_mem[32];
+  accscalar_t* s_mem_ac = (accscalar_t*) (s_mem + 
+    item.get_sub_group().get_max_local_range()[0] / 2);
 
   welford_reduce_mean_m2n<accscalar_t>(
     item, s_mem_ac, s_mem, x_mean, m_2_n, count, block_size, thread_id);
@@ -148,6 +148,8 @@ int main(int argc, char* argv[])
 
   float *mean = (float*) malloc (fs_bytes);
   float *var = (float*) malloc (fs_bytes);
+  float *r_mean = (float*) malloc (fs_bytes);
+  float *r_var = (float*) malloc (fs_bytes);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -167,12 +169,15 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor<int, 1> sm (160, cgh);
       cgh.parallel_for<class welford>(
         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item)
         //[[intel::reqd_sub_group_size(WARP_SIZE)]] 
       {
         welford_kernel<float, float, float>(
-          item, d_input, d_mean, d_var, batch_size, feature_size, spatial_size);
+          item, d_input, d_mean, d_var, 
+          sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+          batch_size, feature_size, spatial_size);
       });
     });
   }
@@ -186,15 +191,18 @@ int main(int argc, char* argv[])
   q.memcpy(mean, d_mean, fs_bytes);
   q.wait();
 
-  double avg_var = 0.0, avg_mean = 0.0;
-  for (int i = 0; i < feature_size; i++) {
-    avg_var += var[i];
-    avg_mean += mean[i];
-  }
-  avg_var /= feature_size;
-  avg_mean /= feature_size;
+  welford_reference<float, float, float>(
+      input, r_mean, r_var, batch_size, feature_size, spatial_size);
 
-  printf("Checksum: mean = %f and variance = %f\n", avg_var, avg_mean);
+  bool ok = true;
+  for (int i = 0; i < feature_size; i++) {
+    if (fabsf(var[i] - r_var[i]) > 1e-3f || fabsf(mean[i] - r_mean[i]) > 1e-3f) {
+       printf("Error at index %d: %f %f %f %f\n", i, var[i], r_var[i], mean[i], r_mean[i]);
+       ok = false;
+       break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   sycl::free(d_input, q);
   sycl::free(d_mean, q);
@@ -202,5 +210,7 @@ int main(int argc, char* argv[])
   free(input);
   free(mean);
   free(var);
+  free(r_mean);
+  free(r_var);
   return 0;
 }
