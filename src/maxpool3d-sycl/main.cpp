@@ -8,6 +8,9 @@
 typedef float DTYPE;
 
 void maxpool3d(
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
   const DTYPE* i_img,
         DTYPE* o_img,
   const int Hstride,
@@ -17,26 +20,31 @@ void maxpool3d(
   const int i_img_width,
   const int i_img_height,
   const int o_img_width,
-  const int o_img_height,
-  sycl::nd_item<3> &item )
+  const int o_img_height)
 {
-  const int x = item.get_global_id(2);
-  const int y = item.get_global_id(1);
-  const int z = item.get_global_id(0);
-  const int xidx = Hstride*x;
-  const int yidx = Vstride*y;
-  DTYPE maxval = (DTYPE)0;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      const int x = item.get_global_id(2);
+      const int y = item.get_global_id(1);
+      const int z = item.get_global_id(0);
+      const int xidx = Hstride*x;
+      const int yidx = Vstride*y;
+      DTYPE maxval = (DTYPE)0;
 
-  for (int r = 0; r < pool_height; r++)
-  {
-    const int idxIntmp = ((z*i_img_height + yidx + r) * i_img_width) + xidx;
-    for(int c = 0; c < pool_width; c++)
-    {
-      const int idxIn = idxIntmp + c;
-      maxval = sycl::fmax(maxval, i_img[idxIn]);
-    }
-  }
-  o_img[(((z * o_img_height) + y) * o_img_width) + x] = maxval;
+      for (int r = 0; r < pool_height; r++)
+      {
+        const int idxIntmp = ((z*i_img_height + yidx + r) * i_img_width) + xidx;
+        for(int c = 0; c < pool_width; c++)
+        {
+          const int idxIn = idxIntmp + c;
+          maxval = sycl::fmax(maxval, i_img[idxIn]);
+        }
+      }
+      o_img[(((z * o_img_height) + y) * o_img_width) + x] = maxval;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char** argv)
@@ -108,14 +116,9 @@ int main(int argc, char** argv)
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&] (sycl::handler &h) {
-      h.parallel_for<class maxpool3>(
-      sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-        maxpool3d(d_image, d_result, Hstride, Vstride,
-                  pool_width, pool_height, i_img_width, i_img_height,
-                  o_img_width, o_img_height, item);
-      });
-    });
+    maxpool3d(q, gws, lws, d_image, d_result, Hstride, Vstride,
+              pool_width, pool_height, i_img_width, i_img_height,
+              o_img_width, o_img_height);
   }
 
   q.wait();
