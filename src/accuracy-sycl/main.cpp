@@ -7,13 +7,10 @@
 
 #define GPU_NUM_THREADS 256
 
-template <typename T>
-void BlockReduce(T &input, sycl::nd_item<1> &item) {
-  input = sycl::reduce_over_group(item.get_group(), input, sycl::plus<>());
-}
-
 void accuracy_kernel(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
     const int N,
     const int D,
     const int top_k,
@@ -21,31 +18,36 @@ void accuracy_kernel(
     const int* labelData,
     int* accuracy)
 {
-  int count = 0;
-
-  for (int row = item.get_group(0); row < N; row += item.get_group_range(0)) {
-    const int label = labelData[row];
-    const float label_pred = Xdata[row * D + label];
-    int ngt = 0;
-    for (int col = item.get_local_id(0); col < D; col += item.get_local_range(0)) {
-      const float pred = Xdata[row * D + col];
-      if (pred > label_pred || (pred == label_pred && col <= label)) {
-        ++ngt;
-      }
-    }
-    BlockReduce(ngt, item);
-    if (ngt <= top_k) {
-      ++count;
-    }
-    item.barrier(sycl::access::fence_space::local_space);
-  }
-  if (item.get_local_id(0) == 0) { 
-    auto ao = sycl::atomic_ref<int,
-                                sycl::memory_order::relaxed,
-                                sycl::memory_scope::device,
-                                sycl::access::address_space::global_space> (accuracy[0]);
-    ao.fetch_add(count);
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int count = 0;
+      for (int row = item.get_group(2); row < N; row += item.get_group_range(2)) {
+         const int label = labelData[row];
+         const float label_pred = Xdata[row * D + label];
+         int ngt = 0;
+         for (int col = item.get_local_id(2); col < D; col += item.get_local_range(2)) {
+           const float pred = Xdata[row * D + col];
+           if (pred > label_pred || (pred == label_pred && col <= label)) {
+             ++ngt;
+           }
+         }
+         ngt = sycl::reduce_over_group(item.get_group(), ngt, sycl::plus<>());
+         if (ngt <= top_k) {
+           ++count;
+         }
+         item.barrier(sycl::access::fence_space::local_space);
+       }
+       if (item.get_local_id(2) == 0) {
+         auto ao = sycl::atomic_ref<int,
+                                    sycl::memory_order::relaxed,
+                                    sycl::memory_scope::device,
+                                    sycl::access::address_space::global_space> (accuracy[0]);
+         ao.fetch_add(count);
+       }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
  
 int main(int argc, char* argv[])
@@ -95,23 +97,18 @@ int main(int argc, char* argv[])
   int *d_count = sycl::malloc_device<int>(1, q);
 
   q.wait();
-  sycl::range<1> lws (GPU_NUM_THREADS);
+  sycl::range<3> lws (1, 1, GPU_NUM_THREADS);
 
   for (int ngrid = nrows / 4; ngrid <= nrows; ngrid += nrows / 4) {
 
     printf("Grid size is %d\n", ngrid);
-    sycl::range<1> gws (ngrid * GPU_NUM_THREADS);
+    sycl::range<3> gws (1, 1, ngrid * GPU_NUM_THREADS);
 
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
       q.memset(d_count, 0, sizeof(int));
-      q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for<class accuracy>(
-          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-          accuracy_kernel(item, nrows, ndims, top_k, d_data, d_label, d_count);
-	});
-      });
+      accuracy_kernel(q, gws, lws, nrows, ndims, top_k, d_data, d_label, d_count);
     }
 
     q.wait();
