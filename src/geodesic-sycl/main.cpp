@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <chrono>
+#include <cmath>
 #include <sycl/sycl.hpp>
 
 float  distance_host ( int i, float latitude_1, float longitude_1,

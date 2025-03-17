@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <chrono>
+#include <cmath>
 #include <hip/hip_runtime.h>
 
 float  distance_host ( int i, float latitude_1, float longitude_1,
