@@ -228,6 +228,7 @@ int main(int argc, char **argv) {
         q.memcpy(d_outliers_candidate, h_outliers_candidate, p.max_iter * sizeof(int));
         q.memcpy(d_model_param_local, h_model_param_local, 4 * p.max_iter * sizeof(float));
         q.memcpy(d_g_out_id, h_g_out_id, sizeof(int));
+        q.wait();
 
         // Launch CPU threads
         std::thread main_thread(run_cpu_threads, h_model_param_local, h_flow_vector_array, n_flow_vectors,
@@ -244,6 +245,7 @@ int main(int argc, char **argv) {
             d_g_out_id, d_model_candidate, d_outliers_candidate, 1);
 
         q.memcpy(&candidates, d_g_out_id, sizeof(int));
+        q.wait();
         q.memcpy(h_model_candidate, d_model_candidate, candidates * sizeof(int));
         q.memcpy(h_outliers_candidate, d_outliers_candidate, candidates * sizeof(int));
         q.wait();
