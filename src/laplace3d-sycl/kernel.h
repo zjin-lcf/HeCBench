@@ -30,13 +30,12 @@ void laplace3d(
   sycl::queue &q,
   sycl::range<3> &gws,
   sycl::range<3> &lws,
-  const int slm_size,
   int NX, int NY, int NZ, int pitch,
   const float *__restrict d_u1,
         float *__restrict d_u2)
 {
   auto cgf = [&](sycl::handler& cgh) {
-    sycl::local_accessor<float, 1> u1 (sycl::range<1>(slm_size), cgh);
+    sycl::local_accessor<float, 1> u1 (sycl::range<1>(3 * KOFF), cgh);
     auto kfn = [=](sycl::nd_item<3> item) {
       int   indg, indg_h, indg0;
       int   i, j, k, ind, ind_h, halo, active;
