@@ -10,61 +10,72 @@
 
 template <typename T, bool kNFirst>
 void ChannelShuffleNCHWKernel(
-    sycl::nd_item<3> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
     const int G,
     const int K,
     const int HxW,
     const T* X,
           T* Y)
 {
-  int blockIdx_x  = item.get_group(2);
-  int threadIdx_x = item.get_local_id(2);
-  int blockIdx_y  = item.get_group(1);
-  int blockIdx_z  = item.get_group(0);
+  auto cgf = [&](sycl::handler& cgh) {
+    auto kfn = [=](sycl::nd_item<3> item) {
+      int blockIdx_x  = item.get_group(2);
+      int threadIdx_x = item.get_local_id(2);
+      int blockIdx_y  = item.get_group(1);
+      int blockIdx_z  = item.get_group(0);
 
-  const int C = G * K;
-  const int n = kNFirst ? blockIdx_x : blockIdx_y;
-  const int s = kNFirst ? blockIdx_y : blockIdx_x;
-  const int g = blockIdx_z % G;
-  const int k = blockIdx_z / G;
-  const int offset = s * NUM_THREADS + threadIdx_x;
-  if (offset < HxW) {
-    Y[(n * C + blockIdx_z) * HxW + offset] =
-        X[(n * C + g * K + k) * HxW + offset];
-  }
+      const int C = G * K;
+      const int n = kNFirst ? blockIdx_x : blockIdx_y;
+      const int s = kNFirst ? blockIdx_y : blockIdx_x;
+      const int g = blockIdx_z % G;
+      const int k = blockIdx_z / G;
+      const int offset = s * NUM_THREADS + threadIdx_x;
+      if (offset < HxW) {
+        Y[(n * C + blockIdx_z) * HxW + offset] =
+            X[(n * C + g * K + k) * HxW + offset];
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template <typename T, int kSharedSize>
 void ChannelShuffleNHWCKernel(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
     const int G,
     const int K,
     const T* X,
           T* Y)
 {
-  int blockIdx_x  = item.get_group(0);
-  int blockDim_x  = item.get_local_range(0);
-  int threadIdx_x = item.get_local_id(0);
+  auto cgf = [&](sycl::handler& cgh) {
+    sycl::local_accessor<T, 1> sdata (sycl::range<1>(kSharedSize), cgh);
+    auto kfn = [=](sycl::nd_item<3> item) {
+      int blockIdx_x  = item.get_group(2);
+      int blockDim_x  = item.get_local_range(2);
+      int threadIdx_x = item.get_local_id(2);
 
-  auto g = item.get_group();
-  sycl::multi_ptr<T[kSharedSize], sycl::access::address_space::local_space> localPtr =
-    sycl::ext::oneapi::group_local_memory_for_overwrite<T[kSharedSize]>(g);
+      const int C = G * K;
+      const int offset = blockIdx_x * C;
+      for (int i = threadIdx_x; i < C; i += blockDim_x) {
+        sdata[i] = X[offset + i];
+      }
 
-  T* sdata = *localPtr;
+      item.barrier(sycl::access::fence_space::local_space);
 
-  const int C = G * K;
-  const int offset = blockIdx_x * C;
-  for (int i = threadIdx_x; i < C; i += blockDim_x) {
-    sdata[i] = X[offset + i];
-  }
-
-  sycl::group_barrier(g, sycl::memory_scope::work_group);
-
-  for (int i = threadIdx_x; i < C; i += blockDim_x) {
-    const int g = i % G;
-    const int k = i / G;
-    Y[offset + i] = sdata[g * K + k];
-  }
+      for (int i = threadIdx_x; i < C; i += blockDim_x) {
+        const int g = i % G;
+        const int k = i / G;
+        Y[offset + i] = sdata[g * K + k];
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template <typename T>
@@ -84,24 +95,14 @@ bool ChannelShuffleNCHW (sycl::queue &q, T *X, int N, int C, int G, int numel, T
     sycl::range<3> lws (1, 1, NUM_THREADS);
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for<class shuffle_nchw>(
-          sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-          ChannelShuffleNCHWKernel<float, false>(item, G, K, HxW, X, Y);
-        });
-      });
+      ChannelShuffleNCHWKernel<float, false>(q, gws, lws, G, K, HxW, X, Y);
     }
   } else {
     sycl::range<3> gws (C, S, N * NUM_THREADS);
     sycl::range<3> lws (1, 1, NUM_THREADS);
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for<class shuffle2_nchw>(
-          sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-          ChannelShuffleNCHWKernel<float, true>(item, G, K, HxW, X, Y);
-        });
-      });
+      ChannelShuffleNCHWKernel<float, true>(q, gws, lws, G, K, HxW, X, Y);
     }
   }
 
@@ -122,37 +123,22 @@ bool ChannelShuffleNHWC (sycl::queue &q, T *X, int N, int C, int G, int numel, T
   const int HxW = numel / (N * C);
   const int outer_size = N * HxW;
 
-  sycl::range<1> gws (outer_size * NUM_THREADS);
-  sycl::range<1> lws (NUM_THREADS);
+  sycl::range<3> gws (1, 1, outer_size * NUM_THREADS);
+  sycl::range<3> lws (1, 1, NUM_THREADS);
 
   auto start = std::chrono::steady_clock::now();
 
   if (C <= 32) {
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for<class shuffle_nhwc_sm32>(
-          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-          ChannelShuffleNHWCKernel<float, 32>(item, G, K, X, Y);
-        });
-      });
+      ChannelShuffleNHWCKernel<float, 32>(q, gws, lws, G, K, X, Y);
     }
   } else if (C <= 128) {
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for<class shuffle_nhwc_sm128>(
-          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-          ChannelShuffleNHWCKernel<float, 128>(item, G, K, X, Y);
-        });
-      });
+      ChannelShuffleNHWCKernel<float, 128>(q, gws, lws, G, K, X, Y);
     }
   } else if (C <= 512) {
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for<class shuffle_nhwc_sm512>(
-          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-          ChannelShuffleNHWCKernel<float, 512>(item, G, K, X, Y);
-        });
-      });
+      ChannelShuffleNHWCKernel<float, 512>(q, gws, lws, G, K, X, Y);
     }
   }
 
