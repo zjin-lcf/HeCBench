@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../include
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -52,14 +52,11 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp io.c
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
-data.txt: mkinit.py
-	python mkinit.py 4096 8192 data.txt
-
-run: $(program) data.txt
-	$(LAUNCHER) ./$(program) 4096 8192 1000 data.txt
+run: $(program)
+	$(LAUNCHER) ./$(program) 4096 4096 1000
