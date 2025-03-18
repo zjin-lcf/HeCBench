@@ -9,7 +9,9 @@
 template <typename scalar_t, typename accscalar_t,
           typename index_t, int NLL_LOSS_THREADS>
 void nll_loss_forward_reduce2d_kernel(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
     scalar_t* __restrict__ output,
     scalar_t* __restrict__ total_weight,
     const scalar_t* __restrict__ input,
@@ -20,46 +22,45 @@ void nll_loss_forward_reduce2d_kernel(
     int64_t kdim,
     int64_t ignore_index)
 {
-   auto g = item.get_group();
+  auto cgf = [&](sycl::handler& cgh) {
+    sycl::local_accessor<accscalar_t, 1> sm_inputs (sycl::range<1>(NLL_LOSS_THREADS), cgh);
+    sycl::local_accessor<accscalar_t, 1> acc_weight (sycl::range<1>(NLL_LOSS_THREADS), cgh);
 
-   sycl::multi_ptr<accscalar_t[NLL_LOSS_THREADS], sycl::access::address_space::local_space>
-     ip = sycl::ext::oneapi::group_local_memory_for_overwrite<accscalar_t[NLL_LOSS_THREADS]>(g);
-   accscalar_t* sm_inputs = *ip;
+    auto kfn = [=](sycl::nd_item<3> item) {
+      int tid = item.get_local_id(2);
+      sm_inputs[tid] = static_cast<accscalar_t>(0);
+      acc_weight[tid] = static_cast<accscalar_t>(0);
 
-   sycl::multi_ptr<accscalar_t[NLL_LOSS_THREADS], sycl::access::address_space::local_space>
-     wp = sycl::ext::oneapi::group_local_memory_for_overwrite<accscalar_t[NLL_LOSS_THREADS]>(g);
-   accscalar_t* acc_weight = *wp;
+      for (int i = tid; i < nframe; i += NLL_LOSS_THREADS) {
+        index_t t = target[i];
+        if (t != ignore_index) {
+          scalar_t cur_weight =
+              weights != nullptr ? weights[t] : static_cast<scalar_t>(1);
+          sm_inputs[tid] -= static_cast<accscalar_t>(input[i * kdim + t] * cur_weight);
+          acc_weight[tid] += static_cast<accscalar_t>(cur_weight);
+        }
+      }
 
-  int tid = item.get_local_id(0);
-  sm_inputs[tid] = static_cast<accscalar_t>(0);
-  acc_weight[tid] = static_cast<accscalar_t>(0);
+      item.barrier(sycl::access::fence_space::local_space);
 
-  for (int i = tid; i < nframe; i += NLL_LOSS_THREADS) {
-    index_t t = target[i];
-    if (t != ignore_index) {
-      scalar_t cur_weight =
-          weights != nullptr ? weights[t] : static_cast<scalar_t>(1);
-      sm_inputs[tid] -= static_cast<accscalar_t>(input[i * kdim + t] * cur_weight);
-      acc_weight[tid] += static_cast<accscalar_t>(cur_weight);
-    }
-  }
-
-  group_barrier(g, sycl::memory_scope::work_group);
-
-  if (tid == 0) {
-    accscalar_t output_acc = 0;
-    accscalar_t total_weight_acc = 0;
-    for (int i = 0; i < NLL_LOSS_THREADS; ++i) {
-      output_acc += sm_inputs[i];
-      total_weight_acc += acc_weight[i];
-    }
-    *total_weight = static_cast<scalar_t>(total_weight_acc);
-    if (size_average) {
-      *output = static_cast<scalar_t>(output_acc / total_weight_acc);
-    } else {
-      *output = static_cast<scalar_t>(output_acc);
-    }
-  }
+      if (tid == 0) {
+        accscalar_t output_acc = 0;
+        accscalar_t total_weight_acc = 0;
+        for (int i = 0; i < NLL_LOSS_THREADS; ++i) {
+          output_acc += sm_inputs[i];
+          total_weight_acc += acc_weight[i];
+        }
+        *total_weight = static_cast<scalar_t>(total_weight_acc);
+        if (size_average) {
+          *output = static_cast<scalar_t>(output_acc / total_weight_acc);
+        } else {
+          *output = static_cast<scalar_t>(output_acc);
+        }
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template <typename scalar_t, typename index_t, int GPU_THREADS>
@@ -106,18 +107,15 @@ void eval(const int64_t nframe,
 
   q.memcpy(d_target, h_target, target_size_bytes);
 
-  sycl::range<1> gws (GPU_THREADS);
-  sycl::range<1> lws (GPU_THREADS);
+  sycl::range<3> gws (1, 1, GPU_THREADS);
+  sycl::range<3> lws (1, 1, GPU_THREADS);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        nll_loss_forward_reduce2d_kernel
-          <scalar_t, scalar_t, index_t, GPU_THREADS>(
-                        item,
+    nll_loss_forward_reduce2d_kernel<scalar_t, scalar_t, index_t, GPU_THREADS>(
+                        q, gws, lws,
                         d_output,
                         d_total_weight,
                         d_input,
@@ -127,8 +125,6 @@ void eval(const int64_t nframe,
                         nframe,
                         kdim,
                         ignore_index);
-      });
-    });
   }
   q.wait();
 
@@ -145,7 +141,7 @@ void eval(const int64_t nframe,
   bool ok = true;
   float ho, ro, hw, rw;
   ho = (float)h_output;
-  ro = (float)r_output; 
+  ro = (float)r_output;
   hw = (float)h_total_weight;
   rw = (float)r_total_weight;
   // relax the error bound for FP16
