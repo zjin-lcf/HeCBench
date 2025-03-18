@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <chrono>
 #include <hip/hip_runtime.h>
-
-#define WARP_SIZE 32
+#include "reference.h"
 
 template<typename T, typename C>
 __device__ __forceinline__
@@ -25,7 +25,7 @@ __device__ __forceinline__
 void warp_reduce_mean_m2n(T &mean, T &m2n, int &num)
 {
   #pragma unroll
-  for(int i = WARP_SIZE/2; i > 0; i >>= 1) {
+  for(int i = warpSize/2; i > 0; i >>= 1) {
     auto num_new = __shfl_down(num, i);
     auto mean_new = __shfl_down(mean, i);
     auto m2n_new = __shfl_down(m2n, i);
@@ -43,10 +43,10 @@ __device__ void welford_reduce_mean_m2n(
       int block_size,
       int thread_id)
 {
-  int lane = thread_id % WARP_SIZE;
-  int wid = thread_id / WARP_SIZE;
+  int lane = thread_id % warpSize;
+  int wid = thread_id / warpSize;
 
-  if (block_size > 32) {
+  if (block_size > warpSize) {
     warp_reduce_mean_m2n(mean, m2n, num);
     if (lane == 0) {
       x[wid*2] = mean;
@@ -56,9 +56,9 @@ __device__ void welford_reduce_mean_m2n(
     __syncthreads();
 
     if (wid == 0) {
-      mean = (thread_id < block_size / WARP_SIZE)? x[lane*2] : T(0);
-      m2n = (thread_id < block_size / WARP_SIZE)? x[lane*2+1] : T(0);
-      num = (thread_id < block_size / WARP_SIZE)? count[lane] : int(0);
+      mean = (thread_id < block_size / warpSize)? x[lane*2] : T(0);
+      m2n = (thread_id < block_size / warpSize)? x[lane*2+1] : T(0);
+      num = (thread_id < block_size / warpSize)? count[lane] : int(0);
     }
   }
 
@@ -94,7 +94,7 @@ __global__ void welford_kernel(
   }
 
   static __shared__ int s_mem[160];
-  accscalar_t* s_mem_ac = (accscalar_t*) &s_mem[32];
+  accscalar_t* s_mem_ac = (accscalar_t*) &s_mem[warpSize];
 
   welford_reduce_mean_m2n<accscalar_t>(s_mem_ac, s_mem, x_mean, m_2_n, count, block_size, thread_id);
 
@@ -135,6 +135,8 @@ int main(int argc, char* argv[])
 
   float *mean = (float*) malloc (fs_bytes);
   float *var = (float*) malloc (fs_bytes);
+  float *r_mean = (float*) malloc (fs_bytes);
+  float *r_var = (float*) malloc (fs_bytes);
   
   float *d_input, *d_mean, *d_var;  
   hipMalloc((void**)&d_input, is_bytes);
@@ -159,15 +161,18 @@ int main(int argc, char* argv[])
   hipMemcpy(var, d_var, fs_bytes, hipMemcpyDeviceToHost);
   hipMemcpy(mean, d_mean, fs_bytes, hipMemcpyDeviceToHost);
 
-  double avg_var = 0.0, avg_mean = 0.0;
-  for (int i = 0; i < feature_size; i++) {
-    avg_var += var[i];
-    avg_mean += mean[i];
-  }
-  avg_var /= feature_size;
-  avg_mean /= feature_size;
+  welford_reference<float, float, float>(
+      input, r_mean, r_var, batch_size, feature_size, spatial_size);
 
-  printf("Checksum: mean = %f and variance = %f\n", avg_var, avg_mean);
+  bool ok = true;
+  for (int i = 0; i < feature_size; i++) {
+    if (fabsf(var[i] - r_var[i]) > 1e-3f || fabsf(mean[i] - r_mean[i]) > 1e-3f) {
+       printf("Error at index %d: %f %f %f %f\n", i, var[i], r_var[i], mean[i], r_mean[i]);
+       ok = false;
+       break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   hipFree(d_input);
   hipFree(d_mean);
@@ -175,5 +180,7 @@ int main(int argc, char* argv[])
   free(input);
   free(mean);
   free(var);
+  free(r_mean);
+  free(r_var);
   return 0;
 }
