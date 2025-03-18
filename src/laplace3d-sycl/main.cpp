@@ -39,7 +39,7 @@ int main(int argc, char **argv){
 
   printf("\nGrid dimensions: %d x %d x %d\n", NX, NY, NZ);
   printf("Result verification %s \n", verify ? "enabled" : "disabled");
- 
+
   // allocate memory for arrays
 
   const size_t grid3D_size = NX * NY * NZ ;
@@ -53,7 +53,7 @@ int main(int argc, char **argv){
 
   // initialise u1
   int i, j, k;
-    
+
   for (k=0; k<NZ; k++) {
     for (j=0; j<NY; j++) {
       for (i=0; i<NX; i++) {
@@ -81,34 +81,21 @@ int main(int argc, char **argv){
   const int bx = 1 + (NX-1)/BLOCK_X;
   const int by = 1 + (NY-1)/BLOCK_Y;
 
-  sycl::range<2> lws (BLOCK_Y, BLOCK_X);
-  sycl::range<2> gws (by * BLOCK_Y, bx * BLOCK_X);
+  sycl::range<3> lws (1, BLOCK_Y, BLOCK_X);
+  sycl::range<3> gws (1, by * BLOCK_Y, bx * BLOCK_X);
 
   printf("\nglobal work size  = %d %d %d \n", bx * BLOCK_X, by * BLOCK_Y, 1);
   printf("local work size = %d %d %d \n", BLOCK_X, BLOCK_Y, 1);
 
   // Warmup
-  q.submit([&] (sycl::handler &cgh) {
-    sycl::local_accessor<float, 1> sm (3*KOFF, cgh);
-    cgh.parallel_for<class warmup>(
-      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-      laplace3d(item, NX, NY, NZ, pitch,
-                d_u1, d_u2, sm.get_pointer());
-    });
-  }).wait();
+  laplace3d(q, gws, lws, 3 * KOFF, NX, NY, NZ, pitch, d_u1, d_u2);
+  q.wait();
 
   // Execute GPU kernel
   auto start = std::chrono::steady_clock::now();
 
   for (i = 1; i <= REPEAT; ++i) {
-    q.submit([&] (sycl::handler &cgh) {
-      sycl::local_accessor<float, 1> sm (3*KOFF, cgh);
-      cgh.parallel_for<class eval>(
-        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-        laplace3d(item, NX, NY, NZ, pitch,
-                  d_u1, d_u2, sm.get_pointer());
-      });
-    });
+    laplace3d(q, gws, lws, 3 * KOFF, NX, NY, NZ, pitch, d_u1, d_u2);
     std::swap(d_u1, d_u2);
   }
 
