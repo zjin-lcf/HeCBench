@@ -43,19 +43,32 @@ void reference(float *out, const float *in, const float delta, const float norm,
  * Naive implementation of a single iteration of the lapl
  * equation. Each thread takes one site of the output array
  */
-void
-dev_lapl_iter(float *out, const float *in, const float delta, const float norm, const int Lx, const int Ly,
-              const sycl::nd_item<1> &item)
+void dev_lapl_iter(sycl::queue &q,
+                   sycl::range<3> &gws,
+                   sycl::range<3> &lws,
+                   float *out,
+                   const float *in,
+                   const float delta,
+                   const float norm,
+                   const int lx,
+                   const int ly)
 {
-  int i = item.get_global_id(0);
-  int x = i % Lx;
-  int y = i / Lx;
-  int v00 = y*Lx + x;
-  int v0p = y*Lx + (x + 1)%Lx;
-  int v0m = y*Lx + (Lx + x - 1)%Lx;
-  int vp0 = ((y+1)%Ly)*Lx + x;
-  int vm0 = ((Ly+y-1)%Ly)*Lx + x;
-  out[v00] = norm*in[v00] + delta*(in[v0p] + in[v0m] + in[vp0] + in[vm0]);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int i = item.get_global_id(2);
+      int x = i % lx;
+      int y = i / lx;
+      int v00 = y*lx + x;
+      int v0p = y*lx + (x + 1)%lx;
+      int v0m = y*lx + (lx + x - 1)%lx;
+      int vp0 = ((y+1)%ly)*lx + x;
+      int vm0 = ((ly+y-1)%ly)*lx + x;
+      out[v00] = norm*in[v00]
+        + delta*(in[v0p] + in[v0m] + in[vp0] + in[vm0]);
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char *argv[]) {
@@ -122,8 +135,8 @@ int main(int argc, char *argv[]) {
   d_out = sycl::malloc_device<float>(Lx * Ly, q);
   q.memcpy(d_in, buffer, sizeof(float) * Lx * Ly);
 
-  sycl::range<1> gws (Ly*Lx);
-  sycl::range<1> lws (NTY*NTX);
+  sycl::range<3> gws (1, 1, Ly*Lx);
+  sycl::range<3> lws (1, 1, NTY*NTX);
 
   /* Do iterations on GPU, record time */
   q.wait();
@@ -132,10 +145,7 @@ int main(int argc, char *argv[]) {
   /* Fixed number of threads per block (in x- and y-direction), number
      of blocks per direction determined by dimensions Lx, Ly */
   for(i=0; i<niter; i++) {
-    q.parallel_for(
-      sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        dev_lapl_iter(d_out, d_in, xdelta, xnorm, Lx, Ly, item);
-    });
+    dev_lapl_iter(q, gws, lws, d_out, d_in, xdelta, xnorm, Lx, Ly);
     std::swap(d_out, d_in);
   }
 
