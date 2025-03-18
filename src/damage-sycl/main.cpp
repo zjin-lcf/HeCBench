@@ -62,26 +62,14 @@ int main(int argc, char* argv[]) {
 
   double *d_damage = sycl::malloc_device<double>(m, q);
 
-  sycl::range<1> lws (BS);
-  sycl::range<1> gws (m*BS);
+  sycl::range<3> lws (1, 1, BS);
+  sycl::range<3> gws (1, 1, m*BS);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      sycl::local_accessor<int, 1> sm (sycl::range<1>(BS), cgh);
-      cgh.parallel_for<class compute>(
-         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-         damage_of_node(item,
-                        n,
-                        d_nlist,
-                        d_family,
-                        d_n_neigh,
-                        d_damage,
-                        sm.get_pointer());
-      });
-    });
+    damage_of_node(q, gws, lws, BS, n, d_nlist, d_family, d_n_neigh, d_damage);
   }
 
   q.wait();
@@ -91,7 +79,7 @@ int main(int argc, char* argv[]) {
 
   q.memcpy(damage, d_damage, sizeof(double) * m).wait();
   double sum = 0.0;
-  for (int i = 0; i < m; i++) sum += damage[i]; 
+  for (int i = 0; i < m; i++) sum += damage[i];
   printf("Checksum: total damage = %lf\n", sum);
 
   sycl::free(d_nlist, q);
