@@ -23,11 +23,79 @@
 
 // final step for the deviation of a sample
 template <typename Type, typename IdxType>
-class sampleKernel;
+void sampleKernel (
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
+  Type *std,
+  IdxType D,
+  IdxType N)
+{
+  auto cgf = [&](sycl::handler& cgh) {
+    auto kfn = [=](sycl::nd_item<3> item) {
+      IdxType i = item.get_global_id(2);
+      if (i < D) std[i] = sycl::sqrt(std[i] / N);
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
 
 // sum of products using atomics
 template <typename Type, typename IdxType, int TPB, int ColsPerBlk = 32>
-class sopKernel;
+void sopKernel (
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
+        Type *__restrict__ std,
+  const Type *__restrict__ data,
+  IdxType D,
+  IdxType N)
+{
+  auto cgf = [&](sycl::handler& cgh) {
+    sycl::local_accessor<Type, 1> sstd (sycl::range<1>(ColsPerBlk), cgh);
+    auto kfn = [=](sycl::nd_item<3> item) {
+      int tx = item.get_local_id(2);
+      int bx = item.get_group(2);
+      int by = item.get_group(1);
+      int gridDim_x = item.get_group_range(2);
+
+      const int RowsPerBlkPerIter = TPB / ColsPerBlk;
+      IdxType thisColId = tx % ColsPerBlk;
+      IdxType thisRowId = tx / ColsPerBlk;
+      IdxType colId = thisColId + ((IdxType)by * ColsPerBlk);
+      IdxType rowId = thisRowId + ((IdxType)bx * RowsPerBlkPerIter);
+      Type thread_data = Type(0);
+      const IdxType stride = RowsPerBlkPerIter * gridDim_x;
+      for (IdxType i = rowId; i < N; i += stride) {
+        Type val = (colId < D) ? data[i * D + colId] : Type(0);
+        thread_data += val * val;
+      }
+      if (tx < ColsPerBlk) sstd[tx] = Type(0);
+      item.barrier(sycl::access::fence_space::local_space);
+
+      //atomicAdd(sstd + thisColId, thread_data);
+      auto atomic_local = sycl::atomic_ref<Type,
+                          sycl::memory_order::relaxed,
+                          sycl::memory_scope::work_group,
+                          sycl::access::address_space::local_space> (sstd[thisColId]);
+      atomic_local.fetch_add(thread_data);
+
+      item.barrier(sycl::access::fence_space::local_space);
+
+      if (tx < ColsPerBlk) {
+        // atomicAdd(std + colId, sstd[thisColId]);
+        auto atomic_global = sycl::atomic_ref<Type,
+                             sycl::memory_order::relaxed,
+                             sycl::memory_scope::device,
+                             sycl::access::address_space::global_space> (std[colId]);
+        atomic_global.fetch_add(sstd[thisColId]);
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
 
 /**
  * @brief Compute stddev of the input matrix
@@ -46,75 +114,30 @@ class sopKernel;
  */
 template <typename Type, typename IdxType = int>
 void stddev(sycl::queue &q,
-            Type *d_std,
-            const Type *d_data,
-            IdxType D, IdxType N, bool sample) {
+            Type *std,
+            const Type *data,
+            IdxType D, IdxType N, bool sample)
+{
   static const int TPB = 256;
   static const int RowsPerThread = 4;
   static const int ColsPerBlk = 32;
   static const int RowsPerBlk = (TPB / ColsPerBlk) * RowsPerThread;
 
-  sycl::range<2> gws ((D + (IdxType)ColsPerBlk - 1) / (IdxType)ColsPerBlk ,
+  sycl::range<3> gws (1,
+                      (D + (IdxType)ColsPerBlk - 1) / (IdxType)ColsPerBlk ,
                       (N + (IdxType)RowsPerBlk - 1) / (IdxType)RowsPerBlk * TPB);
 
-  sycl::range<2> lws (1, TPB);
+  sycl::range<3> lws (1, 1, TPB);
 
   // required for atomics
-  q.memset(d_std, 0, sizeof(Type) * D); // required for atomics
+  q.memset(std, 0, sizeof(Type) * D); // required for atomics
 
-  q.submit([&] (sycl::handler &cgh) {
-    sycl::local_accessor<Type, 1> sstd (sycl::range<1>(ColsPerBlk), cgh);
-    cgh.parallel_for<class sopKernel<Type, IdxType, TPB, ColsPerBlk>>(
-      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-      int tx = item.get_local_id(1);
-      int bx = item.get_group(1);
-      int by = item.get_group(0);
-      int gridDim_x = item.get_group_range(1);
+  sopKernel<Type, IdxType, TPB, ColsPerBlk>(q, gws, lws, std, data, D, N);
 
-      const int RowsPerBlkPerIter = TPB / ColsPerBlk;
-      IdxType thisColId = tx % ColsPerBlk;
-      IdxType thisRowId = tx / ColsPerBlk;
-      IdxType colId = thisColId + ((IdxType)by * ColsPerBlk);
-      IdxType rowId = thisRowId + ((IdxType)bx * RowsPerBlkPerIter);
-      Type thread_data = Type(0);
-      const IdxType stride = RowsPerBlkPerIter * gridDim_x;
-      for (IdxType i = rowId; i < N; i += stride) {
-        Type val = (colId < D) ? d_data[i * D + colId] : Type(0);
-        thread_data += val * val;
-      }
-      if (tx < ColsPerBlk) sstd[tx] = Type(0);
-      item.barrier(sycl::access::fence_space::local_space);
-
-      //atomicAdd(sstd + thisColId, thread_data);
-      auto atomic_local = sycl::atomic_ref<Type,
-                          sycl::memory_order::relaxed,
-                          sycl::memory_scope::work_group,
-                          sycl::access::address_space::local_space> (sstd[thisColId]);
-          atomic_local.fetch_add(thread_data);
-
-      item.barrier(sycl::access::fence_space::local_space);
-
-      if (tx < ColsPerBlk) {
-        // atomicAdd(std + colId, sstd[thisColId]);
-        auto atomic_global = sycl::atomic_ref<Type,
-                             sycl::memory_order::relaxed,
-                             sycl::memory_scope::device,
-                             sycl::access::address_space::global_space> (d_std[colId]);
-        atomic_global.fetch_add(sstd[thisColId]);
-      }
-    });
-  });
-
-  sycl::range<1> gws2 ((D+TPB-1)/TPB*TPB);
-  sycl::range<1> lws2 (TPB);
+  sycl::range<3> gws2 (1, 1, (D+TPB-1)/TPB*TPB);
+  sycl::range<3> lws2 (1, 1, TPB);
   IdxType sampleSize = sample ? N-1 : N;
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for<class sampleKernel<Type, IdxType>>(
-      sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
-      IdxType i = item.get_global_id(0);
-      if (i < D) d_std[i] = sycl::sqrt(d_std[i] / sampleSize);
-    });
-  });
+  sampleKernel<Type, IdxType>(q, gws2, lws2, std, D, sampleSize);
 }
 
 int main(int argc, char* argv[]) {
