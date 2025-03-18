@@ -8,10 +8,10 @@
  */
 
 // Includes
-#include <cstdio>
-#include <algorithm>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/time.h>
-#include <time.h>
 #include <cuda.h>
 
 // Constants used by the program
@@ -338,7 +338,7 @@ void modified_insertion_sort(float *dist, int *index, int length, int k) {
     }
 
     // Shift values (and indexes) higher that the current distance to the right
-    int j = std::min(i, k - 1);
+    int j = i < k - 1 ? i : k-1;
     while (j > 0 && dist[j - 1] > curr_dist) {
       dist[j] = dist[j - 1];
       index[j] = index[j - 1];
