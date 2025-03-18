@@ -11,7 +11,9 @@
 #include "utils.h"
 
 void md (
-  sycl::nd_item<1> &item,
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
   const POSVECTYPE* __restrict position,
         FORCEVECTYPE* __restrict force,
   const int* __restrict neighborList,
@@ -21,40 +23,46 @@ void md (
   const FPTYPE lj2_t,
   const FPTYPE cutsq_t )
 {
-  const uint idx = item.get_global_id(0);
-  if (idx >= nAtom) return;
+  auto cgf = [&](sycl::handler& cgh) {
+    auto kfn = [=](sycl::nd_item<3> item) {
+      const uint idx = item.get_global_id(2);
+      if (idx >= nAtom) return;
 
-  POSVECTYPE ipos = position[idx];
-  FORCEVECTYPE f = FORCEVECTYPE(0);
+      POSVECTYPE ipos = position[idx];
+      FORCEVECTYPE f = FORCEVECTYPE(0);
 
-  int j = 0;
-  while (j < maxNeighbors)
-  {
-    int jidx = neighborList[j*nAtom + idx];
+      int j = 0;
+      while (j < maxNeighbors)
+      {
+        int jidx = neighborList[j*nAtom + idx];
 
-    // Uncoalesced read
-    POSVECTYPE jpos = position[jidx];
+        // Uncoalesced read
+        POSVECTYPE jpos = position[jidx];
 
-    // Calculate distance
-    FPTYPE delx = ipos.x() - jpos.x();
-    FPTYPE dely = ipos.y() - jpos.y();
-    FPTYPE delz = ipos.z() - jpos.z();
-    FPTYPE r2inv = delx*delx + dely*dely + delz*delz;
+        // Calculate distance
+        FPTYPE delx = ipos.x() - jpos.x();
+        FPTYPE dely = ipos.y() - jpos.y();
+        FPTYPE delz = ipos.z() - jpos.z();
+        FPTYPE r2inv = delx*delx + dely*dely + delz*delz;
 
-    // If distance is less than cutoff, calculate force
-    if (r2inv > 0 && r2inv < cutsq_t)
-    {
-      r2inv = (FPTYPE)1.0 / r2inv;
-      FPTYPE r6inv = r2inv * r2inv * r2inv;
-      FPTYPE forceC = r2inv * r6inv * (lj1_t * r6inv - lj2_t);
+        // If distance is less than cutoff, calculate force
+        if (r2inv > 0 && r2inv < cutsq_t)
+        {
+          r2inv = (FPTYPE)1.0 / r2inv;
+          FPTYPE r6inv = r2inv * r2inv * r2inv;
+          FPTYPE forceC = r2inv * r6inv * (lj1_t * r6inv - lj2_t);
 
-      f.x() += delx * forceC;
-      f.y() += dely * forceC;
-      f.z() += delz * forceC;
-    }
-    j++;
-  }
-  force[idx] = f;
+          f.x() += delx * forceC;
+          f.y() += dely * forceC;
+          f.z() += delz * forceC;
+        }
+        j++;
+      }
+      force[idx] = f;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char** argv)
@@ -113,24 +121,11 @@ int main(int argc, char** argv)
   int *d_neighborList = sycl::malloc_device<int>(nAtom * maxNeighbors, q);
   q.memcpy(d_neighborList, neighborList, sizeof(int) * nAtom * maxNeighbors);
 
-  sycl::range<1> lws (256);
-  sycl::range<1> gws ((nAtom + 255) / 256 * 256);
+  sycl::range<3> lws (1, 1, 256);
+  sycl::range<3> gws (1, 1, (nAtom + 255) / 256 * 256);
 
   // warmup and result verification
-  q.submit([&](sycl::handler& cgh) {
-    cgh.parallel_for<class warmup>(
-      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-      md(item,
-         d_position,
-         d_force,
-         d_neighborList,
-         nAtom,
-         maxNeighbors,
-         lj1,
-         lj2,
-         cutsq);
-    });
-  });
+  md(q, gws, lws, d_position, d_force, d_neighborList, nAtom, maxNeighbors, lj1, lj2, cutsq);
 
   q.memcpy(force, d_force, nAtom * sizeof(FORCEVECTYPE)).wait();
 
@@ -142,20 +137,7 @@ int main(int argc, char** argv)
 
   for (int i = 0; i < iteration; i++)
   {
-    q.submit([&](sycl::handler& cgh) {
-      cgh.parallel_for<class run>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        md(item,
-           d_position,
-           d_force,
-           d_neighborList,
-           nAtom,
-           maxNeighbors,
-           lj1,
-           lj2,
-           cutsq);
-      });
-    });
+    md(q, gws, lws, d_position, d_force, d_neighborList, nAtom, maxNeighbors, lj1, lj2, cutsq);
   }
 
   q.wait();
