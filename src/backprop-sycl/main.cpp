@@ -4,9 +4,11 @@
 #include <math.h>
 #include <sys/time.h>
 #include <sycl/sycl.hpp>
-#include "backprop.h"
+#include "backprop.h"   // defined in backprop-cuda
 
-////////////////////////////////////////////////////////////////////////////////
+// sycl kernels
+#include "bpnn_layerforward.h"
+#include "bpnn_adjust_weights.h"
 
 
 double get_time() {
@@ -21,7 +23,7 @@ unsigned int num_blocks = 0;
 ////////////////////////////////////////////////////////////////////////////////
 // Program main
 ////////////////////////////////////////////////////////////////////////////////
-int main( int argc, char** argv) 
+int main( int argc, char** argv)
 {
   setup(argc, argv);
   return 0;
@@ -34,7 +36,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
 
   in = net->input_n;
   hid = net->hidden_n;
-  out = net->output_n;   
+  out = net->output_n;
 
   float *input_weights_one_dim;
   float *input_weights_prev_one_dim;
@@ -50,7 +52,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   // this preprocessing stage is temporarily added to correct the bug of wrong memcopy using two-dimensional net->inputweights
   // todo: fix mem allocation
   int m = 0;
-  for (int k = 0; k <= in; k++) {  
+  for (int k = 0; k <= in; k++) {
     for (int j = 0; j <= hid; j++) {
       input_weights_one_dim[m] = net->input_weights[k][j];
       input_weights_prev_one_dim[m] = net-> input_prev_weights[k][j];
@@ -77,23 +79,15 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   float *d_hidden_partial_sum = sycl::malloc_device<float>(num_blocks*WIDTH, q);
 
   // set global and local workitems
-  sycl::range<2> gws(BLOCK_SIZE*num_blocks, BLOCK_SIZE);
-  sycl::range<2> lws(BLOCK_SIZE, BLOCK_SIZE);
+  sycl::range<3> gws(1, BLOCK_SIZE*num_blocks, BLOCK_SIZE);
+  sycl::range<3> lws(1, BLOCK_SIZE, BLOCK_SIZE);
 
-  q.submit([&](sycl::handler& cgh) {
-    sycl::local_accessor <float, 1> input_node (sycl::range<1>(HEIGHT), cgh);
-    sycl::local_accessor <float, 1> weight_matrix (sycl::range<1>(HEIGHT * WIDTH), cgh);
-    cgh.parallel_for<class forward>(
-      sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-      #include "bpnn_layerforward.sycl"
-    });
-  });
-
+  kernel_layerforward(q, gws, lws, d_input, d_input_weights, d_hidden_partial_sum, hid);
   q.memcpy(partial_sum, d_hidden_partial_sum, sizeof(float)*num_blocks*WIDTH).wait();
 
   for (int j = 1; j <= hid; j++) {
     sum = 0.0;
-    for (int k = 0; k < num_blocks; k++) {  
+    for (int k = 0; k < num_blocks; k++) {
       sum += partial_sum[k * hid + j-1] ;
     }
 #ifdef DEBUG
@@ -105,7 +99,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
 
   bpnn_layerforward(net->hidden_units, net->output_units, net->hidden_weights, hid, out);
   bpnn_output_error(net->output_delta, net->target, net->output_units, out, &out_err);
-  bpnn_hidden_error(net->hidden_delta, hid, net->output_delta, out, net->hidden_weights, net->hidden_units, &hid_err);  
+  bpnn_hidden_error(net->hidden_delta, hid, net->output_delta, out, net->hidden_weights, net->hidden_units, &hid_err);
   bpnn_adjust_weights(net->output_delta, out, net->hidden_units, hid, net->hidden_weights, net->hidden_prev_weights);
 
   // input_weights_sycl has been written in the first kernel, so it needs to be restored.
@@ -117,12 +111,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   float *d_input_prev_weights = sycl::malloc_device<float>((in+1)*(hid+1), q);
   q.memcpy(d_input_prev_weights, input_weights_prev_one_dim, sizeof(float)*(in+1)*(hid+1));
 
-  q.submit([&](sycl::handler& cgh) {
-    cgh.parallel_for<class adjust_weights>(
-    sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-      #include "bpnn_adjust_weights.sycl"
-    });
-  });
+  kernel_adjust_weights(q, gws, lws, d_input, d_input_weights, d_hidden_delta, d_input_prev_weights, hid);
 
   q.memcpy(input_weights_one_dim, d_input_weights, sizeof(float)*(in+1)*(hid+1)).wait();
 
@@ -136,9 +125,9 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
 
 #ifdef OUTPUT
-  for (int i = 0; i < (in+1); i++) 
+  for (int i = 0; i < (in+1); i++)
     printf("i=%d input_units=%f\n", i,net->input_units[i]);
-  for (int i = 0; i < (in+1)*(hid+1); i++) 
+  for (int i = 0; i < (in+1)*(hid+1); i++)
     printf("i=%d input_weights=%f\n", i,input_weights_one_dim[i]);
 #endif
   free(input_weights_prev_one_dim);
