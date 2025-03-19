@@ -16,31 +16,49 @@
 #define GPU_THREADS 256
 
 #define KERNEL_LOOP(index, range) \
-  for (int index = item.get_global_id(0);  \
+  for (int index = item.get_global_id(2);  \
            index < (range); \
-           index += item.get_local_range(0) * item.get_group_range(0))
+           index += item.get_local_range(2) * item.get_group_range(2))
 
 template <typename T>
-void SwishKernel(sycl::nd_item<1> &item, const int N, const T* X, T* Y)
+void SwishKernel(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int N, const T* X, T* Y)
 {
-  KERNEL_LOOP(i, N) {
-    Y[i] = ldg(X + i) / (T(1) + sycl::exp(-ldg(X + i)));
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      KERNEL_LOOP(i, N) {
+        Y[i] = ldg(X + i) / (T(1) + sycl::exp(-ldg(X + i)));
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template <typename T>
 void SwishGradientKernel(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
     const int N,
     const T* X,
     const T* Y,
     const T* dY,
           T* dX)
 {
-  KERNEL_LOOP(i, N) {
-    dX[i] = ldg(dY + i) *
-            (ldg(Y + i) + (T(1) - ldg(Y + i)) / (T(1) + sycl::exp(-ldg(X + i))));
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      KERNEL_LOOP(i, N) {
+        dX[i] = ldg(dY + i) *
+                (ldg(Y + i) + (T(1) - ldg(Y + i)) / (T(1) + sycl::exp(-ldg(X + i))));
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template<typename T>
@@ -79,19 +97,14 @@ void eval_swish (const int N, const int repeat) {
 
   d_dX = sycl::malloc_device<T>(N, q);
 
-  sycl::range<1> gws ((N + GPU_THREADS - 1) / GPU_THREADS * GPU_THREADS);
-  sycl::range<1> lws (GPU_THREADS);
+  sycl::range<3> gws (1, 1, (N + GPU_THREADS - 1) / GPU_THREADS * GPU_THREADS);
+  sycl::range<3> lws (1, 1, GPU_THREADS);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class swish>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        SwishKernel(item, N, d_X, d_Y);
-      });
-    });
+    SwishKernel(q, gws, lws, N, d_X, d_Y);
   }
 
   q.wait();
@@ -102,12 +115,7 @@ void eval_swish (const int N, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class swish_grad>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        SwishGradientKernel(item, N, d_X, d_Y, d_dY, d_dX);
-      });
-    });
+    SwishGradientKernel(q, gws, lws, N, d_X, d_Y, d_dY, d_dX);
   };
 
   q.wait();
