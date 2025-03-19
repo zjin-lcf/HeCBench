@@ -19,6 +19,7 @@
 #include <math.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
+#include "atomics.h"
 #include "reference.h"
 
 // final step for the deviation of a sample
@@ -74,22 +75,26 @@ void sopKernel (
       if (tx < ColsPerBlk) sstd[tx] = Type(0);
       item.barrier(sycl::access::fence_space::local_space);
 
-      //atomicAdd(sstd + thisColId, thread_data);
+      atomicAdd(sstd[thisColId], thread_data);
+      /*
       auto atomic_local = sycl::atomic_ref<Type,
                           sycl::memory_order::relaxed,
                           sycl::memory_scope::work_group,
                           sycl::access::address_space::local_space> (sstd[thisColId]);
       atomic_local.fetch_add(thread_data);
+      */
 
       item.barrier(sycl::access::fence_space::local_space);
 
       if (tx < ColsPerBlk) {
-        // atomicAdd(std + colId, sstd[thisColId]);
+        atomicAdd(std[colId], sstd[thisColId]);
+        /*
         auto atomic_global = sycl::atomic_ref<Type,
                              sycl::memory_order::relaxed,
                              sycl::memory_scope::device,
                              sycl::access::address_space::global_space> (std[colId]);
         atomic_global.fetch_add(sstd[thisColId]);
+        */
       }
     };
     cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
