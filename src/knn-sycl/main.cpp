@@ -17,77 +17,37 @@
 // Constants used by the program
 #define BLOCK_DIM 16
 
-//-----------------------------------------------------------------------------------------------//
-//                                   K-th NEAREST NEIGHBORS //
-//-----------------------------------------------------------------------------------------------//
+void computeDistanceGlobal(sycl::queue &q,
+                           sycl::range<3> &gws,
+                           sycl::range<3> &lws,
+                           const float *__restrict__ A,
+                           int ref_width,
+                           const float *__restrict__ B,
+                           int query_width,
+                           int height,
+                           float *__restrict__ AB)
+{
+  auto cgf = [&](sycl::handler& cgh) {
+    sycl::local_accessor<float, 2> shared_A (sycl::range<2>{BLOCK_DIM, BLOCK_DIM}, cgh);
+    sycl::local_accessor<float, 2> shared_B (sycl::range<2>{BLOCK_DIM, BLOCK_DIM}, cgh);
+    sycl::local_accessor<int, 0> begin_A (cgh);
+    sycl::local_accessor<int, 0> begin_B (cgh);
+    sycl::local_accessor<int, 0> step_A (cgh);
+    sycl::local_accessor<int, 0> step_B (cgh);
+    sycl::local_accessor<int, 0> end_A (cgh);
 
-/*
-  * @param ref_host      reference points ; pointer to linear matrix
-  * @param ref_width     number of reference points ; width of the matrix
-  * @param query_host    query points ; pointer to linear matrix
-  * @param query_width   number of query points ; width of the matrix
-  * @param height        dimension of points ; height of the matrices
-  * @param k             number of neighbor to consider
-  * @param dist_host     distances to k nearest neighbors ; pointer to linear
- * matrix
-  * @param dist_host     indexes of the k nearest neighbors ; pointer to linear
- * matrix
-  *
-  */
-void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_host,
-              int query_width, int height, int k, float *dist_host, int *ind_host) {
-
-  unsigned int size_of_float = sizeof(float);
-  unsigned int size_of_int = sizeof(int);
-
-  // Allocation of global memory for indexes
-  float *query_dev = sycl::malloc_device<float>(query_width * height, q);
-  q.memcpy(query_dev, query_host, query_width * height * sizeof(float));
-
-  float *dist_dev  = sycl::malloc_device<float>(query_width * ref_width, q);
-
-    int *ind_dev   = sycl::malloc_device<int>(query_width * k, q);
-
-  float *ref_dev   = sycl::malloc_device<float>(ref_width * height, q);
-  q.memcpy(ref_dev, ref_host, ref_width * height * sizeof(float));
-
-  // Grids ans threads
-  sycl::range<2> g_16x16((ref_width + 15) / 16 * 16, (query_width + 15) / 16 * 16);
-  sycl::range<2> t_16x16(16, 16);
-
-  sycl::range<1> g_256x1((query_width + 255) / 256 * 256);
-  sycl::range<1> t_256x1(256);
-
-  sycl::range<2> g_k_16x16((k + 15) / 16 * 16, (query_width + 15) / 16 * 16);
-  sycl::range<2> t_k_16x16(16, 16);
-
-
-  // Kernel 1: Compute all the distances
-  //cuComputeDistanceGlobal<<<g_16x16, t_16x16>>>(ref_dev, ref_width, query_dev, query_width, height, dist_dev);
-  q.submit([&] (sycl::handler &h) {
-    auto A = ref_dev;
-    auto B = query_dev;
-    auto AB = dist_dev;
-    sycl::local_accessor<float, 2> shared_A (sycl::range<2>{BLOCK_DIM, BLOCK_DIM}, h);
-    sycl::local_accessor<float, 2> shared_B (sycl::range<2>{BLOCK_DIM, BLOCK_DIM}, h);
-    sycl::local_accessor<int, 0> begin_A (h);
-    sycl::local_accessor<int, 0> begin_B (h);
-    sycl::local_accessor<int, 0> step_A (h);
-    sycl::local_accessor<int, 0> step_B (h);
-    sycl::local_accessor<int, 0> end_A (h);
-    h.parallel_for<class ComputeDistanceGlobal>(
-      sycl::nd_range<2>(g_16x16, t_16x16), [=] (sycl::nd_item<2> item) {
+    auto kfn = [=](sycl::nd_item<3> item) {
       // Thread index
-      int tx = item.get_local_id(1);
-      int ty = item.get_local_id(0);
+      int tx = item.get_local_id(2);
+      int ty = item.get_local_id(1);
 
       // Other variables
       float tmp;
       float ssd = 0;
 
       // Loop parameters
-      begin_A = BLOCK_DIM * item.get_group(0);
-      begin_B = BLOCK_DIM * item.get_group(1);
+      begin_A = BLOCK_DIM * item.get_group(1);
+      begin_B = BLOCK_DIM * item.get_group(2);
       step_A  = BLOCK_DIM * ref_width;
       step_B  = BLOCK_DIM * query_width;
       end_A   = begin_A + (height - 1) * ref_width;
@@ -132,26 +92,27 @@ void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_h
       // Write the block sub-matrix to device memory; each thread writes one element
       if (cond2 && cond1)
         AB[(begin_A + ty) * query_width + begin_B + tx] = ssd;
-    });
-  });
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
 
-#ifdef DEBUG
-  q.memcpy(dist_host, dist_dev, query_width * ref_width * size_of_float).wait();
-  for (int i = 0; i < query_width * ref_width; i++)
-    printf("k1 dist: %d %f\n", i, dist_host[i]);
-#endif
-
-  // Kernel 2: Sort each column
-  //cuInsertionSort<<<g_256x1, t_256x1>>>(dist_dev, ind_dev, query_width, ref_width, k);
-  q.submit([&] (sycl::handler &h) {
-    h.parallel_for<class insertionSort>(
-      sycl::nd_range<1>(g_256x1, t_256x1), [=] (sycl::nd_item<1> item) {
+void insertionSort(sycl::queue &q,
+                   sycl::range<3> &gws,
+                   sycl::range<3> &lws,
+                   float *__restrict__ dist_dev,
+                   int *__restrict__ ind_dev,
+                   int query_width, int ref_width, int k)
+{
+  auto cgf = [&](sycl::handler& cgh) {
+    auto kfn = [=](sycl::nd_item<3> item) {
       int l, i, j;
       float *p_dist;
       int *p_ind;
       float curr_dist, max_dist;
       int curr_row, max_row;
-      unsigned int xIndex = item.get_global_id(0);
+      unsigned int xIndex = item.get_global_id(2);
 
       if (xIndex < query_width) {
         // Pointer shift, initialization, and max value
@@ -206,8 +167,83 @@ void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_h
           }
         }
       }
-    });
-  });
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
+void parallelSqrt(sycl::queue &q,
+                  sycl::range<3> &gws,
+                  sycl::range<3> &lws,
+                  float *dist_dev, int query_width, int k)
+{
+  auto cgf = [&](sycl::handler& cgh) {
+    auto kfn = [=](sycl::nd_item<3> item) {
+      unsigned int xIndex = item.get_global_id(2);
+      unsigned int yIndex = item.get_global_id(1);
+      if (xIndex < query_width && yIndex < k)
+        dist_dev[yIndex * query_width + xIndex] = sycl::sqrt(dist_dev[yIndex * query_width + xIndex]);
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+//-----------------------------------------------------------------------------------------------//
+//                                   K-th NEAREST NEIGHBORS //
+//-----------------------------------------------------------------------------------------------//
+
+/*
+  * @param ref_host      reference points ; pointer to linear matrix
+  * @param ref_width     number of reference points ; width of the matrix
+  * @param query_host    query points ; pointer to linear matrix
+  * @param query_width   number of query points ; width of the matrix
+  * @param height        dimension of points ; height of the matrices
+  * @param k             number of neighbor to consider
+  * @param dist_host     distances to k nearest neighbors ; pointer to linear
+ * matrix
+  * @param dist_host     indexes of the k nearest neighbors ; pointer to linear
+ * matrix
+  *
+  */
+void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_host,
+              int query_width, int height, int k, float *dist_host, int *ind_host) {
+
+  unsigned int size_of_float = sizeof(float);
+  unsigned int size_of_int = sizeof(int);
+
+  // Allocation of global memory for indexes
+  float *query_dev = sycl::malloc_device<float>(query_width * height, q);
+  q.memcpy(query_dev, query_host, query_width * height * sizeof(float));
+
+  float *dist_dev  = sycl::malloc_device<float>(query_width * ref_width, q);
+
+    int *ind_dev   = sycl::malloc_device<int>(query_width * k, q);
+
+  float *ref_dev   = sycl::malloc_device<float>(ref_width * height, q);
+  q.memcpy(ref_dev, ref_host, ref_width * height * sizeof(float));
+
+  // Grids ans threads
+  sycl::range<3> g_16x16(1, (ref_width + 15) / 16 * 16, (query_width + 15) / 16 * 16);
+  sycl::range<3> t_16x16(1, 16, 16);
+
+  sycl::range<3> g_256x1(1, 1, (query_width + 255) / 256 * 256);
+  sycl::range<3> t_256x1(1, 1, 256);
+
+  sycl::range<3> g_k_16x16(1, (k + 15) / 16 * 16, (query_width + 15) / 16 * 16);
+  sycl::range<3> t_k_16x16(1, 16, 16);
+
+  // Kernel 1: Compute all the distances
+  computeDistanceGlobal(q, g_16x16, t_16x16, ref_dev, ref_width, query_dev, query_width, height, dist_dev);
+
+#ifdef DEBUG
+  q.memcpy(dist_host, dist_dev, query_width * ref_width * size_of_float).wait();
+  for (int i = 0; i < query_width * ref_width; i++)
+    printf("k1 dist: %d %f\n", i, dist_host[i]);
+#endif
+
+  // Kernel 2: Sort each column
+  insertionSort(q, g_256x1, t_256x1, dist_dev, ind_dev, query_width, ref_width, k);
 
 #ifdef DEBUG
   q.memcpy(dist_host, dist_dev, query_width * ref_width * size_of_float);
@@ -222,16 +258,7 @@ void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_h
 #endif
 
   // Kernel 3: Compute square root of k first elements
-  //cuParallelSqrt<<<g_k_16x16, t_k_16x16>>>(dist_dev, query_width, k);
-  q.submit([&] (sycl::handler &h) {
-    h.parallel_for<class parallelSqrt>(
-      sycl::nd_range<2>(g_k_16x16, t_k_16x16), [=] (sycl::nd_item<2> item) {
-      unsigned int xIndex = item.get_global_id(1);
-      unsigned int yIndex = item.get_global_id(0);
-      if (xIndex < query_width && yIndex < k)
-        dist_dev[yIndex * query_width + xIndex] = sycl::sqrt(dist_dev[yIndex * query_width + xIndex]);
-    });
-  });
+  parallelSqrt(q, g_k_16x16, t_k_16x16, dist_dev, query_width, k);
 
   q.memcpy(dist_host, dist_dev, query_width * k * size_of_float);
   q.memcpy(ind_host, ind_dev, query_width * k * size_of_int);
