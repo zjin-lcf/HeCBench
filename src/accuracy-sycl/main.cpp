@@ -3,6 +3,7 @@
 #include <chrono>
 #include <random>
 #include <sycl/sycl.hpp>
+#include "atomics.h"
 #include "reference.h"
 
 #define GPU_NUM_THREADS 256
@@ -38,11 +39,14 @@ void accuracy_kernel(
          item.barrier(sycl::access::fence_space::local_space);
        }
        if (item.get_local_id(2) == 0) {
+         atomicAdd(accuracy[0], count);
+         /*
          auto ao = sycl::atomic_ref<int,
                                     sycl::memory_order::relaxed,
                                     sycl::memory_scope::device,
                                     sycl::access::address_space::global_space> (accuracy[0]);
          ao.fetch_add(count);
+         */
        }
     };
     cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
