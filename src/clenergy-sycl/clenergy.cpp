@@ -19,9 +19,78 @@
 #define UNROLLX       8
 #define UNROLLY       1
 #define BLOCKSIZEX    8
-#define BLOCKSIZEY    8 
+#define BLOCKSIZEY    8
 #define BLOCKSIZE    BLOCKSIZEX * BLOCKSIZEY
 
+void cenergy(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int numatoms,
+    const float gridspacing,
+    float *energygrid,
+    const sycl::float4 *atominfo)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      unsigned int xindex = item.get_group(2) * item.get_local_range(2) * UNROLLX + item.get_local_id(2);
+      unsigned int yindex = item.get_group(1) * item.get_local_range(1) + item.get_local_id(1);
+      unsigned int outaddr = item.get_group_range(2) * item.get_local_range(2) * UNROLLX * yindex + xindex;
+
+      float coory = gridspacing * yindex;
+      float coorx = gridspacing * xindex;
+
+      float energyvalx1=0.0f;
+      float energyvalx2=0.0f;
+      float energyvalx3=0.0f;
+      float energyvalx4=0.0f;
+      float energyvalx5=0.0f;
+      float energyvalx6=0.0f;
+      float energyvalx7=0.0f;
+      float energyvalx8=0.0f;
+
+      float gridspacing_u = gridspacing * BLOCKSIZEX;
+
+      //
+      // XXX 59/8 FLOPS per atom
+      //
+      int atomid;
+      for (atomid=0; atomid<numatoms; atomid++) {
+        float dy = coory - atominfo[atomid].y();
+        float dyz2 = (dy * dy) + atominfo[atomid].z();
+
+        float dx1 = coorx - atominfo[atomid].x();
+        float dx2 = dx1 + gridspacing_u;
+        float dx3 = dx2 + gridspacing_u;
+        float dx4 = dx3 + gridspacing_u;
+        float dx5 = dx4 + gridspacing_u;
+        float dx6 = dx5 + gridspacing_u;
+        float dx7 = dx6 + gridspacing_u;
+        float dx8 = dx7 + gridspacing_u;
+
+        energyvalx1 += atominfo[atomid].w() * sycl::rsqrt(dx1*dx1 + dyz2);
+        energyvalx2 += atominfo[atomid].w() * sycl::rsqrt(dx2*dx2 + dyz2);
+        energyvalx3 += atominfo[atomid].w() * sycl::rsqrt(dx3*dx3 + dyz2);
+        energyvalx4 += atominfo[atomid].w() * sycl::rsqrt(dx4*dx4 + dyz2);
+        energyvalx5 += atominfo[atomid].w() * sycl::rsqrt(dx5*dx5 + dyz2);
+        energyvalx6 += atominfo[atomid].w() * sycl::rsqrt(dx6*dx6 + dyz2);
+        energyvalx7 += atominfo[atomid].w() * sycl::rsqrt(dx7*dx7 + dyz2);
+        energyvalx8 += atominfo[atomid].w() * sycl::rsqrt(dx8*dx8 + dyz2);
+      }
+
+      energygrid[outaddr             ] += energyvalx1;
+      energygrid[outaddr+1*BLOCKSIZEX] += energyvalx2;
+      energygrid[outaddr+2*BLOCKSIZEX] += energyvalx3;
+      energygrid[outaddr+3*BLOCKSIZEX] += energyvalx4;
+      energygrid[outaddr+4*BLOCKSIZEX] += energyvalx5;
+      energygrid[outaddr+5*BLOCKSIZEX] += energyvalx6;
+      energygrid[outaddr+6*BLOCKSIZEX] += energyvalx7;
+      energygrid[outaddr+7*BLOCKSIZEX] += energyvalx8;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
 
 int copyatoms(sycl::queue &q, float *atoms, int count, float zplane, sycl::float4 *atominfo) {
 
@@ -61,9 +130,9 @@ int initatoms(float **atombuf, int count, sycl::int3 volsize, float gridspacing)
 
   for (i=0; i<count; i++) {
     int addr = i * 4;
-    atoms[addr    ] = (rand() / (float) RAND_MAX) * size.x(); 
-    atoms[addr + 1] = (rand() / (float) RAND_MAX) * size.y(); 
-    atoms[addr + 2] = (rand() / (float) RAND_MAX) * size.z(); 
+    atoms[addr    ] = (rand() / (float) RAND_MAX) * size.x();
+    atoms[addr + 1] = (rand() / (float) RAND_MAX) * size.y();
+    atoms[addr + 2] = (rand() / (float) RAND_MAX) * size.z();
     atoms[addr + 3] = ((rand() / (float) RAND_MAX) * 2.0) - 1.0;  // charge
   }
 
@@ -98,7 +167,7 @@ int main(int argc, char** argv) {
   // set voxel spacing
   float gridspacing = 0.1;
 
-  // setup CUDA grid and block sizes
+  // setup SYCL global and local work sizes
   // XXX we have to make a trade-off between the number of threads per
   //     block and the resulting padding size we'll end up with since
   //     each thread will do several consecutive grid cells in this version,
@@ -143,7 +212,7 @@ int main(int argc, char** argv) {
 
   int iterations=0;
   int atomstart;
-  for (atomstart=0; atomstart<atomcount; atomstart+=MAXATOMS) {   
+  for (atomstart=0; atomstart<atomcount; atomstart+=MAXATOMS) {
     iterations++;
     int runatoms;
     int atomsremaining = atomcount - atomstart;
@@ -158,70 +227,15 @@ int main(int argc, char** argv) {
 
     // copy the atoms to the GPU
     wkf_timer_start(copytimer);
-    if (copyatoms(q, atoms + 4*atomstart, runatoms, 0*gridspacing, datominfo)) 
+    if (copyatoms(q, atoms + 4*atomstart, runatoms, 0*gridspacing, datominfo))
       return -1;
     wkf_timer_stop(copytimer);
     copytotal += wkf_timer_time(copytimer);
 
     // RUN the kernel...
     wkf_timer_start(runtimer);
-    q.submit([&](auto &h) {
-      h.parallel_for(sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
-        unsigned int xindex = item.get_group(2) * item.get_local_range(2) * UNROLLX + item.get_local_id(2);
-        unsigned int yindex = item.get_group(1) * item.get_local_range(1) + item.get_local_id(1);
-        unsigned int outaddr = item.get_group_range(2) * item.get_local_range(2) * UNROLLX * yindex + xindex;
-
-        float coory = gridspacing * yindex;
-        float coorx = gridspacing * xindex;
-
-        float energyvalx1=0.0f;
-        float energyvalx2=0.0f;
-        float energyvalx3=0.0f;
-        float energyvalx4=0.0f;
-        float energyvalx5=0.0f;
-        float energyvalx6=0.0f;
-        float energyvalx7=0.0f;
-        float energyvalx8=0.0f;
-
-        float gridspacing_u = gridspacing * BLOCKSIZEX;
-
-        //
-        // XXX 59/8 FLOPS per atom
-        //
-        int atomid;
-        for (atomid=0; atomid<runatoms; atomid++) {
-          float dy = coory - datominfo[atomid].y();
-          float dyz2 = (dy * dy) + datominfo[atomid].z();
-
-          float dx1 = coorx - datominfo[atomid].x();
-          float dx2 = dx1 + gridspacing_u;
-          float dx3 = dx2 + gridspacing_u;
-          float dx4 = dx3 + gridspacing_u;
-          float dx5 = dx4 + gridspacing_u;
-          float dx6 = dx5 + gridspacing_u;
-          float dx7 = dx6 + gridspacing_u;
-          float dx8 = dx7 + gridspacing_u;
-
-          energyvalx1 += datominfo[atomid].w() * sycl::rsqrt(dx1*dx1 + dyz2);
-          energyvalx2 += datominfo[atomid].w() * sycl::rsqrt(dx2*dx2 + dyz2);
-          energyvalx3 += datominfo[atomid].w() * sycl::rsqrt(dx3*dx3 + dyz2);
-          energyvalx4 += datominfo[atomid].w() * sycl::rsqrt(dx4*dx4 + dyz2);
-          energyvalx5 += datominfo[atomid].w() * sycl::rsqrt(dx5*dx5 + dyz2);
-          energyvalx6 += datominfo[atomid].w() * sycl::rsqrt(dx6*dx6 + dyz2);
-          energyvalx7 += datominfo[atomid].w() * sycl::rsqrt(dx7*dx7 + dyz2);
-          energyvalx8 += datominfo[atomid].w() * sycl::rsqrt(dx8*dx8 + dyz2);
-        }
-
-        doutput[outaddr             ] += energyvalx1;
-        doutput[outaddr+1*BLOCKSIZEX] += energyvalx2;
-        doutput[outaddr+2*BLOCKSIZEX] += energyvalx3;
-        doutput[outaddr+3*BLOCKSIZEX] += energyvalx4;
-        doutput[outaddr+4*BLOCKSIZEX] += energyvalx5;
-        doutput[outaddr+5*BLOCKSIZEX] += energyvalx6;
-        doutput[outaddr+6*BLOCKSIZEX] += energyvalx7;
-        doutput[outaddr+7*BLOCKSIZEX] += energyvalx8;
-      });
-    }).wait();
+    cenergy(q, gws, lws, runatoms, 0.1, doutput, datominfo);
+    q.wait();
     wkf_timer_stop(runtimer);
     runtotal += wkf_timer_time(runtimer);
   }
@@ -259,7 +273,7 @@ int main(int argc, char** argv) {
 
   /* 59/8 FLOPS per atom eval */
   printf("FP performance: %g GFLOPS\n", atomevalssec * (59.0/8.0));
-  
+
   free(atoms);
   free(energy);
   sycl::free(doutput, q);
