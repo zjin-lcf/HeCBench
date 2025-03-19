@@ -40,6 +40,126 @@ double get_time() {
   return t.tv_sec+t.tv_usec*1e-6;
 }
 
+void pathfinder (
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int*__restrict__ gpuWall,
+    const int*__restrict__ gpuSrc,
+          int*__restrict__ gpuResult,
+          int*__restrict__ outputBuffer,
+    const int iteration,
+    const int theHalo,
+    const int borderCols,
+    const int cols,
+    const int t)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    sycl::local_accessor<int, 1> prev (sycl::range<1>(250), cgh);
+    sycl::local_accessor<int, 1> result (sycl::range<1>(250), cgh);
+
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int BLOCK_SIZE = item.get_local_range(2);
+      int bx = item.get_group(2);
+      int tx = item.get_local_id(2);
+
+      // Each block finally computes result for a small block
+      // after N iterations.
+      // it is the non-overlapping small blocks that cover
+      // all the input data
+
+      // calculate the small block size.
+      int small_block_cols = BLOCK_SIZE - (iteration*theHalo*2);
+
+      // calculate the boundary for the block according to
+      // the boundary of its small block
+      int blkX = (small_block_cols*bx) - borderCols;
+      int blkXmax = blkX+BLOCK_SIZE-1;
+
+      // calculate the global thread coordination
+      int xidx = blkX+tx;
+
+      // effective range within this block that falls within
+      // the valid range of the input data
+      // used to rule out computation outside the boundary.
+      int validXmin = (blkX < 0) ? -blkX : 0;
+      int validXmax = (blkXmax > cols-1) ? BLOCK_SIZE-1-(blkXmax-cols+1) : BLOCK_SIZE-1;
+
+      int W = tx-1;
+      int E = tx+1;
+
+      W = (W < validXmin) ? validXmin : W;
+      E = (E > validXmax) ? validXmax : E;
+
+      bool isValid = IN_RANGE(tx, validXmin, validXmax);
+
+      if(IN_RANGE(xidx, 0, cols-1))
+      {
+        prev[tx] = gpuSrc[xidx];
+      }
+
+      item.barrier(sycl::access::fence_space::local_space);
+
+      bool computed;
+      for (int i = 0; i < iteration; i++)
+      {
+        computed = false;
+
+        if( IN_RANGE(tx, i+1, BLOCK_SIZE-i-2) && isValid )
+        {
+          computed = true;
+          int left = prev[W];
+          int up = prev[tx];
+          int right = prev[E];
+          int shortest = MIN(left, up);
+          shortest = MIN(shortest, right);
+
+          int index = cols*(t+i)+xidx;
+          result[tx] = shortest + gpuWall[index];
+
+          // ===================================================================
+          // add debugging info to the debug output buffer...
+          if (tx==11 && i==0)
+          {
+            // set bufIndex to what value/range of values you want to know.
+            int bufIndex = gpuSrc[xidx];
+            // dont touch the line below.
+            outputBuffer[bufIndex] = 1;
+          }
+          // ===================================================================
+        }
+
+        item.barrier(sycl::access::fence_space::local_space);
+
+        if(i==iteration-1)
+        {
+          // we are on the last iteration, and thus don't need to
+          // compute for the next step.
+          break;
+        }
+
+        if(computed)
+        {
+          //Assign the computation range
+          prev[tx] = result[tx];
+        }
+        item.barrier(sycl::access::fence_space::local_space);
+      }
+
+      // update the global memory
+      // after the last iteration, only threads coordinated within the
+      // small block perform the calculation and switch on "computed"
+      if (computed)
+      {
+        gpuResult[xidx] = result[tx];
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
+
 int main(int argc, char** argv)
 {
   // Program variables.
@@ -125,8 +245,8 @@ int main(int argc, char** argv)
   int *d_gpuResult = sycl::malloc_device<int>(cols, q);
   int *d_outputBuffer = sycl::malloc_device<int>(16384, q);
 
-  sycl::range<1> gws(size);
-  sycl::range<1> lws(block_size);
+  sycl::range<3> gws(1, 1, size);
+  sycl::range<3> lws(1, 1, block_size);
 
   q.wait();
   double kstart = get_time();
@@ -136,16 +256,8 @@ int main(int argc, char** argv)
     // Calculate this for the kernel argument...
     int iteration = MIN(pyramid_height, rows-t-1);
 
-    q.submit([&](sycl::handler& cgh) {
-      sycl::local_accessor <int, 1> prev (lws, cgh);
-      sycl::local_accessor <int, 1> result (lws, cgh);
-      // Set the kernel arguments.
-      cgh.parallel_for<class dynproc_kernel>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-          #include "kernel.sycl"
-      });
-    });
-
+    pathfinder(q, gws, lws, d_gpuWall, d_gpuSrc, d_gpuResult,
+               d_outputBuffer, iteration, theHalo, borderCols, cols, t);
     int* temp = d_gpuResult;
     d_gpuResult = d_gpuSrc;
     d_gpuSrc = temp;
