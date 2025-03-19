@@ -2,7 +2,7 @@
  * Copyright 2014      ARM Ltd.
  *
  * Use of this software is governed by the MIT license
- *   
+ *
  */
 
 #include <stdio.h>
@@ -10,6 +10,7 @@
 #include <math.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
+#include "kernel.h"
 
 #define REPEAT 1000
 #define N 370
@@ -20,12 +21,6 @@
 #define X_SIZE (N * INCX)
 #define Y_SIZE (N * INCY)
 
-struct ComplexFloat {
-  float Re;
-  float Im;
-};
-
-#include "kernel.cpp"
 
 void chemv_cpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
                struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
@@ -106,7 +101,7 @@ void chemv_cpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
  */
 void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
                struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
-               struct ComplexFloat Y[Y_SIZE]) 
+               struct ComplexFloat Y[Y_SIZE])
 {
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -123,29 +118,18 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
   struct ComplexFloat *d_Y = sycl::malloc_device<struct ComplexFloat>(Y_SIZE, q);
   q.memcpy(d_Y, Y, sizeof(struct ComplexFloat) * Y_SIZE);
 
-  sycl::range<1> k0_lws(32);
-  sycl::range<1> k0_gws(32*12);
+  sycl::range<3> k0_lws(1, 1, 32);
+  sycl::range<3> k0_gws(1, 1, 32*12);
 
-  sycl::range<1> k1_lws(32);
-  sycl::range<1> k1_gws(32*12);
+  sycl::range<3> k1_lws(1, 1, 32);
+  sycl::range<3> k1_gws(1, 1, 32*12);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < REPEAT; n++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class k0>(
-        sycl::nd_range<1>(k0_gws, k0_lws), [=] (sycl::nd_item<1> item) {
-        kernel0(d_AT, d_X, d_Y, alpha_im, alpha_re, beta_im, beta_re, item);
-      });
-    });
-
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class k1>(
-        sycl::nd_range<1>(k1_gws, k1_lws), [=] (sycl::nd_item<1> item) {
-        kernel1(d_AT, d_X, d_Y, alpha_im, alpha_re, item);
-      });
-    });
+    kernel0(q, k0_gws, k0_lws, d_AT, d_X, d_Y, alpha_im, alpha_re, beta_im, beta_re);
+    kernel1(q, k1_gws, k1_lws, d_AT, d_X, d_Y, alpha_im, alpha_re);
   }
 
   q.wait();
