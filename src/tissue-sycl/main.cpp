@@ -5,7 +5,7 @@
   This spreads it over more threads.
   TWS September 2014
  */
- 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -48,7 +48,9 @@ void reference(
 }
 
 void tissue(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
     const   int *__restrict d_tisspoints,
     const float *__restrict d_gtt,
     const float *__restrict d_gbartt,
@@ -57,29 +59,35 @@ void tissue(
     const float *__restrict d_qt,
     int nnt, int nntDev, int step, int isp)
 {
-  int jtp,ixyz,ix,iy,iz,jx,jy,jz,istep;
-  int nnt2 = 2*nnt;
-  float p = 0.f;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int jtp,ixyz,ix,iy,iz,jx,jy,jz,istep;
+      int nnt2 = 2*nnt;
+      float p = 0.f;
 
-  const int i = item.get_global_id(0);
-  const int itp = i/step;
-  const int itp1 = i%step;
-  if(itp < nnt) {
-    ix = d_tisspoints[itp];
-    iy = d_tisspoints[itp+nnt];
-    iz = d_tisspoints[itp+nnt2];
-    for(jtp = itp1; jtp < nnt; jtp += step) {
-      jx = d_tisspoints[jtp];
-      jy = d_tisspoints[jtp+nnt];
-      jz = d_tisspoints[jtp+nnt2];
-      ixyz = sycl::abs(jx-ix) + sycl::abs(jy-iy) + sycl::abs(jz-iz) + (isp-1)*nntDev;
-      p += d_gtt[ixyz]*d_ctprev[jtp] + d_gbartt[ixyz]*d_qt[jtp];
-    }
-    if(itp1 == 0) d_ct[itp] = p;
-  }
-  // d_ct is incremented in sequence from the needed threads
-  for(istep=1; istep<step; istep++)
-    if(itp1 == istep && itp < nnt) d_ct[itp] += p;
+      const int i = item.get_global_id(2);
+      const int itp = i/step;
+      const int itp1 = i%step;
+      if(itp < nnt) {
+        ix = d_tisspoints[itp];
+        iy = d_tisspoints[itp+nnt];
+        iz = d_tisspoints[itp+nnt2];
+        for(jtp = itp1; jtp < nnt; jtp += step) {
+          jx = d_tisspoints[jtp];
+          jy = d_tisspoints[jtp+nnt];
+          jz = d_tisspoints[jtp+nnt2];
+          ixyz = sycl::abs(jx-ix) + sycl::abs(jy-iy) + sycl::abs(jz-iz) + (isp-1)*nntDev;
+          p += d_gtt[ixyz]*d_ctprev[jtp] + d_gbartt[ixyz]*d_qt[jtp];
+        }
+        if(itp1 == 0) d_ct[itp] = p;
+      }
+      // d_ct is incremented in sequence from the needed threads
+      for(istep=1; istep<step; istep++)
+        if(itp1 == istep && itp < nnt) d_ct[itp] += p;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char** argv) {
@@ -107,7 +115,7 @@ int main(int argc, char** argv) {
   float* h_qt = (float*) malloc (nntDev*sizeof(float));
   float* h_ct_gold = (float*) malloc (nntDev*sizeof(float));
 
-  // bound the distance between any two 3D points 
+  // bound the distance between any two 3D points
   for (int i = 0; i < 3 * nntDev; i++) {
     h_tisspoints[i] = rand() % (nntDev / 3);
   }
@@ -121,7 +129,7 @@ int main(int argc, char** argv) {
     h_qt[i] = rand() / (float)RAND_MAX;
   }
 
-  int step = 4; //a power of two 
+  int step = 4; //a power of two
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -143,25 +151,16 @@ int main(int argc, char** argv) {
   q.memcpy(d_ctprev, h_ctprev, nntDev*sizeof(float));
   q.memcpy(d_qt, h_qt, nntDev*sizeof(float));
 
-  sycl::range<1> lws (256);
-  sycl::range<1> gws ((step*nnt + 255) / 256 * 256);
+  sycl::range<3> lws (1, 1, 256);
+  sycl::range<3> gws (1, 1, (step*nnt + 255) / 256 * 256);
 
   // quick verification and warmup
   for (int i = 0; i < 2; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class warmup>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        tissue(item, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
-               nnt, nntDev, step, 1);
-      });
-    });
+    tissue(q, gws, lws, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+           nnt, nntDev, step, 1);
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class warmup2>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        tissue(item, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
-               nnt, nntDev, step, 2);
-      });
-    });
+    tissue(q, gws, lws, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+           nnt, nntDev, step, 2);
   }
 
   for (int i = 0; i < 2; i++) {
@@ -186,21 +185,11 @@ int main(int argc, char** argv) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class timing>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        tissue(item, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
-               nnt, nntDev, step, 1);
-      });
-    });
+    tissue(q, gws, lws, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+           nnt, nntDev, step, 1);
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class timing2>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        tissue(item, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
-               nnt, nntDev, step, 2);
-      });
-    });
+    tissue(q, gws, lws, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+           nnt, nntDev, step, 2);
   }
 
   q.wait();
