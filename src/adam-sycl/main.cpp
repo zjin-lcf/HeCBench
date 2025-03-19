@@ -8,7 +8,9 @@
 
 template <typename T, typename G>
 void adam (
-  sycl::nd_item<1> &item,
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
         T* __restrict p,
         T* __restrict m,
         T* __restrict v,
@@ -23,25 +25,31 @@ void adam (
   adamMode_t mode,
   const float decay)
 {
-  const int i = item.get_global_id(0);
-  const int totThreads = item.get_group_range(0) * item.get_local_range(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      const int i = item.get_global_id(2);
+      const int totThreads = item.get_group_range(2) * item.get_local_range(2);
 
-  for (size_t j = i; j < vector_size; j += totThreads) {
-    for (int t = 1; t <= time_step; t++) {
-      T scaled_grad = g[j]/grad_scale;
-      m[j] = b1*m[j] + (1.f-b1)*scaled_grad;
-      v[j] = b2*v[j] + (1.f-b2)*scaled_grad*scaled_grad;
-      float m_corrected = m[j] / (1.f-sycl::pown(b1, t));
-      float v_corrected = v[j] / (1.f-sycl::pown(b2, t));
-      float denom;
-      if (mode == ADAM_MODE_0)
-        denom = sycl::sqrt(v_corrected + eps);
-      else // Mode 1
-        denom = sycl::sqrt(v_corrected) + eps;
-      float update = (m_corrected/denom) + (decay*p[j]);
-      p[j] -= (step_size*update);
-    }
-  }
+      for (size_t j = i; j < vector_size; j += totThreads) {
+        for (int t = 1; t <= time_step; t++) {
+          T scaled_grad = g[j]/grad_scale;
+          m[j] = b1*m[j] + (1.f-b1)*scaled_grad;
+          v[j] = b2*v[j] + (1.f-b2)*scaled_grad*scaled_grad;
+          float m_corrected = m[j] / (1.f-sycl::pown(b1, t));
+          float v_corrected = v[j] / (1.f-sycl::pown(b2, t));
+          float denom;
+          if (mode == ADAM_MODE_0)
+            denom = sycl::sqrt(v_corrected + eps);
+          else // Mode 1
+            denom = sycl::sqrt(v_corrected) + eps;
+          float update = (m_corrected/denom) + (decay*p[j]);
+          p[j] -= (step_size*update);
+        }
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 
@@ -102,8 +110,9 @@ int main(int argc, char* argv[])
   const float grad_scale = 256.f;
 
   const int threadsPerBlock = 256;
-  sycl::range<1> gws ((vector_size+threadsPerBlock-1) / threadsPerBlock * threadsPerBlock);
-  sycl::range<1> lws (threadsPerBlock);
+  sycl::range<3> gws (1, 1, (vector_size+threadsPerBlock-1) /
+                            threadsPerBlock * threadsPerBlock);
+  sycl::range<3> lws (1, 1, threadsPerBlock);
 
   adamMode_t mode = ADAM_MODE_0;
 
@@ -111,11 +120,8 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class kernel>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        adam<float, float>(
-          item,
+    adam<float, float>(
+          q, gws, lws,
           d_p, d_m, d_v, d_g,
           beta1, beta2,
           eps,
@@ -125,8 +131,6 @@ int main(int argc, char* argv[])
           vector_size,
           mode,
           decay);
-      });
-    });
   }
 
   q.wait();
@@ -154,7 +158,7 @@ int main(int argc, char* argv[])
     mode,
     decay);
 
-  bool ok = true; 
+  bool ok = true;
   double cr = 0, cp = 0;
   for (int i = 0; i < vector_size; i++) {
     if (fabsf(r[i] - p[i]) > 1e-3f) {
