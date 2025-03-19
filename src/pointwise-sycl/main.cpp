@@ -36,14 +36,12 @@ typedef struct {
   double i, c, h;
 } checksum;
 
-// Device functions
-inline float sigmoidf(float in) {
-  return 1.f / (1.f + sycl::exp(-in));
-}
 
 // Fused kernel
 void elementWise_fp(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
     int hiddenSize, int miniBatch,
     const float *__restrict tmp_h,
     const float *__restrict tmp_i,
@@ -54,35 +52,41 @@ void elementWise_fp(
     const float *__restrict c_in,
     float *__restrict c_out)
 {
-  int index = item.get_global_id(0);
-  int numElements = miniBatch * hiddenSize;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int index = item.get_global_id(2);
+      int numElements = miniBatch * hiddenSize;
 
-  if (index >= numElements) return;
+      if (index >= numElements) return;
 
-  int batch = index / hiddenSize;
-  int gateIndex = (index % hiddenSize) + 4 * batch * hiddenSize;
+      int batch = index / hiddenSize;
+      int gateIndex = (index % hiddenSize) + 4 * batch * hiddenSize;
 
-  float g[4];
+      float g[4];
 
-  for (int i = 0; i < 4; i++) {
-    g[i] = tmp_i[i * hiddenSize + gateIndex] + tmp_h[i * hiddenSize + gateIndex];
-    g[i] += bias[i * hiddenSize + index % hiddenSize] + bias[(i + 4) * hiddenSize + index % hiddenSize];
-    linearGates[gateIndex + i * hiddenSize] = g[i];
-  }
+      for (int i = 0; i < 4; i++) {
+        g[i] = tmp_i[i * hiddenSize + gateIndex] + tmp_h[i * hiddenSize + gateIndex];
+        g[i] += bias[i * hiddenSize + index % hiddenSize] + bias[(i + 4) * hiddenSize + index % hiddenSize];
+        linearGates[gateIndex + i * hiddenSize] = g[i];
+      }
 
-  float in_gate     = sigmoidf(g[0]);
-  float forget_gate = sigmoidf(g[1]);
-  float in_gate2    = sycl::tanh(g[2]);
-  float out_gate    = sigmoidf(g[3]);
+      float in_gate     = 1.f / (1.f + sycl::exp(-g[0]));
+      float forget_gate = 1.f / (1.f + sycl::exp(-g[1]));
+      float in_gate2    = sycl::tanh(g[2]);
+      float out_gate    = 1.f / (1.f + sycl::exp(-g[3]));
 
-  float val = (forget_gate * c_in[index]) + (in_gate * in_gate2);
+      float val = (forget_gate * c_in[index]) + (in_gate * in_gate2);
 
-  c_out[index] = val;
+      c_out[index] = val;
 
-  val = out_gate * sycl::tanh(val);
+      val = out_gate * sycl::tanh(val);
 
-  h_out[index] = val;
-  i_out[index] = val;
+      h_out[index] = val;
+      i_out[index] = val;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 float LCG_random(unsigned int * seed) {
@@ -93,11 +97,21 @@ float LCG_random(unsigned int * seed) {
   return (float) (*seed) / (float) m;
 }
 
-void init (sycl::nd_item<1> &item, float* data, int size) {
-  int index = item.get_global_id(0);
-  if (index >= size) return;
-  unsigned int seed = index ^ size;
-  data[index] = LCG_random(&seed);
+void init(sycl::queue &q,
+          sycl::range<3> &gws,
+          sycl::range<3> &lws,
+          float* data, int size)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int index = item.get_global_id(2);
+      if (index >= size) return;
+      unsigned int seed = index ^ size;
+      data[index] = LCG_random(&seed);
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 void test(sycl::queue &q, int hiddenSize, int miniBatch, int seqLength, int numLayers,
@@ -125,39 +139,16 @@ void test(sycl::queue &q, int hiddenSize, int miniBatch, int seqLength, int numL
   float *linearGates = sycl::malloc_device<float>(4 * seqLength * numLayers * numElements, q);
 
   // Initialise with random values on a device
-  sycl::range<1> lws (256);
-  sycl::range<1> gws_hc ((hc_size + 255)/256*256);
-  sycl::range<1> gws_b ((bias_size + 255)/256*256);
-  sycl::range<1> gws_tmp_h ((tmp_h_size + 255)/256*256);
-  sycl::range<1> gws_tmp_i ((tmp_i_size + 255)/256*256);
+  sycl::range<3> lws (1, 1, 256);
+  sycl::range<3> gws_hc (1, 1, (hc_size + 255)/256*256);
+  sycl::range<3> gws_b (1, 1, (bias_size + 255)/256*256);
+  sycl::range<3> gws_tmp_h (1, 1, (tmp_h_size + 255)/256*256);
+  sycl::range<3> gws_tmp_i (1, 1, (tmp_i_size + 255)/256*256);
 
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for<class init_h_data>(
-      sycl::nd_range<1>(gws_tmp_h, lws), [=] (sycl::nd_item<1> item) {
-      init(item, tmp_h, tmp_h_size);
-    });
-  });
-
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for<class init_c_data>(
-      sycl::nd_range<1>(gws_hc, lws), [=] (sycl::nd_item<1> item) {
-      init(item, c_data, hc_size);
-    });
-  });
-
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for<class init_i_data>(
-      sycl::nd_range<1>(gws_tmp_i, lws), [=] (sycl::nd_item<1> item) {
-      init(item, tmp_i, tmp_i_size);
-    });
-  });
-
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for<class init_bias_data>(
-      sycl::nd_range<1>(gws_b, lws), [=] (sycl::nd_item<1> item) {
-      init(item, bias, bias_size);
-    });
-  });
+  init(q, gws_tmp_h, lws, tmp_h, tmp_h_size);
+  init(q, gws_hc, lws, c_data, hc_size);
+  init(q, gws_tmp_i, lws, tmp_i, tmp_i_size);
+  init(q, gws_b, lws, bias, bias_size);
 
   q.wait();
 
@@ -167,7 +158,7 @@ void test(sycl::queue &q, int hiddenSize, int miniBatch, int seqLength, int numL
   int rEnd = 0;
   int recurBatchSize = 2;
 
-  sycl::range<1> gws_p ((numElements + 255)/256*256);
+  sycl::range<3> gws_p (1, 1, (numElements + 255)/256*256);
 
   double ktime = 0.0;
 
@@ -213,10 +204,8 @@ void test(sycl::queue &q, int hiddenSize, int miniBatch, int seqLength, int numL
 
     for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
-        q.submit([&] (sycl::handler &cgh) {
-          cgh.parallel_for<class pw>(sycl::nd_range<1>(gws_p, lws), [=] (sycl::nd_item<1> item) {
-            elementWise_fp
-            (item,
+        elementWise_fp
+            (q, gws_p, lws,
 	     hiddenSize, miniBatch,
              tmp_h + 4 * layer * numElements,
              tmp_i + 4 * i * numElements,
@@ -226,8 +215,6 @@ void test(sycl::queue &q, int hiddenSize, int miniBatch, int seqLength, int numL
              i_data + i * numElements + (layer + 1) * seqLength * numElements,
              c_data + i * numElements + layer * (seqLength + 1) * numElements,
              c_data + (i + 1) * numElements + layer * (seqLength + 1) * numElements);
-	  });
-        });
     }
 
     q.wait();
