@@ -9,7 +9,7 @@
 // transpose
 double* t(const double *idata, const int width, const int height)
 {
-  double *odata = (double*) malloc (sizeof(double) * width * height); 
+  double *odata = (double*) malloc (sizeof(double) * width * height);
   for (int yIndex = 0; yIndex < height; yIndex++) {
     for (int xIndex = 0; xIndex < width; xIndex++) {
       int index_in  = xIndex + width * yIndex;
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
   rands = (double*) malloc (rands_size_byte);
   probs = (double*) malloc (alphas_size_byte);
 
-  // load the csv file 
+  // load the csv file
   for (int i = 0; i < alphas_size; i++)
     fscanf(fp, "%lf", &alphas[i]);
   fclose(fp);
@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
   // normal distribution (mean: 0 and var: 1)
   std::mt19937 gen(19937);
   std::normal_distribution<double> norm_dist(0.0,1.0);
-  for (int i = 0; i < rands_size; i++) rands[i] = norm_dist(gen); 
+  for (int i = 0; i < rands_size; i++) rands[i] = norm_dist(gen);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -73,8 +73,8 @@ int main(int argc, char* argv[]) {
 
   // kernel 1
   int threads_per_block = 192;
-  sycl::range<1> lws (threads_per_block);
-  sycl::range<1> gws (ceil(1.0 * n / threads_per_block) * threads_per_block);
+  sycl::range<3> lws (1, 1, threads_per_block);
+  sycl::range<3> gws (1, 1, ceil(1.0 * n / threads_per_block) * threads_per_block);
 
   q.memset(d_probs, 0.0, alphas_size_byte);
 
@@ -82,12 +82,7 @@ int main(int argc, char* argv[]) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class k1>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        compute_probs(d_alphas, d_rands, d_probs, n, K, M, item);
-      });
-    });
+    compute_probs(q, gws, lws, 0, d_alphas, d_rands, d_probs, n, K, M);
   }
 
   q.wait();
@@ -113,12 +108,7 @@ int main(int argc, char* argv[]) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class k2>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        compute_probs_unitStrides(d_alphas, d_rands, d_probs, n, K, M, item);
-      });
-    });
+    compute_probs_unitStrides(q, gws, lws, 0, d_alphas, d_rands, d_probs, n, K, M);
   }
 
   q.wait();
@@ -134,8 +124,9 @@ int main(int argc, char* argv[]) {
 
   // kernel 3
   threads_per_block = 96;
-  sycl::range<1> lws2 (threads_per_block);
-  sycl::range<1> gws2 (ceil(1.0 * n / threads_per_block) * threads_per_block);
+  sycl::range<3> lws2 (1, 1, threads_per_block);
+  sycl::range<3> gws2 (1, 1, ceil(1.0 * n / threads_per_block) * threads_per_block);
+  const int slm_size = K * threads_per_block * 2;
 
   q.memset(d_probs, 0.0, alphas_size_byte);
 
@@ -143,14 +134,8 @@ int main(int argc, char* argv[]) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      sycl::local_accessor<double, 1> sm (sycl::range<1>(K * threads_per_block * 2), cgh);
-      cgh.parallel_for<class k3>(
-        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
-        compute_probs_unitStrides_sharedMem(d_alphas, d_rands, d_probs, n, K, M,
-                                            sm.get_pointer(), item);
-      });
-    });
+    compute_probs_unitStrides_sharedMem(q, gws2, lws2, slm_size,
+                                        d_alphas, d_rands, d_probs, n, K, M);
   }
 
   q.wait();
@@ -164,7 +149,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < alphas_size; i++) s += probs[i];
   printf("compute_probs_unitStrides_sharedMem: checksum = %lf\n", s);
 
-  // free memory 
+  // free memory
   sycl::free(d_alphas, q);
   sycl::free(d_rands, q);
   sycl::free(d_probs, q);
