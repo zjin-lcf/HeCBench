@@ -11,6 +11,7 @@ void adam (
   sycl::queue &q,
   sycl::range<3> &gws,
   sycl::range<3> &lws,
+  const int slm_size,
         T* __restrict p,
         T* __restrict m,
         T* __restrict v,
@@ -121,7 +122,7 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < repeat; i++) {
     adam<float, float>(
-          q, gws, lws,
+          q, gws, lws, 0,
           d_p, d_m, d_v, d_g,
           beta1, beta2,
           eps,

@@ -2,6 +2,7 @@ void advCubatureHex3D (
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     const int Nelements,
     const dfloat * __restrict vgeo,
     const dfloat * __restrict cubvgeo,

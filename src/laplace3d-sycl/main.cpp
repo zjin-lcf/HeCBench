@@ -88,14 +88,14 @@ int main(int argc, char **argv){
   printf("local work size = %d %d %d \n", BLOCK_X, BLOCK_Y, 1);
 
   // Warmup
-  laplace3d(q, gws, lws, NX, NY, NZ, pitch, d_u1, d_u2);
+  laplace3d(q, gws, lws, 0, NX, NY, NZ, pitch, d_u1, d_u2);
   q.wait();
 
   // Execute GPU kernel
   auto start = std::chrono::steady_clock::now();
 
   for (i = 1; i <= REPEAT; ++i) {
-    laplace3d(q, gws, lws, NX, NY, NZ, pitch, d_u1, d_u2);
+    laplace3d(q, gws, lws, 0, NX, NY, NZ, pitch, d_u1, d_u2);
     std::swap(d_u1, d_u2);
   }
 

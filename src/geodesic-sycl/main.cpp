@@ -77,6 +77,7 @@ float  distance_host ( int i, float latitude_1, float longitude_1,
 void distance_kernel(sycl::queue &q,
                      sycl::range<3> &gws,
                      sycl::range<3> &lws,
+                     const int slm_size,
                      const sycl::float4 *d_A,
                      float *d_C,
                      const int N)
@@ -169,7 +170,7 @@ void distance_device(const sycl::float4* VA, float* VC, const size_t N, const in
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < iteration; n++) {
-    distance_kernel(q, gws, lws, d_A, d_C, N);
+    distance_kernel(q, gws, lws, 0, d_A, d_C, N);
   }
   q.wait();
 

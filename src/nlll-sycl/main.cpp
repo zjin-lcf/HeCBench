@@ -12,6 +12,7 @@ void nll_loss_forward_reduce2d_kernel(
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     scalar_t* __restrict__ output,
     scalar_t* __restrict__ total_weight,
     const scalar_t* __restrict__ input,
@@ -115,7 +116,7 @@ void eval(const int64_t nframe,
 
   for (int i = 0; i < repeat; i++) {
     nll_loss_forward_reduce2d_kernel<scalar_t, scalar_t, index_t, GPU_THREADS>(
-                        q, gws, lws,
+                        q, gws, lws, 0,
                         d_output,
                         d_total_weight,
                         d_input,

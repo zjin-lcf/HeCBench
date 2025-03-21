@@ -28,6 +28,7 @@ void sampleKernel (
   sycl::queue &q,
   sycl::range<3> &gws,
   sycl::range<3> &lws,
+  const int slm_size,
   Type *std,
   IdxType D,
   IdxType N)
@@ -142,7 +143,7 @@ void stddev(sycl::queue &q,
   sycl::range<3> gws2 (1, 1, (D+TPB-1)/TPB*TPB);
   sycl::range<3> lws2 (1, 1, TPB);
   IdxType sampleSize = sample ? N-1 : N;
-  sampleKernel<Type, IdxType>(q, gws2, lws2, std, D, sampleSize);
+  sampleKernel<Type, IdxType>(q, gws2, lws2, 0, std, D, sampleSize);
 }
 
 int main(int argc, char* argv[]) {

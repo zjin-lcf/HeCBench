@@ -42,6 +42,7 @@ void elementWise_fp(
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     int hiddenSize, int miniBatch,
     const float *__restrict tmp_h,
     const float *__restrict tmp_i,
@@ -205,7 +206,7 @@ void test(sycl::queue &q, int hiddenSize, int miniBatch, int seqLength, int numL
     for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
         elementWise_fp
-            (q, gws_p, lws,
+            (q, gws_p, lws, 0,
 	     hiddenSize, miniBatch,
              tmp_h + 4 * layer * numElements,
              tmp_i + 4 * i * numElements,

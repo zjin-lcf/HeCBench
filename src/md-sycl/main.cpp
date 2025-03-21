@@ -14,6 +14,7 @@ void md (
   sycl::queue &q,
   sycl::range<3> &gws,
   sycl::range<3> &lws,
+  const int slm_size,
   const POSVECTYPE* __restrict position,
         FORCEVECTYPE* __restrict force,
   const int* __restrict neighborList,
@@ -125,7 +126,7 @@ int main(int argc, char** argv)
   sycl::range<3> gws (1, 1, (nAtom + 255) / 256 * 256);
 
   // warmup and result verification
-  md(q, gws, lws, d_position, d_force, d_neighborList, nAtom, maxNeighbors, lj1, lj2, cutsq);
+  md(q, gws, lws, 0, d_position, d_force, d_neighborList, nAtom, maxNeighbors, lj1, lj2, cutsq);
 
   q.memcpy(force, d_force, nAtom * sizeof(FORCEVECTYPE)).wait();
 
@@ -137,7 +138,7 @@ int main(int argc, char** argv)
 
   for (int i = 0; i < iteration; i++)
   {
-    md(q, gws, lws, d_position, d_force, d_neighborList, nAtom, maxNeighbors, lj1, lj2, cutsq);
+    md(q, gws, lws, 0, d_position, d_force, d_neighborList, nAtom, maxNeighbors, lj1, lj2, cutsq);
   }
 
   q.wait();

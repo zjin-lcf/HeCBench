@@ -11,6 +11,7 @@ void maxpool3d(
   sycl::queue &q,
   sycl::range<3> &gws,
   sycl::range<3> &lws,
+  const int slm_size,
   const DTYPE* i_img,
         DTYPE* o_img,
   const int Hstride,
@@ -116,7 +117,7 @@ int main(int argc, char** argv)
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    maxpool3d(q, gws, lws, d_image, d_result, Hstride, Vstride,
+    maxpool3d(q, gws, lws, 0, d_image, d_result, Hstride, Vstride,
               pool_width, pool_height, i_img_width, i_img_height,
               o_img_width, o_img_height);
   }

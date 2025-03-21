@@ -90,6 +90,7 @@ int main(int argc, char **argv) {
     advCubatureHex3D(q,
                      gws,
                      lws,
+                     0,
                      Nelements,
                      vgeo,
                      cubvgeo,

@@ -28,6 +28,7 @@ template <typename value_idx, typename value_t>
 void sigmas_kernel(sycl::queue &q,
                    sycl::range<3> &gws,
                    sycl::range<3> &lws,
+                   const int slm_size,
                    const value_t* __restrict__ distances,
                          value_t* __restrict__ P,
                    const float perplexity,
@@ -110,7 +111,7 @@ void perplexity_search(sycl::queue &q,
 
   auto start = std::chrono::steady_clock::now();
 
-  sigmas_kernel<value_idx, value_t>(q, gws, lws, distances, P, perplexity,
+  sigmas_kernel<value_idx, value_t>(q, gws, lws, 0, distances, P, perplexity,
                                     desired_entropy, epochs, tol, n, dim);
 
   q.wait();

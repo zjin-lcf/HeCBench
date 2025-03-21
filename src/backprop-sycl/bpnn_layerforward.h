@@ -2,6 +2,7 @@ void kernel_layerforward(
   sycl::queue &q,
   sycl::range<3> &gws,
   sycl::range<3> &lws,
+  const int slm_size,
   const float*__restrict__ input,
         float*__restrict__ input_weights,
         float*__restrict__ hidden_partial_sum,

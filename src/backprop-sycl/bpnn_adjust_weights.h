@@ -2,6 +2,7 @@ void kernel_adjust_weights (
   sycl::queue &q,
   sycl::range<3> &gws,
   sycl::range<3> &lws,
+  const int slm_size,
   const float*__restrict__ ly,
         float*__restrict__ w,
   const float*__restrict__ delta,

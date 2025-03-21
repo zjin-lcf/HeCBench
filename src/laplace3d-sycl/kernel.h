@@ -30,6 +30,7 @@ void laplace3d(
   sycl::queue &q,
   sycl::range<3> &gws,
   sycl::range<3> &lws,
+  const int slm_size,
   int NX, int NY, int NZ, int pitch,
   const float *__restrict d_u1,
         float *__restrict d_u2)

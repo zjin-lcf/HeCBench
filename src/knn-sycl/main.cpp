@@ -20,6 +20,7 @@
 void computeDistanceGlobal(sycl::queue &q,
                            sycl::range<3> &gws,
                            sycl::range<3> &lws,
+                           const int slm_size,
                            const float *__restrict__ A,
                            int ref_width,
                            const float *__restrict__ B,
@@ -101,6 +102,7 @@ void computeDistanceGlobal(sycl::queue &q,
 void insertionSort(sycl::queue &q,
                    sycl::range<3> &gws,
                    sycl::range<3> &lws,
+                   const int slm_size,
                    float *__restrict__ dist_dev,
                    int *__restrict__ ind_dev,
                    int query_width, int ref_width, int k)
@@ -176,6 +178,7 @@ void insertionSort(sycl::queue &q,
 void parallelSqrt(sycl::queue &q,
                   sycl::range<3> &gws,
                   sycl::range<3> &lws,
+                  const int slm_size,
                   float *dist_dev, int query_width, int k)
 {
   auto cgf = [&](sycl::handler& cgh) {
@@ -234,7 +237,7 @@ void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_h
   sycl::range<3> t_k_16x16(1, 16, 16);
 
   // Kernel 1: Compute all the distances
-  computeDistanceGlobal(q, g_16x16, t_16x16, ref_dev, ref_width, query_dev, query_width, height, dist_dev);
+  computeDistanceGlobal(q, g_16x16, t_16x16, 0, ref_dev, ref_width, query_dev, query_width, height, dist_dev);
 
 #ifdef DEBUG
   q.memcpy(dist_host, dist_dev, query_width * ref_width * size_of_float).wait();
@@ -243,7 +246,7 @@ void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_h
 #endif
 
   // Kernel 2: Sort each column
-  insertionSort(q, g_256x1, t_256x1, dist_dev, ind_dev, query_width, ref_width, k);
+  insertionSort(q, g_256x1, t_256x1, 0, dist_dev, ind_dev, query_width, ref_width, k);
 
 #ifdef DEBUG
   q.memcpy(dist_host, dist_dev, query_width * ref_width * size_of_float);
@@ -258,7 +261,7 @@ void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_h
 #endif
 
   // Kernel 3: Compute square root of k first elements
-  parallelSqrt(q, g_k_16x16, t_k_16x16, dist_dev, query_width, k);
+  parallelSqrt(q, g_k_16x16, t_k_16x16, 0, dist_dev, query_width, k);
 
   q.memcpy(dist_host, dist_dev, query_width * k * size_of_float);
   q.memcpy(ind_host, ind_dev, query_width * k * size_of_int);

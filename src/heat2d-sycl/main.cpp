@@ -46,6 +46,7 @@ void reference(float *out, const float *in, const float delta, const float norm,
 void dev_lapl_iter(sycl::queue &q,
                    sycl::range<3> &gws,
                    sycl::range<3> &lws,
+                   const int slm_size,
                    float *out,
                    const float *in,
                    const float delta,
@@ -145,7 +146,7 @@ int main(int argc, char *argv[]) {
   /* Fixed number of threads per block (in x- and y-direction), number
      of blocks per direction determined by dimensions Lx, Ly */
   for(i=0; i<niter; i++) {
-    dev_lapl_iter(q, gws, lws, d_out, d_in, xdelta, xnorm, Lx, Ly);
+    dev_lapl_iter(q, gws, lws, 0, d_out, d_in, xdelta, xnorm, Lx, Ly);
     std::swap(d_out, d_in);
   }
 

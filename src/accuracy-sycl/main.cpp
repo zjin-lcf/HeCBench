@@ -12,6 +12,7 @@ void accuracy_kernel(
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     const int N,
     const int D,
     const int top_k,
@@ -112,7 +113,7 @@ int main(int argc, char* argv[])
 
     for (int i = 0; i < repeat; i++) {
       q.memset(d_count, 0, sizeof(int));
-      accuracy_kernel(q, gws, lws, nrows, ndims, top_k, d_data, d_label, d_count);
+      accuracy_kernel(q, gws, lws, 0, nrows, ndims, top_k, d_data, d_label, d_count);
     }
 
     q.wait();

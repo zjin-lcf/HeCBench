@@ -26,6 +26,7 @@ void cenergy(
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     const int numatoms,
     const float gridspacing,
     float *energygrid,
@@ -234,7 +235,7 @@ int main(int argc, char** argv) {
 
     // RUN the kernel...
     wkf_timer_start(runtimer);
-    cenergy(q, gws, lws, runatoms, 0.1, doutput, datominfo);
+    cenergy(q, gws, lws, 0, runatoms, 0.1, doutput, datominfo);
     q.wait();
     wkf_timer_stop(runtimer);
     runtotal += wkf_timer_time(runtimer);

@@ -13,6 +13,7 @@ void ChannelShuffleNCHWKernel(
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     const int G,
     const int K,
     const int HxW,
@@ -47,6 +48,7 @@ void ChannelShuffleNHWCKernel(
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     const int G,
     const int K,
     const T* X,
@@ -95,14 +97,14 @@ bool ChannelShuffleNCHW (sycl::queue &q, T *X, int N, int C, int G, int numel, T
     sycl::range<3> lws (1, 1, NUM_THREADS);
 
     for (int i = 0; i < repeat; i++) {
-      ChannelShuffleNCHWKernel<float, false>(q, gws, lws, G, K, HxW, X, Y);
+      ChannelShuffleNCHWKernel<float, false>(q, gws, lws, 0, G, K, HxW, X, Y);
     }
   } else {
     sycl::range<3> gws (C, S, N * NUM_THREADS);
     sycl::range<3> lws (1, 1, NUM_THREADS);
 
     for (int i = 0; i < repeat; i++) {
-      ChannelShuffleNCHWKernel<float, true>(q, gws, lws, G, K, HxW, X, Y);
+      ChannelShuffleNCHWKernel<float, true>(q, gws, lws, 0, G, K, HxW, X, Y);
     }
   }
 
@@ -130,15 +132,15 @@ bool ChannelShuffleNHWC (sycl::queue &q, T *X, int N, int C, int G, int numel, T
 
   if (C <= 32) {
     for (int i = 0; i < repeat; i++) {
-      ChannelShuffleNHWCKernel<float, 32>(q, gws, lws, G, K, X, Y);
+      ChannelShuffleNHWCKernel<float, 32>(q, gws, lws, 0, G, K, X, Y);
     }
   } else if (C <= 128) {
     for (int i = 0; i < repeat; i++) {
-      ChannelShuffleNHWCKernel<float, 128>(q, gws, lws, G, K, X, Y);
+      ChannelShuffleNHWCKernel<float, 128>(q, gws, lws, 0, G, K, X, Y);
     }
   } else if (C <= 512) {
     for (int i = 0; i < repeat; i++) {
-      ChannelShuffleNHWCKernel<float, 512>(q, gws, lws, G, K, X, Y);
+      ChannelShuffleNHWCKernel<float, 512>(q, gws, lws, 0, G, K, X, Y);
     }
   }
 

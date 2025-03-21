@@ -51,6 +51,7 @@ void tissue(
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     const   int *__restrict d_tisspoints,
     const float *__restrict d_gtt,
     const float *__restrict d_gbartt,
@@ -156,10 +157,10 @@ int main(int argc, char** argv) {
 
   // quick verification and warmup
   for (int i = 0; i < 2; i++) {
-    tissue(q, gws, lws, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+    tissue(q, gws, lws, 0, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
            nnt, nntDev, step, 1);
 
-    tissue(q, gws, lws, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+    tissue(q, gws, lws, 0, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
            nnt, nntDev, step, 2);
   }
 
@@ -185,10 +186,10 @@ int main(int argc, char** argv) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    tissue(q, gws, lws, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+    tissue(q, gws, lws, 0, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
            nnt, nntDev, step, 1);
 
-    tissue(q, gws, lws, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
+    tissue(q, gws, lws, 0, d_tisspoints, d_gtt, d_gbartt, d_ct, d_ctprev, d_qt,
            nnt, nntDev, step, 2);
   }
 

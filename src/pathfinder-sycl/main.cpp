@@ -44,6 +44,7 @@ void pathfinder (
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     const int*__restrict__ gpuWall,
     const int*__restrict__ gpuSrc,
           int*__restrict__ gpuResult,
@@ -256,7 +257,7 @@ int main(int argc, char** argv)
     // Calculate this for the kernel argument...
     int iteration = MIN(pyramid_height, rows-t-1);
 
-    pathfinder(q, gws, lws, d_gpuWall, d_gpuSrc, d_gpuResult,
+    pathfinder(q, gws, lws, 0, d_gpuWall, d_gpuSrc, d_gpuResult,
                d_outputBuffer, iteration, theHalo, borderCols, cols, t);
     int* temp = d_gpuResult;
     d_gpuResult = d_gpuSrc;

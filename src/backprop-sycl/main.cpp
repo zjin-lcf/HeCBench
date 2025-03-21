@@ -82,7 +82,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   sycl::range<3> gws(1, BLOCK_SIZE*num_blocks, BLOCK_SIZE);
   sycl::range<3> lws(1, BLOCK_SIZE, BLOCK_SIZE);
 
-  kernel_layerforward(q, gws, lws, d_input, d_input_weights, d_hidden_partial_sum, hid);
+  kernel_layerforward(q, gws, lws, 0, d_input, d_input_weights, d_hidden_partial_sum, hid);
   q.memcpy(partial_sum, d_hidden_partial_sum, sizeof(float)*num_blocks*WIDTH).wait();
 
   for (int j = 1; j <= hid; j++) {
@@ -111,7 +111,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   float *d_input_prev_weights = sycl::malloc_device<float>((in+1)*(hid+1), q);
   q.memcpy(d_input_prev_weights, input_weights_prev_one_dim, sizeof(float)*(in+1)*(hid+1));
 
-  kernel_adjust_weights(q, gws, lws, d_input, d_input_weights, d_hidden_delta, d_input_prev_weights, hid);
+  kernel_adjust_weights(q, gws, lws, 0, d_input, d_input_weights, d_hidden_delta, d_input_prev_weights, hid);
 
   q.memcpy(input_weights_one_dim, d_input_weights, sizeof(float)*(in+1)*(hid+1)).wait();
 

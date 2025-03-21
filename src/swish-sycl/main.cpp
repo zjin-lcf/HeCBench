@@ -25,6 +25,7 @@ void SwishKernel(
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     const int N, const T* X, T* Y)
 {
   auto cgf = [&] (sycl::handler &cgh) {
@@ -104,7 +105,7 @@ void eval_swish (const int N, const int repeat) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    SwishKernel(q, gws, lws, N, d_X, d_Y);
+    SwishKernel(q, gws, lws, 0, N, d_X, d_Y);
   }
 
   q.wait();

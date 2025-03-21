@@ -128,8 +128,8 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < REPEAT; n++) {
-    kernel0(q, k0_gws, k0_lws, d_AT, d_X, d_Y, alpha_im, alpha_re, beta_im, beta_re);
-    kernel1(q, k1_gws, k1_lws, d_AT, d_X, d_Y, alpha_im, alpha_re);
+    kernel0(q, k0_gws, k0_lws, 0, d_AT, d_X, d_Y, alpha_im, alpha_re, beta_im, beta_re);
+    kernel1(q, k1_gws, k1_lws, 0, d_AT, d_X, d_Y, alpha_im, alpha_re);
   }
 
   q.wait();
