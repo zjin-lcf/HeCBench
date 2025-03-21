@@ -8,24 +8,33 @@
 #include "reference.h"
 
 void glu_kernel(
-   sycl::nd_item<1> &item,
+   sycl::queue &q,
+   sycl::range<3> &gws,
+   sycl::range<3> &lws,
+   const int slm_size,
    const int M,
    const int split_dim_size,
    const int N,
    const float* Xdata,
          float* Ydata)
 {
-  const int xOffset = 2 * split_dim_size * N;
-  const int yOffset = split_dim_size * N;
-  int index = item.get_global_id(0);
-  if (index >= M * split_dim_size * N) return;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      const int xOffset = 2 * split_dim_size * N;
+      const int yOffset = split_dim_size * N;
+      int index = item.get_global_id(2);
+      if (index >= M * split_dim_size * N) return;
 
-  const int i = index / split_dim_size / N;
-  const int j = index / N % split_dim_size;
-  const int k = index % N;
-  const float x1 = Xdata[i * xOffset + j * N + k];
-  const float x2 = Xdata[i * xOffset + (j + split_dim_size) * N + k];
-  Ydata[i * yOffset + j * N + k] = x1 * (1.f / (1.f + sycl::exp(-x2)));
+      const int i = index / split_dim_size / N;
+      const int j = index / N % split_dim_size;
+      const int k = index % N;
+      const float x1 = Xdata[i * xOffset + j * N + k];
+      const float x2 = Xdata[i * xOffset + (j + split_dim_size) * N + k];
+      Ydata[i * yOffset + j * N + k] = x1 * (1.f / (1.f + sycl::exp(-x2)));
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char* argv[])
@@ -78,7 +87,7 @@ int main(int argc, char* argv[])
 
   float *d_Y = sycl::malloc_device<float>(nelems, q);
 
-  const int block_size = 256; 
+  const int block_size = 256;
 
   for (int input_dim = -1; input_dim < 3 * (ndims-1); input_dim++) {
 
@@ -94,19 +103,15 @@ int main(int argc, char* argv[])
 
     ComputeGlu(m, split_dim_size, n, X, Y_ref);
 
-    sycl::range<1> gws ((m * split_dim_size * n + block_size - 1) / block_size * block_size);
-    sycl::range<1> lws (block_size);
+    sycl::range<3> gws (1, 1, (m * split_dim_size * n + block_size - 1) /
+                              block_size * block_size);
+    sycl::range<3> lws (1, 1, block_size);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for<class glu>(
-          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-          glu_kernel(item, m, split_dim_size, n, d_X, d_Y);
-        });
-      });
+      glu_kernel(q, gws, lws, 0, m, split_dim_size, n, d_X, d_Y);
     }
 
     q.wait();
