@@ -62,9 +62,9 @@ float* attention_device(const float* key, const float* value, const float* query
 
     for (int k = 0; k < repeat; k++) {
       q.memset(d_exp_sum, 0, 4);
-      kernel1_warpReduce(q, gws, lws,
+      attention_kernel1_warpReduce(q, gws, lws,
                          d_key, d_query, d_dot_product, d_exp_sum, n, d);
-      kernel2_blockReduce(q, gws2, lws,
+      attention_kernel2_blockReduce(q, gws2, lws,
                          d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
@@ -84,9 +84,9 @@ float* attention_device(const float* key, const float* value, const float* query
 
     for (int k = 0; k < repeat; k++) {
       q.memset(d_exp_sum, 0, 4);
-      kernel1_warpReduce(q, gws, lws,
+      attention_kernel1_warpReduce(q, gws, lws,
                          d_key, d_query, d_dot_product, d_exp_sum, n, d);
-      kernel2_warpReduce(q, gws2, lws,
+      attention_kernel2_warpReduce(q, gws2, lws,
                          d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
@@ -105,9 +105,9 @@ float* attention_device(const float* key, const float* value, const float* query
 
     for (int k = 0; k < repeat; k++) {
       q.memset(d_exp_sum, 0, 4);
-      kernel1_blockReduce(q, gws, lws,
+      attention_kernel1_blockReduce(q, gws, lws,
                           d_key, d_query, d_dot_product, d_exp_sum, n, d);
-      kernel2_blockReduce(q, gws2, lws,
+      attention_kernel2_blockReduce(q, gws2, lws,
                           d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
@@ -129,11 +129,11 @@ float* attention_device(const float* key, const float* value, const float* query
 
     for (int k = 0; k < repeat; k++) {
       q.memset(d_exp_sum, 0, 4);
-      kernel1(q, gws, lws, 0,
+      attention_kernel1(q, gws, lws, 0,
               d_key, d_query, d_dot_product, d_exp_sum, n, d);
-      kernel2(q, gws, lws, 0,
+      attention_kernel2(q, gws, lws, 0,
               d_exp_sum, d_dot_product, d_score, n);
-      kernel3(q, gws2, lws, 0,
+      attention_kernel3(q, gws2, lws, 0,
               d_score, d_value, d_output, n, d);
     }
 

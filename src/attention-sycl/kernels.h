@@ -1,7 +1,7 @@
 #include <sycl/sycl.hpp>
 #include "atomics.h"
 
-void kernel1 (
+void attention_kernel1 (
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
@@ -29,7 +29,7 @@ void kernel1 (
   q.submit(cgf);
 }
 
-void kernel2 (
+void attention_kernel2 (
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
@@ -51,7 +51,7 @@ void kernel2 (
 }
 
 
-void kernel3 (
+void attention_kernel3 (
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
@@ -78,7 +78,7 @@ void kernel3 (
 }
 
 
-void kernel1_blockReduce (
+void attention_kernel1_blockReduce (
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
@@ -111,7 +111,7 @@ void kernel1_blockReduce (
 }
 
 
-void kernel1_warpReduce (
+void attention_kernel1_warpReduce (
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
@@ -146,7 +146,7 @@ void kernel1_warpReduce (
 }
 
 
-void kernel2_blockReduce (
+void attention_kernel2_blockReduce (
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
@@ -176,7 +176,7 @@ void kernel2_blockReduce (
   q.submit(cgf);
 }
 
-void kernel2_warpReduce (
+void attention_kernel2_warpReduce (
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
