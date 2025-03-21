@@ -15,54 +15,37 @@ typedef int scalar_t;
    size, Func, T, grid_dim, ...)                                       \
   do {                                                                 \
    if (size >= 128) {                                                  \
-     sycl::range<2> gws (128, grid_dim);                               \
-     sycl::range<2> lws (128, 1);                                      \
-     q.submit([&](sycl::handler &cgh) {                                \
-       cgh.parallel_for(                                               \
-         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {    \
-         Func<T>(item, __VA_ARGS__);                                   \
-       });                                                             \
-     });                                                               \
+     sycl::range<3> gws (1, 128, grid_dim);                            \
+     sycl::range<3> lws (1, 128, 1);                                   \
+     Func<T>(q, gws, lws, 0, __VA_ARGS__);                             \
    } else if (size >= 64) {                                            \
-     sycl::range<2> gws (64, 2 * grid_dim);                            \
-     sycl::range<2> lws (64, 2);                                       \
-     q.submit([&](sycl::handler &cgh) {                                \
-       cgh.parallel_for(                                               \
-         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {    \
-         Func<T>(item, __VA_ARGS__);                                   \
-       });                                                             \
-     });                                                               \
+     sycl::range<3> gws (1, 64, 2 * grid_dim);                         \
+     sycl::range<3> lws (1, 64, 2);                                    \
+     Func<T>(q, gws, lws, 0, __VA_ARGS__);                             \
    } else if (size >= 32) {                                            \
-     sycl::range<2> gws (32, 4 * grid_dim);                            \
-     sycl::range<2> lws (32, 4);                                       \
-     q.submit([&](sycl::handler &cgh) {                                \
-       cgh.parallel_for(                                               \
-         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {    \
-         Func<T>(item, __VA_ARGS__);                                   \
-       });                                                             \
-     });                                                               \
+     sycl::range<3> gws (1, 32, 4 * grid_dim);                         \
+     sycl::range<3> lws (1, 32, 4);                                    \
+     Func<T>(q, gws, lws, 0, __VA_ARGS__);                             \
    } else {                                                            \
-     sycl::range<2> gws (16, 8 * grid_dim);                            \
-     sycl::range<2> lws (16, 8);                                       \
-     q.submit([&](sycl::handler &cgh) {                                \
-       cgh.parallel_for(                                               \
-         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {    \
-         Func<T>(item, __VA_ARGS__);                                   \
-       });                                                             \
-     });                                                               \
+     sycl::range<3> gws (1, 16, 8 * grid_dim);                         \
+     sycl::range<3> lws (1, 16, 8);                                    \
+     Func<T>(q, gws, lws, 0, __VA_ARGS__);                             \
    }                                                                   \
   } while (false)
 
 
 template <typename T>
-void BlockReduce(T &input1, T &input2, sycl::nd_item<2> &item) {
-  input1 = sycl::reduce_over_group(item.get_group(), input1, sycl::plus<>());
-  input2 = sycl::reduce_over_group(item.get_group(), input2, sycl::plus<>());
+void BlockReduce(T &input1, T &input2, sycl::nd_item<3> &item) {
+  input1 = sycl::reduce_over_group(item.get_group(), input1, sycl::plus<T>());
+  input2 = sycl::reduce_over_group(item.get_group(), input2, sycl::plus<T>());
 }
 
 template <typename T>
 void ChannelSumNCHW(
-    sycl::nd_item<2> item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     const int N,
     const int C,
     const int HxW,
@@ -70,32 +53,41 @@ void ChannelSumNCHW(
     T*__restrict__ sum,
     T*__restrict__ sumsq)
 {
-  T m_val = 0;
-  T v_val = 0;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      T m_val = 0;
+      T v_val = 0;
 
-  const int c = item.get_group(1);
+      const int c = item.get_group(2);
 
-  // sum batches from different channels
-  for (int n = item.get_local_id(1); n < N;
-           n += item.get_local_range(1)) {
-    for (int hw = item.get_local_id(0); hw < HxW;
-         hw += item.get_local_range(0)) {
-      const int index = (n * C + c) * HxW + hw;
-      m_val += *(X + index);
-      v_val += *(X + index) * *(X + index);
-    }
-  }
+      // sum batches from different channels
+      for (int n = item.get_local_id(2); n < N;
+               n += item.get_local_range(2)) {
+        for (int hw = item.get_local_id(1); hw < HxW;
+             hw += item.get_local_range(1)) {
+          const int index = (n * C + c) * HxW + hw;
+          m_val += *(X + index);
+          v_val += *(X + index) * *(X + index);
+        }
+      }
 
-  BlockReduce<T>(m_val, v_val, item);
-  if (item.get_local_id(1) == 0 && item.get_local_id(0) == 0) {
-    sum[c] = m_val;
-    sumsq[c] = v_val;
-  }
+      BlockReduce<T>(m_val, v_val, item);
+      if (item.get_local_id(2) == 0 && item.get_local_id(1) == 0) {
+        sum[c] = m_val;
+        sumsq[c] = v_val;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template <typename T>
 void ChannelSumNHWC(
-    sycl::nd_item<2> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     const int N,
     const int C,
     const int HxW,
@@ -103,22 +95,28 @@ void ChannelSumNHWC(
     T*__restrict__ sum,
     T*__restrict__ sumsq)
 {
-  const int inner_size = N * HxW;
-  const int c = item.get_group(1);
-  T m_val = 0;
-  T v_val = 0;
-  for (int i = item.get_local_id(1); i < inner_size;
-       i += item.get_local_range(1)) {
-    const int index = i * C + c;
-    m_val += *(X + index);
-    v_val += *(X + index) * *(X + index);
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      const int inner_size = N * HxW;
+      const int c = item.get_group(2);
+      T m_val = 0;
+      T v_val = 0;
+      for (int i = item.get_local_id(2); i < inner_size;
+           i += item.get_local_range(2)) {
+        const int index = i * C + c;
+        m_val += *(X + index);
+        v_val += *(X + index) * *(X + index);
+      }
 
-  BlockReduce<T>(m_val, v_val, item);
-  if (item.get_local_id(1) == 0) {
-    sum[c] = m_val;
-    sumsq[c] = v_val;
-  }
+      BlockReduce<T>(m_val, v_val, item);
+      if (item.get_local_id(2) == 0) {
+        sum[c] = m_val;
+        sumsq[c] = v_val;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 void ComputeChannelSumNCHW (
@@ -155,17 +153,13 @@ void ComputeChannelSumNHWC (
     long &time,
     int repeat)
 {
-  sycl::range<2> lws (1, NUM_THREADS);
-  sycl::range<2> gws (1, C * NUM_THREADS);
+  sycl::range<3> lws (1, 1, NUM_THREADS);
+  sycl::range<3> gws (1, 1, C * NUM_THREADS);
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-        ChannelSumNHWC<scalar_t>(item, N, C, HxW, X, sum, sumsq);
-      });
-    });
+    ChannelSumNHWC<scalar_t>(q, gws, lws, 0, N, C, HxW, X, sum, sumsq);
   }
 
   q.wait();
