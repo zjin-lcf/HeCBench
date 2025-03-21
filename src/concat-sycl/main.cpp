@@ -6,33 +6,42 @@
 #include "reference.h"
 
 template <typename T>
-void concat (sycl::nd_item<1> &item,
+void concat (sycl::queue &q,
+             sycl::range<3> &gws,
+             sycl::range<3> &lws,
+             const int slm_size,
              const T *__restrict inp1,
              const T *__restrict inp2,
                    T *output,
              int sz0, int sz2, int sz1_1, int sz1_2)
 {
-  int nele = sz0 * sz2 * (sz1_1 + sz1_2);
-  int idx = item.get_global_id(0);
-  if (idx >= nele) return;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int nele = sz0 * sz2 * (sz1_1 + sz1_2);
+      int idx = item.get_global_id(2);
+      if (idx >= nele) return;
 
-  float *dst_ptr = (float *)output + idx;
-  int idx2 = idx % sz2;
-  idx = idx / sz2;
-  int idx1 = idx % (sz1_1 + sz1_2);
-  int idx0 = idx / (sz1_1 + sz1_2);
-  float *src_ptr;
-  int sz1;
-  if (idx1 < sz1_1) {
-    sz1 = sz1_1;
-    src_ptr = (float *)inp1;
-  } else {
-    idx1 -= sz1_1;
-    sz1 = sz1_2;
-    src_ptr = (float *)inp2;
-  }
-  src_ptr += flat_3dim(idx0, idx1, idx2, sz1, sz2);
-  *dst_ptr = *src_ptr;
+      float *dst_ptr = (float *)output + idx;
+      int idx2 = idx % sz2;
+      idx = idx / sz2;
+      int idx1 = idx % (sz1_1 + sz1_2);
+      int idx0 = idx / (sz1_1 + sz1_2);
+      float *src_ptr;
+      int sz1;
+      if (idx1 < sz1_1) {
+        sz1 = sz1_1;
+        src_ptr = (float *)inp1;
+      } else {
+        idx1 -= sz1_1;
+        sz1 = sz1_2;
+        src_ptr = (float *)inp2;
+      }
+      src_ptr += flat_3dim(idx0, idx1, idx2, sz1, sz2);
+      *dst_ptr = *src_ptr;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char* argv[])
@@ -85,11 +94,11 @@ int main(int argc, char* argv[])
     float *outp_ref = (float*) malloc (outp_size_bytes);
 
     for (size_t i = 0; i < inp1_size; i++) {
-      inp1[i] = rand() % inp1_size; 
+      inp1[i] = rand() % inp1_size;
     }
 
     for (size_t i = 0; i < inp2_size; i++) {
-      inp2[i] = rand() % inp2_size; 
+      inp2[i] = rand() % inp2_size;
     }
 
     float *d_inp1, *d_inp2, *d_outp;
@@ -102,19 +111,13 @@ int main(int argc, char* argv[])
 
     const size_t n = batch_size * beam_size * nhead * head_dim * (sl1 + sl2);
     const size_t nblock = (n + 255) / 256;
-    sycl::range<1> gws (nblock * 256);
-    sycl::range<1> lws (256);
+    sycl::range<3> gws (1, 1, nblock * 256);
+    sycl::range<3> lws (1, 1, 256);
 
     // warmup and verify
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class warmup>(
-      sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        concat(item, d_inp1, d_inp2, d_outp, batch_size * beam_size * nhead, head_dim, sl1, sl2);
-      });
-    });
+    concat(q, gws, lws, 0, d_inp1, d_inp2, d_outp, batch_size * beam_size * nhead, head_dim, sl1, sl2);
 
-    concat_cpu(
-      inp1, inp2, outp_ref, batch_size * beam_size * nhead, head_dim, sl1, sl2);
+    concat_cpu(inp1, inp2, outp_ref, batch_size * beam_size * nhead, head_dim, sl1, sl2);
 
     q.memcpy (outp, d_outp, outp_size_bytes).wait();
     int error = memcmp(outp_ref, outp, outp_size_bytes);
@@ -123,12 +126,7 @@ int main(int argc, char* argv[])
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      q.submit([&] (sycl::handler &cgh) {
-        cgh.parallel_for<class eval>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-          concat(item, d_inp1, d_inp2, d_outp, batch_size * beam_size * nhead, head_dim, sl1, sl2);
-        });
-      });
+      concat(q, gws, lws, 0, d_inp1, d_inp2, d_outp, batch_size * beam_size * nhead, head_dim, sl1, sl2);
     }
 
     q.wait();
