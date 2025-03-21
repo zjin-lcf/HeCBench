@@ -28,45 +28,63 @@ void reference(
 
 template <typename T>
 void dense_esuhm(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     const T* input,
     const T* dense,
           T* output,
     int embedding_dim,
     const int* offset)
 {
-  const int batch_idx  = item.get_group(0); // each batch is handled by a block
-  const int grain_size = item.get_local_range(0);
-  const int tid = item.get_local_id(0);
-  const int range = offset[batch_idx + 1] - offset[batch_idx];
-  for (int idx = tid; idx < embedding_dim; idx += grain_size) {
-    const T dense_elem = dense[batch_idx * embedding_dim + idx];
-    for (int nested_idx = idx; nested_idx < range; nested_idx += embedding_dim) {
-      output[offset[batch_idx] + nested_idx] =
-        input[offset[batch_idx] + nested_idx] + dense_elem;
-    }
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      const int batch_idx  = item.get_group(2); // each batch is handled by a block
+      const int grain_size = item.get_local_range(2);
+      const int tid = item.get_local_id(2);
+      const int range = offset[batch_idx + 1] - offset[batch_idx];
+      for (int idx = tid; idx < embedding_dim; idx += grain_size) {
+        const T dense_elem = dense[batch_idx * embedding_dim + idx];
+        for (int nested_idx = idx; nested_idx < range; nested_idx += embedding_dim) {
+          output[offset[batch_idx] + nested_idx] =
+            input[offset[batch_idx] + nested_idx] + dense_elem;
+        }
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template <typename T>
 void dense_esuhm2(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     const T* input,
     const T* dense,
           T* output,
     int embedding_dim,
     const int* offset)
 {
-  const int batch_idx = item.get_group(0);
-  const int start = offset[batch_idx];
-  const int range = offset[batch_idx + 1] - start;
-  for (int idx = item.get_local_id(0); idx < embedding_dim;
-           idx += item.get_local_range(0)) {
-    const T dense_elem = dense[batch_idx * embedding_dim + idx];
-    for (int nested_idx = idx; nested_idx < range; nested_idx += embedding_dim) {
-      output[start + nested_idx] = input[start + nested_idx] + dense_elem;
-    }
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      const int batch_idx = item.get_group(2);
+      const int start = offset[batch_idx];
+      const int range = offset[batch_idx + 1] - start;
+      for (int idx = item.get_local_id(2); idx < embedding_dim;
+               idx += item.get_local_range(2)) {
+        const T dense_elem = dense[batch_idx * embedding_dim + idx];
+        for (int nested_idx = idx; nested_idx < range; nested_idx += embedding_dim) {
+          output[start + nested_idx] = input[start + nested_idx] + dense_elem;
+        }
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char* argv[])
@@ -152,16 +170,14 @@ int main(int argc, char* argv[])
 
       q.memset(d_output, 0, input_size_bytes);
       q.wait();
+
+      sycl::range<3> gws (1, 1, batch_size * block_size);
+      sycl::range<3> lws (1, 1, block_size);
+
       auto start = std::chrono::steady_clock::now();
 
       for (int i = 0; i < repeat; i++) {
-        q.submit([&] (sycl::handler &cgh) {
-          cgh.parallel_for<class de1>(
-            sycl::nd_range<1>(sycl::range<1>(batch_size * block_size),
-                              sycl::range<1>(block_size)), [=] (sycl::nd_item<1> item) {
-            dense_esuhm(item, d_input, d_dense, d_output, ncols, d_input_offset);
-          });
-        });
+        dense_esuhm(q, gws, lws, 0, d_input, d_dense, d_output, ncols, d_input_offset);
       }
 
       q.wait();
@@ -175,13 +191,7 @@ int main(int argc, char* argv[])
       start = std::chrono::steady_clock::now();
 
       for (int i = 0; i < repeat; i++) {
-        q.submit([&] (sycl::handler &cgh) {
-          cgh.parallel_for<class de2>(
-            sycl::nd_range<1>(sycl::range<1>(batch_size * block_size),
-                              sycl::range<1>(block_size)), [=] (sycl::nd_item<1> item) {
-            dense_esuhm2(item, d_input, d_dense, d_output, ncols, d_input_offset);
-          });
-        });
+        dense_esuhm2(q, gws, lws, 0, d_input, d_dense, d_output, ncols, d_input_offset);
       }
 
       q.wait();
