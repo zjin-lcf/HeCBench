@@ -54,25 +54,18 @@ float* attention_device(const float* key, const float* value, const float* query
 
   if (impl_num == 3) {
 
+    sycl::range<3> gws  (1, 1, grids(n, 256, warpSize) * 256);
+    sycl::range<3> gws2 (1, 1, d * 256);
+    sycl::range<3> lws  (1, 1, 256);
+
     auto start = std::chrono::steady_clock::now();
 
     for (int k = 0; k < repeat; k++) {
       q.memset(d_exp_sum, 0, 4);
-      q.parallel_for(sycl::nd_range<1>(sycl::range<1>(grids(n, 256, warpSize) * 256),
-                                       sycl::range<1>(256)),
-                         [=](sycl::nd_item<1> item) {
-                           kernel1_warpReduce(d_key, d_query, d_dot_product,
-                                              d_exp_sum, n, d, item);
-                         });
-      q.submit([&](sycl::handler &cgh) {
-        cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(d * 256),
-                                           sycl::range<1>(256)),
-                         [=](sycl::nd_item<1> item) {
-                           kernel2_blockReduce(d_exp_sum, d_dot_product,
-                                               d_value, d_output, n, d,
-                                               item);
-                         });
-      });
+      kernel1_warpReduce(q, gws, lws,
+                         d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      kernel2_blockReduce(q, gws2, lws,
+                         d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
     q.wait();
@@ -83,25 +76,18 @@ float* attention_device(const float* key, const float* value, const float* query
 
   else if (impl_num == 2) {
 
+    sycl::range<3> gws  (1, 1, grids(n, 256, warpSize) * 256);
+    sycl::range<3> gws2 (1, 1, grids(d, 256, warpSize) * 256);
+    sycl::range<3> lws  (1, 1, 256);
+
     auto start = std::chrono::steady_clock::now();
 
     for (int k = 0; k < repeat; k++) {
       q.memset(d_exp_sum, 0, 4);
-      q.parallel_for(sycl::nd_range<1>(sycl::range<1>(grids(n, 256, warpSize) * 256),
-                                       sycl::range<1>(256)),
-                         [=](sycl::nd_item<1> item) {
-                           kernel1_warpReduce(d_key, d_query, d_dot_product,
-                                              d_exp_sum, n, d, item);
-                         });
-      q.submit([&](sycl::handler &cgh) {
-        cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(grids(d, 256, warpSize) * 256),
-                                           sycl::range<1>(256)),
-                         [=](sycl::nd_item<1> item) {
-                           kernel2_warpReduce(d_exp_sum, d_dot_product,
-                                               d_value, d_output, n, d,
-                                               item);
-                         });
-      });
+      kernel1_warpReduce(q, gws, lws,
+                         d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      kernel2_warpReduce(q, gws2, lws,
+                         d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
     q.wait();
@@ -111,28 +97,18 @@ float* attention_device(const float* key, const float* value, const float* query
   }
 
   else if (impl_num == 1) {
+    sycl::range<3> gws  (1, 1, n * 256);
+    sycl::range<3> gws2 (1, 1, d * 256);
+    sycl::range<3> lws  (1, 1, 256);
 
     auto start = std::chrono::steady_clock::now();
 
     for (int k = 0; k < repeat; k++) {
       q.memset(d_exp_sum, 0, 4);
-      q.submit([&](sycl::handler &cgh) {
-        cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(n * 256),
-                                           sycl::range<1>(256)),
-                         [=](sycl::nd_item<1> item) {
-                           kernel1_blockReduce(d_key, d_query, d_dot_product,
-                                               d_exp_sum, n, d, item);
-                         });
-      });
-      q.submit([&](sycl::handler &cgh) {
-        cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(d * 256),
-                                           sycl::range<1>(256)),
-                         [=](sycl::nd_item<1> item) {
-                           kernel2_blockReduce(d_exp_sum, d_dot_product,
-                                               d_value, d_output, n, d,
-                                               item);
-                         });
-      });
+      kernel1_blockReduce(q, gws, lws,
+                          d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      kernel2_blockReduce(q, gws2, lws,
+                          d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
     q.wait();
@@ -145,31 +121,20 @@ float* attention_device(const float* key, const float* value, const float* query
     float *d_score;
     d_score = sycl::malloc_device<float>(n, q);
 
+    sycl::range<3> gws  (1, 1, (n + 255) / 256 * 256);
+    sycl::range<3> gws2 (1, 1, (d + 255) / 256 * 256);
+    sycl::range<3> lws  (1, 1, 256);
+
     auto start = std::chrono::steady_clock::now();
 
     for (int k = 0; k < repeat; k++) {
       q.memset(d_exp_sum, 0, 4);
-      q.parallel_for(
-          sycl::nd_range<1>(sycl::range<1>((n + 255) / 256) *
-                            sycl::range<1>(256),
-                            sycl::range<1>(256)),
-          [=](sycl::nd_item<1> item) {
-            kernel1(d_key, d_query, d_dot_product, d_exp_sum, n, d, item);
-          });
-      q.parallel_for(
-          sycl::nd_range<1>(sycl::range<1>((n + 255) / 256) *
-                            sycl::range<1>(256),
-                            sycl::range<1>(256)),
-          [=](sycl::nd_item<1> item) {
-            kernel2(d_exp_sum, d_dot_product, d_score, n, item);
-          });
-      q.parallel_for(
-          sycl::nd_range<1>(sycl::range<1>((d + 255) / 256) *
-                            sycl::range<1>(256),
-                            sycl::range<1>(256)),
-          [=](sycl::nd_item<1> item) {
-            kernel3(d_score, d_value, d_output, n, d, item);
-          });
+      kernel1(q, gws, lws, 0,
+              d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      kernel2(q, gws, lws, 0,
+              d_exp_sum, d_dot_product, d_score, n);
+      kernel3(q, gws2, lws, 0,
+              d_score, d_value, d_output, n, d);
     }
 
     q.wait();
