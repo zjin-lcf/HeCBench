@@ -6,86 +6,109 @@
 #include "constants.h"
 
 namespace mean_shift::gpu {
-  void mean_shift(sycl::nd_item<1> &item, const float *data, float *data_next) {
-    size_t tid = item.get_global_id(0);
-    if (tid < N) {
-      size_t row = tid * D;
-      float new_position[D] = {0.f};
-      float tot_weight = 0.f;
-      for (size_t i = 0; i < N; ++i) {
-        size_t row_n = i * D;
-        float sq_dist = 0.f;
-        for (size_t j = 0; j < D; ++j) {
-          sq_dist += (data[row + j] - data[row_n + j]) * (data[row + j] - data[row_n + j]);
-        }
-        if (sq_dist <= RADIUS) {
-          float weight = sycl::exp(-sq_dist / DBL_SIGMA_SQ);
-          for (size_t j = 0; j < D; ++j) {
-            new_position[j] += weight * data[row_n + j];
+  void mean_shift(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    const float *data,
+    float *data_next)
+  {
+    auto cgf = [&] (sycl::handler &cgh) {
+      auto kfn = [=] (sycl::nd_item<3> item) {
+        size_t tid = item.get_global_id(2);
+        if (tid < N) {
+          size_t row = tid * D;
+          float new_position[D] = {0.f};
+          float tot_weight = 0.f;
+          for (size_t i = 0; i < N; ++i) {
+            size_t row_n = i * D;
+            float sq_dist = 0.f;
+            for (size_t j = 0; j < D; ++j) {
+              sq_dist += (data[row + j] - data[row_n + j]) * (data[row + j] - data[row_n + j]);
+            }
+            if (sq_dist <= RADIUS) {
+              float weight = sycl::exp(-sq_dist / DBL_SIGMA_SQ);
+              for (size_t j = 0; j < D; ++j) {
+                new_position[j] += weight * data[row_n + j];
+              }
+              tot_weight += weight;
+            }
           }
-          tot_weight += weight;
+          for (size_t j = 0; j < D; ++j) {
+            data_next[row + j] = new_position[j] / tot_weight;
+          }
         }
-      }
-      for (size_t j = 0; j < D; ++j) {
-        data_next[row + j] = new_position[j] / tot_weight;
-      }
-    }
+      };
+      cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+    };
+    q.submit(cgf);
   }
 
-  void mean_shift_tiling(sycl::nd_item<1> &item,
-                         float *__restrict local_data,
-                         float *__restrict valid_data,
-                         const float* data,
-                               float*__restrict data_next) {
-
-    // Shared memory allocation
-    // A few convenient variables
-    int tid = item.get_global_id(0);
-    int lid = item.get_local_id(0);
-    int row = tid * D;
-    int local_row = lid * D;
-    float new_position[D] = {0.f};
-    float tot_weight = 0.f;
-    // Load data in shared memory
-    for (int t = 0; t < BLOCKS; ++t) {
-      int tid_in_tile = t * TILE_WIDTH + lid;
-      if (tid_in_tile < N) {
-        int row_in_tile = tid_in_tile * D;
-        for (int j = 0; j < D; ++j) {
-          local_data[local_row + j] = data[row_in_tile + j];
-        }
-        valid_data[lid] = 1;
-      }
-      else {
-        for (int j = 0; j < D; ++j) {
-          local_data[local_row + j] = 0;
-        }
-        valid_data[lid] = 0;
-      }
-      item.barrier(sycl::access::fence_space::local_space);
-      for (int i = 0; i < TILE_WIDTH; ++i) {
-        int local_row_tile = i * D;
-        float valid_radius = RADIUS * valid_data[i];
-        float sq_dist = 0.;
-        for (int j = 0; j < D; ++j) {
-          sq_dist += (data[row + j] - local_data[local_row_tile + j]) *
-                     (data[row + j] - local_data[local_row_tile + j]);
-        }
-        if (sq_dist <= valid_radius) {
-          float weight = sycl::exp(-sq_dist / DBL_SIGMA_SQ);
-          for (int j = 0; j < D; ++j) {
-            new_position[j] += (weight * local_data[local_row_tile + j]);
+  void mean_shift_tiling(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    const float* data,
+    float*__restrict data_next)
+  {
+    auto cgf = [&] (sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> local_data (sycl::range<1>(TILE_WIDTH * D), cgh);
+      sycl::local_accessor<float, 1> valid_data (sycl::range<1>(TILE_WIDTH), cgh);
+      auto kfn = [=] (sycl::nd_item<3> item) {
+        // Shared memory allocation
+        // A few convenient variables
+        int tid = item.get_global_id(2);
+        int lid = item.get_local_id(2);
+        int row = tid * D;
+        int local_row = lid * D;
+        float new_position[D] = {0.f};
+        float tot_weight = 0.f;
+        // Load data in shared memory
+        for (int t = 0; t < BLOCKS; ++t) {
+          int tid_in_tile = t * TILE_WIDTH + lid;
+          if (tid_in_tile < N) {
+            int row_in_tile = tid_in_tile * D;
+            for (int j = 0; j < D; ++j) {
+              local_data[local_row + j] = data[row_in_tile + j];
+            }
+            valid_data[lid] = 1;
           }
-          tot_weight += (weight * valid_data[i]);
+          else {
+            for (int j = 0; j < D; ++j) {
+              local_data[local_row + j] = 0;
+            }
+            valid_data[lid] = 0;
+          }
+          item.barrier(sycl::access::fence_space::local_space);
+          for (int i = 0; i < TILE_WIDTH; ++i) {
+            int local_row_tile = i * D;
+            float valid_radius = RADIUS * valid_data[i];
+            float sq_dist = 0.;
+            for (int j = 0; j < D; ++j) {
+              sq_dist += (data[row + j] - local_data[local_row_tile + j]) *
+                         (data[row + j] - local_data[local_row_tile + j]);
+            }
+            if (sq_dist <= valid_radius) {
+              float weight = sycl::exp(-sq_dist / DBL_SIGMA_SQ);
+              for (int j = 0; j < D; ++j) {
+                new_position[j] += (weight * local_data[local_row_tile + j]);
+              }
+              tot_weight += (weight * valid_data[i]);
+            }
+          }
+          item.barrier(sycl::access::fence_space::local_space);
         }
-      }
-      item.barrier(sycl::access::fence_space::local_space);
-    }
-    if (tid < N) {
-      for (int j = 0; j < D; ++j) {
-        data_next[row + j] = new_position[j] / tot_weight;
-      }
-    }
+        if (tid < N) {
+          for (int j = 0; j < D; ++j) {
+            data_next[row + j] = new_position[j] / tot_weight;
+          }
+        }
+      };
+      cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+    };
+    q.submit(cgf);
   }
 }
 
@@ -126,19 +149,15 @@ int main(int argc, char* argv[]) {
   // Copy to GPU memory
   q.memcpy(d_data, data.data(), data_bytes).wait();
 
-  sycl::range<1> gws (BLOCKS * THREADS);
-  sycl::range<1> lws (THREADS);
+  sycl::range<3> gws (1, 1, BLOCKS * THREADS);
+  sycl::range<3> lws (1, 1, THREADS);
 
   // Run mean shift clustering and time the execution
   auto start = std::chrono::steady_clock::now();
 
   for (size_t i = 0; i < mean_shift::gpu::NUM_ITER; ++i) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class base>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        mean_shift::gpu::mean_shift(item, d_data, d_data_next);
-      });
-    }).wait();
+    mean_shift::gpu::mean_shift(q, gws, lws, 0, d_data, d_data_next);
+    q.wait();
     mean_shift::gpu::utils::swap(d_data, d_data_next);
   }
 
@@ -161,15 +180,8 @@ int main(int argc, char* argv[]) {
 
   start = std::chrono::steady_clock::now();
   for (size_t i = 0; i < mean_shift::gpu::NUM_ITER; ++i) {
-    q.submit([&] (sycl::handler &cgh) {
-      sycl::local_accessor<float, 1> local_data (sycl::range<1>(TILE_WIDTH * D), cgh);
-      sycl::local_accessor<float, 1> valid_data (sycl::range<1>(TILE_WIDTH), cgh);
-      cgh.parallel_for<class opt>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        mean_shift::gpu::mean_shift_tiling(item, local_data.get_pointer(),
-                                           valid_data.get_pointer(),
-                                           d_data, d_data_next);
-      });
-    }).wait();
+    mean_shift::gpu::mean_shift_tiling(q, gws, lws, 0, d_data, d_data_next);
+    q.wait();
     mean_shift::gpu::utils::swap(d_data, d_data_next);
   }
   end = std::chrono::steady_clock::now();
