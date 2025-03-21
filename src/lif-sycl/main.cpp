@@ -53,7 +53,10 @@ void reference (
 }
 
 void lif (
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     int numNeurons, int neurons_per_item, float dt,
     const float*__restrict encode_result,
           float*__restrict voltage_array,
@@ -63,43 +66,49 @@ void lif (
     const float*__restrict gain,
           float*__restrict spikes)
 {
-  int i = item.get_global_id(0);
-  if( i < numNeurons)
-  {
-    int neuron_index = i % neurons_per_item;
-    int item_index = i / neurons_per_item;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int i = item.get_global_id(2);
+      if( i < numNeurons)
+      {
+        int neuron_index = i % neurons_per_item;
+        int item_index = i / neurons_per_item;
 
-    float voltage = voltage_array[i];
-    float ref_time = reftime_array[i];
-    float current = bias[neuron_index] + gain[neuron_index] * encode_result[item_index];
-    float dV, spike, mult;
+        float voltage = voltage_array[i];
+        float ref_time = reftime_array[i];
+        float current = bias[neuron_index] + gain[neuron_index] * encode_result[item_index];
+        float dV, spike, mult;
 
-    dV = -sycl::expm1(-dt / tau_rc) * (current - voltage);
-    voltage = sycl::fmax(voltage + dV, 0.f);
+        dV = -sycl::expm1(-dt / tau_rc) * (current - voltage);
+        voltage = sycl::fmax(voltage + dV, 0.f);
 
-    ref_time -= dt;
+        ref_time -= dt;
 
-    mult = ref_time;
-    mult *= -1.f / dt;
-    mult += 1.f;
+        mult = ref_time;
+        mult *= -1.f / dt;
+        mult += 1.f;
 
-    mult = sycl::fmin(mult, 1.f);
-    mult = sycl::fmax(mult, 0.f);
+        mult = sycl::fmin(mult, 1.f);
+        mult = sycl::fmax(mult, 0.f);
 
-    voltage *= mult;
+        voltage *= mult;
 
-    if(voltage > 1.f){
-      spike = 1.f / dt;
-      ref_time = tau_ref + dt * (1.f - (voltage - 1.f) / dV);
-      voltage = 0.f;
-    }else{
-      spike = 0.f;
-    }
+        if(voltage > 1.f){
+          spike = 1.f / dt;
+          ref_time = tau_ref + dt * (1.f - (voltage - 1.f) / dV);
+          voltage = 0.f;
+        }else{
+          spike = 0.f;
+        }
 
-    reftime_array[i] = ref_time;
-    voltage_array[i] = voltage;
-    spikes[i] = spike;
-  }
+        reftime_array[i] = ref_time;
+        voltage_array[i] = voltage;
+        spikes[i] = spike;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char* argv[]) {
@@ -166,30 +175,25 @@ int main(int argc, char* argv[]) {
   q.memcpy(d_voltage, voltage, neurons_size);
   q.memcpy(d_reftime, reftime, neurons_size);
 
-  sycl::range<1> lws (256);
-  sycl::range<1> gws ((num_neurons + 255) / 256 * 256);
+  sycl::range<3> lws (1, 1, 256);
+  sycl::range<3> gws (1, 1, (num_neurons + 255) / 256 * 256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for(int step = 0; step < num_steps; step++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class k>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        lif(item,
-            num_neurons,
-            neurons_per_item,
-            dt,
-            d_encode_result,
-            d_voltage,
-            d_reftime,
-            tau_rc,
-            tau_ref,
-            d_bias,
-            d_gain,
-            d_spikes);
-      });
-    });
+    lif(q, gws, lws, 0,
+        num_neurons,
+        neurons_per_item,
+        dt,
+        d_encode_result,
+        d_voltage,
+        d_reftime,
+        tau_rc,
+        tau_ref,
+        d_bias,
+        d_gain,
+        d_spikes);
   }
 
   q.wait();
