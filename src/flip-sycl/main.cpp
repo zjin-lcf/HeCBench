@@ -11,7 +11,10 @@
 
 template <typename scalar_t>
 void flip_kernel(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     const scalar_t* in_tensor,
           scalar_t* out_tensor,
     int64_t  n,
@@ -22,28 +25,34 @@ void flip_kernel(
     const int64_t* shape,
     const int64_t  total_dims)
 {
-  int64_t linear_index = item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int64_t linear_index = item.get_global_id(2);
 
-  if (linear_index >= n) return;
+      if (linear_index >= n) return;
 
-  int64_t cur_indices = linear_index;
-  int64_t rem = 0;
-  int64_t dst_offset = 0;
+      int64_t cur_indices = linear_index;
+      int64_t rem = 0;
+      int64_t dst_offset = 0;
 
-  for (int64_t i = 0; i < total_dims; i++) {
-    int64_t temp = cur_indices;
-    cur_indices = cur_indices / strides_contiguous[i];
-    rem = temp - cur_indices * strides_contiguous[i];
-    for (int64_t j = 0; j < flip_dims_size; j++) {
-      // flip the indices if it is in flip_dims
-      if (i == flip_dims[j]) {
-        cur_indices = shape[i] - 1 - cur_indices;
+      for (int64_t i = 0; i < total_dims; i++) {
+        int64_t temp = cur_indices;
+        cur_indices = cur_indices / strides_contiguous[i];
+        rem = temp - cur_indices * strides_contiguous[i];
+        for (int64_t j = 0; j < flip_dims_size; j++) {
+          // flip the indices if it is in flip_dims
+          if (i == flip_dims[j]) {
+            cur_indices = shape[i] - 1 - cur_indices;
+          }
+        }
+        dst_offset += cur_indices * strides[i];
+        cur_indices = rem;
       }
-    }
-    dst_offset += cur_indices * strides[i];
-    cur_indices = rem;
-  }
-  out_tensor[linear_index] = in_tensor[dst_offset];
+      out_tensor[linear_index] = in_tensor[dst_offset];
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 // display the values of a property in a tensor
@@ -131,14 +140,13 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
 
   const int threadsPerBlock = 256;
 
-  sycl::range<1> gws ((n + threadsPerBlock - 1) / threadsPerBlock * threadsPerBlock);
-  sycl::range<1> lws (threadsPerBlock);
+  sycl::range<3> gws (1, 1, (n + threadsPerBlock - 1) /
+                            threadsPerBlock * threadsPerBlock);
+  sycl::range<3> lws (1, 1, threadsPerBlock);
 
   // warmup and verify
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-      flip_kernel<scalar_t>(
-        item,
+  flip_kernel<scalar_t>(
+        q, gws, lws, 0,
         d_input,
         d_output,
         n,
@@ -148,8 +156,6 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
         d_strides_contiguous,
         d_shape,
         num_dims);
-    });
-  });
 
   flip_kernel_cpu<scalar_t>(
     input, output_ref, n, flip.data(), num_flip_dims,
@@ -170,10 +176,8 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        flip_kernel<scalar_t>(
-          item,
+    flip_kernel<scalar_t>(
+          q, gws, lws, 0,
           d_input,
           d_output,
           n,
@@ -183,8 +187,6 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
           d_strides_contiguous,
           d_shape,
           num_dims);
-      });
-    });
   }
 
   q.wait();
