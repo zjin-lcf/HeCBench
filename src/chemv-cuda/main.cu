@@ -127,8 +127,8 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < REPEAT; n++) {
-    kernel0 <<< k0_dimGrid, k0_dimBlock >>> (dev_AT, dev_X, dev_Y, alpha_im, alpha_re, beta_im, beta_re);
-    kernel1 <<< k1_dimGrid, k1_dimBlock >>> (dev_AT, dev_X, dev_Y, alpha_im, alpha_re);
+    chemv_kernel0 <<< k0_dimGrid, k0_dimBlock >>> (dev_AT, dev_X, dev_Y, alpha_im, alpha_re, beta_im, beta_re);
+    chemv_kernel1 <<< k1_dimGrid, k1_dimBlock >>> (dev_AT, dev_X, dev_Y, alpha_im, alpha_re);
   }
 
   cudaDeviceSynchronize();

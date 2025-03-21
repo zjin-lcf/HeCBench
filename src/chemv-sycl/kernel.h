@@ -3,7 +3,7 @@ struct ComplexFloat {
   float Im;
 };
 
-void kernel0(sycl::queue &q,
+void chemv_kernel0(sycl::queue &q,
              sycl::range<3> &gws,
              sycl::range<3> &lws,
              const int slm_size,
@@ -69,7 +69,7 @@ void kernel0(sycl::queue &q,
   q.submit(cgf);
 }
 
-void kernel1(sycl::queue &q,
+void chemv_kernel1(sycl::queue &q,
              sycl::range<3> &gws,
              sycl::range<3> &lws,
              const int slm_size,

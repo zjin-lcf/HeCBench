@@ -1,6 +1,6 @@
 #include "kernel.h"
 
-__global__ void kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, float alpha_im, float alpha_re, float beta_im, float beta_re)
+__global__ void chemv_kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, float alpha_im, float alpha_re, float beta_im, float beta_re)
 {
     int b0 = blockIdx.x;
     int t0 = threadIdx.x;
@@ -49,7 +49,7 @@ __global__ void kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct 
       __syncthreads();
     }
 }
-__global__ void kernel1(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, float alpha_im, float alpha_re)
+__global__ void chemv_kernel1(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, float alpha_im, float alpha_re)
 {
     int b0 = blockIdx.x;
     int t0 = threadIdx.x;

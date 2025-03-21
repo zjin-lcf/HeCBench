@@ -1,4 +1,4 @@
-void kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
+void chemv_kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
              float alpha_im, float alpha_re, float beta_im, float beta_re)
 {
   #pragma omp target teams num_teams(12) thread_limit(32) 
@@ -55,7 +55,7 @@ void kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloa
   }
 }
 
-void kernel1(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
+void chemv_kernel1(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
              float alpha_im, float alpha_re)
 {
   #pragma omp target teams num_teams(12) thread_limit(32) 
