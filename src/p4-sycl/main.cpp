@@ -20,10 +20,14 @@
 #include <cstdio>
 #include <cstdlib>
 #include <sycl/sycl.hpp>
+#include "atomics.h"
 #include "params.h"
 
 void postprocess (
-  sycl::nd_item<1> &item,
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
+  const int slm_size,
   const float *__restrict cls_input,
         float *__restrict box_input,
   const float *__restrict dir_cls_input,
@@ -43,79 +47,80 @@ void postprocess (
   const float score_thresh,
   const float dir_offset)
 {
-  int loc_index = item.get_group(0);
-  int ith_anchor = item.get_local_id(0);
-  if (ith_anchor >= num_anchors) return;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int loc_index = item.get_group(2);
+      int ith_anchor = item.get_local_id(2);
+      if (ith_anchor >= num_anchors) return;
 
-  int col = loc_index % feature_x_size;
-  int row = loc_index / feature_x_size;
-  float x_offset = min_x_range + col * (max_x_range - min_x_range) / (feature_x_size - 1);
-  float y_offset = min_y_range + row * (max_y_range - min_y_range) / (feature_y_size - 1);
-  int cls_offset = loc_index * num_anchors * num_classes + ith_anchor * num_classes;
-  float dev_cls[2] = {-1.f, 0.f};
+      int col = loc_index % feature_x_size;
+      int row = loc_index / feature_x_size;
+      float x_offset = min_x_range + col * (max_x_range - min_x_range) / (feature_x_size - 1);
+      float y_offset = min_y_range + row * (max_y_range - min_y_range) / (feature_y_size - 1);
+      int cls_offset = loc_index * num_anchors * num_classes + ith_anchor * num_classes;
+      float dev_cls[2] = {-1.f, 0.f};
 
-  const float *scores = cls_input + cls_offset;
-  float max_score = 1.f / (1.f + sycl::exp(-scores[0]));
-  int cls_id = 0;
-  for (int i = 1; i < num_classes; i++) {
-    float cls_score = 1.f / (1.f + sycl::exp(-scores[i]));
-    if (cls_score > max_score) {
-      max_score = cls_score;
-      cls_id = i;
-    }
-  }
-  dev_cls[0] = static_cast<float>(cls_id);
-  dev_cls[1] = max_score;
+      const float *scores = cls_input + cls_offset;
+      float max_score = 1.f / (1.f + sycl::exp(-scores[0]));
+      int cls_id = 0;
+      for (int i = 1; i < num_classes; i++) {
+        float cls_score = 1.f / (1.f + sycl::exp(-scores[i]));
+        if (cls_score > max_score) {
+          max_score = cls_score;
+          cls_id = i;
+        }
+      }
+      dev_cls[0] = static_cast<float>(cls_id);
+      dev_cls[1] = max_score;
 
-  if (dev_cls[1] >= score_thresh)
-  {
-    const int box_offset = loc_index * num_anchors * num_box_values + ith_anchor * num_box_values;
-    const int dir_cls_offset = loc_index * num_anchors * 2 + ith_anchor * 2;
-    const float *anchor_ptr = anchors + ith_anchor * 4;
-    const float z_offset = anchor_ptr[2] / 2 + anchor_bottom_heights[ith_anchor / 2];
-    const float anchor[7] = {x_offset, y_offset, z_offset, anchor_ptr[0], anchor_ptr[1], anchor_ptr[2], anchor_ptr[3]};
-    float *box_encodings = box_input + box_offset;
+      if (dev_cls[1] >= score_thresh)
+      {
+        const int box_offset = loc_index * num_anchors * num_box_values + ith_anchor * num_box_values;
+        const int dir_cls_offset = loc_index * num_anchors * 2 + ith_anchor * 2;
+        const float *anchor_ptr = anchors + ith_anchor * 4;
+        const float z_offset = anchor_ptr[2] / 2 + anchor_bottom_heights[ith_anchor / 2];
+        const float anchor[7] = {x_offset, y_offset, z_offset, anchor_ptr[0], anchor_ptr[1], anchor_ptr[2], anchor_ptr[3]};
+        float *box_encodings = box_input + box_offset;
 
-    const float xa = anchor[0];
-    const float ya = anchor[1];
-    const float za = anchor[2];
-    const float dxa = anchor[3];
-    const float dya = anchor[4];
-    const float dza = anchor[5];
-    const float ra = anchor[6];
-    const float diagonal = sycl::sqrt(dxa * dxa + dya * dya);
-    box_encodings[0] = box_encodings[0] * diagonal + xa;
-    box_encodings[1] = box_encodings[1] * diagonal + ya;
-    box_encodings[2] = box_encodings[2] * dza + za;
-    box_encodings[3] = sycl::exp(box_encodings[3]) * dxa;
-    box_encodings[4] = sycl::exp(box_encodings[4]) * dya;
-    box_encodings[5] = sycl::exp(box_encodings[5]) * dza;
-    box_encodings[6] = box_encodings[6] + ra;
+        const float xa = anchor[0];
+        const float ya = anchor[1];
+        const float za = anchor[2];
+        const float dxa = anchor[3];
+        const float dya = anchor[4];
+        const float dza = anchor[5];
+        const float ra = anchor[6];
+        const float diagonal = sycl::sqrt(dxa * dxa + dya * dya);
+        box_encodings[0] = box_encodings[0] * diagonal + xa;
+        box_encodings[1] = box_encodings[1] * diagonal + ya;
+        box_encodings[2] = box_encodings[2] * dza + za;
+        box_encodings[3] = sycl::exp(box_encodings[3]) * dxa;
+        box_encodings[4] = sycl::exp(box_encodings[4]) * dya;
+        box_encodings[5] = sycl::exp(box_encodings[5]) * dza;
+        box_encodings[6] = box_encodings[6] + ra;
 
-    const int dir_label = dir_cls_input[dir_cls_offset] > dir_cls_input[dir_cls_offset + 1] ? 0 : 1;
-    const float period = (float)M_PI;
-    const float val = box_input[box_offset + 6] - dir_offset;
-    const float dir_rot = val - sycl::floor(val / (period + 1e-8f)) * period;
-    const float yaw = dir_rot + dir_offset + period * dir_label;
+        const int dir_label = dir_cls_input[dir_cls_offset] > dir_cls_input[dir_cls_offset + 1] ? 0 : 1;
+        const float period = (float)M_PI;
+        const float val = box_input[box_offset + 6] - dir_offset;
+        const float dir_rot = val - sycl::floor(val / (period + 1e-8f)) * period;
+        const float yaw = dir_rot + dir_offset + period * dir_label;
 
-    auto ao_ref = sycl::atomic_ref<int,
-                  sycl::memory_order::relaxed,
-                  sycl::memory_scope::device,
-                  sycl::access::address_space::global_space> (object_counter[0]);
-    int resCount = ao_ref.fetch_add(1);
-
-    bndbox_output[0] = resCount+1;
-    float *data = bndbox_output + 1 + resCount * 9;
-    data[0] = box_input[box_offset];
-    data[1] = box_input[box_offset + 1];
-    data[2] = box_input[box_offset + 2];
-    data[3] = box_input[box_offset + 3];
-    data[4] = box_input[box_offset + 4];
-    data[5] = box_input[box_offset + 5];
-    data[6] = yaw;
-    data[7] = dev_cls[0];
-    data[8] = dev_cls[1];
-  }
+        int resCount = atomicAdd(object_counter, 1);
+        bndbox_output[0] = resCount+1;
+        float *data = bndbox_output + 1 + resCount * 9;
+        data[0] = box_input[box_offset];
+        data[1] = box_input[box_offset + 1];
+        data[2] = box_input[box_offset + 2];
+        data[3] = box_input[box_offset + 3];
+        data[4] = box_input[box_offset + 4];
+        data[5] = box_input[box_offset + 5];
+        data[6] = yaw;
+        data[7] = dev_cls[0];
+        data[8] = dev_cls[1];
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char* argv[])
@@ -188,8 +193,8 @@ int main(int argc, char* argv[])
 
   double time = 0.0;
 
-  sycl::range<1> lws (num_anchors);
-  sycl::range<1> gws (feature_size * num_anchors);
+  sycl::range<3> lws (1, 1, num_anchors);
+  sycl::range<3> gws (1, 1, feature_size * num_anchors);
 
   for (int i = 0; i < repeat; i++) {
     q.memcpy(d_box_input, h_box_input, box_size_byte);
@@ -199,30 +204,26 @@ int main(int argc, char* argv[])
 
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class p4>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        postprocess(item,
-                    d_cls_input,
-                    d_box_input,
-                    d_dir_cls_input,
-                    d_anchors,
-                    d_anchor_bottom_heights,
-                    d_bndbox_output,
-                    d_object_counter,
-                    min_x_range,
-                    max_x_range,
-                    min_y_range,
-                    max_y_range,
-                    feature_x_size,
-                    feature_y_size,
-                    num_anchors,
-                    num_classes,
-                    num_box_values,
-                    score_thresh,
-                    dir_offset);
-      });
-    }).wait();
+    postprocess(q, gws, lws, 0,
+                d_cls_input,
+                d_box_input,
+                d_dir_cls_input,
+                d_anchors,
+                d_anchor_bottom_heights,
+                d_bndbox_output,
+                d_object_counter,
+                min_x_range,
+                max_x_range,
+                min_y_range,
+                max_y_range,
+                feature_x_size,
+                feature_y_size,
+                num_anchors,
+                num_classes,
+                num_box_values,
+                score_thresh,
+                dir_offset);
+    q.wait();
 
     auto end = std::chrono::steady_clock::now();
     time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
