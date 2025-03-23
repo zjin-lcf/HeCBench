@@ -39,6 +39,9 @@ ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
 endif
 
+# Linker Flags
+LDFLAGS = -ldnnl
+
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
             -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
