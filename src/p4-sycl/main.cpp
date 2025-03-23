@@ -16,12 +16,11 @@
  */
 
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <sycl/sycl.hpp>
 #include "params.h"
-
-float sigmoidf(const float x) { return 1.0f / (1.0f + sycl::exp(-x)); }
 
 void postprocess (
   sycl::nd_item<1> &item,
@@ -56,10 +55,10 @@ void postprocess (
   float dev_cls[2] = {-1.f, 0.f};
 
   const float *scores = cls_input + cls_offset;
-  float max_score = sigmoidf(scores[0]);
+  float max_score = 1.f / (1.f + sycl::exp(-scores[0]));
   int cls_id = 0;
   for (int i = 1; i < num_classes; i++) {
-    float cls_score = sigmoidf(scores[i]);
+    float cls_score = 1.f / (1.f + sycl::exp(-scores[i]));
     if (cls_score > max_score) {
       max_score = cls_score;
       cls_id = i;
