@@ -25,6 +25,72 @@ void softMax_cpu(const int numSlice, const int sliceSize, const float* src, floa
   }
 }
 
+
+void softMax (
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    const int numSlice,
+    const int sliceSize,
+    const float* src,
+    float* dest)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int i = item.get_global_id(2);
+      if (i >= numSlice) return;
+      float max_ = src[i * sliceSize];
+      for (int j = 0; j < sliceSize; j++) {
+        max_ = sycl::fmax(max_, src[i * sliceSize + j]);
+      }
+      float sum = 0;
+      for (int j = 0; j < sliceSize; j++) {
+        sum += sycl::exp(src[i * sliceSize + j] - max_);
+      }
+      for (int j = 0; j < sliceSize; j++) {
+        dest[i * sliceSize + j] = sycl::exp(src[i * sliceSize + j] - max_) / sum;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
+void softMax2 (
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    const int numSlice,
+    const int sliceSize,
+    const float* src,
+    float* dest)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      sycl::sub_group warp = item.get_sub_group();
+      int i = item.get_group(2) * warp.get_group_linear_range() + warp.get_group_linear_id();
+      if (i >= numSlice) return;
+      float max_ = src[i * sliceSize];
+      for (int j = warp.get_local_linear_id(); j < sliceSize; j += warp.get_max_local_range()[0]) {
+        max_ = sycl::fmax(max_, src[i * sliceSize + j]);
+      }
+      max_ = sycl::reduce_over_group(warp, max_, sycl::maximum<float>{});
+      float sum = 0;
+      for (int j = warp.get_local_linear_id(); j < sliceSize; j += warp.get_max_local_range()[0]) {
+        sum += sycl::exp(src[i * sliceSize + j] - max_);
+      }
+      sum = sycl::reduce_over_group(warp, sum, sycl::plus<float>{});
+      for (int j = warp.get_local_linear_id(); j < sliceSize; j += warp.get_max_local_range()[0]) {
+        dest[i * sliceSize + j] = sycl::exp(src[i * sliceSize + j] - max_) / sum;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
 int main(int argc, char* argv[]) {
   if (argc != 5) {
     printf("Usage: %s <number of slices> <slice size> <implementations> <repeat>\n", argv[0]);
@@ -64,36 +130,15 @@ int main(int argc, char* argv[]) {
   float *d_output = sycl::malloc_device<float>(numElem, q);
 
   if (kernel == 1) {
-    sycl::range<1> gws ((numSlice+BLOCK_SIZE/warpSize-1)/(BLOCK_SIZE/warpSize)*BLOCK_SIZE);
-    sycl::range<1> lws (BLOCK_SIZE);
+    sycl::range<3> gws (1, 1, (numSlice+BLOCK_SIZE/warpSize-1) /
+                              (BLOCK_SIZE/warpSize)*BLOCK_SIZE);
+    sycl::range<3> lws (1, 1, BLOCK_SIZE);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     for (int n = 0; n < repeat; n++) {
-      q.submit([&](sycl::handler &h) {
-        h.parallel_for<class sm2>(
-          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item)
-          //[[sycl::reqd_sub_group_size(warpSize)]]
-        {
-          sycl::sub_group warp = item.get_sub_group();
-          int i = item.get_group(0) * warp.get_group_linear_range() + warp.get_group_linear_id();
-          if (i >= numSlice) return;
-          float max_ = d_input[i * sliceSize];
-          for (int j = warp.get_local_linear_id(); j < sliceSize; j += warp.get_max_local_range()[0]) {
-            max_ = sycl::max(max_, d_input[i * sliceSize + j]);
-          }
-          max_ = sycl::reduce_over_group(warp, max_, sycl::maximum<float>{});
-          float sum = 0;
-          for (int j = warp.get_local_linear_id(); j < sliceSize; j += warp.get_max_local_range()[0]) {
-            sum += sycl::exp(d_input[i * sliceSize + j] - max_);
-          }
-          sum = sycl::reduce_over_group(warp, sum, sycl::plus<float>{});
-          for (int j = warp.get_local_linear_id(); j < sliceSize; j += warp.get_max_local_range()[0]) {
-            d_output[i * sliceSize + j] = sycl::exp(d_input[i * sliceSize + j] - max_) / sum;
-          }
-        });
-      });
+      softMax2(q, gws, lws, 0, numSlice, sliceSize, d_input, d_output);
     }
     q.wait();
     auto end = std::chrono::steady_clock::now();
@@ -102,31 +147,14 @@ int main(int argc, char* argv[]) {
   }
   else {
 
-    sycl::range<1> gws ((numSlice+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
-    sycl::range<1> lws (BLOCK_SIZE);
+    sycl::range<3> gws (1, 1, (numSlice+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+    sycl::range<3> lws (1, 1, BLOCK_SIZE);
 
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     for (int n = 0; n < repeat; n++) {
-      q.submit([&](sycl::handler &h) {
-        h.parallel_for<class sm>(
-          sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-          int i = item.get_global_id(0);
-          if (i >= numSlice) return;
-          float max_ = d_input[i * sliceSize];
-          for (int j = 1; j < sliceSize; j++) {
-            max_ = sycl::max(max_, d_input[i * sliceSize + j]);
-          }
-          float sum = 0;
-          for (int j = 0; j < sliceSize; j++) {
-            sum += sycl::exp(d_input[i * sliceSize + j] - max_);
-          }
-          for (int j = 0; j < sliceSize; j++) {
-            d_output[i * sliceSize + j] = sycl::exp(d_input[i * sliceSize + j] - max_) / sum;
-          }
-        });
-      });
+      softMax(q, gws, lws, 0, numSlice, sliceSize, d_input, d_output);
     }
 
     q.wait();
