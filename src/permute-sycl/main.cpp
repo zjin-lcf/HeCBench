@@ -1,5 +1,5 @@
 /*
-   Kernels for data permute 
+   Kernels for data permute
  */
 
 #include <stdio.h>
@@ -21,37 +21,48 @@ void permuate_cpu(float *inp, float *q, float *k, float *v, int B, int T, int C,
 }
 
 void permute_kernel(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     float* __restrict__ Q,
     float* __restrict__ K,
     float* __restrict__ V,
     const float* inp,
-    int B, int T, int NH, int d, const sycl::nd_item<1> &item) {
-  // okay so now, this kernel wants Q,K,V to all be of shape (B, NH, T, d)
-  // but instead, we have a single tensor QKV (inp) of shape (B, T, 3, NH, d)
-  int idx = item.get_global_id(0);
+    int B, int T, int NH, int d)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      // okay so now, this kernel wants Q,K,V to all be of shape (B, NH, T, d)
+      // but instead, we have a single tensor QKV (inp) of shape (B, T, 3, NH, d)
+      int idx = item.get_global_id(2);
 
-  // Q[b][nh_][n][d_] = inp[b][n][0][nh_][d_]
-  int C = NH * d;
+      // Q[b][nh_][n][d_] = inp[b][n][0][nh_][d_]
+      int C = NH * d;
 
-  if (idx < B * C * T) {
-    int b = idx / (C * T);
-    int rest = idx % (C * T);
-    int nh_ = rest / (T * d);
-    rest = rest % (T * d);
-    int n = rest / d;
-    int d_ = rest % d;
+      if (idx < B * C * T) {
+        int b = idx / (C * T);
+        int rest = idx % (C * T);
+        int nh_ = rest / (T * d);
+        rest = rest % (T * d);
+        int n = rest / d;
+        int d_ = rest % d;
 
-    int inp_idx = \
-            (b * T * 3 * C)
-            +   (n * 3 * C)
-            +       (0 * C)
-            +          (nh_ * d)
-            +                d_;
+        int inp_idx = \
+                (b * T * 3 * C)
+                +   (n * 3 * C)
+                +       (0 * C)
+                +          (nh_ * d)
+                +                d_;
 
-    Q[idx] = inp[inp_idx];
-    K[idx] = inp[inp_idx + C];
-    V[idx] = inp[inp_idx + 2 * C];
-  }
+        Q[idx] = inp[inp_idx];
+        K[idx] = inp[inp_idx + C];
+        V[idx] = inp[inp_idx + 2 * C];
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 void permute (sycl::queue &q, float* out, const float* inp,
@@ -68,12 +79,9 @@ void permute (sycl::queue &q, float* out, const float* inp,
   V = out + 2 * B * T * C;
   int total_threads = B * T * C;
   int num_blocks = ceil_div(total_threads, block_size);
-  q.parallel_for(
-      sycl::nd_range<1>(sycl::range<1>(num_blocks * block_size),
-                        sycl::range<1>(block_size)),
-      [=](sycl::nd_item<1> item) {
-        permute_kernel(Q, K, V, inp, B, T, NH, HS, item);
-  }).wait();
+  sycl::range<3> gws (1, 1, num_blocks * block_size);
+  sycl::range<3> lws (1, 1, block_size);
+  permute_kernel(q, gws, lws, 0, Q, K, V, inp, B, T, NH, HS);
 }
 
 int main(int argc, char **argv) {
