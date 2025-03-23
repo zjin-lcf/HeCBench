@@ -16,14 +16,13 @@
  */
 
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <math.h>
 #include <omp.h>
 #include "params.h"
 
 #pragma omp declare target
-float sigmoid(const float x) { return 1.0f / (1.0f + expf(-x)); }
 
 void postprocess (
   const float *__restrict cls_input,
@@ -57,10 +56,10 @@ void postprocess (
   float dev_cls[2] = {-1.f, 0.f};
 
   const float *scores = cls_input + cls_offset;
-  float max_score = sigmoid(scores[0]);
+  float max_score = 1.f / (1.f + expf(-scores[0]));
   int cls_id = 0;
   for (int i = 1; i < num_classes; i++) {
-    float cls_score = sigmoid(scores[i]);
+    float cls_score = 1.f / (1.f + expf(-scores[i]));
     if (cls_score > max_score) {
       max_score = cls_score;
       cls_id = i;
