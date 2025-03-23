@@ -1,6 +1,5 @@
 #pragma once
  
-/*
 template <typename T,
           sycl::access::address_space addressSpace =
               sycl::access::address_space::generic_space,
@@ -22,7 +21,6 @@ inline T1 atomicAdd(T1 *addr, T2 operand) {
       sycl::atomic_ref<T1, memoryOrder, memoryScope, addressSpace>(addr[0]);
   return atm.fetch_add(operand);
 }
-*/
 
 template <typename T,
           sycl::access::address_space addressSpace =
