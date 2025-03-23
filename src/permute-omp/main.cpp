@@ -27,10 +27,10 @@ void permute (float* out, const float* inp,
   int d = C / NH; // head size (HS)
 
   // permute and separate inp from (B, T, 3, NH, HS) to 3X (B, NH, T, HS)
-  float *q, *k, *v;
-  q = out + 0 * B * T * C;
-  k = out + 1 * B * T * C;
-  v = out + 2 * B * T * C;
+  float *Q, *K, *V;
+  Q = out + 0 * B * T * C;
+  K = out + 1 * B * T * C;
+  V = out + 2 * B * T * C;
   int total_threads = B * T * C;
   int num_blocks = ceil_div(total_threads, block_size);
   //permute_kernel<<<num_blocks, block_size>>>(q, k, v, inp, B, T, NH, HS);
@@ -52,9 +52,9 @@ void permute (float* out, const float* inp,
             +          (nh_ * d)
             +                d_;
 
-    q[idx] = inp[inp_idx];
-    k[idx] = inp[inp_idx + C];
-    v[idx] = inp[inp_idx + 2 * C];
+    Q[idx] = inp[inp_idx];
+    K[idx] = inp[inp_idx + C];
+    V[idx] = inp[inp_idx + 2 * C];
   }
 }
 

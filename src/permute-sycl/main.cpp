@@ -21,9 +21,9 @@ void permuate_cpu(float *inp, float *q, float *k, float *v, int B, int T, int C,
 }
 
 void permute_kernel(
-    float* __restrict__ q,
-    float* __restrict__ k,
-    float* __restrict__ v,
+    float* __restrict__ Q,
+    float* __restrict__ K,
+    float* __restrict__ V,
     const float* inp,
     int B, int T, int NH, int d, const sycl::nd_item<1> &item) {
   // okay so now, this kernel wants Q,K,V to all be of shape (B, NH, T, d)
@@ -48,30 +48,31 @@ void permute_kernel(
             +          (nh_ * d)
             +                d_;
 
-    q[idx] = inp[inp_idx];
-    k[idx] = inp[inp_idx + C];
-    v[idx] = inp[inp_idx + 2 * C];
+    Q[idx] = inp[inp_idx];
+    K[idx] = inp[inp_idx + C];
+    V[idx] = inp[inp_idx + 2 * C];
   }
 }
 
-void permute (sycl::queue &que, float* out, const float* inp,
-    int B, int T, int C, int NH,
-    const int block_size) {
+void permute (sycl::queue &q, float* out, const float* inp,
+              int B, int T, int C, int NH,
+              const int block_size)
+{
   // inp is (B, T, 3C) QKV
   int HS = C / NH; // head size
 
   // permute and separate inp from (B, T, 3, NH, HS) to 3X (B, NH, T, HS)
-  float *q, *k, *v;
-  q = out + 0 * B * T * C;
-  k = out + 1 * B * T * C;
-  v = out + 2 * B * T * C;
+  float *Q, *K, *V;
+  Q = out + 0 * B * T * C;
+  K = out + 1 * B * T * C;
+  V = out + 2 * B * T * C;
   int total_threads = B * T * C;
   int num_blocks = ceil_div(total_threads, block_size);
-  que.parallel_for(
+  q.parallel_for(
       sycl::nd_range<1>(sycl::range<1>(num_blocks * block_size),
                         sycl::range<1>(block_size)),
       [=](sycl::nd_item<1> item) {
-        permute_kernel(q, k, v, inp, B, T, NH, HS, item);
+        permute_kernel(Q, K, V, inp, B, T, NH, HS, item);
   }).wait();
 }
 
