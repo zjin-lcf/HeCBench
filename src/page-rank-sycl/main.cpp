@@ -48,6 +48,67 @@
 const int max_iter = 1000;
 const float threshold= 1e-16f;
 
+void map(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    const int *__restrict__ pages,
+    const float *__restrict__ page_ranks,
+          float *__restrict__ maps,
+    const unsigned int *__restrict__ noutlinks,
+    const int n)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int i = item.get_global_id(2);
+      int j;
+      if(i < n){
+        float outbound_rank = ldg(&page_ranks[i]) / (float)ldg(&noutlinks[i]);
+        for(j=0; j<n; ++j){
+          maps[i*n+j] = ldg(&pages[i*n+j]) * outbound_rank;
+        }
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
+void reduce(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    float *__restrict__ page_ranks,
+    const float *__restrict__ maps,
+    const int n,
+    float *__restrict__ dif)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int j = item.get_global_id(2);
+      int i;
+      float new_rank;
+      float old_rank;
+
+      if(j<n){
+        old_rank = page_ranks[j];
+        new_rank = 0.0f;
+        for(i=0; i< n; ++i){
+          new_rank += maps[i*n + j];
+        }
+
+        new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
+        dif[j] = sycl::fmax(sycl::fabs(new_rank - old_rank), dif[j]);
+        page_ranks[j] = new_rank;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
 // generates an array of random pages and their links
 int *random_pages(int n, unsigned int *noutlinks, int divisor){
   int i, j, k;
@@ -191,8 +252,8 @@ int main(int argc, char *argv[]) {
   size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
   size_t global_work_size = (n+block_size-1) / block_size * block_size;
 
-  sycl::range<1> gws (global_work_size);
-  sycl::range<1> lws (block_size);
+  sycl::range<3> gws (1, 1, global_work_size);
+  sycl::range<3> lws (1, 1, block_size);
 
   q.wait();
   double ktime = 0.0;
@@ -200,36 +261,8 @@ int main(int argc, char *argv[]) {
   for (t=1; t<=iter && max_diff>=thresh; ++t) {
     auto start = std::chrono::high_resolution_clock::now();
 
-    //map <<< dim3(num_blocks), dim3(block_size) >>> ( d_pages, d_page_ranks, d_maps, d_noutlinks, n);
-    q.submit([&](sycl::handler& cgh) {
-      cgh.parallel_for<class map>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        int i = item.get_global_id(0);
-        if (i < n) {
-          float outbound_rank = ldg(&d_page_ranks[i])/(float)ldg(&d_noutlinks[i]);
-          for(int j=0; j<n; ++j)
-            d_maps[i*n+j] = ldg(&d_pages[i*n+j])*outbound_rank;
-        }
-      });
-    });
-
-    //reduce<<< dim3(num_blocks), dim3(block_size) >>>(d_page_ranks, d_maps, n, d_diffs);
-    q.submit([&](sycl::handler& cgh) {
-      cgh.parallel_for<class reduce>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        int j = item.get_global_id(0);
-        float new_rank;
-        float old_rank;
-        if (j < n) {
-          old_rank = d_page_ranks[j];
-          new_rank = 0.0f;
-          for(int i=0; i< n; ++i) new_rank += d_maps[i*n + j];
-          new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
-          d_diffs[j] = sycl::max(sycl::fabs(new_rank - old_rank), d_diffs[j]);
-          d_page_ranks[j] = new_rank;
-        }
-      });
-    });
+    map(q, gws, lws, 0, d_pages, d_page_ranks, d_maps, d_noutlinks, n);
+    reduce(q, gws, lws, 0, d_page_ranks, d_maps, n, d_diffs);
 
     q.wait();
     auto end = std::chrono::high_resolution_clock::now();
