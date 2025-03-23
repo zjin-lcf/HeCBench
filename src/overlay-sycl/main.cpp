@@ -27,45 +27,51 @@
 #include <sycl/sycl.hpp>
 #include "reference.h"
 
-template <typename T>
-class overlay;
-
 template<typename T>
 void DetectionOverlayBox(
-  sycl::nd_item<2> &item,
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
+  const int slm_size,
   const T*__restrict input,
         T*__restrict output,
   int imgWidth, int imgHeight,
   int x0, int y0, int boxWidth, int boxHeight,
-  const float4 color)
+  const sycl::float4 color)
 {
-  const int box_x = item.get_global_id(1);
-  const int box_y = item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      const int box_x = item.get_global_id(2);
+      const int box_y = item.get_global_id(1);
 
-  if( box_x >= boxWidth || box_y >= boxHeight ) return;
+      if( box_x >= boxWidth || box_y >= boxHeight ) return;
 
-  const int x = box_x + x0;
-  const int y = box_y + y0;
+      const int x = box_x + x0;
+      const int y = box_y + y0;
 
-  if( x >= imgWidth || y >= imgHeight ) return;
+      if( x >= imgWidth || y >= imgHeight ) return;
 
-  T px = input[ y * imgWidth + x ];
+      T px = input[ y * imgWidth + x ];
 
-  const float alpha = color.w() / 255.0f;
-  const float ialph = 1.0f - alpha;
+      const float alpha = color.w() / 255.0f;
+      const float ialph = 1.0f - alpha;
 
-  px.x() = alpha * color.x() + ialph * px.x();
-  px.y() = alpha * color.y() + ialph * px.y();
-  px.z() = alpha * color.z() + ialph * px.z();
+      px.x() = alpha * color.x() + ialph * px.x();
+      px.y() = alpha * color.y() + ialph * px.y();
+      px.z() = alpha * color.z() + ialph * px.z();
 
-  output[y * imgWidth + x] = px;
+      output[y * imgWidth + x] = px;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template<typename T>
 int DetectionOverlay(
   sycl::queue &q,
   T *input, T *output, uint32_t width, uint32_t height,
-  Box *detections, int numDetections, float4 colors)
+  Box *detections, int numDetections, sycl::float4 colors)
 {
   if( width == 0 || height == 0 || !detections || numDetections == 0)
     return 1;
@@ -81,15 +87,11 @@ int DetectionOverlay(
     const int boxTop = detections[n].top;
 
     // launch kernel
-    const sycl::range<2> lws (8, 8);
-    const sycl::range<2> gws ((boxHeight+7)/8*8, (boxWidth+7)/8*8);
+    sycl::range<3> lws (1, 8, 8);
+    sycl::range<3> gws (1, (boxHeight+7)/8*8, (boxWidth+7)/8*8);
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class overlay<T>>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-        DetectionOverlayBox<T>(item, input, output,
-          width, height, boxLeft, boxTop, boxWidth, boxHeight, colors);
-      });
-    });
+    DetectionOverlayBox<T>(q, gws, lws, 0, input, output, width, height,
+                           boxLeft, boxTop, boxWidth, boxHeight, colors);
   }
 
   q.wait();
@@ -115,12 +117,12 @@ int main(int argc, char* argv[]) {
   const int width = atoi(argv[1]);
   const int height = atoi(argv[2]);
   const int img_size = width * height;
-  const int img_size_byte = sizeof(float3) * width * height;
+  const int img_size_byte = sizeof(sycl::float3) * width * height;
 
   srand(123);
-  float3 *input = (float3*) malloc (img_size_byte);
-  float3 *output = (float3*) malloc (img_size_byte);
-  float3 *ref_output = (float3*) malloc (img_size_byte);
+  sycl::float3 *input = (sycl::float3*) malloc (img_size_byte);
+  sycl::float3 *output = (sycl::float3*) malloc (img_size_byte);
+  sycl::float3 *ref_output = (sycl::float3*) malloc (img_size_byte);
 
   for (int i = 0; i < img_size; i++) {
     ref_output[i].x() = input[i].x() = rand() % 256;
@@ -128,10 +130,10 @@ int main(int argc, char* argv[]) {
     ref_output[i].z() = input[i].z() = rand() % 256;
   }
 
-  float3 *d_input = sycl::malloc_device<float3>(img_size, q);
+  sycl::float3 *d_input = sycl::malloc_device<sycl::float3>(img_size, q);
   q.memcpy(d_input, input, img_size_byte);
 
-  float3 *d_output = sycl::malloc_device<float3>(img_size, q);
+  sycl::float3 *d_output = sycl::malloc_device<sycl::float3>(img_size, q);
   q.memcpy(d_output, d_input, img_size_byte);
 
   const int numDetections = img_size * 0.8f;
@@ -143,11 +145,11 @@ int main(int argc, char* argv[]) {
     detections[i].top = rand() % (height - 64);
   }
 
-  float4 colors = {255, 204, 203, 1};
+  sycl::float4 colors = {255, 204, 203, 1};
 
-  DetectionOverlay<float3>(q, d_input, d_output, width, height, detections, numDetections, colors);
+  DetectionOverlay(q, d_input, d_output, width, height, detections, numDetections, colors);
 
-  reference<float3>(input, ref_output, width, height, detections, numDetections, colors);
+  reference(input, ref_output, width, height, detections, numDetections, colors);
 
   q.memcpy(output, d_output, img_size_byte).wait();
 

@@ -1,6 +1,3 @@
-using float4 = sycl::float4;
-using float3 = sycl::float3;
-
 typedef struct {
   int width; 
   int height; 
@@ -14,7 +11,7 @@ void cpuDetectionOverlayBox(
         T*__restrict  output,
   int imgWidth, int imgHeight,
   int x0, int y0, int boxWidth, int boxHeight,
-  const float4 color) 
+  const sycl::float4 color) 
 {
   for(int box_y = 0; box_y < boxHeight; box_y++)
     for(int box_x = 0; box_x < boxWidth; box_x++) {
@@ -41,7 +38,7 @@ void cpuDetectionOverlayBox(
 template<typename T>
 int reference(
   T* input, T* output, uint32_t width, uint32_t height, 
-  Box *detections, int numDetections, float4 colors )
+  Box *detections, int numDetections, sycl::float4 colors )
 {
   if( !input || !output || width == 0 || height == 0 || !detections || numDetections == 0)
     return 1;
