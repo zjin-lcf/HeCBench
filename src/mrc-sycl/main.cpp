@@ -7,10 +7,15 @@
 #include "reference.h"
 
 void MRCGradient (
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
     const float margin, float*__restrict__ dX1, float*__restrict__ dX2) {
-  int i = item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+  int i = item.get_global_id(2);
   if (i < N) {
     float dist = -Y[i] * (X1[i] - X2[i]) + margin;
     if (dist < 0.f) {
@@ -20,13 +25,22 @@ void MRCGradient (
       dX2[i] = Y[i] * dOutput[i];
     }
   }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 void MRCGradient2(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
     const float margin, float*__restrict__ dX1, float*__restrict__ dX2) {
-  int i = item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+  int i = item.get_global_id(2);
   if (i < N) {
     float y = Y[i];
     float o = dOutput[i];
@@ -34,6 +48,10 @@ void MRCGradient2(
     dX1[i] = dist < 0.f ? 0.f : -y * o;
     dX2[i] = dist < 0.f ? 0.f : y * o;
   }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char* argv[])
@@ -90,32 +108,20 @@ int main(int argc, char* argv[])
   d_dX1 = sycl::malloc_device<float>(length, q);
   d_dX2 = sycl::malloc_device<float>(length, q);
 
-  sycl::range<1> gws ((length + 255) / 256 * 256);
-  sycl::range<1> lws (256);
+  sycl::range<3> gws (1, 1, (length + 255) / 256 * 256);
+  sycl::range<3> lws (1, 1, 256);
 
   // warmup
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        MRCGradient(item, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
-      });
-    });
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        MRCGradient2(item, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
-      });
-    });
+    MRCGradient(q, gws, lws, 0, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
+    MRCGradient2(q, gws, lws, 0, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
   }
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        MRCGradient(item, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
-      });
-    });
+    MRCGradient(q, gws, lws, 0, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
   }
 
   q.wait();
@@ -126,11 +132,7 @@ int main(int argc, char* argv[])
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        MRCGradient2(item, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
-      });
-    });
+    MRCGradient2(q, gws, lws, 0, length, d_Y, d_X1, d_X2, d_O, m, d_dX1, d_dX2);
   }
 
   q.wait();
