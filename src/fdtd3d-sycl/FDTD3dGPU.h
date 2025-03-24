@@ -23,8 +23,8 @@ typedef uint64_t memsize_t;
 #define MEMORY_SIZE 134217728
 
 // default values used for shared memory  
-#define localWorkMaxY 16
-#define localWorkMaxX 32
+#define k_blockDimMaxY 16
+#define k_blockDimMaxX 32
 
 // The values are set to give reasonable performance, they can be changed
 // but note that setting an excessively large work group size can result in

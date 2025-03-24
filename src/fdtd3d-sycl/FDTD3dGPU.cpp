@@ -23,8 +23,115 @@
   #define ldg(a) (*(a))
 #endif
 
-bool fdtdGPU(float *output, const float *input, const float *coeff, 
-             const int dimx, const int dimy, const int dimz, const int radius, 
+void finite_difference(
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
+  const int slm_size,
+        float*__restrict__ output,
+  const float*__restrict__ input,
+  const float*__restrict__ coef,
+  const int dimx, const int dimy, const int dimz,
+  const int padding)
+{
+
+  auto cgf = [&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 2> tile(
+       sycl::range<2>(k_blockDimMaxY + 2*k_radius_default,
+                      k_blockDimMaxX + 2*k_radius_default), cgh);
+    auto kfn = [=] (sycl::nd_item<3> item) {
+
+      bool valid = true;
+      const int ltidx = item.get_local_id(2);
+      const int ltidy = item.get_local_id(1);
+      const int workx = item.get_local_range(2);
+      const int worky = item.get_local_range(1);
+      const int gtidx = item.get_group(2) * workx + ltidx;
+      const int gtidy = item.get_group(1) * worky + ltidy;
+
+      const int stride_y = dimx + 2 * k_radius_default;
+      const int stride_z = stride_y * (dimy + 2 * k_radius_default);
+
+      int inputIndex  = 0;
+      int outputIndex = 0;
+
+      inputIndex += k_radius_default * stride_y + k_radius_default + padding;
+
+      inputIndex += gtidy * stride_y + gtidx;
+
+      float infront[k_radius_default];
+      float behind[k_radius_default];
+      float current;
+
+      const int tx = ltidx + k_radius_default;
+      const int ty = ltidy + k_radius_default;
+
+      if (gtidx >= dimx) valid = false;
+      if (gtidy >= dimy) valid = false;
+
+      for (int i = k_radius_default - 2 ; i >= 0 ; i--)
+      {
+        behind[i] = input[inputIndex];
+        inputIndex += stride_z;
+      }
+
+      current = input[inputIndex];
+      outputIndex = inputIndex;
+      inputIndex += stride_z;
+
+      for (int i = 0 ; i < k_radius_default ; i++)
+      {
+        infront[i] = input[inputIndex];
+        inputIndex += stride_z;
+      }
+
+      for (int iz = 0 ; iz < dimz ; iz++)
+      {
+        for (int i = k_radius_default - 1 ; i > 0 ; i--)
+          behind[i] = behind[i - 1];
+        behind[0] = current;
+        current = infront[0];
+        for (int i = 0 ; i < k_radius_default - 1 ; i++)
+          infront[i] = infront[i + 1];
+        infront[k_radius_default - 1] = input[inputIndex];
+
+        inputIndex  += stride_z;
+        outputIndex += stride_z;
+        item.barrier(sycl::access::fence_space::local_space);
+
+          if (ltidy < k_radius_default)
+          {
+            tile[ltidy][tx]                  = input[outputIndex - k_radius_default * stride_y];
+            tile[ltidy + worky + k_radius_default][tx] = input[outputIndex + worky * stride_y];
+          }
+        // Halo left & right
+        if (ltidx < k_radius_default)
+        {
+          tile[ty][ltidx]                  = input[outputIndex - k_radius_default];
+          tile[ty][ltidx + workx + k_radius_default] = input[outputIndex + workx];
+        }
+        tile[ty][tx] = current;
+        item.barrier(sycl::access::fence_space::local_space);
+
+        float value = coef[0] * current;
+        for (int i = 1 ; i <= k_radius_default ; i++)
+        {
+          value += coef[i] * (infront[i-1] + behind[i-1] + tile[ty - i][tx] +
+              tile[ty + i][tx] + tile[ty][tx - i] + tile[ty][tx + i]);
+        }
+
+        // Store the output value
+        if (valid) output[outputIndex] = value;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
+
+bool fdtdGPU(float *output, const float *input, const float *coeff,
+             const int dimx, const int dimy, const int dimz, const int radius,
              const int timesteps, const int argc, const char **argv)
 {
     bool ok = true;
@@ -61,16 +168,16 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
     globalWorkSize[1] = localWorkSize[1] * (unsigned int)ceil((float)dimy / localWorkSize[1]);
     shrLog(" set local work group size to %dx%d\n", localWorkSize[0], localWorkSize[1]);
     shrLog(" set total work size to %dx%d\n", globalWorkSize[0], globalWorkSize[1]);
-    sycl::range<2> gws (globalWorkSize[1], globalWorkSize[0]);
-    sycl::range<2> lws (localWorkSize[1], localWorkSize[0]);
+    sycl::range<3> gws (1, globalWorkSize[1], globalWorkSize[0]);
+    sycl::range<3> lws (1, localWorkSize[1], localWorkSize[0]);
 
-    // Copy the input to the device input buffer 
+    // Copy the input to the device input buffer
     // offset = padding * 4, bytes = volumeSize * 4
     q.memcpy(d_input + padding, input, volumeSize * sizeof(float));
 
     // Copy the input to the device output buffer (actually only need the halo)
     q.memcpy(d_output + padding, input, volumeSize * sizeof(float));
-      
+
     // Execute the FDTD
     shrLog(" GPU FDTD loop\n");
 
@@ -79,116 +186,8 @@ bool fdtdGPU(float *output, const float *input, const float *coeff,
 
     for (int it = 0 ; it < timesteps ; it++)
     {
-        // Launch the kernel
-      q.submit([&] (sycl::handler &cgh) {
-        sycl::local_accessor<float, 2> tile(
-          sycl::range<2>(localWorkMaxY + 2*k_radius_default,
-                         localWorkMaxX + 2*k_radius_default), cgh);
-        cgh.parallel_for<class finite_difference>(
-          sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-          bool valid = true;
-          const int ltidx = item.get_local_id(1);
-          const int ltidy = item.get_local_id(0);
-          const int workx = item.get_local_range(1);
-          const int worky = item.get_local_range(0);
-          const int gtidx = item.get_global_id(1);
-          const int gtidy = item.get_global_id(0);
-          
-          const int stride_y = dimx + 2 * k_radius_default;
-          const int stride_z = stride_y * (dimy + 2 * k_radius_default);
-
-          int d_inputIndex  = 0;
-          int d_outputIndex = 0;
-
-          // Advance d_inputIndex to start of inner volume
-          d_inputIndex += k_radius_default * stride_y + k_radius_default + padding;
-          
-          // Advance d_inputIndex to target element
-          d_inputIndex += gtidy * stride_y + gtidx;
-
-          float infront[k_radius_default];
-          float behind[k_radius_default];
-          float current;
-
-          const int tx = ltidx + k_radius_default;
-          const int ty = ltidy + k_radius_default;
-
-          if (gtidx >= dimx) valid = false;
-          if (gtidy >= dimy) valid = false;
-
-          // For simplicity we assume that the global size is equal to the actual
-          // problem size; since the global size must be a multiple of the local size
-          // this means the problem size must be a multiple of the local size (or
-          // padded to meet this constraint).
-          // Preload the "infront" and "behind" data
-          for (int i = k_radius_default - 2 ; i >= 0 ; i--)
-          {
-              behind[i] = ldg(&d_input[d_inputIndex]);
-              d_inputIndex += stride_z;
-          }
-
-          current = ldg(&d_input[d_inputIndex]);
-          d_outputIndex = d_inputIndex;
-          d_inputIndex += stride_z;
-
-          for (int i = 0 ; i < k_radius_default ; i++)
-          {
-              infront[i] = ldg(&d_input[d_inputIndex]);
-              d_inputIndex += stride_z;
-          }
-
-          // Step through the xy-planes
-          for (int iz = 0 ; iz < dimz ; iz++)
-          {
-              // Advance the slice (move the thread-front)
-              for (int i = k_radius_default - 1 ; i > 0 ; i--)
-                  behind[i] = behind[i - 1];
-              behind[0] = current;
-              current = infront[0];
-              for (int i = 0 ; i < k_radius_default - 1 ; i++)
-                  infront[i] = infront[i + 1];
-              infront[k_radius_default - 1] = ldg(&d_input[d_inputIndex]);
-
-              d_inputIndex  += stride_z;
-              d_outputIndex += stride_z;
-              item.barrier(sycl::access::fence_space::local_space);
-
-              // Note that for the work items on the boundary of the problem, the
-              // supplied index when reading the halo (below) may wrap to the
-              // previous/next row or even the previous/next xy-plane. This is
-              // acceptable since a) we disable the d_output write for these work
-              // items and b) there is at least one xy-plane before/after the
-              // current plane, so the access will be within bounds.
-
-              // Update the data slice in the local tile
-              // Halo above & below
-              if (ltidy < k_radius_default)
-              {
-                  tile[ltidy][tx]                  = ldg(&d_input[d_outputIndex - k_radius_default * stride_y]);
-                  tile[ltidy + worky + k_radius_default][tx] = ldg(&d_input[d_outputIndex + worky * stride_y]);
-              }
-              // Halo left & right
-              if (ltidx < k_radius_default)
-              {
-                  tile[ty][ltidx]                  = ldg(&d_input[d_outputIndex - k_radius_default]);
-                  tile[ty][ltidx + workx + k_radius_default] = ldg(&d_input[d_outputIndex + workx]);
-              }
-              tile[ty][tx] = current;
-              item.barrier(sycl::access::fence_space::local_space);
-
-              // Compute the d_output value
-              float value = ldg(&d_coef[0]) * current;
-              for (int i = 1 ; i <= k_radius_default ; i++)
-              {
-                  value += ldg(&d_coef[i]) * (infront[i-1] + behind[i-1] + tile[ty - i][tx] + 
-                           tile[ty + i][tx] + tile[ty][tx - i] + tile[ty][tx + i]);
-              }
-
-              // Store the d_output value
-              if (valid) d_output[d_outputIndex] = value;
-          }
-        });
-      });
+       // Launch the kernel
+       finite_difference(q, gws, lws, 0, d_output, d_input, d_coef, dimx, dimy, dimz, padding);
 
       // Toggle the buffers
       float* tmp = d_input;
