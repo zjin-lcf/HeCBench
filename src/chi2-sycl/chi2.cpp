@@ -8,6 +8,77 @@
 #include <sycl/sycl.hpp>
 #include "reference.h"
 
+void chi_kernel(
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
+  const int slm_size,
+  const unsigned int rows,
+  const unsigned int cols,
+  const int cRows,
+  const int contRows,
+  const unsigned char *__restrict__ snpdata,
+  float *__restrict__ results)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      unsigned char y;
+      int m, n;
+      unsigned int p = 0;
+      int tot_cases = 1;
+      int tot_controls= 1;
+      int total = 1;
+      float chisquare = 0.0f;
+      float exp[3];
+      float Conexpected[3];
+      float Cexpected[3];
+      float numerator1;
+      float numerator2;
+
+      int tid = item.get_global_id(2);
+      if (tid >= cols) return;
+
+      int cases[3] = {1,1,1};
+      int controls[3] = {1,1,1};
+
+      // read cases: each thread reads a column of snpdata matrix
+      for ( m = 0 ; m < cRows ; m++ ) {
+        y = snpdata[(size_t)m * (size_t)cols + tid];
+        if ( y == '0') { cases[0]++; }
+        else if ( y == '1') { cases[1]++; }
+        else if ( y == '2') { cases[2]++; }
+      }
+
+      // read controls: each thread reads a column of snpdata matrix
+      for ( n = cRows ; n < cRows + contRows ; n++ ) {
+        y = snpdata[(size_t)n * (size_t)cols + tid];
+        if ( y == '0' ) { controls[0]++; }
+        else if ( y == '1') { controls[1]++; }
+        else if ( y == '2') { controls[2]++; }
+      }
+
+      for( p = 0 ; p < 3; p++ ) {
+        tot_cases += cases[p];
+        tot_controls += controls[p];
+      }
+      total = tot_cases + tot_controls;
+
+      for( p = 0 ; p < 3; p++ ) {
+        exp[p] = (float)cases[p] + controls[p];
+        Cexpected[p] = tot_cases * exp[p] / total;
+        Conexpected[p] = tot_controls * exp[p] / total;
+        numerator1 = (float)cases[p] - Cexpected[p];
+        numerator2 = (float)controls[p] - Conexpected[p];
+        chisquare += numerator1 * numerator1 / Cexpected[p] +
+                     numerator2 * numerator2 / Conexpected[p];
+      }
+      results[tid] = chisquare;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
 int main(int argc, char* argv[]) {
 
   if (argc != 7) {
@@ -29,7 +100,7 @@ int main(int argc, char* argv[]) {
   size_t size = (size_t)rows * (size_t)cols;
   printf("Size of the data = %lu\n",size);
 
-  // allocate SNP host data 
+  // allocate SNP host data
   size_t snpdata_size = sizeof(unsigned char) * size;
   size_t result_size = sizeof(float) * cols;
 
@@ -63,69 +134,14 @@ int main(int argc, char* argv[]) {
   q.memcpy(snpdata, dataT, snpdata_size);
 
   unsigned jobs = cols;
-  sycl::range<1> gws ((jobs + nthreads - 1)/nthreads * nthreads);
-  sycl::range<1> lws (nthreads);
+  sycl::range<3> gws (1, 1, (jobs + nthreads - 1)/nthreads * nthreads);
+  sycl::range<3> lws (1, 1, nthreads);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](sycl::handler& cgh) {
-      cgh.parallel_for<class chi2>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        unsigned char y;
-        int m, n;
-        unsigned int p = 0;
-        int tot_cases = 1;
-        int tot_controls= 1;
-        int total = 1;
-        float chisquare = 0.0f;
-        float exp[3];        
-        float Conexpected[3];        
-        float Cexpected[3];
-        float numerator1;
-        float numerator2;
-
-        int tid  = item.get_global_id(0);
-        if (tid >= cols) return;
-
-        int cases[3] = {1,1,1};
-        int controls[3] = {1,1,1};
-
-        // read cases: each thread reads a column of snpdata matrix
-        for ( m = 0 ; m < ncases ; m++ ) {
-          y = snpdata[(size_t)m * (size_t)cols + tid];
-          if ( y == '0') { cases[0]++; }
-          else if ( y == '1') { cases[1]++; }
-          else if ( y == '2') { cases[2]++; }
-        }
-
-        // read controls: each thread reads a column of snpdata matrix
-        for ( n = ncases ; n < ncases + ncontrols ; n++ ) {
-          y = snpdata[(size_t)n * (size_t)cols + tid];
-          if ( y == '0' ) { controls[0]++; }
-          else if ( y == '1') { controls[1]++; }
-          else if ( y == '2') { controls[2]++; }
-        }
-
-        for( p = 0 ; p < 3; p++ ) {
-          tot_cases += cases[p];
-          tot_controls += controls[p];
-        }
-        total = tot_cases + tot_controls;
-
-        for( p = 0 ; p < 3; p++ ) {
-          exp[p] = (float)cases[p] + controls[p]; 
-          Cexpected[p] = tot_cases * exp[p] / total;
-          Conexpected[p] = tot_controls * exp[p] / total;
-          numerator1 = (float)cases[p] - Cexpected[p];
-          numerator2 = (float)controls[p] - Conexpected[p];
-          chisquare += numerator1 * numerator1 / Cexpected[p] +
-                       numerator2 * numerator2 / Conexpected[p];
-        }
-        chi_result[tid] = chisquare;
-      });
-    });
+    chi_kernel(q, gws, lws, 0, rows, cols, ncases, ncontrols, snpdata, chi_result);
   }
   q.wait();
 
