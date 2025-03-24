@@ -5,7 +5,7 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 
-#define idx(i,j)   (i)*y_points+(j)
+#define idx(i,j)   (i)*x_points+(j)
 
 int main(int argc, char* argv[])
 {
