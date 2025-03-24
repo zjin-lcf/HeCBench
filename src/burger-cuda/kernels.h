@@ -1,4 +1,4 @@
-#define idx(i,j)   (i)*y_points+(j)
+#define idx(i,j)   (i)*x_points+(j)
 
 __global__ 
 void core (
