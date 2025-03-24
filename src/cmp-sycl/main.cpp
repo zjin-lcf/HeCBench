@@ -35,138 +35,174 @@
 #include "parser.hpp"
 #include "su_gather.hpp"
 
-void
-init_c(sycl::nd_item<1> &item, real *c, real inc, real c0) 
+void init_c(sycl::queue &q,
+            sycl::range<3> &gws,
+            sycl::range<3> &lws,
+            const int slm_size,
+            real *c, real inc, real c0)
 {
-  int i = item.get_group(0);
-  c[i] = c0 + inc*i;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int i = item.get_group(2);
+      c[i] = c0 + inc*i;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
+void init_half(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+          const real* __restrict scalco,
+          const real* __restrict gx,
+          const real* __restrict gy,
+          const real* __restrict sx,
+          const real* __restrict sy,
+          real* __restrict h)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int i = item.get_group(2);
+      real _s = scalco[i];
+
+      if(-EPSILON < _s && _s < EPSILON) _s = 1.0f;
+      else if(_s < 0) _s = 1.0f / _s;
+
+      real hx = (gx[i] - sx[i]) * _s;
+      real hy = (gy[i] - sy[i]) * _s;
+
+      h[i] = 0.25f * (hx * hx + hy * hy) / FACTOR;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 void
-init_half(sycl::nd_item<1> &item,
-          const real* __restrict scalco, 
-          const real* __restrict gx, 
-          const real* __restrict gy, 
-          const real* __restrict sx, 
-          const real* __restrict sy, 
-          real* __restrict h) 
-{
-  int i = item.get_group(0);
-  real _s = scalco[i];
-
-  if(-EPSILON < _s && _s < EPSILON) _s = 1.0f;
-  else if(_s < 0) _s = 1.0f / _s;
-
-  real hx = (gx[i] - sx[i]) * _s;
-  real hy = (gy[i] - sy[i]) * _s;
-
-  h[i] = 0.25f * (hx * hx + hy * hy) / FACTOR;
-}
-
-void
-compute_semblances(sycl::nd_item<1> &item,
-                   const real* __restrict h, 
-                   const real* __restrict c, 
-                   const real* __restrict samples, 
+compute_semblances(sycl::queue &q,
+                   sycl::range<3> &gws,
+                   sycl::range<3> &lws,
+                   const int slm_size,
+                   const real* __restrict h,
+                   const real* __restrict c,
+                   const real* __restrict samples,
                    real* __restrict num,
                    real* __restrict stt,
-                   int t_id0, 
+                   int t_id0,
                    int t_idf,
                    real _idt,
                    real _dt,
                    int _tau,
                    int _w,
                    int nc,
-                   int ns) 
+                   int ns)
 {
-  real _den = 0.0f, _ac_linear = 0.0f, _ac_squared = 0.0f;
-  real _num[MAX_W],  m = 0.0f;
-  int err = 0;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      real _den = 0.0f, _ac_linear = 0.0f, _ac_squared = 0.0f;
+      real _num[MAX_W],  m = 0.0f;
+      int err = 0;
 
-  int i = item.get_global_id(0);
+      int i = item.get_global_id(2);
 
-  int t0 = i / nc;
-  int c_id = i % nc;
+      int t0 = i / nc;
+      int c_id = i % nc;
 
-  if(i < ns * nc)
-  {
-    real _c = c[c_id];
-    real _t0 = _dt * t0;
-    _t0 *= _t0;
+      if(i < ns * nc)
+      {
+        real _c = c[c_id];
+        real _t0 = _dt * t0;
+        _t0 *= _t0;
 
-    for(int j=0; j < _w; j++) _num[j] = 0.0f;
+        for(int j=0; j < _w; j++) _num[j] = 0.0f;
 
-    for(int t_id=t_id0; t_id < t_idf; t_id++) {
-      real t = sycl::sqrt(_t0 + _c * h[t_id]) * _idt;
+        for(int t_id=t_id0; t_id < t_idf; t_id++) {
+          real t = sycl::sqrt(_t0 + _c * h[t_id]) * _idt;
 
-      int it = (int)( t );
-      int ittau = it - _tau;
-      real x = t - (real)it;
+          int it = (int)( t );
+          int ittau = it - _tau;
+          real x = t - (real)it;
 
-      if(ittau >= 0 && it + _tau + 1 < ns) {
-        int k1 = ittau + (t_id-t_id0)*ns;
-        real sk1p1 = samples[k1], sk1;
+          if(ittau >= 0 && it + _tau + 1 < ns) {
+            int k1 = ittau + (t_id-t_id0)*ns;
+            real sk1p1 = samples[k1], sk1;
 
-        for(int j=0; j < _w; j++) {
-          k1++;
-          sk1 = sk1p1;
-          sk1p1 = samples[k1];
-          // linear interpolation optmized for this problema
-          real v = (sk1p1 - sk1) * x + sk1;
+            for(int j=0; j < _w; j++) {
+              k1++;
+              sk1 = sk1p1;
+              sk1p1 = samples[k1];
+              // linear interpolation optmized for this problema
+              real v = (sk1p1 - sk1) * x + sk1;
 
-          _num[j] += v;
-          _den += v * v;
-          _ac_linear += v;
+              _num[j] += v;
+              _den += v * v;
+              _ac_linear += v;
+            }
+            m += 1;
+          } else { err++; }
         }
-        m += 1;
-      } else { err++; }
-    }
 
-    // Reduction for num
-    for(int j=0; j < _w; j++) _ac_squared += _num[j] * _num[j];
+        // Reduction for num
+        for(int j=0; j < _w; j++) _ac_squared += _num[j] * _num[j];
 
-    // Evaluate semblances
-    if(_den > EPSILON && m > EPSILON && _w > EPSILON && err < 2) {
-      num[i] = _ac_squared / (_den * m);
-      stt[i] = _ac_linear  / (_w   * m);
-    }
-    else {
-      num[i] = -1.0f;
-      stt[i] = -1.0f;
-    }
-  }
+        // Evaluate semblances
+        if(_den > EPSILON && m > EPSILON && _w > EPSILON && err < 2) {
+          num[i] = _ac_squared / (_den * m);
+          stt[i] = _ac_linear  / (_w   * m);
+        }
+        else {
+          num[i] = -1.0f;
+          stt[i] = -1.0f;
+        }
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 void
-redux_semblances(sycl::nd_item<1> &item,
-                 const real* __restrict num, 
-                 const real* __restrict stt, 
-                 int*  __restrict ctr, 
-                 real* __restrict str, 
+redux_semblances(sycl::queue &q,
+                 sycl::range<3> &gws,
+                 sycl::range<3> &lws,
+                 const int slm_size,
+                 const real* __restrict num,
+                 const real* __restrict stt,
+                 int*  __restrict ctr,
+                 real* __restrict str,
                  real* __restrict stk,
-                 const int nc, 
+                 const int nc,
                  const int cdp_id,
-                 const int ns) 
+                 const int ns)
 {
-  int t0 = item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int t0 = item.get_global_id(2);
 
-  if(t0 < ns)
-  {
-    real max_sem = 0.0f;
-    int max_c = -1;
+      if(t0 < ns)
+      {
+        real max_sem = 0.0f;
+        int max_c = -1;
 
-    for(int it=t0*nc; it < (t0+1)*nc ; it++) {
-      real _num = num[it];
-      if(_num > max_sem) {
-        max_sem = _num;
-        max_c = it;
+        for(int it=t0*nc; it < (t0+1)*nc ; it++) {
+          real _num = num[it];
+          if(_num > max_sem) {
+            max_sem = _num;
+            max_c = it;
+          }
+        }
+
+        ctr[cdp_id*ns + t0] = max_c % nc;
+        str[cdp_id*ns + t0] = max_sem;
+        stk[cdp_id*ns + t0] = max_c > -1 ? stt[max_c] : 0;
       }
-    }
-
-    ctr[cdp_id*ns + t0] = max_c % nc;
-    str[cdp_id*ns + t0] = max_sem;
-    stk[cdp_id*ns + t0] = max_c > -1 ? stt[max_c] : 0;
-  }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, const char** argv) {
@@ -266,23 +302,17 @@ int main(int argc, const char** argv) {
   auto beg = std::chrono::high_resolution_clock::now();
 
   // Evaluate Cs - linspace
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for<class k1>(
-      sycl::nd_range<1>(sycl::range<1>(nc), sycl::range<1>(1)),
-      [=] (sycl::nd_item<1> item) {
-      init_c(item, d_c, inc, c0);
-    });
-  });
+  sycl::range<3> gws (1, 1, nc);
+  sycl::range<3> lws (1, 1, 1);
+  init_c(q, gws, lws, 0, d_c, inc, c0);
 
   // Evaluate halfoffset points in x and y coordinates
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for<class k2>(
-      sycl::nd_range<1>(sycl::range<1>(ttraces), sycl::range<1>(1)),
-      [=] (sycl::nd_item<1> item) {
-      init_half(item, d_scalco, d_gx, d_gy,
-                d_sx, d_sy, d_h);
-    });
-  });
+  sycl::range<3> gws2 (1, 1, ttraces);
+  init_half(q, gws2, lws, 0, d_scalco, d_gx, d_gy, d_sx, d_sy, d_h);
+
+  sycl::range<3> gws3 (1, 1, (ns*nc+NTHREADS-1)/NTHREADS*NTHREADS);
+  sycl::range<3> lws2 (1, 1, (NTHREADS));
+  sycl::range<3> gws4 (1, 1, (ns+NTHREADS-1)/NTHREADS*NTHREADS);
 
   for(int cdp_id = 0; cdp_id < ncdps; cdp_id++) {
     int t_id0 = cdp_id > 0 ? ntraces_by_cdp_id[cdp_id-1] : 0;
@@ -292,24 +322,12 @@ int main(int argc, const char** argv) {
     q.memcpy(d_cdpsmpl, h_samples + t_id0*ns , sizeof(real)*stride*ns);
 
     // Compute semblances for each c for each sample
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class k3>(
-        sycl::nd_range<1>(sycl::range<1>((ns*nc+NTHREADS-1)/NTHREADS*NTHREADS), 
-                          sycl::range<1>(NTHREADS)), [=] (sycl::nd_item<1> item) {
-        compute_semblances(item, d_h, d_c, d_cdpsmpl, d_num, d_stt, 
-                           t_id0, t_idf, idt, dt, tau, w, nc, ns);
-      });
-    });
+    compute_semblances(q, gws3, lws2, 0, d_h, d_c, d_cdpsmpl, d_num, d_stt,
+                       t_id0, t_idf, idt, dt, tau, w, nc, ns);
 
     // Get max C for max semblance for each sample on this cdp
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class k4>(
-        sycl::nd_range<1>(sycl::range<1>((ns+NTHREADS-1)/NTHREADS*NTHREADS), 
-                          sycl::range<1>(NTHREADS)), [=] (sycl::nd_item<1> item) {
-        redux_semblances(item, d_num, d_stt, d_ctr, 
-                         d_str, d_stk, nc, cdp_id, ns);
-      });
-    });
+    redux_semblances(q, gws4, lws2, 0, d_num, d_stt, d_ctr,
+                     d_str, d_stk, nc, cdp_id, ns);
 
     number_of_semblances += stride;
 
@@ -368,8 +386,8 @@ int main(int argc, const char** argv) {
    if (r_stk[i] - h_stk[i] > 1e-3) err_stk++;
   }
   float err_ctr_rate = (float)err_ctr / (ncdps * ns);
-  float err_str_rate = (float)err_str / (ncdps * ns); 
-  float err_stk_rate = (float)err_stk / (ncdps * ns); 
+  float err_str_rate = (float)err_str / (ncdps * ns);
+  float err_stk_rate = (float)err_stk / (ncdps * ns);
   printf("Error rate: ctr=%e str=%e stk=%e\n",
          err_ctr_rate, err_str_rate, err_stk_rate);
 
