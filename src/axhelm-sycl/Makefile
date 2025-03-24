@@ -29,8 +29,7 @@ obj = main.o meshBasis.o
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -Ddfloat=float -Ddlong=int \
-          -std=c++17 -Wall -I../include -fsycl \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+          -std=c++17 -Wall -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS_TMP := $(CFLAGS)
@@ -71,7 +70,7 @@ endif
 $(program): $(obj) BlasLapack/libBlasLapack.a
 	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
 
-main.o : main.cpp axhelmReference.cpp
+main.o : main.cpp axhelmReference.cpp axhelmKernel.h
 	$(CC) $(CFLAGS) -c $< -o $@
 	
 meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h
@@ -86,4 +85,4 @@ clean:
 # run one- and three-dimensional kernels
 run: $(program)
 	$(LAUNCHER) ./$(program) 1 8000 100
-	./$(program) 3 8000 100
+	$(LAUNCHER) ./$(program) 3 8000 100
