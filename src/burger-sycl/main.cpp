@@ -4,8 +4,7 @@
 #include <math.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
-
-#define idx(i,j)   (i)*x_points+(j)
+#include "kernels.h"
 
 int main(int argc, char* argv[])
 {
@@ -75,91 +74,41 @@ int main(int argc, char* argv[])
 #endif
 
   double *d_u_new = sycl::malloc_device<double>(grid_elems, q);
-  q.memcpy(d_u_new, u_new, grid_size); 
+  q.memcpy(d_u_new, u_new, grid_size);
 
   double *d_v_new = sycl::malloc_device<double>(grid_elems, q);
-  q.memcpy(d_v_new, v_new, grid_size); 
+  q.memcpy(d_v_new, v_new, grid_size);
 
   double *d_u = sycl::malloc_device<double>(grid_elems, q);
-  q.memcpy(d_u, u, grid_size); 
+  q.memcpy(d_u, u, grid_size);
 
   double *d_v = sycl::malloc_device<double>(grid_elems, q);
-  q.memcpy(d_v, v, grid_size); 
+  q.memcpy(d_v, v, grid_size);
 
   // ranges of the four kernels
-  sycl::range<2> gws ((y_points-2+15)/16*16, (x_points-2+15)/16*16);
-  sycl::range<2> lws (16, 16);
-  sycl::range<1> gws2 ((x_points+255)/256*256);
-  sycl::range<1> lws2 (256);
-  sycl::range<1> gws3 ((y_points+255)/256*256);
-  sycl::range<1> lws3 (256);
-  sycl::range<1> gws4 ((grid_elems+255)/256*256);
-  sycl::range<1> lws4 (256);
+  sycl::range<3> gws (1, (y_points-2+15)/16*16, (x_points-2+15)/16*16);
+  sycl::range<3> lws (1, 16, 16);
+  sycl::range<3> gws2 (1, 1, (x_points+255)/256*256);
+  sycl::range<3> lws2 (1, 1, 256);
+  sycl::range<3> gws3 (1, 1, (y_points+255)/256*256);
+  sycl::range<3> lws3 (1, 1, 256);
+  sycl::range<3> gws4 (1, 1, (grid_elems+255)/256*256);
+  sycl::range<3> lws4 (1, 1, 256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for(int itr = 0; itr < num_itrs; itr++) {
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class core>(
-        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-        int i = item.get_global_id(0) + 1;
-        int j = item.get_global_id(1) + 1;
-        if (j < x_points - 1 && i < y_points - 1) {
-          d_u_new[idx(i,j)] = d_u[idx(i,j)] + 
-            (nu*del_t/(del_x*del_x)) * (d_u[idx(i,j+1)] + d_u[idx(i,j-1)] - 2 * d_u[idx(i,j)]) + 
-            (nu*del_t/(del_y*del_y)) * (d_u[idx(i+1,j)] + d_u[idx(i-1,j)] - 2 * d_u[idx(i,j)]) - 
-            (del_t/del_x)*d_u[idx(i,j)] * (d_u[idx(i,j)] - d_u[idx(i,j-1)]) - 
-            (del_t/del_y)*d_v[idx(i,j)] * (d_u[idx(i,j)] - d_u[idx(i-1,j)]);
-
-          d_v_new[idx(i,j)] = d_v[idx(i,j)] +
-            (nu*del_t/(del_x*del_x)) * (d_v[idx(i,j+1)] + d_v[idx(i,j-1)] - 2 * d_v[idx(i,j)]) + 
-            (nu*del_t/(del_y*del_y)) * (d_v[idx(i+1,j)] + d_v[idx(i-1,j)] - 2 * d_v[idx(i,j)]) -
-            (del_t/del_x)*d_u[idx(i,j)] * (d_v[idx(i,j)] - d_v[idx(i,j-1)]) - 
-            (del_t/del_y)*d_v[idx(i,j)] * (d_v[idx(i,j)] - d_v[idx(i-1,j)]);
-        }
-      });
-    });
+    core(q, gws, lws, 0, d_u_new, d_v_new, d_u, d_v, x_points, y_points, nu, del_t, del_x, del_y);
 
     // Boundary conditions
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class bound_h>(
-        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
-        int i = item.get_global_id(0);
-        if (i < x_points) {
-          d_u_new[idx(0,i)] = 1.0;
-          d_v_new[idx(0,i)] = 1.0;
-          d_u_new[idx(y_points-1,i)] = 1.0;
-          d_v_new[idx(y_points-1,i)] = 1.0;
-        }
-      });
-    });
+    bound_h(q, gws2, lws2, 0, d_u_new, d_v_new, x_points, y_points);
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class bound_v>(
-        sycl::nd_range<1>(gws3, lws3), [=] (sycl::nd_item<1> item) {
-        int j = item.get_global_id(0);
-        if (j < y_points) {
-          d_u_new[idx(j,0)] = 1.0;
-          d_v_new[idx(j,0)] = 1.0;
-          d_u_new[idx(j,x_points-1)] = 1.0;
-          d_v_new[idx(j,x_points-1)] = 1.0;
-        }
-      });
-    });
+    bound_v(q, gws3, lws3, 0, d_u_new, d_v_new, x_points, y_points);
 
     // Updating older values to newer ones
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class update>(
-        sycl::nd_range<1>(gws4, lws4), [=] (sycl::nd_item<1> item) {
-        int i = item.get_global_id(0);
-        if (i < grid_elems) {
-          d_u[i] = d_u_new[i];
-          d_v[i] = d_v_new[i];
-        }
-      });
-    });
+    update(q, gws4, lws4, 0, d_u, d_v, d_u_new, d_v_new, grid_elems);
   }
 
   q.wait();
@@ -194,14 +143,14 @@ int main(int argc, char* argv[])
 
     for(int i = 1; i < y_points-1; i++){
       for(int j = 1; j < x_points-1; j++){
-        u_new[idx(i,j)] = u[idx(i,j)] + (nu*del_t/(del_x*del_x)) * (u[idx(i,j+1)] + u[idx(i,j-1)] - 2 * u[idx(i,j)]) + 
-                              (nu*del_t/(del_y*del_y)) * (u[idx(i+1,j)] + u[idx(i-1,j)] - 2 * u[idx(i,j)]) - 
-                                 (del_t/del_x)*u[idx(i,j)] * (u[idx(i,j)] - u[idx(i,j-1)]) - 
+        u_new[idx(i,j)] = u[idx(i,j)] + (nu*del_t/(del_x*del_x)) * (u[idx(i,j+1)] + u[idx(i,j-1)] - 2 * u[idx(i,j)]) +
+                              (nu*del_t/(del_y*del_y)) * (u[idx(i+1,j)] + u[idx(i-1,j)] - 2 * u[idx(i,j)]) -
+                                 (del_t/del_x)*u[idx(i,j)] * (u[idx(i,j)] - u[idx(i,j-1)]) -
                                  (del_t/del_y)*v[idx(i,j)] * (u[idx(i,j)] - u[idx(i-1,j)]);
 
-        v_new[idx(i,j)] = v[idx(i,j)] + (nu*del_t/(del_x*del_x)) * (v[idx(i,j+1)] + v[idx(i,j-1)] - 2 * v[idx(i,j)]) + 
+        v_new[idx(i,j)] = v[idx(i,j)] + (nu*del_t/(del_x*del_x)) * (v[idx(i,j+1)] + v[idx(i,j-1)] - 2 * v[idx(i,j)]) +
                               (nu*del_t/(del_y*del_y)) * (v[idx(i+1,j)] + v[idx(i-1,j)] - 2 * v[idx(i,j)]) -
-                                 (del_t/del_x)*u[idx(i,j)] * (v[idx(i,j)] - v[idx(i,j-1)]) - 
+                                 (del_t/del_x)*u[idx(i,j)] * (v[idx(i,j)] - v[idx(i,j-1)]) -
                                  (del_t/del_y)*v[idx(i,j)] * (v[idx(i,j)] - v[idx(i-1,j)]);
       }
     }
@@ -233,7 +182,7 @@ int main(int argc, char* argv[])
   bool ok = true;
   for(int i = 0; i < y_points; i++){
     for(int j = 0; j < x_points; j++){
-      if (fabs(du[idx(i,j)] - u[idx(i,j)]) > 1e-6 || 
+      if (fabs(du[idx(i,j)] - u[idx(i,j)]) > 1e-6 ||
           fabs(dv[idx(i,j)] - v[idx(i,j)]) > 1e-6) ok = false;
     }
   }
