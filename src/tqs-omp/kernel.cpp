@@ -46,10 +46,11 @@ void call_TaskQueue_gpu(int blocks,
 {
   #pragma omp target teams num_teams(blocks) thread_limit(threads)
   {
-    int next[3];
+    int l_mem[3];
     #pragma omp parallel 
     {
-      task_t* t = (task_t*)&next[1];
+      int& next = l_mem[0];
+      task_t* t = (task_t*)&l_mem[1];
 
       const int tid       = omp_get_thread_num();
       const int tile_size = omp_get_num_threads();
@@ -57,14 +58,14 @@ void call_TaskQueue_gpu(int blocks,
       // Fetch task
       if(tid == 0) {
         #pragma omp atomic capture
-        *next = (*consumed)++;
-        t->id = task_queue[*next].id;
-        t->op = task_queue[*next].op;
+        next = (*consumed)++;
+        t->id = task_queue[next].id;
+        t->op = task_queue[next].op;
       }
 
       #pragma omp barrier
 
-      while(*next < gpuQueueSize) {
+      while(next < gpuQueueSize) {
         // Compute task
         if(t->op == SIGNAL_WORK_KERNEL) {
           for(int i = 0; i < iterations; i++) {
@@ -82,10 +83,10 @@ void call_TaskQueue_gpu(int blocks,
         }
         if(tid == 0) {
           #pragma omp atomic capture
-          *next = (*consumed)++;
+          next = (*consumed)++;
           // Fetch task
-          t->id = task_queue[*next].id;
-          t->op = task_queue[*next].op;
+          t->id = task_queue[next].id;
+          t->op = task_queue[next].op;
         }
         #pragma omp barrier
       }
