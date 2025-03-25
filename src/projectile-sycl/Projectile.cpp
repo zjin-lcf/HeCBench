@@ -17,6 +17,34 @@ const float kPIValue = 3.1415;
 const float kGValue = 9.81;
 const int BLOCK_SIZE = 256;
 
+void CalculateRange(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    const Projectile *obj,
+    Projectile *pObj)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int i = item.get_global_id(2);
+      if (i >= num_elements) return;
+      float proj_angle = obj[i].getangle();
+      float proj_vel = obj[i].getvelocity();
+      float sin_value = sycl::sin(proj_angle * kPIValue / 180.0f);
+      float cos_value = sycl::cos(proj_angle * kPIValue / 180.0f);
+      float total_time = sycl::fabs((2 * proj_vel * sin_value)) / kGValue;
+      float max_range =  sycl::fabs(proj_vel * total_time * cos_value);
+      float max_height = (proj_vel * proj_vel * sin_value * sin_value) / 2.0f *
+                         kGValue;  // h = v^2 * sin^2theta/2g
+
+      pObj[i].setRangeandTime(max_range, total_time, proj_angle, proj_vel, max_height);
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
 // Function to calculate the range, maximum height and total flight time of a projectile
 // in_vect and out_vect are the vectors with N Projectile numbers and are inputs to the
 // parallel function
@@ -30,30 +58,14 @@ void GpuParallel(sycl::queue& q,
 
   Projectile *bufout_vect = sycl::malloc_device<Projectile>(num_elements, q);
 
-  sycl::range<1> gws ((num_elements + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
-  sycl::range<1> lws (BLOCK_SIZE);
+  sycl::range<3> gws (1, 1, (num_elements + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
+  sycl::range<3> lws (1, 1, BLOCK_SIZE);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](sycl::handler& h) {
-      h.parallel_for<class projectile>(
-        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        int i = item.get_global_id(0); 
-        if (i >= num_elements) return;
-        float proj_angle = bufin_vect[i].getangle();
-        float proj_vel = bufin_vect[i].getvelocity();
-        float sin_value = sycl::sin(proj_angle * kPIValue / 180.0f);
-        float cos_value = sycl::cos(proj_angle * kPIValue / 180.0f);
-        float total_time = sycl::fabs((2 * proj_vel * sin_value)) / kGValue;
-        float max_range = sycl::fabs(proj_vel * total_time * cos_value);
-        float max_height = (proj_vel * proj_vel * sin_value * sin_value) / 2.0f *
-                           kGValue;  // h = v^2 * sin^2theta/2g
-
-        bufout_vect[i].setRangeandTime(max_range, total_time, proj_angle, proj_vel, max_height);
-      });
-    });
+    CalculateRange(q, gws, lws, 0, bufin_vect, bufout_vect);
   }
 
   q.wait();
@@ -94,7 +106,7 @@ int main(int argc, char* argv[]) {
 #endif
 
   GpuParallel(q, input_vect1, out_parallel_vect2, repeat);
-      
+
 #ifdef DEBUG
   for (int i = 0; i < num_elements; i++)
   {
