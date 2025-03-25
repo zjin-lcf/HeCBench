@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 // =============================================================
 
-// ISO2DFD: the 2D-Finite-Difference-Wave Propagation, 
+// ISO2DFD: the 2D-Finite-Difference-Wave Propagation,
 //
 // ISO2DFD is a finite difference stencil kernel for solving the 2D acoustic
 // isotropic wave equation. Kernels in this sample are implemented as 2nd order
@@ -145,35 +145,45 @@ void iso_2dfd_iteration_cpu(float* next, float* prev, float* vel,
  * Range kernel is used to spawn work-items in x, y dimension
  *
  */
-void iso_2dfd_kernel(sycl::nd_item<2> &item,
-                     float* next, const float* prev, const float* vel, 
-		     const float dtDIVdxy, const int nRows, const int nCols) {
+void iso_2dfd_kernel(sycl::queue &q,
+                     sycl::range<3> &gws,
+                     sycl::range<3> &lws,
+                     const int slm_size,
+                     float* next, const float* prev, const float* vel,
+		     const float dtDIVdxy, const int nRows, const int nCols)
+{
   // Compute global id
   // We can use the get.global.id() function of the item variable
   //   to compute global id. The 2D array is laid out in memory in row major
   //   order.
-  size_t gidRow = item.get_global_id(0);
-  size_t gidCol = item.get_global_id(1);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      size_t gidRow = item.get_global_id(1);
+      size_t gidCol = item.get_global_id(2);
 
-  if (gidRow < nRows && gidCol < nCols) {
+      if (gidRow < nRows && gidCol < nCols) {
 
-    size_t gid = (gidRow)*nCols + gidCol;
+        size_t gid = (gidRow)*nCols + gidCol;
 
-    // Computation to solve wave equation in 2D
-    // First check if gid is inside the effective grid (not in halo)
-    if ((gidCol >= HALF_LENGTH && gidCol < nCols - HALF_LENGTH) &&
-        (gidRow >= HALF_LENGTH && gidRow < nRows - HALF_LENGTH)) {
-      // Stencil code to update grid point at position given by global id (gid)
-      // New time step for grid point is computed based on the values of the
-      //    the immediate neighbors in both the horizontal and vertical
-      //    directions, as well as the value of grid point at a previous time step
-      float value = 0.f;
-      value += prev[gid + 1] - 2.f * prev[gid] + prev[gid - 1];
-      value += prev[gid + nCols] - 2.f * prev[gid] + prev[gid - nCols];
-      value *= dtDIVdxy * vel[gid];
-      next[gid] = 2.0f * prev[gid] - next[gid] + value;
-    }
-  }
+        // Computation to solve wave equation in 2D
+        // First check if gid is inside the effective grid (not in halo)
+        if ((gidCol >= HALF_LENGTH && gidCol < nCols - HALF_LENGTH) &&
+            (gidRow >= HALF_LENGTH && gidRow < nRows - HALF_LENGTH)) {
+          // Stencil code to update grid point at position given by global id (gid)
+          // New time step for grid point is computed based on the values of the
+          //    the immediate neighbors in both the horizontal and vertical
+          //    directions, as well as the value of grid point at a previous time step
+          float value = 0.f;
+          value += prev[gid + 1] - 2.f * prev[gid] + prev[gid - 1];
+          value += prev[gid + nCols] - 2.f * prev[gid] + prev[gid - nCols];
+          value *= dtDIVdxy * vel[gid];
+          next[gid] = 2.0f * prev[gid] - next[gid] + value;
+        }
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char* argv[]) {
@@ -244,8 +254,8 @@ int main(int argc, char* argv[]) {
   float *d_vel = sycl::malloc_device<float>(nsize, q);
   q.memcpy(d_vel, vel_base, sizeof(float)*nsize);
 
-  sycl::range<2> gws ((nRows+15)/16*16, (nCols+15)/16*16);
-  sycl::range<2> lws (16, 16);
+  sycl::range<3> gws (1, (nRows+15)/16*16, (nCols+15)/16*16);
+  sycl::range<3> lws (1, 16, 16);
 
   q.wait();
   auto kstart = std::chrono::steady_clock::now();
@@ -255,15 +265,10 @@ int main(int argc, char* argv[]) {
 
     //    alternating the 'next' and 'prev' parameters which effectively
     //    swaps their content at every iteration.
-    q.submit([&](sycl::handler &h) {
-      // Create accessors
-      h.parallel_for<class kernel_next>(
-        sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item) {
-        iso_2dfd_kernel(item, k % 2 ? d_prev : d_next, 
-                              k % 2 ? d_next : d_prev,
-                              d_vel, dtDIVdxy, nRows, nCols);
-      });
-    });
+    iso_2dfd_kernel(q, gws, lws, 0,
+                    k % 2 ? d_prev : d_next,
+                    k % 2 ? d_next : d_prev,
+                    d_vel, dtDIVdxy, nRows, nCols);
   }  // end for
 
   q.wait();
@@ -281,7 +286,6 @@ int main(int argc, char* argv[]) {
   outFile.close();
 
   // Compute wavefield on CPU (for validation)
-  
   std::cout << "Computing wavefield in CPU .." << std::endl;
   // Re-initialize arrays
   initialize(prev_base, next_cpu, vel_base, nRows, nCols);
@@ -306,7 +310,7 @@ int main(int argc, char* argv[]) {
   // If error greater than threshold (last parameter in error function call),
   // report
   if (error)
-    std::cout << "Final wavefields from device and CPU are different: Error "
+    std::cout << "Final wavefields from device and CPU are different: Fail "
               << std::endl;
   else
     std::cout << "Final wavefields from device and CPU are equivalent: Success"
