@@ -21,97 +21,108 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 /**
- * @brief   Calculates decomposed signal with maximum of 9 levels by using 
- *          1D Haar wavelet decomposition 
+ * @brief   Calculates decomposed signal with maximum of 9 levels by using
+ *          1D Haar wavelet decomposition
  * @param   inSignal        input signal
- * @param   coefsSignal     Coefficient details of signal after 9 levels of decompostion 
+ * @param   coefsSignal     Coefficient details of signal after 9 levels of decompostion
  * @param   AverageSignal   Averages of signal after 9 levels of decompostion
- * @param   sharedArray     shared array 
- * @param   tLevels         actual levels required for full decomposition 
+ * @param   sharedArray     shared array
+ * @param   tLevels         actual levels required for full decomposition
  * @param   signalLength    length of signal
- * @param   levelsDone      level of decompositions done 
+ * @param   levelsDone      level of decompositions done
  * @param   mLevels	    maximum number of levels to be processed on device
  */
 
 #include "hwt.h"
 
-void dwtHaar1D(sycl::nd_item<1> &item,
+void dwtHaar1D(sycl::queue &q,
+               sycl::range<3> &gws,
+               sycl::range<3> &lws,
+               const int slm_size,
                 const float *__restrict inSignal,
                       float *__restrict coefsSignal,
                       float *__restrict AverageSignal,
-                      float *__restrict sharedArray,
                       const unsigned int tLevels,
                       const unsigned int signalLength,
                       const unsigned int levelsDone,
 		      const unsigned int mLevels)
-              
+
 {
-    size_t localId = item.get_local_id(0);
-    size_t groupId = item.get_group(0);
-    size_t localSize = item.get_local_range(0);
-    
-    /**
-     * Read input signal data from global memory
-     * to shared memory
-     */
-    float t0 = inSignal[groupId * localSize * 2 + localId];
-    float t1 = inSignal[groupId * localSize * 2 + localSize + localId];
-    // Divide with signal length for normalized decomposition
-    if(0 == levelsDone)
-    {
-       float r = sycl::rsqrt((float)signalLength);
-       t0 *= r;
-       t1 *= r;
-    }
-    sharedArray[localId] = t0;
-    sharedArray[localSize + localId] = t1;
-     
-    item.barrier(sycl::access::fence_space::local_space);
-    
-    unsigned int levels = tLevels > mLevels ? mLevels: tLevels;
-    unsigned int activeThreads = (1 << levels) / 2;
-    unsigned int midOutPos = signalLength / 2;
-    
-    const float rsqrt_two = 0.7071f;
-    for(unsigned int i = 0; i < levels; ++i)
-    {
+  auto cgf = [&] (sycl::handler &cgh) {
+    sycl::local_accessor<float, 1> sharedArray (sycl::range<1>(slm_size), cgh);
 
-        float data0, data1;
-        if(localId < activeThreads)
-        {
-            data0 = sharedArray[2 * localId];
-            data1 = sharedArray[2 * localId + 1];
-        }
+    auto kfn = [=] (sycl::nd_item<3> item) {
 
-        /* make sure all work items have read from sharedArray before modifying it */
-        item.barrier(sycl::access::fence_space::local_space);
+      size_t localId = item.get_local_id(2);
+      size_t groupId = item.get_group(2);
+      size_t localSize = item.get_local_range(2);
 
-        if(localId < activeThreads)
-        {
-            sharedArray[localId] = (data0 + data1) * rsqrt_two;
-            unsigned int globalPos = midOutPos + groupId * activeThreads + localId;
-            coefsSignal[globalPos] = (data0 - data1) * rsqrt_two;
-       
-            midOutPos >>= 1;
-        }
-        activeThreads >>= 1;
-        item.barrier(sycl::access::fence_space::local_space);
-    }
-    
-    /**
-     * Write 0th element for the next decomposition
-     * steps which are performed on host 
-     */
-    
-     if(0 == localId)
-        AverageSignal[groupId] = sharedArray[0];
+      /**
+       * Read input signal data from global memory
+       * to shared memory
+       */
+      float t0 = inSignal[groupId * localSize * 2 + localId];
+      float t1 = inSignal[groupId * localSize * 2 + localSize + localId];
+      // Divide with signal length for normalized decomposition
+      if(0 == levelsDone)
+      {
+         float r = sycl::rsqrt((float)signalLength);
+         t0 *= r;
+         t1 *= r;
+      }
+      sharedArray[localId] = t0;
+      sharedArray[localSize + localId] = t1;
+
+      item.barrier(sycl::access::fence_space::local_space);
+
+      unsigned int levels = tLevels > mLevels ? mLevels: tLevels;
+      unsigned int activeThreads = (1 << levels) / 2;
+      unsigned int midOutPos = signalLength / 2;
+
+      const float rsqrt_two = 0.7071f;
+      for(unsigned int i = 0; i < levels; ++i)
+      {
+
+          float data0, data1;
+          if(localId < activeThreads)
+          {
+              data0 = sharedArray[2 * localId];
+              data1 = sharedArray[2 * localId + 1];
+          }
+
+          /* make sure all work items have read from sharedArray before modifying it */
+          item.barrier(sycl::access::fence_space::local_space);
+
+          if(localId < activeThreads)
+          {
+              sharedArray[localId] = (data0 + data1) * rsqrt_two;
+              unsigned int globalPos = midOutPos + groupId * activeThreads + localId;
+              coefsSignal[globalPos] = (data0 - data1) * rsqrt_two;
+
+              midOutPos >>= 1;
+          }
+          activeThreads >>= 1;
+          item.barrier(sycl::access::fence_space::local_space);
+      }
+
+      /**
+       * Write 0th element for the next decomposition
+       * steps which are performed on host
+       */
+
+       if(0 == localId)
+          AverageSignal[groupId] = sharedArray[0];
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int runKernel(
     sycl::queue &q,
-    float *inData, 
-    float *dOutData, 
-    float *hOutData, 
+    float *inData,
+    float *dOutData,
+    float *hOutData,
     float *dPartialOutData,
     const unsigned int signalLength,
     float *inDataBuf,
@@ -163,23 +174,17 @@ int runKernel(
 
     q.memcpy(inDataBuf, inData, signalLengthByte);
 
-    sycl::range<1> gws (curSignalLength >> 1);
-    sycl::range<1> lws (groupSize);
-    q.submit([&] (sycl::handler &cgh) {
-      sycl::local_accessor<float, 1> lmem (sycl::range<1>(groupSize*2), cgh);
-      cgh.parallel_for<class dwt>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        dwtHaar1D(item,
-                  inDataBuf,
-                  outDataBuf,
-                  partialOutDataBuf,
-                  lmem.get_pointer(),
-                  totalLevels,
-                  curSignalLength,
-                  levelsDone,
-                  maxLevelsOnDevice);
-      });
-    });
+    sycl::range<3> gws (1, 1, curSignalLength >> 1);
+    sycl::range<3> lws (1, 1, groupSize);
+
+    dwtHaar1D(q, gws, lws, groupSize * 2,
+              inDataBuf,
+              outDataBuf,
+              partialOutDataBuf,
+              totalLevels,
+              curSignalLength,
+              levelsDone,
+              maxLevelsOnDevice);
 
     q.memcpy(dOutData, outDataBuf, signalLengthByte);
 
