@@ -72,7 +72,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp kernel_hotspot.sycl
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
