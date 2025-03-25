@@ -44,20 +44,20 @@ void TaskQueue_gpu(const task_t *__restrict__ queue,
                    const int gpuQueueSize)
 {
   extern __shared__ int l_mem[];
-  int* next = l_mem;
-  task_t* t = (task_t*)&next[1];
+  int& next = l_mem[0];
+  task_t* t = (task_t*)&l_mem[1];
 
   const int tid       = threadIdx.x;
   const int tile_size = blockDim.x;
 
   // Fetch task
   if(tid == 0) {
-    *next = atomicAdd(consumed, 1);
-    t->id = queue[*next].id;
-    t->op = queue[*next].op;
+    next = atomicAdd(consumed, 1);
+    t->id = queue[next].id;
+    t->op = queue[next].op;
   }
   __syncthreads();
-  while(*next < gpuQueueSize) {
+  while(next < gpuQueueSize) {
     // Compute task
     if(t->op == SIGNAL_WORK_KERNEL) {
       for(int i = 0; i < iterations; i++) {
@@ -74,10 +74,10 @@ void TaskQueue_gpu(const task_t *__restrict__ queue,
       data[(t->id - offset) * tile_size + tid] += t->id;
     }
     if(tid == 0) {
-      *next = atomicAdd(consumed, 1);
+      next = atomicAdd(consumed, 1);
       // Fetch task
-      t->id = queue[*next].id;
-      t->op = queue[*next].op;
+      t->id = queue[next].id;
+      t->op = queue[next].op;
     }
     __syncthreads();
   }
