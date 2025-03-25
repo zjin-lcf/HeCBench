@@ -6,50 +6,59 @@
 #include "reference.h"
 
 void vanGenuchten(
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
+  const int slm_size,
   const double *__restrict__ Ksat,
   const double *__restrict__ psi,
         double *__restrict__ C,
         double *__restrict__ theta,
         double *__restrict__ K,
-  const int size,
-  sycl::nd_item<1> &item)
+  const int size)
 {
-  double Se, _theta, _psi, lambda, m;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      double Se, _theta, _psi, lambda, m;
 
-  int i = item.get_global_id(0);
-  if (i < size)
-  {
-    lambda = n - 1.0;
-    m = lambda/n;
+      int i = item.get_global_id(2);
+      if (i < size)
+      {
+        lambda = n - 1.0;
+        m = lambda/n;
 
-    // Compute the volumetric moisture content [eqn 21]
-    _psi = psi[i] * 100.0;
-    if ( _psi < 0.0 )
-      _theta = (theta_S - theta_R) / sycl::pow(
-               1.0 + sycl::pow((alpha * (-_psi)), n), m) + theta_R;
-    else
-      _theta = theta_S;
+        // Compute the volumetric moisture content [eqn 21]
+        _psi = psi[i] * 100.0;
+        if ( _psi < 0.0 )
+          _theta = (theta_S - theta_R) / sycl::pow(
+                   1.0 + sycl::pow((alpha * (-_psi)), n), m) + theta_R;
+        else
+          _theta = theta_S;
 
-    theta[i] = _theta;
+        theta[i] = _theta;
 
-    // Compute the effective saturation [eqn 2]
-    Se = (_theta - theta_R)/(theta_S - theta_R);
+        // Compute the effective saturation [eqn 2]
+        Se = (_theta - theta_R)/(theta_S - theta_R);
 
-    // Compute the hydraulic conductivity [eqn 8]
-    double t = 1.0 - sycl::pow(1.0 - sycl::pow(Se, 1.0 / m), m);
-    K[i] = Ksat[i] * sycl::sqrt(Se) * t * t;
+        // Compute the hydraulic conductivity [eqn 8]
+        double t = 1.0 - sycl::pow(1.0 - sycl::pow(Se, 1.0 / m), m);
+        K[i] = Ksat[i] * sycl::sqrt(Se) * t * t;
 
-    // Compute the specific moisture storage derivative of eqn (21).
-    // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
-    if (_psi < 0.0)
-      C[i] = 100.0 * alpha * n * (1.0 / n - 1.0) *
-             sycl::pow(alpha * sycl::fabs(_psi), n - 1.0) *
-             (theta_R - theta_S) *
-             sycl::pow(sycl::pow(alpha * sycl::fabs(_psi), n) + 1.0,
-                            1.0 / n - 2.0);
-    else
-      C[i] = 0.0;
-  }
+        // Compute the specific moisture storage derivative of eqn (21).
+        // So we have to calculate C = d(theta)/dh. Then the unit is converted into [1/m].
+        if (_psi < 0.0)
+          C[i] = 100.0 * alpha * n * (1.0 / n - 1.0) *
+                 sycl::pow(alpha * sycl::fabs(_psi), n - 1.0) *
+                 (theta_R - theta_S) *
+                 sycl::pow(sycl::pow(alpha * sycl::fabs(_psi), n) + 1.0,
+                                1.0 / n - 2.0);
+        else
+          C[i] = 0.0;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char* argv[])
@@ -105,18 +114,14 @@ int main(int argc, char* argv[])
   q.memcpy(d_Ksat, Ksat, size_byte);
   q.memcpy(d_psi, psi, size_byte);
 
-  sycl::range<1> gws ((size + 255) / 256 * 256);
-  sycl::range<1> lws (256);
+  sycl::range<3> gws (1, 1, (size + 255) / 256 * 256);
+  sycl::range<3> lws (1, 1, 256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        vanGenuchten(d_Ksat, d_psi, d_C, d_theta, d_K, size, item);
-      });
-    });
+    vanGenuchten(q, gws, lws, 0, d_Ksat, d_psi, d_C, d_theta, d_K, size);
 
   q.wait();
 
