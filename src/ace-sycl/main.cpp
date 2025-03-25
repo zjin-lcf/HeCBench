@@ -25,33 +25,33 @@ double dFphi(double phi, double u, double lambda)
 }
 
 
-double GradientX(double phi[][DATAYSIZE][DATAXSIZE], 
+double GradientX(double phi[][DATAYSIZE][DATAXSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x+1][y][z] - phi[x-1][y][z]) / (2.0*dx);
 }
 
 
-double GradientY(double phi[][DATAYSIZE][DATAXSIZE], 
+double GradientY(double phi[][DATAYSIZE][DATAXSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x][y+1][z] - phi[x][y-1][z]) / (2.0*dy);
 }
 
 
-double GradientZ(double phi[][DATAYSIZE][DATAXSIZE], 
+double GradientZ(double phi[][DATAYSIZE][DATAXSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x][y][z+1] - phi[x][y][z-1]) / (2.0*dz);
 }
 
 
-double Divergence(double phix[][DATAYSIZE][DATAXSIZE], 
+double Divergence(double phix[][DATAYSIZE][DATAXSIZE],
                   double phiy[][DATAYSIZE][DATAXSIZE],
-                  double phiz[][DATAYSIZE][DATAXSIZE], 
+                  double phiz[][DATAYSIZE][DATAXSIZE],
                   double dx, double dy, double dz, int x, int y, int z)
 {
-  return GradientX(phix,dx,dy,dz,x,y,z) + 
+  return GradientX(phix,dx,dy,dz,x,y,z) +
          GradientY(phiy,dx,dy,dz,x,y,z) +
          GradientZ(phiz,dx,dy,dz,x,y,z);
 }
@@ -105,168 +105,221 @@ double dFunc(double l, double m, double n)
   }
 }
 
-void calculateForce(double phi[][DATAYSIZE][DATAXSIZE], 
+void calculateForce(sycl::queue &q,
+                    sycl::range<3> &gws,
+                    sycl::range<3> &lws,
+                    const int slm_size,
+                    double phi[][DATAYSIZE][DATAXSIZE],
                     double Fx[][DATAYSIZE][DATAXSIZE],
                     double Fy[][DATAYSIZE][DATAXSIZE],
                     double Fz[][DATAYSIZE][DATAXSIZE],
                     double dx, double dy, double dz,
-                    double epsilon, double W0, double tau0,
-                    sycl::nd_item<3> &item)
+                    double epsilon, double W0, double tau0)
 {
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      unsigned iz = item.get_global_id(2);
+      unsigned iy = item.get_global_id(1);
+      unsigned ix = item.get_global_id(0);
 
-  unsigned iz = item.get_global_id(2);
-  unsigned iy = item.get_global_id(1);
-  unsigned ix = item.get_global_id(0);
+      if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) &&
+          (iz < (DATAZSIZE-1)) && (ix > (0)) &&
+          (iy > (0)) && (iz > (0))) {
 
-  if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) && 
-      (iz < (DATAZSIZE-1)) && (ix > (0)) && 
-      (iy > (0)) && (iz > (0))) {
+        double phix = GradientX(phi,dx,dy,dz,ix,iy,iz);
+        double phiy = GradientY(phi,dx,dy,dz,ix,iy,iz);
+        double phiz = GradientZ(phi,dx,dy,dz,ix,iy,iz);
+        double sqGphi = SQ(phix) + SQ(phiy) + SQ(phiz);
+        double c = 16.0 * W0 * epsilon;
+        double w = Wn(phix,phiy,phiz,epsilon,W0);
+        double w2 = SQ(w);
 
-    double phix = GradientX(phi,dx,dy,dz,ix,iy,iz);
-    double phiy = GradientY(phi,dx,dy,dz,ix,iy,iz);
-    double phiz = GradientZ(phi,dx,dy,dz,ix,iy,iz);
-    double sqGphi = SQ(phix) + SQ(phiy) + SQ(phiz);
-    double c = 16.0 * W0 * epsilon;
-    double w = Wn(phix,phiy,phiz,epsilon,W0);
-    double w2 = SQ(w);
-    
 
-    Fx[ix][iy][iz] = w2 * phix + sqGphi * w * c * dFunc(phix,phiy,phiz);
-    Fy[ix][iy][iz] = w2 * phiy + sqGphi * w * c * dFunc(phiy,phiz,phix);
-    Fz[ix][iy][iz] = w2 * phiz + sqGphi * w * c * dFunc(phiz,phix,phiy);
-  }
-  else
-  {
-    Fx[ix][iy][iz] = 0.0;
-    Fy[ix][iy][iz] = 0.0;
-    Fz[ix][iy][iz] = 0.0;
-  }
-
+        Fx[ix][iy][iz] = w2 * phix + sqGphi * w * c * dFunc(phix,phiy,phiz);
+        Fy[ix][iy][iz] = w2 * phiy + sqGphi * w * c * dFunc(phiy,phiz,phix);
+        Fz[ix][iy][iz] = w2 * phiz + sqGphi * w * c * dFunc(phiz,phix,phiy);
+      }
+      else
+      {
+        Fx[ix][iy][iz] = 0.0;
+        Fy[ix][iy][iz] = 0.0;
+        Fz[ix][iy][iz] = 0.0;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 // device function to set the 3D volume
-void allenCahn(double phinew[][DATAYSIZE][DATAXSIZE], 
+void allenCahn(sycl::queue &q,
+               sycl::range<3> &gws,
+               sycl::range<3> &lws,
+               const int slm_size,
+               double phinew[][DATAYSIZE][DATAXSIZE],
                double phiold[][DATAYSIZE][DATAXSIZE],
                double uold[][DATAYSIZE][DATAXSIZE],
                double Fx[][DATAYSIZE][DATAXSIZE],
                double Fy[][DATAYSIZE][DATAXSIZE],
                double Fz[][DATAYSIZE][DATAXSIZE],
                double epsilon, double W0, double tau0, double lambda,
-               double dt, double dx, double dy, double dz,
-               sycl::nd_item<3> &item)
+               double dt, double dx, double dy, double dz)
 {
-  unsigned iz = item.get_global_id(2);
-  unsigned iy = item.get_global_id(1);
-  unsigned ix = item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      unsigned iz = item.get_global_id(2);
+      unsigned iy = item.get_global_id(1);
+      unsigned ix = item.get_global_id(0);
 
-  if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) && 
-      (iz < (DATAZSIZE-1)) && (ix > (0)) && 
-      (iy > (0)) && (iz > (0))) {
+      if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) &&
+          (iz < (DATAZSIZE-1)) && (ix > (0)) &&
+          (iy > (0)) && (iz > (0))) {
 
-    double phix = GradientX(phiold,dx,dy,dz,ix,iy,iz);
-    double phiy = GradientY(phiold,dx,dy,dz,ix,iy,iz);
-    double phiz = GradientZ(phiold,dx,dy,dz,ix,iy,iz); 
+        double phix = GradientX(phiold,dx,dy,dz,ix,iy,iz);
+        double phiy = GradientY(phiold,dx,dy,dz,ix,iy,iz);
+        double phiz = GradientZ(phiold,dx,dy,dz,ix,iy,iz);
 
-    phinew[ix][iy][iz] = phiold[ix][iy][iz] + 
-     (dt / taun(phix,phiy,phiz,epsilon,tau0)) * 
-     (Divergence(Fx,Fy,Fz,dx,dy,dz,ix,iy,iz) - 
-      dFphi(phiold[ix][iy][iz], uold[ix][iy][iz],lambda));
-  }
+        phinew[ix][iy][iz] = phiold[ix][iy][iz] +
+         (dt / taun(phix,phiy,phiz,epsilon,tau0)) *
+         (Divergence(Fx,Fy,Fz,dx,dy,dz,ix,iy,iz) -
+          dFphi(phiold[ix][iy][iz], uold[ix][iy][iz],lambda));
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 
-void boundaryConditionsPhi(double phinew[][DATAYSIZE][DATAXSIZE],
-                           sycl::nd_item<3> &item)
+void boundaryConditionsPhi(sycl::queue &q,
+                           sycl::range<3> &gws,
+                           sycl::range<3> &lws,
+                           const int slm_size,
+                           double phinew[][DATAYSIZE][DATAXSIZE])
 {
-  unsigned iz = item.get_global_id(2);
-  unsigned iy = item.get_global_id(1);
-  unsigned ix = item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      unsigned iz = item.get_global_id(2);
+      unsigned iy = item.get_global_id(1);
+      unsigned ix = item.get_global_id(0);
 
-  if (ix == 0){
-    phinew[ix][iy][iz] = -1.0;
-  }
-  else if (ix == DATAXSIZE-1){
-    phinew[ix][iy][iz] = -1.0;
-  }
-  else if (iy == 0){
-    phinew[ix][iy][iz] = -1.0;
-  }
-  else if (iy == DATAYSIZE-1){
-    phinew[ix][iy][iz] = -1.0;
-  }
-  else if (iz == 0){
-    phinew[ix][iy][iz] = -1.0;
-  }
-  else if (iz == DATAZSIZE-1){
-    phinew[ix][iy][iz] = -1.0;
-  }
+      if (ix == 0){
+        phinew[ix][iy][iz] = -1.0;
+      }
+      else if (ix == DATAXSIZE-1){
+        phinew[ix][iy][iz] = -1.0;
+      }
+      else if (iy == 0){
+        phinew[ix][iy][iz] = -1.0;
+      }
+      else if (iy == DATAYSIZE-1){
+        phinew[ix][iy][iz] = -1.0;
+      }
+      else if (iz == 0){
+        phinew[ix][iy][iz] = -1.0;
+      }
+      else if (iz == DATAZSIZE-1){
+        phinew[ix][iy][iz] = -1.0;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 
-void thermalEquation(double unew[][DATAYSIZE][DATAXSIZE],
+void thermalEquation(sycl::queue &q,
+                     sycl::range<3> &gws,
+                     sycl::range<3> &lws,
+                     const int slm_size,
+                     double unew[][DATAYSIZE][DATAXSIZE],
                      double uold[][DATAYSIZE][DATAXSIZE],
                      double phinew[][DATAYSIZE][DATAXSIZE],
                      double phiold[][DATAYSIZE][DATAXSIZE],
-                     double D, double dt, double dx, double dy, double dz,
-                     sycl::nd_item<3> &item)
+                     double D, double dt, double dx, double dy, double dz)
 {
-  unsigned iz = item.get_global_id(2);
-  unsigned iy = item.get_global_id(1);
-  unsigned ix = item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      unsigned iz = item.get_global_id(2);
+      unsigned iy = item.get_global_id(1);
+      unsigned ix = item.get_global_id(0);
 
-  if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) && 
-      (iz < (DATAZSIZE-1)) && (ix > (0)) && 
-      (iy > (0)) && (iz > (0))){
-    unew[ix][iy][iz] = uold[ix][iy][iz] + 
-      0.5*(phinew[ix][iy][iz]- phiold[ix][iy][iz]) +
-      dt * D * Laplacian(uold,dx,dy,dz,ix,iy,iz);
-  }
+      if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) &&
+          (iz < (DATAZSIZE-1)) && (ix > (0)) &&
+          (iy > (0)) && (iz > (0))){
+        unew[ix][iy][iz] = uold[ix][iy][iz] +
+          0.5*(phinew[ix][iy][iz]- phiold[ix][iy][iz]) +
+          dt * D * Laplacian(uold,dx,dy,dz,ix,iy,iz);
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 
-void boundaryConditionsU(double unew[][DATAYSIZE][DATAXSIZE], double delta,
-                         sycl::nd_item<3> &item)
+void boundaryConditionsU(sycl::queue &q,
+                         sycl::range<3> &gws,
+                         sycl::range<3> &lws,
+                         const int slm_size,
+                         double unew[][DATAYSIZE][DATAXSIZE],
+                         double delta)
 {
-  unsigned iz = item.get_global_id(2);
-  unsigned iy = item.get_global_id(1);
-  unsigned ix = item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      unsigned iz = item.get_global_id(2);
+      unsigned iy = item.get_global_id(1);
+      unsigned ix = item.get_global_id(0);
 
-  if (ix == 0){
-    unew[ix][iy][iz] =  -delta;
-  }
-  else if (ix == DATAXSIZE-1){
-    unew[ix][iy][iz] =  -delta;
-  }
-  else if (iy == 0){
-    unew[ix][iy][iz] =  -delta;
-  }
-  else if (iy == DATAYSIZE-1){
-    unew[ix][iy][iz] =  -delta;
-  }
-  else if (iz == 0){
-    unew[ix][iy][iz] =  -delta;
-  }
-  else if (iz == DATAZSIZE-1){
-    unew[ix][iy][iz] =  -delta;
-  }
+      if (ix == 0){
+        unew[ix][iy][iz] =  -delta;
+      }
+      else if (ix == DATAXSIZE-1){
+        unew[ix][iy][iz] =  -delta;
+      }
+      else if (iy == 0){
+        unew[ix][iy][iz] =  -delta;
+      }
+      else if (iy == DATAYSIZE-1){
+        unew[ix][iy][iz] =  -delta;
+      }
+      else if (iz == 0){
+        unew[ix][iy][iz] =  -delta;
+      }
+      else if (iz == DATAZSIZE-1){
+        unew[ix][iy][iz] =  -delta;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 
-void swapGrid(double cnew[][DATAYSIZE][DATAXSIZE],
-              double cold[][DATAYSIZE][DATAXSIZE],
-              sycl::nd_item<3> &item)
+void swapGrid(sycl::queue &q,
+              sycl::range<3> &gws,
+              sycl::range<3> &lws,
+              const int slm_size,
+              double cnew[][DATAYSIZE][DATAXSIZE],
+              double cold[][DATAYSIZE][DATAXSIZE])
 {
-  unsigned iz = item.get_global_id(2);
-  unsigned iy = item.get_global_id(1);
-  unsigned ix = item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      unsigned iz = item.get_global_id(2);
+      unsigned iy = item.get_global_id(1);
+      unsigned ix = item.get_global_id(0);
 
-  if ((ix < (DATAXSIZE)) && 
-      (iy < (DATAYSIZE)) &&
-      (iz < (DATAZSIZE))) {
-    double tmp = cnew[ix][iy][iz];
-    cnew[ix][iy][iz] = cold[ix][iy][iz];
-    cold[ix][iy][iz] = tmp;
-  }
+      if ((ix < (DATAXSIZE)) &&
+          (iy < (DATAYSIZE)) &&
+          (iz < (DATAZSIZE))) {
+        double tmp = cnew[ix][iy][iz];
+        cnew[ix][iy][iz] = cold[ix][iy][iz];
+        cold[ix][iy][iz] = tmp;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 void initializationPhi(double phi[][DATAYSIZE][DATAXSIZE], double r0)
@@ -353,7 +406,7 @@ int main(int argc, char *argv[])
   memcpy(phi_ref, phi_host, vol_in_bytes);
   memcpy(u_ref, u_host, vol_in_bytes);
   reference(phi_ref, u_ref, vol, num_steps);
-#endif 
+#endif
 
   auto offload_start = std::chrono::steady_clock::now();
 
@@ -385,73 +438,23 @@ int main(int argc, char *argv[])
   auto start = std::chrono::steady_clock::now();
 
   while (t <= num_steps) {
-    
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class calc_force>(
-        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-        calculateForce(d_phiold,
-                       d_Fx,
-                       d_Fy,
-                       d_Fz,
-                       dx,dy,dz,epsilon,W0,tau0,
-                       item);
-      });
-    });
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class allen_cahn>(
-        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-        allenCahn(d_phinew,
-                  d_phiold,
-                  d_uold,
-                  d_Fx,
-                  d_Fy,
-                  d_Fz,
-                  epsilon,W0,tau0,lambda,
-                  dt,dx,dy,dz,
-                  item);
-      });
-    });
+    calculateForce(q, gws, lws, 0, d_phiold, d_Fx, d_Fy, d_Fz,
+                   dx,dy,dz,epsilon,W0,tau0);
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class bc_phi>(
-        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-        boundaryConditionsPhi(d_phinew, item);
-      });
-    });
+    allenCahn(q, gws, lws, 0, d_phinew, d_phiold, d_uold,
+              d_Fx, d_Fy, d_Fz, epsilon,W0,tau0,lambda, dt,dx,dy,dz);
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class thermal_equation>(
-        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-        thermalEquation(d_unew,
-                        d_uold,
-                        d_phinew,
-                        d_phiold,
-                        D,dt,dx,dy,dz,
-                        item);
-      });
-    });
+    boundaryConditionsPhi(q, gws, lws, 0, d_phinew);
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class bc_u>(
-        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-        boundaryConditionsU(d_unew, delta, item);
-      });
-    });
+    thermalEquation(q, gws, lws, 0, d_unew, d_uold, d_phinew, d_phiold,
+                    D,dt,dx,dy,dz);
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class swap_phi>(
-        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-        swapGrid(d_phinew, d_phiold, item);
-      });
-    });
+    boundaryConditionsU(q, gws, lws, 0, d_unew, delta);
 
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class swap_u>(
-        sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-        swapGrid(d_unew, d_uold, item);
-      });
-    });
+    swapGrid(q, gws, lws, 0, d_phinew, d_phiold);
+
+    swapGrid(q, gws, lws, 0, d_unew, d_uold);
 
     t++;
   }
