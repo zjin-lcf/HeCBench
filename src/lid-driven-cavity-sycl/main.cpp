@@ -27,19 +27,7 @@
 const Real dx = xLength / NUM;
 const Real dy = yLength / NUM;
 
-/** Max macro (type safe, from GNU) */
-//#define MAX(a,b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
-
-/** Min macro (type safe) */
-//#define MIN(a,b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })
-
-// map two-dimensional indices to one-dimensional indices for device memory
-#define u(I, J) u_d[((I) * ((NUM) + 2)) + (J)]
-#define v(I, J) v_d[((I) * ((NUM) + 2)) + (J)]
-#define F(I, J) F_d[((I) * ((NUM) + 2)) + (J)]
-#define G(I, J) G_d[((I) * ((NUM) + 2)) + (J)]
-#define pres_red(I, J) pres_red_d[((I) * ((NUM_2) + 2)) + (J)]
-#define pres_black(I, J) pres_black_d[((I) * ((NUM_2) + 2)) + (J)]
+#include "kernels.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 void set_BCs_host (Real*, Real*, Real&, Real&);
@@ -101,28 +89,28 @@ int main (int argc, char *argv[])
   // block and grid dimensions
 
   // boundary conditions kernel
-  sycl::range<1> lws_bcs (BLOCK_SIZE);
-  sycl::range<1> gws_bcs (NUM);
+  sycl::range<3> lws_bcs (1, 1, BLOCK_SIZE);
+  sycl::range<3> gws_bcs (1, 1, NUM);
 
   // pressure kernel
-  sycl::range<2> lws_pr (1, BLOCK_SIZE);
-  sycl::range<2> gws_pr (NUM, NUM / 2);
+  sycl::range<3> lws_pr (1, 1, BLOCK_SIZE);
+  sycl::range<3> gws_pr (1, NUM, NUM / 2);
 
   // block and grid dimensions for F
-  sycl::range<2> lws_F (1, BLOCK_SIZE);
-  sycl::range<2> gws_F (NUM, NUM);
+  sycl::range<3> lws_F (1, 1, BLOCK_SIZE);
+  sycl::range<3> gws_F (1, NUM, NUM);
 
   // block and grid dimensions for G
-  sycl::range<2> lws_G (1, BLOCK_SIZE);
-  sycl::range<2> gws_G (NUM, NUM);
+  sycl::range<3> lws_G (1, 1, BLOCK_SIZE);
+  sycl::range<3> gws_G (1, NUM, NUM);
 
   // horizontal pressure boundary conditions
-  sycl::range<1> lws_hpbc (BLOCK_SIZE);
-  sycl::range<1> gws_hpbc (NUM / 2);
+  sycl::range<3> lws_hpbc (1, 1, BLOCK_SIZE);
+  sycl::range<3> gws_hpbc (1, 1, NUM / 2);
 
   // vertical pressure boundary conditions
-  sycl::range<1> lws_vpbc (BLOCK_SIZE);
-  sycl::range<1> gws_vpbc (NUM / 2);
+  sycl::range<3> lws_vpbc (1, 1, BLOCK_SIZE);
+  sycl::range<3> gws_vpbc (1, 1, NUM / 2);
   ///////////////////////////////////////////
 
   // residual variable
@@ -195,31 +183,12 @@ int main (int argc, char *argv[])
     }
 
     // calculate F and G
-    //calculate_F <<<grid_F, block_F>>> (dt, u_d, v_d, F_d);
-    q.submit([&](sycl::handler &h) {
-      h.parallel_for<class calculate_F>(
-        sycl::nd_range<2>(gws_F, lws_F), [=] (sycl::nd_item<2> item) {
-        #include "calculate_F.sycl"
-      });
-    });
+    calculate_F(q, gws_F, lws_F, 0, dt, u_d, v_d, F_d);
 
-    //    calculate_G <<<grid_G, block_G>>> (dt, u_d, v_d, G_d);
-    q.submit([&](sycl::handler &h) {
-      h.parallel_for<class calculate_G>(
-        sycl::nd_range<2>(gws_G, lws_G), [=] (sycl::nd_item<2> item) {
-        #include "calculate_G.sycl"
-      });
-    });
+    calculate_G(q, gws_G, lws_G, 0, dt, u_d, v_d, G_d);
 
     // get L2 norm of initial pressure
-    //sum_pressure <<<grid_pr, block_pr>>> (pres_red_d, pres_black_d, pres_sum_d);
-    q.submit([&](sycl::handler &h) {
-      sycl::local_accessor <Real, 1> sum_cache (sycl::range<1>(BLOCK_SIZE), h);
-      h.parallel_for<class sum_pressure>(
-        sycl::nd_range<2>(gws_pr, lws_pr), [=] (sycl::nd_item<2> item) {
-        #include "sum_pressure.sycl"
-      });
-    });
+    sum_pressure(q, gws_pr, lws_pr, 0, pres_red_d, pres_black_d, pres_sum_d);
 
     q.memcpy (pres_sum, pres_sum_d, size_res * sizeof(Real)).wait();
 
@@ -242,49 +211,18 @@ int main (int argc, char *argv[])
     for (iter = 1; iter <= it_max; ++iter) {
 
       // set pressure boundary conditions
-      //set_horz_pres_BCs <<<grid_hpbc, block_hpbc>>> (pres_red_d, pres_black_d);
-      q.submit([&](sycl::handler &h) {
-        h.parallel_for<class set_horz_pres_BCs>(
-          sycl::nd_range<1>(gws_hpbc, lws_hpbc), [=] (sycl::nd_item<1> item) {
-          #include "set_horz_pres_BCs.sycl"
-        });
-      });
+      set_horz_pres_BCs(q, gws_hpbc, lws_hpbc, 0, pres_red_d, pres_black_d);
 
-      //      set_vert_pres_BCs <<<grid_vpbc, block_hpbc>>> (pres_red_d, pres_black_d);
-      q.submit([&](sycl::handler &h) {
-        h.parallel_for<class set_vert_pres_BCs>(
-          sycl::nd_range<1>(gws_vpbc, lws_vpbc), [=] (sycl::nd_item<1> item) {
-          #include "set_vert_pres_BCs.sycl"
-        });
-      });
+      set_vert_pres_BCs(q, gws_vpbc, lws_hpbc, 0, pres_red_d, pres_black_d);
 
       // update red cells
-      //      red_kernel <<<grid_pr, block_pr>>> (dt, F_d, G_d, pres_black_d, pres_red_d);
-      q.submit([&](sycl::handler &h) {
-        h.parallel_for<class red_kernel>(
-          sycl::nd_range<2>(gws_pr, lws_pr), [=] (sycl::nd_item<2> item) {
-          #include "red_kernel.sycl"
-        });
-      });
+      red_kernel(q, gws_pr, lws_pr, 0, dt, F_d, G_d, pres_black_d, pres_red_d);
 
       // update black cells
-      //      black_kernel <<<grid_pr, block_pr>>> (dt, F_d, G_d, pres_red_d, pres_black_d);
-      q.submit([&](sycl::handler &h) {
-        h.parallel_for<class black_kernel>(
-          sycl::nd_range<2>(gws_pr, lws_pr), [=] (sycl::nd_item<2> item) {
-          #include "black_kernel.sycl"
-        });
-      });
+      black_kernel(q, gws_pr, lws_pr, 0, dt, F_d, G_d, pres_red_d, pres_black_d);
 
       // calculate residual values
-      //calc_residual <<<grid_pr, block_pr>>> (dt, F_d, G_d, pres_red_d, pres_black_d, res_d);
-      q.submit([&](sycl::handler &h) {
-        sycl::local_accessor <Real, 1> sum_cache (sycl::range<1>(BLOCK_SIZE), h);
-        h.parallel_for<class calc_residual>(
-          sycl::nd_range<2>(gws_pr, lws_pr), [=] (sycl::nd_item<2> item) {
-          #include "calc_residual.sycl"
-        });
-      });
+      calc_residual(q, gws_pr, lws_pr, 0, dt, F_d, G_d, pres_red_d, pres_black_d, res_d);
 
       // transfer residual value(s) back to CPU
       q.memcpy (res, res_d, size_res * sizeof(Real)).wait();
@@ -309,25 +247,11 @@ int main (int argc, char *argv[])
 
     // calculate new velocities and transfer maximums back
 
-    //calculate_u <<<grid_pr, block_pr>>> (dt, F_d, pres_red_d, pres_black_d, u_d, max_u_d);
-    q.submit([&](sycl::handler &h) {
-      sycl::local_accessor <Real, 1> max_cache (sycl::range<1>(BLOCK_SIZE), h);
-      h.parallel_for<class calculate_u>(
-        sycl::nd_range<2>(gws_pr, lws_pr), [=] (sycl::nd_item<2> item) {
-        #include "calculate_u.sycl"
-      });
-    });
+    calculate_u(q, gws_pr, lws_pr, 0, dt, F_d, pres_red_d, pres_black_d, u_d, max_u_d);
 
     q.memcpy (max_u_arr, max_u_d, size_max * sizeof(Real));
 
-    //    calculate_v <<<grid_pr, block_pr>>> (dt, G_d, pres_red_d, pres_black_d, v_d, max_v_d);
-    q.submit([&](sycl::handler &h) {
-      sycl::local_accessor <Real, 1> max_cache (sycl::range<1>(BLOCK_SIZE), h);
-      h.parallel_for<class calculate_v>(
-        sycl::nd_range<2>(gws_pr, lws_pr), [=] (sycl::nd_item<2> item) {
-        #include "calculate_v.sycl"
-      });
-    });
+    calculate_v(q, gws_pr, lws_pr, 0, dt, G_d, pres_red_d, pres_black_d, v_d, max_v_d);
 
     q.memcpy (max_v_arr, max_v_d, size_max * sizeof(Real)).wait();
 
@@ -345,13 +269,7 @@ int main (int argc, char *argv[])
     }
 
     // set velocity boundary conditions
-    //set_BCs <<<grid_bcs, block_bcs>>> (u_d, v_d);
-    q.submit([&](sycl::handler &h) {
-      h.parallel_for<class set_BCs>(
-        sycl::nd_range<1>(gws_bcs, lws_bcs), [=] (sycl::nd_item<1> item) {
-        #include "set_BCs.sycl"
-      });
-    });
+    set_BCs(q, gws_bcs, lws_bcs, 0, u_d, v_d);
 
     // increase time
     time += dt;
