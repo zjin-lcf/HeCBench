@@ -37,100 +37,106 @@
 
 
 // Initialize lattice spins
-void init_spins(signed char *lattice,
+void init_spins(sycl::queue &q,
+                sycl::range<3> &gws,
+                sycl::range<3> &lws,
+                const int slm_size,
+                signed char *lattice,
                 const float *randvals,
                 const long long nx,
-                const long long ny,
-                sycl::nd_item<1> &item)
+                const long long ny)
 {
-  const long long tid = item.get_global_id(0);
-  if (tid >= nx * ny) return;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      const long long tid = item.get_global_id(2);
+      if (tid >= nx * ny) return;
 
-  float randval = randvals[tid];
-  signed char val = (randval < 0.5f) ? -1 : 1;
-  lattice[tid] = val;
+      float randval = randvals[tid];
+      signed char val = (randval < 0.5f) ? -1 : 1;
+      lattice[tid] = val;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template<bool is_black>
-void update_lattice(      signed char *lattice,
+void update_lattice(sycl::queue &q,
+                    sycl::range<3> &gws,
+                    sycl::range<3> &lws,
+                    const int slm_size,
+                    signed char *lattice,
                     const signed char *op_lattice,
                     const float *randvals,
                     const float inv_temp,
                     const long long nx,
-                    const long long ny,
-                    sycl::nd_item<1> &item)
+                    const long long ny)
 {
-  const long long tid = item.get_global_id(0);
-  const int i = tid / ny;
-  const int j = tid % ny;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      const long long tid = item.get_global_id(2);
+      const int i = tid / ny;
+      const int j = tid % ny;
 
-  if (i >= nx || j >= ny) return;
+      if (i >= nx || j >= ny) return;
 
-  // Set stencil indices with periodicity
-  int ipp = (i + 1 < nx) ? i + 1 : 0;
-  int inn = (i - 1 >= 0) ? i - 1: nx - 1;
-  int jpp = (j + 1 < ny) ? j + 1 : 0;
-  int jnn = (j - 1 >= 0) ? j - 1: ny - 1;
+      // Set stencil indices with periodicity
+      int ipp = (i + 1 < nx) ? i + 1 : 0;
+      int inn = (i - 1 >= 0) ? i - 1: nx - 1;
+      int jpp = (j + 1 < ny) ? j + 1 : 0;
+      int jnn = (j - 1 >= 0) ? j - 1: ny - 1;
 
-  // Select off-column index based on color and row index parity
-  int joff;
-  if (is_black) {
-    joff = (i % 2) ? jpp : jnn;
-  } else {
-    joff = (i % 2) ? jnn : jpp;
-  }
+      // Select off-column index based on color and row index parity
+      int joff;
+      if (is_black) {
+        joff = (i % 2) ? jpp : jnn;
+      } else {
+        joff = (i % 2) ? jnn : jpp;
+      }
 
-  // Compute sum of nearest neighbor spins
-  signed char nn_sum = op_lattice[inn * ny + j] + op_lattice[i * ny + j] +
-                       op_lattice[ipp * ny + j] + op_lattice[i * ny + joff];
+      // Compute sum of nearest neighbor spins
+      signed char nn_sum = op_lattice[inn * ny + j] + op_lattice[i * ny + j] +
+                           op_lattice[ipp * ny + j] + op_lattice[i * ny + joff];
 
-  // Determine whether to flip spin
-  signed char lij = lattice[i * ny + j];
-  float acceptance_ratio = sycl::exp(-2.0f * inv_temp * nn_sum * lij);
-  if (randvals[i*ny + j] < acceptance_ratio) {
-    lattice[i * ny + j] = -lij;
-  }
+      // Determine whether to flip spin
+      signed char lij = lattice[i * ny + j];
+      float acceptance_ratio = sycl::exp(-2.0f * inv_temp * nn_sum * lij);
+      if (randvals[i*ny + j] < acceptance_ratio) {
+        lattice[i * ny + j] = -lij;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 
 void update(sycl::queue &q,
-            signed char *d_lattice_b, 
-            signed char *d_lattice_w, 
-            float *d_randvals, 
+            signed char *d_lattice_b,
+            signed char *d_lattice_w,
+            float *d_randvals,
 #ifdef MKLRAND
             mkl::rng::philox4x32x10 &rng,
             mkl::rng::uniform<float> &distr,
 #endif
-	    const float inv_temp, const long long nx, const long long ny) {
-
-
-  int blocks = (nx * ny/2 + THREADS - 1) / THREADS * THREADS;
+	    const float inv_temp, const long long nx, const long long ny)
+{
+  sycl::range<3> lws (1, 1, THREADS);
+  sycl::range<3> gws (1, 1, (nx * ny/2 + THREADS - 1) / THREADS * THREADS);
 
   // Update black
 #ifdef MKLRAND
   mkl::rng::generate(distr, rng, nx * ny / 2, d_randvals);
 #endif
-  q.submit([&](sycl::handler &cgh) {
-    cgh.parallel_for<class update_black>(
-      sycl::nd_range<1>(sycl::range<1>(blocks), sycl::range<1>(THREADS)),
-      [=](sycl::nd_item<1> item) {
-      update_lattice<true>(d_lattice_b, d_lattice_w, d_randvals,
-                           inv_temp, nx, ny / 2, item);
-    });
-  });
+  update_lattice<true>(q, gws, lws, 0, d_lattice_b, d_lattice_w, d_randvals,
+                       inv_temp, nx, ny / 2);
 
   // Update white
 #ifdef MKLRAND
   mkl::rng::generate(distr, rng, nx * ny / 2, d_randvals);
 #endif
-  q.submit([&](sycl::handler &cgh) {
-    cgh.parallel_for<class update_white>(
-      sycl::nd_range<1>(sycl::range<1>(blocks), sycl::range<1>(THREADS)),
-      [=](sycl::nd_item<1> item) {
-      update_lattice<false>(d_lattice_w, d_lattice_b, d_randvals,
-                            inv_temp, nx, ny / 2, item);
-    });
-  });
+  update_lattice<false>(q, gws, lws, 0, d_lattice_w, d_lattice_b, d_randvals,
+                        inv_temp, nx, ny / 2);
 }
 
 static void usage(const char *pname) {
@@ -249,39 +255,27 @@ int main(int argc, char **argv) {
   signed char *d_lattice_b = sycl::malloc_device<signed char>(nx * ny / 2, q);
   signed char *d_lattice_w = sycl::malloc_device<signed char>(nx * ny / 2, q);
 
-  int blocks = (nx * ny/2 + THREADS - 1) / THREADS * THREADS ;
-
-  sycl::range<1> gws (blocks);
-  sycl::range<1> lws (THREADS);
+  sycl::range<3> lws (1, 1, THREADS);
+  sycl::range<3> gws (1, 1, (nx * ny/2 + THREADS - 1) / THREADS * THREADS);
 
 #ifdef MKLRAND
   mkl::rng::generate(distr, rng, nx * ny / 2, d_randvals);
 #endif
 
-  q.submit([&](sycl::handler &cgh) {
-    cgh.parallel_for<class init_lattice_black>(
-      sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-      init_spins(d_lattice_b, d_randvals, nx, ny / 2, item);
-    });
-  });
+  init_spins(q, gws, lws, 0, d_lattice_b, d_randvals, nx, ny / 2);
 
 #ifdef MKLRAND
   mkl::rng::generate(distr, rng, nx * ny / 2, d_randvals);
 #endif
-  q.submit([&](sycl::handler &cgh) {
-    cgh.parallel_for<class init_lattice_white>(
-      sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-      init_spins(d_lattice_w, d_randvals, nx, ny / 2, item);
-    });
-  });
+  init_spins(q, gws, lws, 0, d_lattice_w, d_randvals, nx, ny / 2);
 
   // Warmup iterations
   printf("Starting warmup...\n");
   for (int i = 0; i < nwarmup; i++) {
-    update(q, d_lattice_b, d_lattice_w, d_randvals, 
+    update(q, d_lattice_b, d_lattice_w, d_randvals,
 #ifdef MKLRAND
-        rng, 
-        distr, 
+        rng,
+        distr,
 #endif
         inv_temp, nx, ny);
   }
@@ -291,10 +285,10 @@ int main(int argc, char **argv) {
   printf("Starting trial iterations...\n");
   auto t0 = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < niters; i++) {
-    update(q, d_lattice_b, d_lattice_w, d_randvals, 
+    update(q, d_lattice_b, d_lattice_w, d_randvals,
 #ifdef MKLRAND
-        rng, 
-        distr, 
+        rng,
+        distr,
 #endif
         inv_temp, nx, ny);
   }
