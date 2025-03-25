@@ -4,7 +4,7 @@
 ** PURPOSE: This program will explore use of an explicit
 **          finite difference method to solve the heat
 **          equation under a method of manufactured solution (MMS)
-**          scheme. The solution has been set to be a simple 
+**          scheme. The solution has been set to be a simple
 **          function based on exponentials and trig functions.
 **
 **          A finite difference scheme is used on a 1000x1000 cube.
@@ -38,11 +38,86 @@
 #define PI sycl::acos(-1.0) // Pi
 #define LINE "--------------------" // A line for fancy output
 
-void initial_value(sycl::queue &q, const unsigned int n, const double dx, const double length, double *u);
-void zero(sycl::queue &q, const unsigned int n, double *u);
-void solve(sycl::queue &q, const unsigned int n, const double alpha, const double dx, const double dt, double *u, double *u_tmp);
 double solution(const double t, const double x, const double y, const double alpha, const double length);
 double l2norm(const unsigned int n, const double * u, const int nsteps, const double dt, const double alpha, const double dx, const double length);
+
+// Sets the mesh to an initial value, determined by the MMS scheme
+void initial_value(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    const unsigned int n,
+    const double dx,
+    const double length,
+    double * u)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int idx = item.get_global_id(2);
+      if (idx < n * n) {
+        int i = idx % n;
+        int j = idx / n;
+        double y = dx * (j+1); // Physical y position
+        double x = dx * (i+1); // Physical x position
+        u[i+j*n] = sycl::sin(PI * x / length) * sycl::sin(PI * y / length);
+      }
+
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
+// Zero the array u
+void zero(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    const unsigned int n, double * u)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int idx = item.get_global_id(2);
+      if (idx < n*n) u[idx] = 0.0;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
+
+// Compute the next timestep, given the current timestep
+// Loop over the nxn grid
+void solve(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    const unsigned int n,
+    const double alpha, const double dx, const double dt,
+    const double r, const double r2,
+    double * __restrict__ u, double * __restrict__ u_tmp)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int idx = item.get_global_id(2);
+      if (idx < n * n) {
+        int i = idx % n;
+        int j = idx / n;
+        // Boundaries are zero because the MMS solution is zero there.
+        u_tmp[i+j*n] =  r2 * u[i+j*n] +
+        r * ((i < n-1) ? u[i+1+j*n] : 0.0) +
+        r * ((i > 0)   ? u[i-1+j*n] : 0.0) +
+        r * ((j < n-1) ? u[i+(j+1)*n] : 0.0) +
+        r * ((j > 0)   ? u[i+(j-1)*n] : 0.0);
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
 
 // Main function
 int main(int argc, char *argv[]) {
@@ -124,32 +199,13 @@ int main(int argc, char *argv[]) {
   double *u_tmp = sycl::malloc_device<double>(grid_size, q);
 
   const int block_size = 256;
-  const int n_ceil = (grid_size+block_size-1) / block_size * block_size;
+  int n_ceil = (grid_size + block_size - 1) / block_size;
+  sycl::range<3> lws (1, 1, block_size);
+  sycl::range<3> gws (1, 1, n_ceil * block_size);
 
   // Set the initial value of the grid under the MMS scheme
-  q.submit([&](sycl::handler& cgh) {
-    cgh.parallel_for<class initial_value_kernel>(
-      sycl::nd_range<1>(sycl::range<1>(n_ceil), sycl::range<1>(block_size)),
-      [=](sycl::nd_item<1> item) {
-      int idx = item.get_global_id(0);
-      if (idx < grid_size) {
-        int i = idx % n;
-        int j = idx / n;
-        double y = dx * (j+1); // Physical y position
-        double x = dx * (i+1); // Physical x position
-        u[i+j*n] = sycl::sin(PI * x / length) * sycl::sin(PI * y / length);
-      }
-    });
-  });
-
-  q.submit([&](sycl::handler& cgh) {
-    cgh.parallel_for<class zero_kernel>(
-      sycl::nd_range<1>(sycl::range<1>(n_ceil), sycl::range<1>(block_size)),
-      [=](sycl::nd_item<1> item) {
-      int idx = item.get_global_id(0);
-      if (idx < grid_size) u_tmp[idx] = 0.0;
-    });
-  });
+  initial_value(q, gws, lws, 0, n, dx, length, u);
+  zero(q, gws, lws, 0, n, u_tmp);
 
   // Ensure everything is initalised on the device
   q.wait();
@@ -168,26 +224,7 @@ int main(int argc, char *argv[]) {
     // Call the solve kernel
     // Computes u_tmp at the next timestep
     // given the value of u at the current timestep
-    q.submit([&](sycl::handler& cgh) {
-      // Loop over the nxn grid
-      cgh.parallel_for<class solve_kernel>(
-        sycl::nd_range<1>(sycl::range<1>(n_ceil), sycl::range<1>(block_size)),
-        [=](sycl::nd_item<1> item) {
-        int idx = item.get_global_id(0);
-        if (idx < grid_size) {
-          int i = idx % n;
-          int j = idx / n;
-
-          // Update the 5-point stencil, using boundary conditions on the edges of the domain.
-          // Boundaries are zero because the MMS solution is zero there.
-          u_tmp[i+j*n] = r2 * u[i+j*n] +
-          r * ((i < n-1) ? u[i+1+j*n] : 0.0) +
-          r * ((i > 0)   ? u[i-1+j*n] : 0.0) +
-          r * ((j < n-1) ? u[i+(j+1)*n] : 0.0) +
-          r * ((j > 0)   ? u[i+(j-1)*n] : 0.0);
-        }
-      });
-    });
+    solve(q, gws, lws, 0, n, alpha, dx, dt, r, r2, u, u_tmp);
 
     // Pointer swap
     auto tmp = u;
