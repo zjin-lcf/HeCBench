@@ -42,10 +42,10 @@ void TaskQueue_gpu(const task_t *__restrict queue,
                    const int offset,
                    const int gpuQueueSize,
                    sycl::nd_item<1> &item,
-                   uint8_t *sm)
+                   int *l_mem)
 {
-  int* next = (int*) sm;
-  task_t* t = (task_t*)&next[1];
+  int& next = l_mem[0];
+  task_t* t = (task_t*)&l_mem[1];
 
   const int tid = item.get_local_id(0);
   const int tile_size = item.get_local_range(0);
@@ -56,12 +56,12 @@ void TaskQueue_gpu(const task_t *__restrict queue,
               sycl::memory_order::relaxed,
               sycl::memory_scope::device,
               sycl::access::address_space::global_space> (*consumed);
-    *next = ao.fetch_add(1);
-    t->id = queue[*next].id;
-    t->op = queue[*next].op;
+    next = ao.fetch_add(1);
+    t->id = queue[next].id;
+    t->op = queue[next].op;
   }
   item.barrier(sycl::access::fence_space::local_space);
-  while(*next < gpuQueueSize) {
+  while(next < gpuQueueSize) {
     // Compute task
     if(t->op == SIGNAL_WORK_KERNEL) {
       for(int i = 0; i < iterations; i++) {
@@ -82,10 +82,10 @@ void TaskQueue_gpu(const task_t *__restrict queue,
                 sycl::memory_order::relaxed,
                 sycl::memory_scope::device,
                 sycl::access::address_space::global_space> (*consumed);
-      *next = ao.fetch_add(1);
+      next = ao.fetch_add(1);
       // Fetch task
-      t->id = queue[*next].id;
-      t->op = queue[*next].op;
+      t->id = queue[next].id;
+      t->op = queue[next].op;
     }
     item.barrier(sycl::access::fence_space::local_space);
   }
@@ -106,10 +106,10 @@ void call_TaskQueue_gpu(sycl::queue &q,
   sycl::range<1> lws (threads);
 
   q.submit([&](sycl::handler &cgh) {
-    sycl::local_accessor<uint8_t, 1> sm (sycl::range<1>(l_mem_size), cgh);
+    sycl::local_accessor<int, 1> l_mem (sycl::range<1>(l_mem_size/sizeof(int)), cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       TaskQueue_gpu(queue, data, consumed, iterations, offset,
-                    gpuQueueSize, item, sm.get_pointer());
+                    gpuQueueSize, item, l_mem.get_pointer());
     });
   });
 }
