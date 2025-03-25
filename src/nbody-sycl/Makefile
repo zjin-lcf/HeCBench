@@ -71,7 +71,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp GSimulation.hpp Particle.hpp type.hpp
+%.o: %.cpp GSimulation.hpp GSimulationKernels.hpp Particle.hpp type.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
