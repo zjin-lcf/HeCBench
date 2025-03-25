@@ -66,6 +66,80 @@ void print_vector(T* vector, size_t n) {
   std::cout << std::endl;
 }
 
+void Simulation(sycl::queue &q,
+                sycl::range<3> &gws,
+                sycl::range<3> &lws,
+                const int slm_size,
+                float*__restrict__ a_particleX,
+                float*__restrict__ a_particleY,
+		const float*__restrict__ a_randomX,
+                const float*__restrict__ a_randomY,
+		size_t *__restrict__ a_map,
+                const size_t n_particles,
+                unsigned int nIterations,
+                int grid_size,
+                float radius)
+{
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      size_t ii = item.get_global_id(2);
+      if (ii >= n_particles) return;
+      // Start iterations
+      // Each iteration:
+      //  1. Updates the position of all water molecules
+      //  2. Checks if water molecule is inside a cell or not.
+      //  3. Updates counter in cells array
+      size_t iter = 0;
+      float pX = a_particleX[ii];
+      float pY = a_particleY[ii];
+      size_t map_base = ii * grid_size * grid_size;
+      while (iter < nIterations) {
+        // Computes random displacement for each molecule
+        // This example shows random distances between
+        // -0.05 units and 0.05 units in both X and Y directions
+        // Moves each water molecule by a random vector
+
+        float randnumX = a_randomX[iter * n_particles + ii];
+        float randnumY = a_randomY[iter * n_particles + ii];
+
+        // Transform the scaled random numbers into small displacements
+        float displacementX = randnumX / 1000.0f - 0.0495f;
+        float displacementY = randnumY / 1000.0f - 0.0495f;
+
+        // Move particles using random displacements
+        pX += displacementX;
+        pY += displacementY;
+
+        // Compute distances from particle position to grid point
+        float dX = pX - sycl::trunc(pX);
+        float dY = pY - sycl::trunc(pY);
+
+        // Compute grid point indices
+        int iX = sycl::floor(pX);
+        int iY = sycl::floor(pY);
+
+        // Check if particle is still in computation grid
+        if ((pX < grid_size) && (pY < grid_size) && (pX >= 0) && (pY >= 0)) {
+          // Check if particle is (or remained) inside cell.
+          // Increment cell counter in map array if so
+          if ((dX * dX + dY * dY <= radius * radius))
+            // The map array is organized as (particle, y, x)
+            a_map[map_base + iY * grid_size + iX]++;
+        }
+
+        iter++;
+
+      }  // Next iteration
+
+      a_particleX[ii] = pX;
+      a_particleY[ii] = pY;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
+}
+
+
 // This function distributes simulation work across workers
 void motion_device(float* particleX, float* particleY,
                    float* randomX, float* randomY, int** grid, size_t grid_size,
@@ -113,8 +187,8 @@ void motion_device(float* particleX, float* particleY,
   float *d_particleY = sycl::malloc_device<float>(n_particles, q);
   size_t *d_map = sycl::malloc_device<size_t>(map_size, q);
 
-  sycl::range<1> gws ((n_particles + 255) / 256 * 256);
-  sycl::range<1> lws (256);
+  sycl::range<3> gws (1, 1, (n_particles + 255) / 256 * 256);
+  sycl::range<3> lws (1, 1, 256);
 
   double time_total = 0.0;
 
@@ -127,64 +201,19 @@ void motion_device(float* particleX, float* particleY,
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&](sycl::handler& cgh) {
-      cgh.parallel_for<class motionsim>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        size_t ii = item.get_global_id(0);
-        if (ii >= n_particles) return;
+    Simulation(
+      q, gws, lws, 0,
+      d_particleX,
+      d_particleY,
+      d_randomX,
+      d_randomY,
+      d_map,
+      n_particles,
+      nIterations,
+      grid_size,
+      radius);
 
-        // Start iterations
-        // Each iteration:
-        //  1. Updates the position of all water molecules
-        //  2. Checks if water molecule is inside a cell or not.
-        //  3. Updates counter in cells array
-        float pX = d_particleX[ii];
-        float pY = d_particleY[ii];
-        size_t map_base = ii * grid_size * grid_size;
-        size_t iter = 0;
-        while (iter < nIterations) {
-          // Computes random displacement for each molecule
-          // This example shows random distances between
-          // -0.05 units and 0.05 units in both X and Y directions
-          // Moves each water molecule by a random vector
-
-          float randnumX = d_randomX[iter * n_particles + ii];
-          float randnumY = d_randomY[iter * n_particles + ii];
-
-          // Transform the scaled random numbers into small displacements
-          float displacementX = (float)randnumX / 1000.0f - 0.0495f;
-          float displacementY = (float)randnumY / 1000.0f - 0.0495f;
-
-          // Move particles using random displacements
-          pX += displacementX;
-          pY += displacementY;
-
-          // Compute distances from particle position to grid point
-          float dX = pX - sycl::trunc(pX);
-          float dY = pY - sycl::trunc(pY);
-
-          // Compute grid point indices
-          int iX = sycl::floor(pX);
-          int iY = sycl::floor(pY);
-
-          // Check if particle is still in computation grid
-          if ((pX < grid_size) & (pY < grid_size) & (pX >= 0) & (pY >= 0)) {
-            // Check if particle is (or remained) inside cell.
-            // Increment cell counter in map array if so
-            if (dX * dX + dY * dY <= radius * radius)
-              // The map array is organized as (particle, y, x)
-              d_map[map_base + iY * grid_size + iX]++;
-          }
-
-          iter++;
-        }  // Next iteration
-
-        d_particleX[ii] = pX;
-        d_particleY[ii] = pY;
-
-      });
-    }).wait();
-
+    q.wait();
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     time_total += time;
