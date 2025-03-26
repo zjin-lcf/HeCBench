@@ -65,7 +65,7 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
 
   srand(123);
 
-  for (size_t i = 0; i < W_size; i++) W[i] = rand() % 31; 
+  for (size_t i = 0; i < W_size; i++) W[i] = rand() % 31;
   for (size_t i = 0; i < X_size; i++) X[i] = rand() % 13;
 
   for (size_t i = 0; i < Y_size; i++) {
@@ -106,13 +106,9 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
   bool ok = true;
   for (size_t i = 0; i < Y_size; i++) {
     if (fabs(Y[i] - Y_ref[i]) > 1e-3f) {
-      printf("%f (device) != %f ", Y[i], Y_ref[i]); 
-      printf("at n=%zu m=%zu h=%zu w=%zu\n",
-      i / (M * Hout * Wout), 
-      i % (M * Hout * Wout) / (Hout * Wout), 
-      i % (M * Hout * Wout) % (Hout * Wout) / Wout, 
-      i % (M * Hout * Wout) % (Hout * Wout) % Wout);
-      ok = false; break;
+      printf("%f (device) != %f (reference)\n", Y[i], Y_ref[i]);
+      ok = false;
+      break;
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");

@@ -7,7 +7,7 @@ CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
 ARCH      = sm_60
-CUDNN_V8  = yes
+CUDNN_V8  = no
 LAUNCHER  =
 
 #===============================================================================

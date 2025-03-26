@@ -6,7 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
-ONEDNN    = yes
+ONEDNN    = no
 LAUNCHER  =
 
 GPU       = yes

@@ -24,6 +24,20 @@
   using dt = memory::data_type;
 #endif
 
+template <typename T>
+void verify (const T* Y, T* Y_ref, size_t Y_size)
+{
+  bool ok = true;
+  for (size_t i = 0; i < Y_size; i++) {
+    if (fabs(Y[i] - Y_ref[i]) > 1e-3f) {
+      printf("%f (device) != %f (reference)\n", Y[i], Y_ref[i]);
+      ok = false;
+      break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+}
+
 template<typename T>
 void conv3d_s1(const T * __restrict__ X,
                const T * __restrict__ W,
@@ -175,6 +189,8 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
     Y_ref[i] = -1;
   }
 
+  reference(X, W, Y_ref, N, M, C, K, Hin, Win, Hout, Wout);
+
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
@@ -221,6 +237,8 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time of conv3d_s1 kernel: %f (us)\n",
          (time * 1e-3f) / repeat);
+  q.memcpy(Y, dY, Y_bytes).wait();
+  verify(Y, Y_ref, Y_size);
 
   start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
@@ -237,6 +255,8 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time of conv3d_s2 kernel: %f (us)\n",
          (time * 1e-3f) / repeat);
+  q.memcpy(Y, dY, Y_bytes).wait();
+  verify(Y, Y_ref, Y_size);
 
   start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
@@ -253,27 +273,14 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time of conv3d_s3 kernel: %f (us)\n",
          (time * 1e-3f) / repeat);
+  q.memcpy(Y, dY, Y_bytes).wait();
+  verify(Y, Y_ref, Y_size);
 
 #ifdef ONEDNN_CONV
   #include "conv3d_s4.cpp"
-#else
   q.memcpy(Y, dY, Y_bytes).wait();
+  verify(Y, Y_ref, Y_size);
 #endif
-  reference(X, W, Y_ref, N, M, C, K, Hin, Win, Hout, Wout);
-
-  bool ok = true;
-  for (size_t i = 0; i < Y_size; i++) {
-    if (fabs(Y[i] - Y_ref[i]) > 1e-3f) {
-      printf("%f (device) != %f ", Y[i], Y_ref[i]); 
-      printf("at n=%zu m=%zu h=%zu w=%zu\n",
-      i / (M * Hout * Wout), 
-      i % (M * Hout * Wout) / (Hout * Wout), 
-      i % (M * Hout * Wout) % (Hout * Wout) / Wout, 
-      i % (M * Hout * Wout) % (Hout * Wout) % Wout);
-      ok = false; break;
-    }
-  }
-  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(X);
   free(W);
