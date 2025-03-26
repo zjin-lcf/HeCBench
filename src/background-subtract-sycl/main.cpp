@@ -8,7 +8,10 @@
 #define BLOCK_SIZE 256
 
 void findMovingPixels(
-  sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Img1,
@@ -16,50 +19,77 @@ void findMovingPixels(
   const unsigned char *__restrict Tn,
         unsigned char *__restrict Mp) // moving pixel map
 {
-  size_t i = item.get_global_id(0);
-  if (i >= imgSize) return;
-  if ( sycl::abs(Img[i] - Img1[i]) > Tn[i] || sycl::abs(Img[i] - Img2[i]) > Tn[i] )
-    Mp[i] = 255;
-  else {
-    Mp[i] = 0;
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      size_t i = item.get_global_id(2);
+      if (i >= imgSize) return;
+      if ( sycl::abs(Img[i] - Img1[i]) > Tn[i] || sycl::abs(Img[i] - Img2[i]) > Tn[i] )
+        Mp[i] = 255;
+      else {
+        Mp[i] = 0;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
-// alpha = 0.92 
+// alpha = 0.92
 void updateBackground(
-  sycl::nd_item<1> &item,
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
+  const int slm_size,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Mp,
         unsigned char *__restrict Bn)
 {
-  size_t i = item.get_global_id(0);
-  if (i >= imgSize) return;
-  if ( Mp[i] == 0 ) Bn[i] = 0.92f * Bn[i] + 0.08f * Img[i];
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      size_t i = item.get_global_id(2);
+      if (i >= imgSize) return;
+      if ( Mp[i] == 0 ) Bn[i] = 0.92f * Bn[i] + 0.08f * Img[i];
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 // alpha = 0.92, c = 3
 void updateThreshold(
-  sycl::nd_item<1> &item,
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
+  const int slm_size,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Mp,
   const unsigned char *__restrict Bn,
         unsigned char *__restrict Tn)
 {
-  size_t i = item.get_global_id(0);
-  if (i >= imgSize) return;
-  if (Mp[i] == 0) {
-    float th = 0.92f * Tn[i] + 0.24f * (Img[i] - Bn[i]);
-    Tn[i] = sycl::fmax(th, 20.f);
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      size_t i = item.get_global_id(2);
+      if (i >= imgSize) return;
+      if (Mp[i] == 0) {
+        float th = 0.92f * Tn[i] + 0.24f * (Img[i] - Bn[i]);
+        Tn[i] = sycl::fmax(th, 20.f);
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 //
 // merge three kernels into a single kernel
 //
 void merge(
-  sycl::nd_item<1> &item,
+  sycl::queue &q,
+  sycl::range<3> &gws,
+  sycl::range<3> &lws,
+  const int slm_size,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Img1,
@@ -67,16 +97,22 @@ void merge(
         unsigned char *__restrict Tn,
         unsigned char *__restrict Bn)
 {
-  size_t i = item.get_global_id(0);
-  if (i >= imgSize) return;
-  if ( sycl::abs(Img[i] - Img1[i]) <= Tn[i] && sycl::abs(Img[i] - Img2[i]) <= Tn[i] ) {
-    // update background
-    Bn[i] = 0.92f * Bn[i] + 0.08f * Img[i];
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      size_t i = item.get_global_id(2);
+      if (i >= imgSize) return;
+      if ( sycl::abs(Img[i] - Img1[i]) <= Tn[i] && sycl::abs(Img[i] - Img2[i]) <= Tn[i] ) {
+        // update background
+        Bn[i] = 0.92f * Bn[i] + 0.08f * Img[i];
 
-    // update threshold
-    float th = 0.92f * Tn[i] + 0.24f * (Img[i] - Bn[i]);
-    Tn[i] = sycl::fmax(th, 20.f);
-  }
+        // update threshold
+        float th = 0.92f * Tn[i] + 0.24f * (Img[i] - Bn[i]);
+        Tn[i] = sycl::fmax(th, 20.f);
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 int main(int argc, char* argv[]) {
@@ -122,8 +158,8 @@ int main(int argc, char* argv[]) {
   q.memcpy(d_Bn, Bn, imgSize_bytes);
   q.memcpy(d_Tn, Tn, imgSize_bytes);
 
-  sycl::range<1> gws ((imgSize + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
-  sycl::range<1> lws (BLOCK_SIZE);
+  sycl::range<3> gws (1, 1, (imgSize + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE);
+  sycl::range<3> lws (1, 1, BLOCK_SIZE);
 
   long time = 0;
 
@@ -146,35 +182,15 @@ int main(int argc, char* argv[]) {
     if (i >= 2) {
       if (merged) {
         auto start = std::chrono::steady_clock::now();
-        q.submit([&] (sycl::handler &cgh) {
-          cgh.parallel_for<class merged_kernel>(
-            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-            merge ( item, imgSize, d_Img, d_Img1, d_Img2, d_Tn, d_Bn );
-          });
-        }).wait();
+        merge ( q, gws, lws, 0, imgSize, d_Img, d_Img1, d_Img2, d_Tn, d_Bn );
         auto end = std::chrono::steady_clock::now();
         time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       }
       else {
         auto start = std::chrono::steady_clock::now();
-        q.submit([&] (sycl::handler &cgh) {
-          cgh.parallel_for<class k1>(
-            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-            findMovingPixels ( item, imgSize, d_Img, d_Img1, d_Img2, d_Tn, d_Mp );
-          });
-        });
-        q.submit([&] (sycl::handler &cgh) {
-          cgh.parallel_for<class k2>(
-            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-            updateBackground  ( item, imgSize, d_Img, d_Mp, d_Bn );
-          });
-        });
-        q.submit([&] (sycl::handler &cgh) {
-          cgh.parallel_for<class k3>(
-            sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-            updateThreshold  ( item, imgSize, d_Img, d_Mp, d_Bn, d_Tn );
-          });
-        });
+        findMovingPixels ( q, gws, lws, 0, imgSize, d_Img, d_Img1, d_Img2, d_Tn, d_Mp );
+        updateBackground  ( q, gws, lws, 0, imgSize, d_Img, d_Mp, d_Bn );
+        updateThreshold  ( q, gws, lws, 0, imgSize, d_Img, d_Mp, d_Bn, d_Tn );
         q.wait();
         auto end = std::chrono::steady_clock::now();
         time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -204,7 +220,7 @@ int main(int argc, char* argv[]) {
   sum = sum / imgSize;
   printf("Average threshold change is %d\n", sum);
   printf("Bin counts are %d %d %d %d\n", bin[0], bin[1], bin[2], bin[3]);
-     
+
   free(Img);
   free(Tn);
   free(Bn);
