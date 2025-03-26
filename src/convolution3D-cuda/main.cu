@@ -30,6 +30,20 @@
   }
 #endif
 
+template <typename T>
+void verify (const T* Y, T* Y_ref, size_t Y_size)
+{
+  bool ok = true;
+  for (size_t i = 0; i < Y_size; i++) {
+    if (fabs(Y[i] - Y_ref[i]) > 1e-3f) {
+      printf("%f (device) != %f (reference)\n", Y[i], Y_ref[i]);
+      ok = false;
+      break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+}
+
 template<typename T>
 __global__
 void conv3d_s1(const T * __restrict__ X,
@@ -171,13 +185,15 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
 
   srand(123);
 
-  for (size_t i = 0; i < W_size; i++) W[i] = rand() % 31; 
+  for (size_t i = 0; i < W_size; i++) W[i] = rand() % 31;
   for (size_t i = 0; i < X_size; i++) X[i] = rand() % 13;
 
   for (size_t i = 0; i < Y_size; i++) {
     Y[i] = -1;
     Y_ref[i] = -1;
   }
+
+  reference(X, W, Y_ref, N, M, C, K, Hin, Win, Hout, Wout);
 
   T *dX, *dW, *dY;
   cudaMalloc((void **)&dX, X_bytes);
@@ -201,62 +217,53 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
   dim3 grids_s2 (M, Z, N);
   dim3 grids_s3 (Z, N, M);
   dim3 blocks (TILE_WIDTH, TILE_WIDTH, 1);
-  
+
   cudaDeviceSynchronize();
 
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
     conv3d_s1 <<< grids_s1, blocks >>> (dX, dW, dY, C, M, K, Hin, Win, Hout, Wout, W_grid);
   }
-  
+
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time of conv3d_s1 kernel: %f (us)\n",
          (time * 1e-3f) / repeat);
+  cudaMemcpy(Y, dY, Y_bytes, cudaMemcpyDeviceToHost);
+  verify(Y, Y_ref, Y_size);
 
   start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
     conv3d_s2 <<< grids_s2, blocks >>> (dX, dW, dY, C, M, K, Hin, Win, Hout, Wout, W_grid);
   }
-  
+
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time of conv3d_s2 kernel: %f (us)\n",
          (time * 1e-3f) / repeat);
+  cudaMemcpy(Y, dY, Y_bytes, cudaMemcpyDeviceToHost);
+  verify(Y, Y_ref, Y_size);
 
   start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
     conv3d_s3 <<< grids_s3, blocks >>> (dX, dW, dY, C, M, K, Hin, Win, Hout, Wout, W_grid);
   }
-  
+
   cudaDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time of conv3d_s3 kernel: %f (us)\n",
          (time * 1e-3f) / repeat);
+  cudaMemcpy(Y, dY, Y_bytes, cudaMemcpyDeviceToHost);
+  verify(Y, Y_ref, Y_size);
 
 #ifdef CUDNN_CONV
   #include "conv3d_s4.cu"
-#endif
-
   cudaMemcpy(Y, dY, Y_bytes, cudaMemcpyDeviceToHost);
-  reference(X, W, Y_ref, N, M, C, K, Hin, Win, Hout, Wout);
-
-  bool ok = true;
-  for (size_t i = 0; i < Y_size; i++) {
-    if (fabs(Y[i] - Y_ref[i]) > 1e-3f) {
-      printf("%f (device) != %f ", Y[i], Y_ref[i]);
-      printf("at n=%zu m=%zu h=%zu w=%zu\n",
-      i / (M * Hout * Wout),
-      i % (M * Hout * Wout) / (Hout * Wout),
-      i % (M * Hout * Wout) % (Hout * Wout) / Wout,
-      i % (M * Hout * Wout) % (Hout * Wout) % Wout);
-      ok = false; break;
-    }
-  }
-  printf("%s\n", ok ? "PASS" : "FAIL");
+  verify(Y, Y_ref, Y_size);
+#endif
 
   free(X);
   free(W);

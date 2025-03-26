@@ -6,7 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-HIPDNN    = yes
+HIPDNN    = no
 LAUNCHER  =
 
 #===============================================================================
