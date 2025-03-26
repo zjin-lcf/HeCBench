@@ -4,38 +4,51 @@
 #include <string.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
+#include "atomics.h"
 
 #define BLOCK_SIZE 256
 
 // measure cost of additions without atomics
 template <typename T>
-void woAtomicOnGlobalMem(T* result, int size, sycl::nd_item<1> &item)
+void woAtomicOnGlobalMem(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    T* result, int size)
 {
-  unsigned int tid = item.get_global_id(0);
-  for ( unsigned int i = tid * size; i < (tid + 1) * size; i++){
-    result[tid] += i % 2;
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      unsigned int tid = item.get_global_id(2);
+      for ( unsigned int i = tid * size; i < (tid + 1) * size; i++){
+        result[tid] += i % 2;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 // measure cost of additions with atomics
 template <typename T>
-void wiAtomicOnGlobalMem(T* result, int size, sycl::nd_item<1> &item)
+void wiAtomicOnGlobalMem(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    T* result, int size)
 {
-  unsigned int tid = item.get_global_id(0);
-  auto ao = sycl::atomic_ref<T,
-            sycl::memory_order::relaxed,
-            sycl::memory_scope::device,
-            sycl::access::address_space::global_space> (result[tid]);
-  for ( unsigned int i = tid * size; i < (tid + 1) * size; i++){
-    ao.fetch_add(i % 2);
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      unsigned int tid = item.get_global_id(2);
+      for ( unsigned int i = tid * size; i < (tid + 1) * size; i++){
+        atomicAdd(result[tid], i % 2);
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
-
-template <typename T>
-class noAtomicKernel;
-
-template <typename T>
-class atomicKernel;
 
 template <typename T>
 void atomicCost (int length, int size, int repeat)
@@ -64,19 +77,14 @@ void atomicCost (int length, int size, int repeat)
   T* d_result_wo = (T *)sycl::malloc_device(result_size, q);
   q.memset(d_result_wo, 0, result_size);
 
-  sycl::range<1> lws (BLOCK_SIZE);
-  sycl::range<1> gws (num_threads);
+  sycl::range<3> lws (1, 1, BLOCK_SIZE);
+  sycl::range<3> gws (1, 1, num_threads);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
   for(int i=0; i<repeat; i++)
   {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class noAtomicKernel<T>>(
-        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        wiAtomicOnGlobalMem<T>(d_result_wi, size, item);
-      });
-    });
+    wiAtomicOnGlobalMem<T>(q, gws, lws, 0, d_result_wi, size);
   }
   q.wait();
   auto end = std::chrono::steady_clock::now();
@@ -88,12 +96,7 @@ void atomicCost (int length, int size, int repeat)
   start = std::chrono::steady_clock::now();
   for(int i=0; i<repeat; i++)
   {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class atomicKernel<T>>(
-        sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        woAtomicOnGlobalMem<T>(d_result_wo, size, item);
-      });
-    });
+    woAtomicOnGlobalMem<T>(q, gws, lws, 0, d_result_wo, size);
   }
   q.wait();
   end = std::chrono::steady_clock::now();
