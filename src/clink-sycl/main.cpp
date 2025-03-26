@@ -15,11 +15,6 @@
 #define WGS 256
 #define SAMPLE_TEST_LEN 20000
 
-float sigmoidf(float x)
-{
-  return 1.f / (1.f + sycl::exp(-x));
-}
-
 #ifdef DEBUG
 void dump (const char* work_path, const char* result_filename, const float* result) 
 {
@@ -157,7 +152,7 @@ long lstm_n5( sycl::queue &q,
           for (i = 0; i < 5; ++i)
             i_state[j] += h_state[i] * ldg(&d_intW[j*5+i]);
           i_state[j] += ldg(&d_intB[j]);
-          i_state[j] = sigmoidf(i_state[j]);
+          i_state[j] = 1.f / (1.f + sycl::exp(-i_state[j]));
         }
         
         for (j = 0; j < 5; ++j) {
@@ -165,7 +160,7 @@ long lstm_n5( sycl::queue &q,
           for (i = 0; i < 5; ++i)
             f_state[j] += h_state[i] * ldg(&d_intW[25+j*5+i]);
           f_state[j] += ldg(&d_intB[5+j]);
-          f_state[j] = sigmoidf(f_state[j]);
+          f_state[j] = 1.f / (1.f + sycl::exp(-f_state[j]));
         }
 
         for (j = 0; j < 5; ++j) {
@@ -173,7 +168,7 @@ long lstm_n5( sycl::queue &q,
           for (i = 0; i < 5; ++i)
             o_state[j] += h_state[i] * ldg(&d_intW[50+j*5+i]);
           o_state[j] += ldg(&d_intB[10+j]);
-          o_state[j] = sigmoidf(o_state[j]);
+          o_state[j] = 1.f / (1.f + sycl::exp(-o_state[j]));
         }
 
         for (j = 0; j < 5; ++j) {
