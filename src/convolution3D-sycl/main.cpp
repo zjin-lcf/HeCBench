@@ -39,7 +39,11 @@ void verify (const T* Y, T* Y_ref, size_t Y_size)
 }
 
 template<typename T>
-void conv3d_s1(const T * __restrict__ X,
+void conv3d_s1(sycl::queue &q,
+               sycl::range<3> &gws,
+               sycl::range<3> &lws,
+               const int slm_size,
+               const T * __restrict__ X,
                const T * __restrict__ W,
                      T * __restrict__ Y,
                const int C,
@@ -49,30 +53,37 @@ void conv3d_s1(const T * __restrict__ X,
                const int Win,
                const int Hout,
                const int Wout,
-               const int W_grid,
-               const sycl::nd_item<3> &item)
+               const int W_grid)
 {
-  int n = item.get_group(2);
-  int m = item.get_group(1);
-  int h =
-      item.get_group(0) / W_grid * TILE_WIDTH + item.get_local_id(1);
-  int w =
-      item.get_group(0) % W_grid * TILE_WIDTH + item.get_local_id(2);
-  if (h < Hout && w < Wout) {
-    T s = 0;
-    for (int c = 0; c < C; c++) {
-      for (int p = 0; p < K; p++) {
-        for (int q = 0; q < K; q++) {
-          s += X[II(n, c, h+p, w+q)] * W[WI(m, c, p, q)];
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int n = item.get_group(2);
+      int m = item.get_group(1);
+      int h = item.get_group(0) / W_grid * TILE_WIDTH + item.get_local_id(1);
+      int w = item.get_group(0) % W_grid * TILE_WIDTH + item.get_local_id(2);
+      if (h < Hout && w < Wout) {
+        T s = 0;
+        for (int c = 0; c < C; c++) {
+          for (int p = 0; p < K; p++) {
+            for (int q = 0; q < K; q++) {
+              s += X[II(n, c, h+p, w+q)] * W[WI(m, c, p, q)];
+            }
+          }
         }
+        Y[OI(n, m, h, w)] = s;
       }
-    }
-    Y[OI(n, m, h, w)] = s;
-  }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template<typename T>
-void conv3d_s2(const T * __restrict__ X,
+void conv3d_s2(sycl::queue &q,
+               sycl::range<3> &gws,
+               sycl::range<3> &lws,
+               const int slm_size,
+               const T * __restrict__ X,
                const T * __restrict__ W,
                      T * __restrict__ Y,
                const int C,
@@ -82,28 +93,37 @@ void conv3d_s2(const T * __restrict__ X,
                const int Win,
                const int Hout,
                const int Wout,
-               const int W_grid,
-               const sycl::nd_item<3> &item)
+               const int W_grid)
 {
-  int m = item.get_group(2);
-  int h = item.get_group(1) / W_grid * TILE_WIDTH + item.get_local_id(1);
-  int w = item.get_group(1) % W_grid * TILE_WIDTH + item.get_local_id(2);
-  int n = item.get_group(0);
-  if (h < Hout && w < Wout) {
-    T s = 0;
-    for (int c = 0; c < C; c++) {
-      for (int p = 0; p < K; p++) {
-        for (int q = 0; q < K; q++) {
-          s += X[II(n, c, h+p, w+q)] * W[WI(m, c, p, q)];
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int m = item.get_group(2);
+      int h = item.get_group(1) / W_grid * TILE_WIDTH + item.get_local_id(1);
+      int w = item.get_group(1) % W_grid * TILE_WIDTH + item.get_local_id(2);
+      int n = item.get_group(0);
+      if (h < Hout && w < Wout) {
+        T s = 0;
+        for (int c = 0; c < C; c++) {
+          for (int p = 0; p < K; p++) {
+            for (int q = 0; q < K; q++) {
+              s += X[II(n, c, h+p, w+q)] * W[WI(m, c, p, q)];
+            }
+          }
         }
+        Y[OI(n, m, h, w)] = s;
       }
-    }
-    Y[OI(n, m, h, w)] = s;
-  }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template<typename T>
-void conv3d_s3(const T * __restrict__ X,
+void conv3d_s3(sycl::queue &q,
+               sycl::range<3> &gws,
+               sycl::range<3> &lws,
+               const int slm_size,
+               const T * __restrict__ X,
                const T * __restrict__ W,
                      T * __restrict__ Y,
                const int C,
@@ -113,24 +133,29 @@ void conv3d_s3(const T * __restrict__ X,
                const int Win,
                const int Hout,
                const int Wout,
-               const int W_grid,
-               const sycl::nd_item<3> &item)
+               const int W_grid)
 {
-  int h = item.get_group(2) / W_grid * TILE_WIDTH + item.get_local_id(1);
-  int w = item.get_group(2) % W_grid * TILE_WIDTH + item.get_local_id(2);
-  int n = item.get_group(1);
-  int m = item.get_group(0);
-  if (h < Hout && w < Wout) {
-    T s = 0;
-    for (int c = 0; c < C; c++) {
-      for (int p = 0; p < K; p++) {
-        for (int q = 0; q < K; q++) {
-          s += X[II(n, c, h+p, w+q)] * W[WI(m, c, p, q)];
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int h = item.get_group(2) / W_grid * TILE_WIDTH + item.get_local_id(1);
+      int w = item.get_group(2) % W_grid * TILE_WIDTH + item.get_local_id(2);
+      int n = item.get_group(1);
+      int m = item.get_group(0);
+      if (h < Hout && w < Wout) {
+        T s = 0;
+        for (int c = 0; c < C; c++) {
+          for (int p = 0; p < K; p++) {
+            for (int q = 0; q < K; q++) {
+              s += X[II(n, c, h+p, w+q)] * W[WI(m, c, p, q)];
+            }
+          }
         }
+        Y[OI(n, m, h, w)] = s;
       }
-    }
-    Y[OI(n, m, h, w)] = s;
-  }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 
@@ -218,18 +243,17 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
   sycl::range<3> grids_s1(Z, M, N);
   sycl::range<3> grids_s2(N, Z, M);
   sycl::range<3> grids_s3(M, N, Z);
-  sycl::range<3> blocks(1, TILE_WIDTH, TILE_WIDTH);
+  sycl::range<3> lws (1, TILE_WIDTH, TILE_WIDTH);
+
+  sycl::range<3> gws1 (grids_s1 * lws);
+  sycl::range<3> gws2 (grids_s2 * lws);
+  sycl::range<3> gws3 (grids_s3 * lws);
 
   q.wait();
 
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<3>(grids_s1 * blocks, blocks),
-                       [=](sycl::nd_item<3> item) {
-        conv3d_s1(dX, dW, dY, C, M, K, Hin, Win, Hout, Wout, W_grid, item);
-      });
-    });
+    conv3d_s1(q, gws1, lws, 0, dX, dW, dY, C, M, K, Hin, Win, Hout, Wout, W_grid);
   }
 
   q.wait();
@@ -242,12 +266,7 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
 
   start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<3>(grids_s2 * blocks, blocks),
-                       [=](sycl::nd_item<3> item) {
-        conv3d_s2(dX, dW, dY, C, M, K, Hin, Win, Hout, Wout, W_grid, item);
-      });
-    });
+    conv3d_s2(q, gws2, lws, 0, dX, dW, dY, C, M, K, Hin, Win, Hout, Wout, W_grid);
   }
 
   q.wait();
@@ -260,12 +279,7 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
 
   start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
-    q.submit([&](sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<3>(grids_s3 * blocks, blocks),
-                       [=](sycl::nd_item<3> item) {
-        conv3d_s3(dX, dW, dY, C, M, K, Hin, Win, Hout, Wout, W_grid, item);
-      });
-    });
+    conv3d_s3(q, gws3, lws, 0, dX, dW, dY, C, M, K, Hin, Win, Hout, Wout, W_grid);
   }
 
   q.wait();
@@ -281,6 +295,20 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
   q.memcpy(Y, dY, Y_bytes).wait();
   verify(Y, Y_ref, Y_size);
 #endif
+
+  bool ok = true;
+  for (size_t i = 0; i < Y_size; i++) {
+    if (fabs(Y[i] - Y_ref[i]) > 1e-3f) {
+      printf("%f (device) != %f ", Y[i], Y_ref[i]); 
+      printf("at n=%zu m=%zu h=%zu w=%zu\n",
+      i / (M * Hout * Wout), 
+      i % (M * Hout * Wout) / (Hout * Wout), 
+      i % (M * Hout * Wout) % (Hout * Wout) / Wout, 
+      i % (M * Hout * Wout) % (Hout * Wout) % Wout);
+      ok = false; break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(X);
   free(W);
