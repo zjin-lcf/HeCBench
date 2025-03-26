@@ -26,30 +26,61 @@ auto report_error = [] (sycl::exception_list elist) {
 
 // Tests assert function.
 // Thread whose id > N will print assertion failed error message.
-void testKernel(int N, sycl::nd_item<1> &item)
+void testKernel(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
+    int N)
 {
-  int gid = item.get_global_id(0);
-  assert(gid < N) ;
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int gid = item.get_global_id(2);
+      assert(gid < N) ;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 // Performance impact of assert()
-void perfKernel(sycl::nd_item<1> &item)
+void perfKernel(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size)
 {
-  int gid = item.get_global_id(0);
-  assert(gid <= item.get_local_range(0) * item.get_group_range(0));
-  int s = 0;
-  for (int n = 1; n <= gid; n++) {
-    s++; assert(s <= gid);
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int gid = item.get_global_id(2);
+      assert(gid <= item.get_local_range(2) * item.get_group_range(2));
+      int s = 0;
+      for (int n = 1; n <= gid; n++) {
+        s++; assert(s <= gid);
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
-void perfKernel2(sycl::nd_item<1> &item)
+void perfKernel2(
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size)
 {
-  int gid = item.get_global_id(0);
-  int s = 0;
-  for (int n = 1; n <= gid; n++) {
-    s++; assert(s <= gid);
-  }
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int gid = item.get_global_id(2);
+      int s = 0;
+      for (int n = 1; n <= gid; n++) {
+        s++; assert(s <= gid);
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 // Declaration, forward
@@ -84,17 +115,13 @@ bool runTest(sycl::queue &q, int argc, char **argv) {
 
   // Kernel configuration, where a one-dimensional
   // grid and one-dimensional blocks are configured.
-  sycl::range<1> gws (Nblocks * Nthreads);
-  sycl::range<1> lws (Nthreads);
+  sycl::range<3> gws (1, 1, Nblocks * Nthreads);
+  sycl::range<3> lws (1, 1, Nthreads);
 
   printf("\nLaunch kernel to generate assertion failures\n");
 
   try {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        testKernel(60, item);
-      });
-    });
+    testKernel(q, gws, lws, 0, 60);
 
     // Synchronize (flushes assert output).
     printf("\n-- Begin assert output\n\n");
@@ -110,29 +137,23 @@ bool runPerf(sycl::queue &q, int argc, char **argv)
   int Nblocks = 1000;
   int Nthreads = 256;
 
-  sycl::range<1> gws (Nblocks * Nthreads);
-  sycl::range<1> lws (Nthreads);
+  sycl::range<3> gws (1, 1, Nblocks * Nthreads);
+  sycl::range<3> lws (1, 1, Nthreads);
 
   printf("\nLaunch kernel to evaluate the impact of assertion on performance \n");
 
   printf("Each thread in the kernel executes threadID + 1 assertions\n");
   auto start = std::chrono::steady_clock::now();
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-      perfKernel(item);
-    });
-  }).wait();
+  perfKernel(q, gws, lws, 0);
+  q.wait();
   auto end = std::chrono::steady_clock::now();
   std::chrono::duration<float> time = end - start;
   printf("Kernel time : %f\n", time.count());
 
   printf("Each thread in the kernel executes threadID assertions\n");
   start = std::chrono::steady_clock::now();
-  q.submit([&] (sycl::handler &cgh) {
-    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-      perfKernel2(item);
-    });
-  }).wait();
+  perfKernel2(q, gws, lws, 0);
+  q.wait();
   end = std::chrono::steady_clock::now();
   time = end - start;
   printf("Kernel time : %f\n", time.count());
