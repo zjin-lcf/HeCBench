@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../background-subtract-cuda 
 
 # Linker Flags
 LDFLAGS = 
@@ -52,7 +52,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp ../background-subtract-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -60,4 +60,4 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) 4096 2048 0 102
-	./$(program) 4096 2048 1 102
+	$(LAUNCHER) ./$(program) 4096 2048 1 102
