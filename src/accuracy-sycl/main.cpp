@@ -8,6 +8,11 @@
 
 #define GPU_NUM_THREADS 256
 
+template <typename T>
+void BlockReduce(T &input1, sycl::nd_item<3> &item) {
+  input1 = sycl::reduce_over_group(item.get_group(), input1, sycl::plus<T>());
+}
+
 void accuracy_kernel(
     sycl::queue &q,
     sycl::range<3> &gws,
@@ -33,21 +38,14 @@ void accuracy_kernel(
              ++ngt;
            }
          }
-         ngt = sycl::reduce_over_group(item.get_group(), ngt, sycl::plus<>());
+         BlockReduce(ngt, item);
          if (ngt <= top_k) {
            ++count;
          }
          item.barrier(sycl::access::fence_space::local_space);
        }
        if (item.get_local_id(2) == 0) {
-         atomicAdd(accuracy[0], count);
-         /*
-         auto ao = sycl::atomic_ref<int,
-                                    sycl::memory_order::relaxed,
-                                    sycl::memory_scope::device,
-                                    sycl::access::address_space::global_space> (accuracy[0]);
-         ao.fetch_add(count);
-         */
+         atomicAdd(accuracy, count);
        }
     };
     cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
