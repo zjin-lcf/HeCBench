@@ -2,21 +2,10 @@
 #include <iostream>
 #include <cstring>
 #include <sycl/sycl.hpp>
-
-#ifdef __NVPTX__
-  #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
-  using namespace sycl::ext::oneapi::experimental::cuda;
-#else
-  #define ldg(a) (*(a))
-#endif
-
-// a multiple of WGS for simplicity
-#define N 8192
-#define WGS 256
-#define SAMPLE_TEST_LEN 20000
+#include "kernel.h"
 
 #ifdef DEBUG
-void dump (const char* work_path, const char* result_filename, const float* result) 
+void dump (const char* work_path, const char* result_filename, const float* result)
 {
   char file_name[100];
   int i;
@@ -36,7 +25,7 @@ void dump (const char* work_path, const char* result_filename, const float* resu
 #endif
 
 void init(const char* work_path, const char* input_filename, const char* weight_filename,
-		float* sample_input, float* inW, float* intW, float* intB, float* outW, float* outB) 
+		float* sample_input, float* inW, float* intW, float* intB, float* outW, float* outB)
 {
   char file_name[100];
 
@@ -98,13 +87,13 @@ void init(const char* work_path, const char* input_filename, const char* weight_
 }
 
 long lstm_n5( sycl::queue &q,
-              const float* x, 
-              const float* inW, 
-              const float* intW, 
-              const float* intB, 
-              const float* outW, 
+              const float* x,
+              const float* inW,
+              const float* intW,
+              const float* intB,
+              const float* outW,
               const float* outB,
-                    float* y) 
+                    float* y)
 {
   float *d_x = sycl::malloc_device<float>(N*SAMPLE_TEST_LEN, q);
   q.memcpy(d_x, x, sizeof(float) * N * SAMPLE_TEST_LEN);
@@ -125,73 +114,16 @@ long lstm_n5( sycl::queue &q,
   q.memcpy(d_outB, outB, sizeof(float));
 
   float *d_y = sycl::malloc_device<float>(N*SAMPLE_TEST_LEN, q);
-  
+
+  sycl::range<3> gws (1, 1, N);
+  sycl::range<3> lws (1, 1, WGS);
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  q.submit([&](sycl::handler& cgh) {
-    cgh.parallel_for<class lstm>(
-      sycl::nd_range<1>(sycl::range<1>(N), sycl::range<1>(WGS)),
-      [=] (sycl::nd_item<1> item) {
-      int t,i,j;
-      int gid = item.get_global_id(0);
-      
-      float h_state[5] = {0,0,0,0,0};
-      float c_state[5] = {0,0,0,0,0};
-      float i_state[5] = {0,0,0,0,0};
-      float f_state[5] = {0,0,0,0,0};
-      float o_state[5] = {0,0,0,0,0};
-      float g_state[5] = {0,0,0,0,0};
-      
-      for (t = 0; t < SAMPLE_TEST_LEN; ++t) {
-
-        float x = ldg(&d_x[gid * SAMPLE_TEST_LEN + t]);
-
-        for (j = 0; j < 5; ++j) {
-          i_state[j] = ldg(&d_inW[j]) * x;
-          for (i = 0; i < 5; ++i)
-            i_state[j] += h_state[i] * ldg(&d_intW[j*5+i]);
-          i_state[j] += ldg(&d_intB[j]);
-          i_state[j] = 1.f / (1.f + sycl::exp(-i_state[j]));
-        }
-        
-        for (j = 0; j < 5; ++j) {
-          f_state[j] = ldg(&d_inW[5+j]) * x;
-          for (i = 0; i < 5; ++i)
-            f_state[j] += h_state[i] * ldg(&d_intW[25+j*5+i]);
-          f_state[j] += ldg(&d_intB[5+j]);
-          f_state[j] = 1.f / (1.f + sycl::exp(-f_state[j]));
-        }
-
-        for (j = 0; j < 5; ++j) {
-          o_state[j] = ldg(&d_inW[10+j]) * x;
-          for (i = 0; i < 5; ++i)
-            o_state[j] += h_state[i] * ldg(&d_intW[50+j*5+i]);
-          o_state[j] += ldg(&d_intB[10+j]);
-          o_state[j] = 1.f / (1.f + sycl::exp(-o_state[j]));
-        }
-
-        for (j = 0; j < 5; ++j) {
-          g_state[j] = ldg(&d_inW[15+j]) * x;
-          for (i = 0; i < 5; ++i)
-            g_state[j] += h_state[i] * ldg(&d_intW[75+j*5+i]);
-          g_state[j] += ldg(&d_intB[15+j]);
-          g_state[j] = sycl::tanh(g_state[j]);
-        }
-
-        for (j = 0; j < 5; ++j) {
-          c_state[j] = c_state[j] * f_state[j] + g_state[j] * i_state[j];
-          h_state[j] = sycl::tanh(c_state[j]) * o_state[j];
-        }
-
-        float y = ldg(&d_outB[0]);
-        for (j = 0; j < 5; ++j)
-          y += h_state[j] * ldg(&d_outW[j]);
-        d_y[gid * SAMPLE_TEST_LEN + t] = y;
-      }
-    });
-  }).wait();
-
+  lstm_inference(q, gws, lws, 0, d_x, d_inW, d_intW, d_intB,
+                 d_outW, d_outB, d_y);
+  q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
