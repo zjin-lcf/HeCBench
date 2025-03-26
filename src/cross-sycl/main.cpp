@@ -8,18 +8,12 @@
 // Reference
 // https://pytorch.org/docs/stable/generated/torch.linalg.cross.html#torch.linalg.cross
 
-template <typename T>
-class cross1;
-
-template <typename T>
-class cross2;
-
-template <typename T>
-class cross3;
-
 template <typename T, typename StrideType>
 void cross_kernel(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     int numel,
           T* out,
     const T* x1,
@@ -28,31 +22,40 @@ void cross_kernel(
     StrideType x1stride,
     StrideType x2stride)
 {
-  for (int i = item.get_global_id(0);
-           i < numel; i += item.get_local_range(0) * item.get_group_range(0)) {
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      for (int i = item.get_global_id(2);
+               i < numel; i += item.get_local_range(2) * item.get_group_range(2)) {
 
-    auto* out_row = out + 3*i;
-    const auto* x1_row = x1 + 3*i;
-    const auto* x2_row = x2 + 3*i;
+        auto* out_row = out + 3*i;
+        const auto* x1_row = x1 + 3*i;
+        const auto* x2_row = x2 + 3*i;
 
-    const T val0 = (x1_row[1 * x1stride] * x2_row[2 * x2stride] -
-                    x1_row[2 * x1stride] * x2_row[1 * x2stride]);
+        const T val0 = (x1_row[1 * x1stride] * x2_row[2 * x2stride] -
+                        x1_row[2 * x1stride] * x2_row[1 * x2stride]);
 
-    const T val1 = (x1_row[2 * x1stride] * x2_row[0 * x2stride] -
-                    x1_row[0 * x1stride] * x2_row[2 * x2stride]);
+        const T val1 = (x1_row[2 * x1stride] * x2_row[0 * x2stride] -
+                        x1_row[0 * x1stride] * x2_row[2 * x2stride]);
 
-    const T val2 = (x1_row[0 * x1stride] * x2_row[1 * x2stride] -
-                    x1_row[1 * x1stride] * x2_row[0 * x2stride]);
+        const T val2 = (x1_row[0 * x1stride] * x2_row[1 * x2stride] -
+                        x1_row[1 * x1stride] * x2_row[0 * x2stride]);
 
-    out_row[0 * ostride] = val0;
-    out_row[1 * ostride] = val1;
-    out_row[2 * ostride] = val2;
-  }
+        out_row[0 * ostride] = val0;
+        out_row[1 * ostride] = val1;
+        out_row[2 * ostride] = val2;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template <typename T, typename StrideType>
 void cross2_kernel(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     int numel,
           T* out,
     const T* x1,
@@ -61,71 +64,86 @@ void cross2_kernel(
     StrideType x1stride,
     StrideType x2stride)
 {
-  for (int i = item.get_global_id(0);
-           i < numel; i += item.get_local_range(0) * item.get_group_range(0)) {
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      for (int i = item.get_global_id(2);
+               i < numel; i += item.get_local_range(2) * item.get_group_range(2)) {
 
-    auto* out_row = out + 3*i;
-    const auto* x1_row = x1 + 3*i;
-    const auto* x2_row = x2 + 3*i;
+        auto* out_row = out + 3*i;
+        const auto* x1_row = x1 + 3*i;
+        const auto* x2_row = x2 + 3*i;
 
-    const T x1_c0 = x1_row[0 * x1stride];
-    const T x1_c1 = x1_row[1 * x1stride];
-    const T x1_c2 = x1_row[2 * x1stride];
-    const T x2_c0 = x2_row[0 * x2stride];
-    const T x2_c1 = x2_row[1 * x2stride];
-    const T x2_c2 = x2_row[2 * x2stride];
+        const T x1_c0 = x1_row[0 * x1stride];
+        const T x1_c1 = x1_row[1 * x1stride];
+        const T x1_c2 = x1_row[2 * x1stride];
+        const T x2_c0 = x2_row[0 * x2stride];
+        const T x2_c1 = x2_row[1 * x2stride];
+        const T x2_c2 = x2_row[2 * x2stride];
 
-    const T val0 = x1_c1 * x2_c2 - x1_c2 * x2_c1 ;
+        const T val0 = x1_c1 * x2_c2 - x1_c2 * x2_c1 ;
 
-    const T val1 = x1_c2 * x2_c0 - x1_c0 * x2_c2 ;
+        const T val1 = x1_c2 * x2_c0 - x1_c0 * x2_c2 ;
 
-    const T val2 = x1_c0 * x2_c1 - x1_c1 * x2_c0 ;
+        const T val2 = x1_c0 * x2_c1 - x1_c1 * x2_c0 ;
 
-    out_row[0 * ostride] = val0;
-    out_row[1 * ostride] = val1;
-    out_row[2 * ostride] = val2;
-  }
+        out_row[0 * ostride] = val0;
+        out_row[1 * ostride] = val1;
+        out_row[2 * ostride] = val2;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 template <typename T>
 void cross3_kernel(
-    sycl::nd_item<1> &item,
+    sycl::queue &q,
+    sycl::range<3> &gws,
+    sycl::range<3> &lws,
+    const int slm_size,
     int numel,
           T* out,
     const T* x1,
     const T* x2)
 {
-  for (int i = item.get_global_id(0);
-           i < numel; i += item.get_local_range(0) * item.get_group_range(0)) {
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      for (int i = item.get_global_id(2);
+               i < numel; i += item.get_local_range(2) * item.get_group_range(2)) {
 
-    auto* out_row = out + 3*i;
-    const auto* x1_row = x1 + 3*i;
-    const auto* x2_row = x2 + 3*i;
+        auto* out_row = out + 3*i;
+        const auto* x1_row = x1 + 3*i;
+        const auto* x2_row = x2 + 3*i;
 
-    const T x1_c0 = x1_row[0];
-    const T x1_c1 = x1_row[1];
-    const T x1_c2 = x1_row[2];
-    const T x2_c0 = x2_row[0];
-    const T x2_c1 = x2_row[1];
-    const T x2_c2 = x2_row[2];
+        const T x1_c0 = x1_row[0];
+        const T x1_c1 = x1_row[1];
+        const T x1_c2 = x1_row[2];
+        const T x2_c0 = x2_row[0];
+        const T x2_c1 = x2_row[1];
+        const T x2_c2 = x2_row[2];
 
-    const T val0 = x1_c1 * x2_c2 - x1_c2 * x2_c1 ;
+        const T val0 = x1_c1 * x2_c2 - x1_c2 * x2_c1 ;
 
-    const T val1 = x1_c2 * x2_c0 - x1_c0 * x2_c2 ;
+        const T val1 = x1_c2 * x2_c0 - x1_c0 * x2_c2 ;
 
-    const T val2 = x1_c0 * x2_c1 - x1_c1 * x2_c0 ;
+        const T val2 = x1_c0 * x2_c1 - x1_c1 * x2_c0 ;
 
-    out_row[0] = val0;
-    out_row[1] = val1;
-    out_row[2] = val2;
-  }
+        out_row[0] = val0;
+        out_row[1] = val1;
+        out_row[2] = val2;
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 }
 
 
 template <typename T>
 void eval(const int nrows, const int repeat) {
   const int num_elems = nrows * 3;
-  const int size_bytes = num_elems * sizeof(T); 
+  const int size_bytes = num_elems * sizeof(T);
 
   T *a, *b, *o, *o2, *o3;
   a = (T*) malloc (size_bytes);
@@ -155,18 +173,14 @@ void eval(const int nrows, const int repeat) {
   q.memcpy(d_a, a, size_bytes);
   q.memcpy(d_b, b, size_bytes);
 
-  sycl::range<1> gws ((nrows + 255) / 256 * 256);
-  sycl::range<1> lws (256);
+  sycl::range<3> gws (1, 1, (nrows + 255) / 256 * 256);
+  sycl::range<3> lws (1, 1, 256);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class cross1<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        cross_kernel(item, nrows, d_o, d_a, d_b, 1, 1, 1);
-      });
-    });
+    cross_kernel(q, gws, lws, 0, nrows, d_o, d_a, d_b, 1, 1, 1);
   }
 
   q.wait();
@@ -179,11 +193,7 @@ void eval(const int nrows, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class cross2<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        cross2_kernel(item, nrows, d_o, d_a, d_b, 1, 1, 1);
-      });
-    });
+    cross2_kernel(q, gws, lws, 0, nrows, d_o, d_a, d_b, 1, 1, 1);
   }
 
   q.wait();
@@ -196,11 +206,7 @@ void eval(const int nrows, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class cross3<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        cross3_kernel(item, nrows, d_o, d_a, d_b);
-      });
-    });
+    cross3_kernel(q, gws, lws, 0, nrows, d_o, d_a, d_b);
   }
 
   q.wait();
