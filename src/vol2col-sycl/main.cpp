@@ -37,7 +37,6 @@ void vol2col_kernel(
 {
   for (int64_t n = item.get_global_id(0); n < range;
                n += item.get_group_range(0) * item.get_local_range(0)) {
-
     int w_out = n % width_col;
     int64_t index = n / width_col;
     int h_out = index % height_col;
@@ -48,19 +47,19 @@ void vol2col_kernel(
     int t_in = t_out * stride_t - pad_t;
     int h_in = h_out * stride_h - pad_h;
     int w_in = w_out * stride_w - pad_w;
-    data_vol += ((channel_in * depth + t_in) * height + h_in) * width + w_in;
-    data_col += ((channel_out * depth_col + t_out) * height_col + h_out) * width_col + w_out;
+    auto v = data_vol + ((channel_in * depth + t_in) * height + h_in) * width + w_in;
+    auto c = data_col + ((channel_out * depth_col + t_out) * height_col + h_out) * width_col + w_out;
     for (int i = 0; i < ksize_t; ++i) {
       for (int j = 0; j < ksize_h; ++j) {
         for (int k = 0; k < ksize_w; ++k) {
           int t = t_in + i * dilation_t;
           int h = h_in + j * dilation_h;
           int w = w_in + k * dilation_w;
-          *data_col = (t >= 0 && h >= 0 && w >= 0 && t < depth && h < height && w < width)
-              ? data_vol[i * dilation_t * height * width +
-                         j * dilation_h * width + k * dilation_w]
+          *c = (t >= 0 && h >= 0 && w >= 0 && t < depth && h < height && w < width)
+              ? v[i * dilation_t * height * width +
+                  j * dilation_h * width + k * dilation_w]
               : static_cast<T>(0);
-          data_col += depth_col * height_col * width_col;
+          c += depth_col * height_col * width_col;
         }
       }
     }
