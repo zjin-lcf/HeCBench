@@ -5,11 +5,12 @@
 #include <chrono>
 #include <hip/hip_runtime.h>
 #include "kernels.h"
+#include "reference.h"
 
 // transpose
 double* t(const double *idata, const int width, const int height)
 {
-  double *odata = (double*) malloc (sizeof(double) * width * height); 
+  double *odata = (double*) malloc (sizeof(double) * width * height);
   for (int yIndex = 0; yIndex < height; yIndex++) {
     for (int xIndex = 0; xIndex < width; xIndex++) {
       int index_in  = xIndex + width * yIndex;
@@ -43,12 +44,13 @@ int main(int argc, char* argv[]) {
   int rands_size = M * K;  // M rows and K cols
   int rands_size_byte = M * K * sizeof(double);
 
-  double *alphas, *rands, *probs;
+  double *alphas, *rands, *probs, *probs_ref;
   alphas = (double*) malloc (alphas_size_byte);
   rands = (double*) malloc (rands_size_byte);
   probs = (double*) malloc (alphas_size_byte);
+  probs_ref = (double*) malloc (alphas_size_byte);
 
-  // load the csv file 
+  // load the csv file
   for (int i = 0; i < alphas_size; i++)
     fscanf(fp, "%lf", &alphas[i]);
   fclose(fp);
@@ -56,7 +58,9 @@ int main(int argc, char* argv[]) {
   // normal distribution (mean: 0 and var: 1)
   std::mt19937 gen(19937);
   std::normal_distribution<double> norm_dist(0.0,1.0);
-  for (int i = 0; i < rands_size; i++) rands[i] = norm_dist(gen); 
+  for (int i = 0; i < rands_size; i++) rands[i] = norm_dist(gen);
+
+  reference(alphas, rands, probs_ref, n, K, M);
 
   double *d_alphas, *d_rands, *d_probs;
   hipMalloc((void**)&d_rands, rands_size_byte);
@@ -71,75 +75,67 @@ int main(int argc, char* argv[]) {
   dim3 threads (threads_per_block);
   dim3 blocks(ceil(1.0 * n / threads_per_block));
 
-  hipMemset(d_probs, 0.0, alphas_size_byte);
-
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(compute_probs, blocks, threads, 0, 0, d_alphas, d_rands, d_probs, n, K, M);
+    compute_probs<<<blocks, threads>>>(d_alphas, d_rands, d_probs, n, K, M);
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average execution time of compute_probs kernel: %f (s)\n", (time * 1e-9f) / repeat);
 
   hipMemcpy(probs, d_probs, alphas_size_byte, hipMemcpyDeviceToHost);
-  double s = 0.0;
-  for (int i = 0; i < alphas_size; i++) s += probs[i];
-  printf("compute_probs: checksum = %lf\n", s);
+  verify(probs, probs_ref, alphas_size);
 
   // kernel 2
   double *t_rands = t(rands, K, M);
   double *t_alphas = t(alphas, K, n);
+
+  reference_unitStrides(t_alphas, t_rands, probs_ref, n, K, M);
+
   hipMemcpy(d_rands, t_rands, rands_size_byte, hipMemcpyHostToDevice);
   hipMemcpy(d_alphas, t_alphas, alphas_size_byte, hipMemcpyHostToDevice);
-
-  hipMemset(d_probs, 0.0, alphas_size_byte);
 
   hipDeviceSynchronize();
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(compute_probs_unitStrides, blocks, threads, 0, 0, 
+    compute_probs_unitStrides<<<blocks, threads>>>(
       d_alphas, d_rands, d_probs, n, K, M);
 
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average execution time of compute_probs_unitStrides kernel: %f (s)\n", (time * 1e-9f) / repeat);
 
   hipMemcpy(probs, d_probs, alphas_size_byte, hipMemcpyDeviceToHost);
-  s = 0.0;
-  for (int i = 0; i < alphas_size; i++) s += probs[i];
-  printf("compute_probs_unitStrides: checksum = %lf\n", s);
+  verify(probs, probs_ref, alphas_size);
 
   // kernel 3
   threads_per_block = 96;
   dim3 threads2 (threads_per_block);
-  dim3 blocks2(ceil(1.0 * n / threads_per_block));
+  dim3 blocks2 (ceil(1.0 * n / threads_per_block));
 
   const int sm_size = sizeof(double) * K * threads_per_block * 2;
-  hipMemset(d_probs, 0.0, alphas_size_byte);
 
   hipDeviceSynchronize();
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    hipLaunchKernelGGL(compute_probs_unitStrides_sharedMem, blocks2, threads2, sm_size, 0, 
+    compute_probs_unitStrides_sharedMem<<<blocks2, threads2, sm_size, 0>>>(
       d_alphas, d_rands, d_probs, n, K, M);
 
   hipDeviceSynchronize();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average execution time of compute_probs_unitStrides_sharedMem kernel: %f (s)\n", (time * 1e-9f) / repeat);
 
   hipMemcpy(probs, d_probs, alphas_size_byte, hipMemcpyDeviceToHost);
-  s = 0.0;
-  for (int i = 0; i < alphas_size; i++) s += probs[i];
-  printf("compute_probs_unitStrides_sharedMem: checksum = %lf\n", s);
+  verify(probs, probs_ref, alphas_size);
 
-  // free memory 
+  // free memory
   hipFree(d_alphas);
   hipFree(d_rands);
   hipFree(d_probs);
@@ -148,5 +144,6 @@ int main(int argc, char* argv[]) {
   free(t_alphas);
   free(t_rands);
   free(probs);
+  free(probs_ref);
   return 0;
 }
