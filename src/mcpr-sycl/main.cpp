@@ -5,11 +5,12 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 #include "kernels.h"
+#include "reference.h"
 
 // transpose
 double* t(const double *idata, const int width, const int height)
 {
-  double *odata = (double*) malloc (sizeof(double) * width * height); 
+  double *odata = (double*) malloc (sizeof(double) * width * height);
   for (int yIndex = 0; yIndex < height; yIndex++) {
     for (int xIndex = 0; xIndex < width; xIndex++) {
       int index_in  = xIndex + width * yIndex;
@@ -43,12 +44,13 @@ int main(int argc, char* argv[]) {
   int rands_size = M * K;  // M rows and K cols
   int rands_size_byte = M * K * sizeof(double);
 
-  double *alphas, *rands, *probs;
+  double *alphas, *rands, *probs, *probs_ref;
   alphas = (double*) malloc (alphas_size_byte);
   rands = (double*) malloc (rands_size_byte);
   probs = (double*) malloc (alphas_size_byte);
+  probs_ref = (double*) malloc (alphas_size_byte);
 
-  // load the csv file 
+  // load the csv file
   for (int i = 0; i < alphas_size; i++)
     fscanf(fp, "%lf", &alphas[i]);
   fclose(fp);
@@ -56,7 +58,9 @@ int main(int argc, char* argv[]) {
   // normal distribution (mean: 0 and var: 1)
   std::mt19937 gen(19937);
   std::normal_distribution<double> norm_dist(0.0,1.0);
-  for (int i = 0; i < rands_size; i++) rands[i] = norm_dist(gen); 
+  for (int i = 0; i < rands_size; i++) rands[i] = norm_dist(gen);
+
+  reference(alphas, rands, probs_ref, n, K, M);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -76,8 +80,6 @@ int main(int argc, char* argv[]) {
   sycl::range<1> lws (threads_per_block);
   sycl::range<1> gws (ceil(1.0 * n / threads_per_block) * threads_per_block);
 
-  q.memset(d_probs, 0.0, alphas_size_byte);
-
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
@@ -93,21 +95,19 @@ int main(int argc, char* argv[]) {
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average execution time of compute_probs kernel: %f (s)\n", (time * 1e-9f) / repeat);
 
   q.memcpy(probs, d_probs, alphas_size_byte).wait();
-
-  double s = 0.0;
-  for (int i = 0; i < alphas_size; i++) s += probs[i];
-  printf("compute_probs: checksum = %lf\n", s);
+  verify(probs, probs_ref, alphas_size);
 
   // kernel 2
   double *t_rands = t(rands, K, M);
   double *t_alphas = t(alphas, K, n);
+
+  reference_unitStrides(t_alphas, t_rands, probs_ref, n, K, M);
+
   q.memcpy(d_rands, t_rands, rands_size_byte);
   q.memcpy(d_alphas, t_alphas, alphas_size_byte);
-
-  q.memset(d_probs, 0.0, alphas_size_byte);
 
   q.wait();
   start = std::chrono::steady_clock::now();
@@ -124,20 +124,15 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average execution time of compute_probs_unitStrides kernel: %f (s)\n", (time * 1e-9f) / repeat);
 
   q.memcpy(probs, d_probs, alphas_size_byte).wait();
-
-  s = 0.0;
-  for (int i = 0; i < alphas_size; i++) s += probs[i];
-  printf("compute_probs_unitStrides: checksum = %lf\n", s);
+  verify(probs, probs_ref, alphas_size);
 
   // kernel 3
   threads_per_block = 96;
   sycl::range<1> lws2 (threads_per_block);
   sycl::range<1> gws2 (ceil(1.0 * n / threads_per_block) * threads_per_block);
-
-  q.memset(d_probs, 0.0, alphas_size_byte);
 
   q.wait();
   start = std::chrono::steady_clock::now();
@@ -156,15 +151,12 @@ int main(int argc, char* argv[]) {
   q.wait();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+  printf("Average execution time of compute_probs_unitStrides_sharedMem kernel: %f (s)\n", (time * 1e-9f) / repeat);
 
   q.memcpy(probs, d_probs, alphas_size_byte).wait();
+  verify(probs, probs_ref, alphas_size);
 
-  s = 0.0;
-  for (int i = 0; i < alphas_size; i++) s += probs[i];
-  printf("compute_probs_unitStrides_sharedMem: checksum = %lf\n", s);
-
-  // free memory 
+  // free memory
   sycl::free(d_alphas, q);
   sycl::free(d_rands, q);
   sycl::free(d_probs, q);
@@ -173,5 +165,6 @@ int main(int argc, char* argv[]) {
   free(t_alphas);
   free(t_rands);
   free(probs);
+  free(probs_ref);
   return 0;
 }
