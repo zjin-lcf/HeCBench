@@ -7,8 +7,6 @@
 
 // Setup engine and stream in DNNL
 sycl::queue q;
-auto engine = dnnl::sycl_interop::make_engine(q.get_device(), q.get_context());
-auto stream = dnnl::sycl_interop::make_stream(engine, q);
 
 float* make_random_float(size_t N) {
     float* arr = (float*)malloc(N * sizeof(float));

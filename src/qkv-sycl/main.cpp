@@ -7,6 +7,9 @@
 
 #include "common.hpp"
 
+auto engine = dnnl::sycl_interop::make_engine(q.get_device(), q.get_context());
+auto stream = dnnl::sycl_interop::make_stream(engine, q);
+
 auto MKL_OP_T = oneapi::mkl::transpose::trans;
 auto MKL_OP_N = oneapi::mkl::transpose::nontrans;
 
