@@ -246,7 +246,7 @@ int main(int argc, char** argv)
   }
 
   double offload_end = get_time();
-  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+  printf("Device offloading time = %lf (s)\n", offload_end - offload_start);
 
   // add a null terminator at the end of the string.
   outputBuffer[16383] = '\0';
