@@ -12,7 +12,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = haccmk
+program = main
 
 source = haccmk.cu
 
