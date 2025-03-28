@@ -19,7 +19,7 @@ HIP_ARCH  = gfx908
 # Program name & source code list
 #===============================================================================
 
-program = haccmk
+program = main
 
 source = haccmk.cpp
 
