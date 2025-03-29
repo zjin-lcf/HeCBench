@@ -129,7 +129,7 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
 
   for (int n = 0; n < REPEAT; n++) {
     chemv_kernel0(q, k0_gws, k0_lws, 0, d_AT, d_X, d_Y, alpha_im, alpha_re, beta_im, beta_re);
-    chemv_chemv_kernel1(q, k1_gws, k1_lws, 0, d_AT, d_X, d_Y, alpha_im, alpha_re);
+    chemv_kernel1(q, k1_gws, k1_lws, 0, d_AT, d_X, d_Y, alpha_im, alpha_re);
   }
 
   q.wait();
