@@ -31,7 +31,7 @@ obj = $(source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../aidw-cuda -fsycl \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+          -fopenmp --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS_TMP := $(CFLAGS)
@@ -79,5 +79,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 10 1 100
-	$(LAUNCHER) ./$(program) 100 0 100
+	$(LAUNCHER) ./$(program) 100 1 100

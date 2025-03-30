@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../aidw-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -fopenmp -Wall -I../aidw-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -54,5 +54,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 10 1 100
-	$(LAUNCHER) ./$(program) 100 0 100
+	$(LAUNCHER) ./$(program) 100 1 100

@@ -9,8 +9,8 @@
 // thread block size
 #define BLOCK_SIZE  256
 
-// accuracy
-#define EPS 1e-1f
+// accuracy of 1e-1f is not met with the fast math option across compilers
+#define EPS 1
 
 void reference(
   const float *__restrict dx, 
@@ -25,6 +25,7 @@ void reference(
   const float *__restrict avg_dist) 
 
 {
+  #pragma omp parallel for
   for (int tid = 0; tid < inum; tid++) {
     float sum = 0.f, dist = 0.f, t = 0.f, z = 0.f, alpha = 0.f;
 
