@@ -57,23 +57,18 @@ void sopKernel (
   auto cgf = [&](sycl::handler& cgh) {
     sycl::local_accessor<Type, 1> sstd (sycl::range<1>(ColsPerBlk), cgh);
     auto kfn = [=](sycl::nd_item<3> item) {
-      int tx = item.get_local_id(2);
-      int bx = item.get_group(2);
-      int by = item.get_group(1);
-      int gridDim_x = item.get_group_range(2);
-
       const int RowsPerBlkPerIter = TPB / ColsPerBlk;
-      IdxType thisColId = tx % ColsPerBlk;
-      IdxType thisRowId = tx / ColsPerBlk;
-      IdxType colId = thisColId + ((IdxType)by * ColsPerBlk);
-      IdxType rowId = thisRowId + ((IdxType)bx * RowsPerBlkPerIter);
+      IdxType thisColId = item.get_local_id(2) % ColsPerBlk;
+      IdxType thisRowId = item.get_local_id(2) / ColsPerBlk;
+      IdxType colId = thisColId + ((IdxType)item.get_group(1) * ColsPerBlk);
+      IdxType rowId = thisRowId + ((IdxType)item.get_group(2) * RowsPerBlkPerIter);
       Type thread_data = Type(0);
-      const IdxType stride = RowsPerBlkPerIter * gridDim_x;
+      const IdxType stride = RowsPerBlkPerIter * item.get_group_range(2);
       for (IdxType i = rowId; i < N; i += stride) {
         Type val = (colId < D) ? data[i * D + colId] : Type(0);
         thread_data += val * val;
       }
-      if (tx < ColsPerBlk) sstd[tx] = Type(0);
+      if (item.get_local_id(2) < ColsPerBlk) sstd[item.get_local_id(2)] = Type(0);
       item.barrier(sycl::access::fence_space::local_space);
 
       atomicAdd(sstd[thisColId], thread_data);
@@ -87,7 +82,7 @@ void sopKernel (
 
       item.barrier(sycl::access::fence_space::local_space);
 
-      if (tx < ColsPerBlk) {
+      if (item.get_local_id(2) < ColsPerBlk) {
         atomicAdd(std[colId], sstd[thisColId]);
         /*
         auto atomic_global = sycl::atomic_ref<Type,
