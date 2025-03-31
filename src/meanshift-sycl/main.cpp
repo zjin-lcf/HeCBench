@@ -51,16 +51,16 @@ namespace mean_shift::gpu {
     sycl::range<3> &lws,
     const int slm_size,
     const float* data,
-    float*__restrict data_next)
+    float* data_next)
   {
     auto cgf = [&] (sycl::handler &cgh) {
+      // Shared memory allocation
       sycl::local_accessor<float, 1> local_data (sycl::range<1>(TILE_WIDTH * D), cgh);
       sycl::local_accessor<float, 1> valid_data (sycl::range<1>(TILE_WIDTH), cgh);
       auto kfn = [=] (sycl::nd_item<3> item) {
-        // Shared memory allocation
         // A few convenient variables
-        int tid = item.get_global_id(2);
         int lid = item.get_local_id(2);
+        int tid = item.get_group(2) * item.get_local_range(2) + lid;
         int row = tid * D;
         int local_row = lid * D;
         float new_position[D] = {0.f};
