@@ -22,19 +22,14 @@ void ChannelShuffleNCHWKernel(
 {
   auto cgf = [&](sycl::handler& cgh) {
     auto kfn = [=](sycl::nd_item<3> item) {
-      int blockIdx_x  = item.get_group(2);
-      int threadIdx_x = item.get_local_id(2);
-      int blockIdx_y  = item.get_group(1);
-      int blockIdx_z  = item.get_group(0);
-
       const int C = G * K;
-      const int n = kNFirst ? blockIdx_x : blockIdx_y;
-      const int s = kNFirst ? blockIdx_y : blockIdx_x;
-      const int g = blockIdx_z % G;
-      const int k = blockIdx_z / G;
-      const int offset = s * NUM_THREADS + threadIdx_x;
+      const int n = kNFirst ? item.get_group(2) : item.get_group(1);
+      const int s = kNFirst ? item.get_group(1) : item.get_group(2);
+      const int g = item.get_group(0) % G;
+      const int k = item.get_group(0) / G;
+      const int offset = s * NUM_THREADS + item.get_local_id(2);
       if (offset < HxW) {
-        Y[(n * C + blockIdx_z) * HxW + offset] =
+        Y[(n * C + item.get_group(0)) * HxW + offset] =
             X[(n * C + g * K + k) * HxW + offset];
       }
     };
@@ -57,19 +52,15 @@ void ChannelShuffleNHWCKernel(
   auto cgf = [&](sycl::handler& cgh) {
     sycl::local_accessor<T, 1> sdata (sycl::range<1>(kSharedSize), cgh);
     auto kfn = [=](sycl::nd_item<3> item) {
-      int blockIdx_x  = item.get_group(2);
-      int blockDim_x  = item.get_local_range(2);
-      int threadIdx_x = item.get_local_id(2);
-
       const int C = G * K;
-      const int offset = blockIdx_x * C;
-      for (int i = threadIdx_x; i < C; i += blockDim_x) {
+      const int offset = item.get_group(2) * C;
+      for (int i = item.get_local_id(2); i < C; i += item.get_local_range(2)) {
         sdata[i] = X[offset + i];
       }
 
       item.barrier(sycl::access::fence_space::local_space);
 
-      for (int i = threadIdx_x; i < C; i += blockDim_x) {
+      for (int i = item.get_local_id(2); i < C; i += item.get_local_range(2)) {
         const int g = i % G;
         const int k = i / G;
         Y[offset + i] = sdata[g * K + k];
