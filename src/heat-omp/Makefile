@@ -13,7 +13,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = heat
+program = main
 
 source = heat.cpp
 
