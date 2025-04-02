@@ -20,7 +20,6 @@ __global__ void chemv_kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, s
     float private_var97_Re;
     float private_var98_Re;
 
-    #define ppcg_min(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x < _y ? _x : _y; })
     for (int c1 = 0; c1 <= ppcg_min(368, 32 * b0 + 30); c1 += 32) {
       if (32 * b0 + t0 <= 369 && c1 == 0) {
         private_var5_Re = ((Y[32 * b0 + t0].Re * beta_re) - (Y[32 * b0 + t0].Im * beta_im));
@@ -61,8 +60,6 @@ __global__ void chemv_kernel1(struct ComplexFloat *AT, struct ComplexFloat *X, s
     float private_var94_Re;
     float private_var95_Re;
 
-    #define ppcg_min(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x < _y ? _x : _y; })
-    #define ppcg_max(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x > _y ? _x : _y; })
     for (int c1 = 5888 * b0; c1 <= ppcg_min(67712, 5856 * b0 + 6016); c1 += 32) {
       for (int c3 = ppcg_max(0, 5888 * b0 + 184 * t0 - c1); c3 <= ppcg_min(31, 5856 * b0 + 183 * t0 - c1 + 368); c3 += 1) {
         private_var94_Re = ((alpha_re * AT[5984 * b0 + 187 * t0 + c1 + c3 + 1].Re) - (alpha_im * (-AT[5984 * b0 + 187 * t0 + c1 + c3 + 1].Im)));
