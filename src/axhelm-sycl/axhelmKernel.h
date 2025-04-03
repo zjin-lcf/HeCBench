@@ -1,6 +1,6 @@
 
 void axhelm(
-    sycl::queue &s,
+    sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
     const int slm_size,
@@ -9,7 +9,7 @@ void axhelm(
     const dfloat * __restrict__ ggeo,
     const dfloat * __restrict__ D,
     const dfloat * __restrict__ lambda,
-    const dfloat * __restrict__ q,
+    const dfloat * __restrict__ Q,
     dfloat * __restrict__ Aq)
 {
   auto cgf = [&] (sycl::handler &cgh) {
@@ -30,7 +30,7 @@ void axhelm(
       s_D[j*8+i] = D[j*8+i];
       const int base = i + j * 8 + e * 512;
       for (int k = 0; k < 8; ++k) {
-        r_q[k] = q[base + k * 8 * 8];
+        r_q[k] = Q[base + k * 8 * 8];
         r_Aq[k] = 0;
       }
       #pragma unroll 8
@@ -83,11 +83,11 @@ void axhelm(
     };
     cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
   };
-  s.submit(cgf);
+  q.submit(cgf);
 }
 
 void axhelm_n3(
-    sycl::queue &s,
+    sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
     const int slm_size,
@@ -96,7 +96,7 @@ void axhelm_n3(
     const dfloat * __restrict__ ggeo,
     const dfloat * __restrict__ D,
     const dfloat * __restrict__ lambda,
-    const dfloat * __restrict__ q,
+    const dfloat * __restrict__ Q,
     dfloat * __restrict__ Aq)
 {
   auto cgf = [&] (sycl::handler &cgh) {
@@ -123,9 +123,9 @@ void axhelm_n3(
       s_D[j*8+i] = D[j*8+i];
       const int base = i + j * 8 + e * 512;
       for (int k = 0; k < 8; k++) {
-        r_U[k] = q[base + k * 8 * 8 + 0 * offset];
-        r_V[k] = q[base + k * 8 * 8 + 1 * offset];
-        r_W[k] = q[base + k * 8 * 8 + 2 * offset];
+        r_U[k] = Q[base + k * 8 * 8 + 0 * offset];
+        r_V[k] = Q[base + k * 8 * 8 + 1 * offset];
+        r_W[k] = Q[base + k * 8 * 8 + 2 * offset];
         r_AU[k] = 0;
         r_AV[k] = 0;
         r_AW[k] = 0;
@@ -215,5 +215,5 @@ void axhelm_n3(
     };
     cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
   };
-  s.submit(cgf);
+  q.submit(cgf);
 }
