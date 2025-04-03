@@ -164,8 +164,8 @@ int main(void) {
 #endif
 
   // block and grid dimensions
-  sycl::range<2> lws (2, BLOCK_SIZE);
-  sycl::range<2> gws (NUM, NUM / 2);
+  sycl::range<3> lws (1, 2, BLOCK_SIZE);
+  sycl::range<3> gws (1, NUM, NUM / 2);
 
   // allocate device memory
   Real *aP_d, *aW_d, *aE_d, *aS_d, *aN_d, *b_d;
@@ -208,19 +208,13 @@ int main(void) {
 
     Real norm_L2 = ZERO;
 
-    q.parallel_for(sycl::nd_range<2>(gws, lws),
-      [=](sycl::nd_item<2> item) {
-      red_kernel(aP_d, aW_d, aE_d, aS_d, aN_d, b_d,
-                 temp_black_d, temp_red_d, bl_norm_L2_d, item);
-    });
+    red_kernel(q, gws, lws, 0, aP_d, aW_d, aE_d, aS_d, aN_d, b_d,
+               temp_black_d, temp_red_d, bl_norm_L2_d);
 
     norm_L2 = oneapi::dpl::reduce(policy, bl_norm_L2_d, bl_norm_L2_d + size_norm, Real(0));
 
-    q.parallel_for(sycl::nd_range<2>(gws, lws),
-      [=](sycl::nd_item<2> item) {
-      black_kernel(aP_d, aW_d, aE_d, aS_d, aN_d, b_d,
-                   temp_red_d, temp_black_d, bl_norm_L2_d, item);
-    });
+    black_kernel(q, gws, lws, 0, aP_d, aW_d, aE_d, aS_d, aN_d, b_d,
+                 temp_red_d, temp_black_d, bl_norm_L2_d);
 
     norm_L2 += oneapi::dpl::reduce(policy, bl_norm_L2_d, bl_norm_L2_d + size_norm, Real(0));
 

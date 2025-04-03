@@ -26,7 +26,11 @@ const Real omega = 1.85f;
  * \param[out]    bl_norm_L2  array with residual information for blocks
  */
 
-void red_kernel (const Real *__restrict__ aP,
+void red_kernel (sycl::queue &q,
+                 sycl::range<3> &gws,
+                 sycl::range<3> &lws,
+                 const int slm_size,
+                 const Real *__restrict__ aP,
                  const Real *__restrict__ aW,
                  const Real *__restrict__ aE,
                  const Real *__restrict__ aS,
@@ -34,30 +38,34 @@ void red_kernel (const Real *__restrict__ aP,
                  const Real *__restrict__ b,
                  const Real *__restrict__ temp_black,
                        Real *__restrict__ temp_red,
-                       Real *__restrict__ norm_L2,
-                       const sycl::nd_item<2> &item)
+                       Real *__restrict__ norm_L2)
 {
-  int row = 1 + item.get_global_id(1);
-  int col = 1 + item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int row = 1 + item.get_global_id(2);
+      int col = 1 + item.get_global_id(1);
 
-  int ind_red = col * ((NUM >> 1) + 2) + row; // local (red) index
-  int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1); // global index
+      int ind_red = col * ((NUM >> 1) + 2) + row; // local (red) index
+      int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1); // global index
 
-  Real temp_old = temp_red[ind_red];
+      Real temp_old = temp_red[ind_red];
 
-  Real res = b[ind]
-        + aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
-        + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
-        + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
-        + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)];
+      Real res = b[ind]
+            + aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
+            + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
+            + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
+            + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)];
 
-  Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
+      Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
 
-  temp_red[ind_red] = temp_new;
-  res = temp_new - temp_old;
+      temp_red[ind_red] = temp_new;
+      res = temp_new - temp_old;
 
-  norm_L2[ind_red] = res * res;
-
+      norm_L2[ind_red] = res * res;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 } // end red_kernel
 
 /** Function to update temperature for black cells
@@ -73,7 +81,11 @@ void red_kernel (const Real *__restrict__ aP,
  * \param[out]     bl_norm_L2  array with residual information for blocks
  */
 
-void black_kernel (const Real *__restrict__ aP,
+void black_kernel (sycl::queue &q,
+                   sycl::range<3> &gws,
+                   sycl::range<3> &lws,
+                   const int slm_size,
+                   const Real *__restrict__ aP,
                    const Real *__restrict__ aW,
                    const Real *__restrict__ aE,
                    const Real *__restrict__ aS,
@@ -81,27 +93,32 @@ void black_kernel (const Real *__restrict__ aP,
                    const Real *__restrict__ b,
                    const Real *__restrict__ temp_red,
                          Real *__restrict__ temp_black,
-                         Real *__restrict__ norm_L2,
-                         const sycl::nd_item<2> &item)
+                         Real *__restrict__ norm_L2)
 {
-  int row = 1 + item.get_global_id(1);
-  int col = 1 + item.get_global_id(0);
+  auto cgf = [&] (sycl::handler &cgh) {
+    auto kfn = [=] (sycl::nd_item<3> item) {
+      int row = 1 + item.get_global_id(2);
+      int col = 1 + item.get_global_id(1);
 
-  int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
-  int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1); // global index
+      int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
+      int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1); // global index
 
-  Real temp_old = temp_black[ind_black];
+      Real temp_old = temp_black[ind_black];
 
-  Real res = b[ind]
-        + aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
-        + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
-        + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
-        + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)];
+      Real res = b[ind]
+            + aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
+            + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
+            + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
+            + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)];
 
-  Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
+      Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
 
-  temp_black[ind_black] = temp_new;
-  res = temp_new - temp_old;
+      temp_black[ind_black] = temp_new;
+      res = temp_new - temp_old;
 
-  norm_L2[ind_black] = res * res;
+      norm_L2[ind_black] = res * res;
+    };
+    cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
+  };
+  q.submit(cgf);
 } // end black_kernel
