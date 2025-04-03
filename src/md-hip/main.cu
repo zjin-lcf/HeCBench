@@ -20,7 +20,7 @@ __global__ void md (
   const FPTYPE lj2_t,
   const FPTYPE cutsq_t )
 {
-  const uint idx = blockDim.x * blockIdx.x + threadIdx.x;
+  const uint idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= nAtom) return;
 
   POSVECTYPE ipos = position[idx];
