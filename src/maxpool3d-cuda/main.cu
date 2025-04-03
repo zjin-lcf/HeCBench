@@ -20,9 +20,9 @@ maxpool3d(
   const int o_img_width,
   const int o_img_height )
 {
-  const int x = blockDim.x * blockIdx.x + threadIdx.x;
-  const int y = blockDim.y * blockIdx.y + threadIdx.y;
-  const int z = blockDim.z * blockIdx.z + threadIdx.z;
+  const int x = blockIdx.x * blockDim.x + threadIdx.x;
+  const int y = blockIdx.y * blockDim.y + threadIdx.y;
+  const int z = blockIdx.z * blockDim.z + threadIdx.z;
   const int xidx = Hstride * x;
   const int yidx = Vstride * y;
   DTYPE maxval = (DTYPE)0;
