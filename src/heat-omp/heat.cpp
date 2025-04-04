@@ -34,7 +34,6 @@
 #include <omp.h>
 
 // Key constants used in this program
-#define PI acos(-1.0) // Pi
 #define LINE "--------------------\n" // A line for fancy output
 
 double solution(const double t, const double x, const double y, const double alpha, const double length);
@@ -119,7 +118,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < n; ++i) {
       double y = (j+1)*dx; // Physical y position
       double x = (i+1)*dx; // Physical x position
-      u[i+j*n] = sin(PI * x / length) * sin(PI * y / length);
+      u[i+j*n] = sin(acos(-1.0) * x / length) * sin(acos(-1.0) * y / length);
     }
   }
 
@@ -194,7 +193,7 @@ int main(int argc, char *argv[]) {
 // True answer given by the manufactured solution
 double solution(const double t, const double x, const double y, const double alpha, const double length) {
 
-  return exp(-2.0*alpha*PI*PI*t/(length*length)) * sin(PI*x/length) * sin(PI*y/length);
+  return exp(-2.0*alpha*M_PI*M_PI*t/(length*length)) * sin(M_PI*x/length) * sin(M_PI*y/length);
 
 }
 
