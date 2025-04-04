@@ -44,6 +44,7 @@ void SwishGradientKernel(
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
+    const int slm_size,
     const int N,
     const T* X,
     const T* Y,
