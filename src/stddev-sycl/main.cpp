@@ -49,6 +49,7 @@ void sopKernel (
   sycl::queue &q,
   sycl::range<3> &gws,
   sycl::range<3> &lws,
+  const int slm_size,
         Type *__restrict__ std,
   const Type *__restrict__ data,
   IdxType D,
@@ -133,7 +134,7 @@ void stddev(sycl::queue &q,
   // required for atomics
   q.memset(std, 0, sizeof(Type) * D); // required for atomics
 
-  sopKernel<Type, IdxType, TPB, ColsPerBlk>(q, gws, lws, std, data, D, N);
+  sopKernel<Type, IdxType, TPB, ColsPerBlk>(q, gws, lws, 0, std, data, D, N);
 
   sycl::range<3> gws2 (1, 1, (D+TPB-1)/TPB*TPB);
   sycl::range<3> lws2 (1, 1, TPB);
