@@ -37,7 +37,6 @@
 #include <cuda.h>
 
 // Key constants used in this program
-#define PI acos(-1.0) // Pi
 #define LINE "--------------------" // A line for fancy output
 
 __global__ void initial_value(const unsigned int n, const double dx, const double length, double * u);
@@ -205,7 +204,7 @@ __global__ void initial_value(const unsigned int n, const double dx, const doubl
     int j = idx / n;
     double y = dx * (j+1); // Physical y position
     double x = dx * (i+1); // Physical x position
-    u[i+j*n] = sin(PI * x / length) * sin(PI * y / length);
+    u[i+j*n] = sin(acos(-1.0) * x / length) * sin(acos(-1.0) * y / length);
   }
 }
 
@@ -241,7 +240,7 @@ __global__ void solve(const unsigned int n, const double alpha, const double dx,
 // True answer given by the manufactured solution
 double solution(const double t, const double x, const double y, const double alpha, const double length) {
 
-  return exp(-2.0*alpha*PI*PI*t/(length*length)) * sin(PI*x/length) * sin(PI*y/length);
+  return exp(-2.0*alpha*M_PI*M_PI*t/(length*length)) * sin(M_PI*x/length) * sin(M_PI*y/length);
 
 }
 

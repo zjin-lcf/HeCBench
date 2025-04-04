@@ -35,7 +35,6 @@
 #include <sycl/sycl.hpp>
 
 // Key constants used in this program
-#define PI sycl::acos(-1.0) // Pi
 #define LINE "--------------------" // A line for fancy output
 
 double solution(const double t, const double x, const double y, const double alpha, const double length);
@@ -60,7 +59,7 @@ void initial_value(
         int j = idx / n;
         double y = dx * (j+1); // Physical y position
         double x = dx * (i+1); // Physical x position
-        u[i+j*n] = sycl::sin(PI * x / length) * sycl::sin(PI * y / length);
+        u[i+j*n] = sycl::sin(sycl::acos(-1.0) * x / length) * sycl::sin(sycl::acos(-1.0) * y / length);
       }
 
     };
@@ -264,9 +263,7 @@ int main(int argc, char *argv[]) {
 
 // True answer given by the manufactured solution
 double solution(const double t, const double x, const double y, const double alpha, const double length) {
-
-  return exp(-2.0*alpha*PI*PI*t/(length*length)) * sin(PI*x/length) * sin(PI*y/length);
-
+  return exp(-2.0*alpha*M_PI*M_PI*t/(length*length)) * sin(M_PI*x/length) * sin(M_PI*y/length);
 }
 
 
