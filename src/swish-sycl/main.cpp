@@ -116,7 +116,7 @@ void eval_swish (const int N, const int repeat) {
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    SwishGradientKernel(q, gws, lws, N, d_X, d_Y, d_dY, d_dX);
+    SwishGradientKernel(q, gws, lws, 0, N, d_X, d_Y, d_dY, d_dX);
   };
 
   q.wait();
