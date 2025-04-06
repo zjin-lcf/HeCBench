@@ -125,9 +125,9 @@ int main(int argc, char **argv) {
     int block_size = block_sizes[j];
     printf("Checking block size %d.\n", block_size);
     permute (q, d_out, d_inp, B, T, C, NH, block_size);
-    validate_result(d_out, Q, "q", S, 1e-6f);
-    validate_result(d_out+B*T*C, K, "k", S, 1e-6f);
-    validate_result(d_out+2*B*T*C, V, "v", S, 1e-6f);
+    validate_result(q, d_out, Q, "q", S, 1e-6f);
+    validate_result(q, d_out+B*T*C, K, "k", S, 1e-6f);
+    validate_result(q, d_out+2*B*T*C, V, "v", S, 1e-6f);
   }
   printf("All results match. Starting benchmarks.\n\n");
 
