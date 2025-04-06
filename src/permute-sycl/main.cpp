@@ -93,33 +93,33 @@ int main(int argc, char **argv) {
   // create host memory of random numbers
   float* inp = make_random_float(S * 3);
   float* out = make_random_float(S * 3);
-  float* q = make_random_float(S);
-  float* k = make_random_float(S);
-  float* v = make_random_float(S);
+  float* Q = make_random_float(S);
+  float* K = make_random_float(S);
+  float* V = make_random_float(S);
 
-  permuate_cpu(inp, q, k, v, B, T, C, NH);
+  permuate_cpu(inp, Q, K, V, B, T, C, NH);
 
   // move to GPU
 #ifdef USE_GPU
-  sycl::queue que(sycl::gpu_selector_v, sycl::property::queue::in_order());
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  sycl::queue que(sycl::cpu_selector_v, sycl::property::queue::in_order());
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
   float *d_inp, *d_out;
-  d_inp = sycl::malloc_device<float>(S * 3, que);
-  que.memcpy(d_inp, inp, S * 3 * sizeof(float));
-  d_out = sycl::malloc_device<float>(S * 3, que);
+  d_inp = sycl::malloc_device<float>(S * 3, q);
+  q.memcpy(d_inp, inp, S * 3 * sizeof(float));
+  d_out = sycl::malloc_device<float>(S * 3, q);
 
   int block_sizes[] = {32, 64, 128, 256, 512};
 
   for (size_t j = 0; j < sizeof(block_sizes) / sizeof(int); j++) {
     int block_size = block_sizes[j];
     printf("Checking block size %d.\n", block_size);
-    permute (que, d_out, d_inp, B, T, C, NH, block_size);
-    validate_result(d_out, q, "q", S, 1e-6f);
-    validate_result(d_out+B*T*C, k, "k", S, 1e-6f);
-    validate_result(d_out+2*B*T*C, v, "v", S, 1e-6f);
+    permute (q, d_out, d_inp, B, T, C, NH, block_size);
+    validate_result(d_out, Q, "q", S, 1e-6f);
+    validate_result(d_out+B*T*C, K, "k", S, 1e-6f);
+    validate_result(d_out+2*B*T*C, V, "v", S, 1e-6f);
   }
   printf("All results match. Starting benchmarks.\n\n");
 
@@ -127,19 +127,19 @@ int main(int argc, char **argv) {
   for (size_t j = 0; j < sizeof(block_sizes) / sizeof(int); j++) {
     int block_size = block_sizes[j];
     float elapsed_time = benchmark_kernel(repeat_times, permute,
-        que, d_out, d_inp, B, T, C, NH, block_size);
+        q, d_out, d_inp, B, T, C, NH, block_size);
 
     printf("block_size %4d | time %f ms\n", block_size, elapsed_time);
   }
 
   // free memory
   free(inp);
-  free(q);
-  free(k);
-  free(v);
+  free(Q);
+  free(K);
+  free(V);
   free(out);
-  sycl::free(d_inp, que);
-  sycl::free(d_out, que);
+  sycl::free(d_inp, q);
+  sycl::free(d_out, q);
 
   return 0;
 }
