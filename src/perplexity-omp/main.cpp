@@ -25,20 +25,19 @@
 #include "reference.cpp"
 
 template <typename value_idx, typename value_t>
-void perplexity_search(const value_t* __restrict distances,
-                       value_t* __restrict P,
-                       const float perplexity,
-                       const int epochs,
-                       const float tol,
-                       const value_idx n,
-                       const int k,
-                       double &time)
+void sigmas_kernel(const unsigned int numTeams,
+                   const unsigned int numThreads,
+                   const value_t* __restrict__ distances,
+                         value_t* __restrict__ P,
+                   const float perplexity,
+                   const float desired_entropy,
+                   const int epochs,
+                   const float tol,
+                   const value_idx n,
+                   const int k)
 {
-  const float desired_entropy = logf(perplexity);
-
-  auto start = std::chrono::steady_clock::now();
-
-  #pragma omp target teams distribute parallel for thread_limit(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < n; i++) {
     value_t beta_min = -INFINITY, beta_max = INFINITY;
     value_t beta = 1;
@@ -84,6 +83,26 @@ void perplexity_search(const value_t* __restrict distances,
       }
     }
   }
+}
+
+template <typename value_idx, typename value_t>
+void perplexity_search(const value_t* __restrict distances,
+                       value_t* __restrict P,
+                       const float perplexity,
+                       const int epochs,
+                       const float tol,
+                       const value_idx n,
+                       const int dim,
+                       double &time)
+{
+  const float desired_entropy = logf(perplexity);
+
+  const unsigned int numThreads = 256;
+  const unsigned int numTeams = (n+255) / numThreads;
+
+  auto start = std::chrono::steady_clock::now();
+
+  sigmas_kernel(numTeams, numThreads, distances, P, perplexity, desired_entropy, epochs, tol, n, dim);
 
   auto end = std::chrono::steady_clock::now();
   time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
