@@ -7,6 +7,30 @@
 
 #define NUM_THREADS 256
 
+void accuracy_kernel(const unsigned int numTeams,
+                     const unsigned int numThreads,
+                     const int N, const int D, const int top_k,
+                     const float* Xdata, const int* labelData, int* accuracy)
+{
+  #pragma omp target teams distribute num_teams(numTeams)
+  for (int row = 0; row < N; row++) {
+    const int label = labelData [ row ];
+    const float label_pred = Xdata [ row * D + label ];
+    int ngt = 0;
+    #pragma omp parallel for reduction (+:ngt) num_threads(numThreads)
+    for ( int col = 0; col < D; col++ ) {
+      const float pred = Xdata [ row * D + col ];
+      if ( pred > label_pred || ( pred == label_pred && col <= label)) {
+        ++ngt;
+      }
+    }
+    if (ngt <= top_k) {
+      #pragma omp atomic
+      (*accuracy)++;
+    }
+  }
+}
+
 int main(int argc, char* argv[])
 {
   if (argc != 5) {
@@ -37,9 +61,9 @@ int main(int argc, char* argv[])
     data[i] = distr(g);
   }
 
-  int count_ref = reference(nrows, ndims, top_k, data, label);
+  int *count = (int*) malloc (sizeof(int));
 
-  int count[1];
+  int count_ref = reference(nrows, ndims, top_k, data, label);
 
   #pragma omp target data map(to: label[0:nrows], data[0:data_size]) \
                           map(alloc: count[0:1])
@@ -53,24 +77,7 @@ int main(int argc, char* argv[])
       for (int i = 0; i < repeat; i++) {
         count[0] = 0;
         #pragma omp target update to (count[0:1]) 
-
-        #pragma omp target teams distribute num_teams(ngrid)
-        for (int row = 0; row < nrows; row++) {
-          const int label_data = label[row];
-          const float label_pred = data[row * ndims + label_data];
-          int ngt = 0;
-          #pragma omp parallel for reduction(+:ngt) num_threads(NUM_THREADS)
-          for (int col = 0; col < ndims; col++) {
-            const float pred = data[row * ndims + col];
-            if (pred > label_pred || (pred == label_pred && col <= label_data)) {
-              ++ngt;
-            }
-          }
-          if (ngt <= top_k) {
-            #pragma omp atomic update
-            ++count[0];
-          }
-        }
+        accuracy_kernel(ngrid, NUM_THREADS, nrows, ndims, top_k, data, label, count);
       }
 
       auto end = std::chrono::steady_clock::now();
@@ -86,6 +93,7 @@ int main(int argc, char* argv[])
 
   free(label);
   free(data);
+  free(count);
 
   return 0;
 }
