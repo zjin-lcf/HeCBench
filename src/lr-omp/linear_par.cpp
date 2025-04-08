@@ -102,12 +102,12 @@ void r_squared(linear_param_t *params, data_t *dataset, sum_t *linreg, result_t 
     #pragma omp target data map (to: dataset[0:size])\
                             map (alloc: results[0:wg_count])
     {
-      const int nTeams = gpu_global_size / wg_size;
+      const unsigned int nTeams = gpu_global_size / wg_size;
 
       auto start = std::chrono::steady_clock::now();
 
       for (int i = 0; i < params->repeat; i++)
-        rsquared(nTeams, dataset, mean, equation, results);
+        rsquared(nTeams, wg_size, dataset, mean, equation, results);
 
       auto end = std::chrono::steady_clock::now();
       auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -159,12 +159,12 @@ void parallelized_regression(linear_param_t *params, data_t *dataset, result_t *
     #pragma omp target data map (to: dataset[0:size])\
                             map (alloc: results[0:wg_count])
     {
-      const int nTeams = gpu_global_size / wg_size;
+      const unsigned int nTeams = gpu_global_size / wg_size;
 
       auto start = std::chrono::steady_clock::now();
 
       for (int i = 0; i < params->repeat; i++)
-        linear_regression(nTeams, dataset, results);
+        linear_regression(nTeams, wg_size, dataset, results);
 
       auto end = std::chrono::steady_clock::now();
       auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
