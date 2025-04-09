@@ -7,6 +7,44 @@
 
 typedef float DTYPE;
 
+void maxpool3d(
+  const unsigned int numTeams,
+  const unsigned int numThreads,
+  const DTYPE* i_img,
+        DTYPE* o_img,
+  const int Hstride,
+  const int Vstride,
+  const int pool_width,
+  const int pool_height,
+  const int i_img_count,
+  const int i_img_width,
+  const int i_img_height,
+  const int o_img_width,
+  const int o_img_height )
+{
+  #pragma omp target teams distribute parallel for collapse(3) \
+  num_teams(numTeams) num_threads(numThreads)
+  for (int z = 0; z < i_img_count; z++) {
+    for (int y = 0; y < o_img_height; y++) {
+      for (int x = 0; x < o_img_width; x++) {
+        const int xidx = Hstride*x;
+        const int yidx = Vstride*y;
+        DTYPE maxval = (DTYPE)0;
+        for (int r = 0; r < pool_height; r++) 
+        { 
+          const int idxIntmp = ((z*i_img_height + yidx + r) * i_img_width) + xidx;
+          for(int c = 0; c < pool_width; c++)
+          {
+            const int idxIn = idxIntmp + c;
+            maxval = fmaxf(maxval, i_img[idxIn]);
+          }
+        }
+        o_img[(((z * o_img_height) + y) * o_img_width) + x] = maxval;
+      }
+    }
+  }
+}
+
 int main(int argc, char** argv)
 {
   if (argc != 5) {
@@ -50,32 +88,20 @@ int main(int argc, char** argv)
   const int pool_width  = Hstride;
   const int pool_height = Vstride;
 
+  const unsigned int numThreads = 256;
+  const unsigned int numTeams = (o_img_width + 7) / 8 *
+                                (o_img_height + 7) / 8 *
+                                (i_img_count + 3) / 4;
+
   #pragma omp target data map(to: h_image[0:size_image*i_img_count]) \
                           map(from: d_output[0:size_output*i_img_count])
   {
     auto start = std::chrono::steady_clock::now();
 
     for (int n = 0; n < repeat; n++) {
-      #pragma omp target teams distribute parallel for collapse(3) thread_limit(256) 
-      for (int z = 0; z < i_img_count; z++) {
-        for (int y = 0; y < o_img_height; y++) {
-          for (int x = 0; x < o_img_width; x++) {
-            const int xidx = Hstride*x;
-            const int yidx = Vstride*y;
-            DTYPE maxval = (DTYPE)0;
-            for (int r = 0; r < pool_height; r++) 
-            { 
-              const int idxIntmp = ((z*i_img_height + yidx + r) * i_img_width) + xidx;
-              for(int c = 0; c < pool_width; c++)
-              {
-                const int idxIn = idxIntmp + c;
-                maxval = fmaxf(maxval,h_image[idxIn]);
-              }
-            }
-            d_output[(((z*o_img_height)+y)*o_img_width)+x] = maxval;
-          }
-        }
-      }
+      maxpool3d(numTeams, numThreads, h_image, d_output, Hstride, Vstride, 
+                pool_width, pool_height, i_img_count, i_img_width, i_img_height,
+                o_img_width, o_img_height);
     }
 
     auto end = std::chrono::steady_clock::now();
