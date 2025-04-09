@@ -15,6 +15,7 @@ maxpool3d(
   const int Vstride,
   const int pool_width,
   const int pool_height,
+  const int i_img_count,
   const int i_img_width,
   const int i_img_height,
   const int o_img_width,
@@ -23,6 +24,9 @@ maxpool3d(
   const int x = blockIdx.x * blockDim.x + threadIdx.x;
   const int y = blockIdx.y * blockDim.y + threadIdx.y;
   const int z = blockIdx.z * blockDim.z + threadIdx.z;
+  if (x >= o_img_width || y >= o_img_height || z >= i_img_count)
+    return;
+
   const int xidx = Hstride * x;
   const int yidx = Vstride * y;
   DTYPE maxval = (DTYPE)0;
@@ -47,12 +51,6 @@ int main(int argc, char** argv)
   }
   int i_img_width  = atoi(argv[1]);  
   int i_img_height = atoi(argv[2]);
-
-  if (i_img_width % 16 != 0 || i_img_height % 16 != 0) {
-    printf("image dimension is a multiple of 16\n");
-    return 1;
-  }
-
   int i_img_count = atoi(argv[3]);
   int repeat = atoi(argv[4]);
 
@@ -92,9 +90,8 @@ int main(int argc, char** argv)
   DTYPE* d_result;
   cudaMalloc((void**)&d_result, mem_size_output*i_img_count);
 
-  // assume output image dimensions are multiple of 16
-  dim3 block_dim (16, 16, 1);
-  dim3 grid_dim(o_img_width/16, o_img_height/16, i_img_count);
+  dim3 block_dim (8, 8, 4);
+  dim3 grid_dim((o_img_width+7)/8, (o_img_height+7)/8, (i_img_count+3)/4);
 
   // filter size same as stride size
   const int pool_width  = Hstride;
@@ -105,7 +102,7 @@ int main(int argc, char** argv)
 
   for (int n = 0; n < repeat; n++) {
     maxpool3d<<<grid_dim, block_dim>>>(d_image, d_result, Hstride, Vstride, 
-      pool_width, pool_height, i_img_width, i_img_height, o_img_width, o_img_height);
+      pool_width, pool_height, i_img_count, i_img_width, i_img_height, o_img_width, o_img_height);
   }
 
   cudaDeviceSynchronize();
