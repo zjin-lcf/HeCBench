@@ -14,6 +14,7 @@ void maxpool3d(
   const int Vstride,
   const int pool_width,
   const int pool_height,
+  const int i_img_count,
   const int i_img_width,
   const int i_img_height,
   const int o_img_width,
@@ -23,6 +24,9 @@ void maxpool3d(
   const int x = item.get_global_id(2);
   const int y = item.get_global_id(1);
   const int z = item.get_global_id(0);
+  if (x >= o_img_width || y >= o_img_height || z >= i_img_count)
+    return;
+
   const int xidx = Hstride*x;
   const int yidx = Vstride*y;
   DTYPE maxval = (DTYPE)0;
@@ -47,12 +51,6 @@ int main(int argc, char** argv)
   }
   int i_img_width  = atoi(argv[1]);
   int i_img_height = atoi(argv[2]);
-
-  if (i_img_width % 16 != 0 || i_img_height % 16 != 0) {
-    printf("image dimension is a multiple of 16\n");
-    return 1;
-  }
-
   int i_img_count = atoi(argv[3]);
   int repeat = atoi(argv[4]);
 
@@ -96,9 +94,10 @@ int main(int argc, char** argv)
 
   DTYPE *d_result = sycl::malloc_device<DTYPE>(size_output*i_img_count, q);
 
-  // assume output image dimensions are multiple of 16
-  sycl::range<3> lws (1, 16, 16);
-  sycl::range<3> gws (i_img_count, o_img_height, o_img_width);
+  sycl::range<3> lws (4, 8, 8);
+  sycl::range<3> gws ((i_img_count+3)/4*4,
+                      (o_img_height+7)/8*8,
+                      (o_img_width+7)/8*8);
 
   // filter size same as stride size
   const int pool_width  = Hstride;
@@ -112,7 +111,7 @@ int main(int argc, char** argv)
       h.parallel_for<class maxpool3>(
       sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         maxpool3d(d_image, d_result, Hstride, Vstride,
-                  pool_width, pool_height, i_img_width, i_img_height,
+                  pool_width, pool_height, i_img_count, i_img_width, i_img_height,
                   o_img_width, o_img_height, item);
       });
     });

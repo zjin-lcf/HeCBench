@@ -15,13 +15,6 @@ int main(int argc, char** argv)
   }
   int i_img_width  = atoi(argv[1]);  
   int i_img_height = atoi(argv[2]);
-
-  // not required for the omp version
-  if (i_img_width % 16 != 0 || i_img_height % 16 != 0) {
-    printf("image dimension is a multiple of 16\n");
-    return 1;
-  }
-
   int i_img_count = atoi(argv[3]);
   int repeat = atoi(argv[4]);
 
