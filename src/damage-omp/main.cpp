@@ -49,10 +49,13 @@ int main(int argc, char* argv[]) {
   #pragma omp target data map(to: nlist[0:n], family[0:m]) \
                           map(from: n_neigh[0:m], damage[0:m])
   {
+    const int numTeams = m;
+    const int numThreads = BS;
+
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) 
-      damage_of_node (n, nlist, family, n_neigh, damage);
+      damage_of_node (numTeams, numThreads, n, nlist, family, n_neigh, damage);
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
