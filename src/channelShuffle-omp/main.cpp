@@ -9,6 +9,8 @@
 
 template <typename T>
 void ChannelShuffleNCHWKernel(
+    const int numTeams,
+    const int numThreads,
     const int N,
     const int G,
     const int K,
@@ -17,7 +19,8 @@ void ChannelShuffleNCHWKernel(
           T* Y)
 {
   const int C = G * K;
-  #pragma omp target teams distribute parallel for collapse(3) num_threads(NUM_THREADS)
+  #pragma omp target teams distribute parallel for collapse(3) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int n = 0; n < N; n++)
     for (int c = 0; c < C; c++)
       for (int s = 0; s < HxW; s++)
@@ -25,11 +28,18 @@ void ChannelShuffleNCHWKernel(
 }
 
 template <typename T>
-void
-ChannelShuffleNHWCKernel(const int O, const int G, const int K, const T* X, T* Y)
+void ChannelShuffleNHWCKernel(
+    const int numTeams,
+    const int numThreads,
+    const int O,
+    const int G,
+    const int K,
+    const T* X,
+          T* Y)
 {
   const int C = G * K;
-  #pragma omp target teams distribute parallel for collapse(2) num_threads(NUM_THREADS)
+  #pragma omp target teams distribute parallel for collapse(2) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int o = 0; o < O; o++)
     for (int i = 0; i < C; i++)
       Y[o*C + i] = X[o*C + (i % G) * K + i / G];
@@ -43,11 +53,15 @@ bool ChannelShuffleNCHW (T *X, int N, int C, int G, int numel, T *Y,
 
   const int K = C / G;
   const int HxW = numel / (N * C);
+  const int S = (HxW + NUM_THREADS - 1) / NUM_THREADS;
+
+  const int numTeams = S * N * C; 
+  const int numThreads = NUM_THREADS;
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    ChannelShuffleNCHWKernel<float>(N, G, K, HxW, X, Y);
+    ChannelShuffleNCHWKernel<float>(numTeams, numThreads, N, G, K, HxW, X, Y);
   }
 
   auto end = std::chrono::steady_clock::now();
@@ -65,11 +79,13 @@ bool ChannelShuffleNHWC (T *X, int N, int C, int G, int numel, T *Y,
   const int K = C / G;
   const int HxW = numel / (N * C);
   const int O = N * HxW;
+  const int numTeams = O;
+  const int numThreads = NUM_THREADS;
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    ChannelShuffleNHWCKernel<float>(O, G, K, X, Y);
+    ChannelShuffleNHWCKernel<float>(numTeams, numThreads, O, G, K, X, Y);
   }
 
   auto end = std::chrono::steady_clock::now();
