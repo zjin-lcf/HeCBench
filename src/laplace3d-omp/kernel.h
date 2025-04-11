@@ -27,11 +27,14 @@
 // device code
 
 void laplace3d(
+  const int numTeams,  
+  const int numThreads,  
   int NX, int NY, int NZ, int pitch, 
   const float *__restrict u1,
         float *__restrict u2)
 {
-  #pragma omp target teams distribute parallel for collapse(3) thread_limit(BLOCK_X*BLOCK_Y)
+  #pragma omp target teams distribute parallel for collapse(3) \
+   num_teams(numTeams), num_threads(numThreads)
   for (int k=0; k<NZ; k++) {
     for (int j=0; j<NY; j++) {
       for (int i=0; i<NX; i++) {   // i loop innermost for sequential memory access
