@@ -34,14 +34,15 @@ namespace mean_shift::gpu {
     }
   }
 
-  void mean_shift_tiling(const float* data, float* data_next,
-                         const int teams, const int threads) {
-    #pragma omp target teams num_teams(teams) thread_limit(threads)
-    {
+  void mean_shift_tiling(const int numTeams,
+                         const int numThreads,
+                         const float* data,
+                               float* data_next)
+  {
+    #pragma omp target teams num_teams(numTeams) {
       float local_data[TILE_WIDTH * D];
       float valid_data[TILE_WIDTH];
-      #pragma omp parallel 
-      {
+      #pragma omp parallel num_threads(numThreads) {
         int lid = omp_get_thread_num();
         int bid = omp_get_team_num();
         int tid = bid * omp_get_num_threads() + lid;
@@ -153,7 +154,7 @@ int main(int argc, char* argv[]) {
 
     start = std::chrono::steady_clock::now();
     for (size_t i = 0; i < mean_shift::gpu::NUM_ITER; ++i) {
-      mean_shift::gpu::mean_shift_tiling(d_data, d_data_next, BLOCKS, THREADS);
+      mean_shift::gpu::mean_shift_tiling(BLOCKS, THREADS, d_data, d_data_next);
       mean_shift::gpu::utils::swap(d_data, d_data_next);
     }
     end = std::chrono::steady_clock::now();
