@@ -5,6 +5,7 @@
 #include <random>
 #include <hip/hip_runtime.h>
 #include "kernels.h"
+#include "reference.h"
 
 int main(int argc, char* argv[])
 {
@@ -21,6 +22,7 @@ int main(int argc, char* argv[])
 
   float *g = (float*) malloc (size_bytes);
   float *p = (float*) malloc (size_bytes);
+  float *p_ref = (float*) malloc (size_bytes);
   float *m_qscale = (float*) malloc (size_bytes);
   float *v_qscale = (float*) malloc (size_bytes);
   int8_t *m = (int8_t*) malloc (vector_size);
@@ -33,7 +35,7 @@ int main(int argc, char* argv[])
     m_qscale[i] = dist(gen);
     v_qscale[i] = dist(gen);
     g[i] = dist(gen);
-    r[i] = p[i] = dist(gen);
+    r[i] = p[i] = p_ref[i] = dist(gen);
   }
 
   for (int64_t i = 0; i < vector_size; i++) {
@@ -63,7 +65,8 @@ int main(int argc, char* argv[])
   hipMemcpy(d_p, p, size_bytes, hipMemcpyHostToDevice);
 
   const int threadsPerBlock = 64; // fixed at 64
-  const dim3 grids ((vector_size+threadsPerBlock-1) / threadsPerBlock);
+  const int blocksPerGrid = (vector_size+threadsPerBlock-1) / threadsPerBlock;
+  const dim3 grids (blocksPerGrid);
   const dim3 blocks (threadsPerBlock);
 
   // default constants
@@ -75,6 +78,64 @@ int main(int argc, char* argv[])
   const float resid_beta1 = 1.0f - beta1;
   const float resid_beta2 = 1.0f - beta2;
   const float weight_decay_update = 1.0f - lr * weight_decay;
+
+  for (int step = 1; step <= time_step; step++) {
+
+    const float correction1 = 1.0f - powf(beta1, step);
+    const float correction2_sqrt = sqrtf(1.0f - powf(beta2, step));
+    const float step_size = lr / correction1;
+
+    fused_4bit_kernel<float><<<grids, blocks>>>(
+              d_p,
+              d_g,
+              d_m_qscale,
+              d_v_qscale,
+              d_m,
+              d_v,
+              beta1,
+              beta2,
+              lr,
+              weight_decay,
+              eps,
+              step,
+              vector_size,
+              correction1,
+              correction2_sqrt,
+              step_size,
+              weight_decay_update,
+              resid_beta1,
+              resid_beta2);
+
+    reference<float, threadsPerBlock>(
+              blocksPerGrid,
+              p_ref,
+              g,
+              m_qscale,
+              v_qscale,
+              m,
+              v,
+              beta1,
+              beta2,
+              lr,
+              weight_decay,
+              eps,
+              step,
+              vector_size,
+              correction1,
+              correction2_sqrt,
+              step_size,
+              weight_decay_update,
+              resid_beta1,
+              resid_beta2);
+  }
+
+  hipMemcpy(p, d_p, size_bytes, hipMemcpyDeviceToHost); 
+  float absmax_error = 0;
+  for (int64_t i = 0; i < vector_size * 2; i++) {
+    absmax_error = fmaxf(absmax_error, fabsf(p[i] - p_ref[i]));
+  }
+  printf("Absolute maximum error: %f\n", absmax_error);
+  printf("%s\n", absmax_error > 1e-3f ? "FAIL" : "PASS");
 
   auto start = std::chrono::steady_clock::now();
 
@@ -110,8 +171,6 @@ int main(int argc, char* argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (ms)\n", time * 1e-6f / time_step);
 
-  hipMemcpy(p, d_p, size_bytes, hipMemcpyDeviceToHost); 
-
   hipFree(d_p);
   hipFree(d_m);
   hipFree(d_v);
@@ -120,6 +179,7 @@ int main(int argc, char* argv[])
   hipFree(d_g);
 
   free(p);
+  free(p_ref);
   free(m_qscale);
   free(v_qscale);
   free(m);
