@@ -37,11 +37,6 @@ typedef struct {
   double i, c, h;
 } checksum;
 
-// Device functions
-inline float sigmoidf(float in) {
-  return 1.f / (1.f + expf(-in));  
-}
-
 // Fused kernel
 void elementWise_fp(int hiddenSize, int miniBatch,
     const float *__restrict tmp_h, 
@@ -69,10 +64,10 @@ void elementWise_fp(int hiddenSize, int miniBatch,
       linearGates[gateIndex + i * hiddenSize] = g[i];
     }   
 
-    float in_gate     = sigmoidf(g[0]);
-    float forget_gate = sigmoidf(g[1]);
+    float in_gate     = 1.f / (1.f + expf(-g[0]));
+    float forget_gate = 1.f / (1.f + expf(-g[1]));
     float in_gate2    = tanhf(g[2]);
-    float out_gate    = sigmoidf(g[3]);
+    float out_gate    = 1.f / (1.f + expf(-g[3]));
 
     float val = (forget_gate * c_in[index]) + (in_gate * in_gate2);
 
