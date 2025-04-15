@@ -94,6 +94,20 @@ void stddev(Type *std, const Type *data, IdxType D, IdxType N, bool sample) {
     std[i] = sqrtf(std[i] / sampleSize);
 }
 
+template <typename Type, typename IdxType = int>
+void stddev_fused(Type *std, const Type *data, IdxType D, IdxType N, bool sample)
+{
+  #pragma omp target teams distribute num_teams(D)
+  for (IdxType c = 0; c < D; c++) {
+    Type sum = 0;
+    #pragma omp parallel for reduction(+:sum) num_threads(256)
+    for (IdxType r = 0; r < N; r++)
+      sum += data[r*D+c] * data[r*D+c];
+    IdxType sampleSize = sample ? N-1 : N;
+    std[c] = sqrtf(sum / sampleSize);
+  }
+}
+
 int main(int argc, char* argv[]) {
   if (argc != 4) {
     printf("Usage: %s <D> <N> <repeat>\n", argv[0]);
@@ -149,6 +163,35 @@ int main(int argc, char* argv[]) {
   }
 
   printf("%s\n", ok ? "PASS" : "FAIL");
+
+  #pragma omp target data map (to: data[0:inputSize]) map (from: std[0:outputSize])
+  {
+    // warmup
+    stddev_fused(std, data, D, N, sample);
+
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      stddev_fused(std, data, D, N, sample);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of stddev_fused kernels: %f (s)\n", (time * 1e-9f) / repeat);
+  }
+
+  // verify
+  stddev_ref(std_ref, data, D, N, sample);
+
+  ok = true;
+  for (int i = 0; i < D; i++) {
+    if (fabsf(std_ref[i] - std[i]) > 1e-3) {
+      ok = false;
+      break;
+    }
+  }
+
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
   free(std_ref);
   free(std);
   free(data);
