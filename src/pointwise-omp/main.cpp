@@ -38,7 +38,10 @@ typedef struct {
 } checksum;
 
 // Fused kernel
-void elementWise_fp(int hiddenSize, int miniBatch,
+void elementWise_fp(
+    const int numTeams,
+    const int numThreads,
+    int hiddenSize, int miniBatch,
     const float *__restrict tmp_h, 
     const float *__restrict tmp_i, 
     const float *__restrict bias,
@@ -48,10 +51,9 @@ void elementWise_fp(int hiddenSize, int miniBatch,
     const float *__restrict c_in,
     float *__restrict c_out)
 {
-  int numElements = miniBatch * hiddenSize;
-
-  #pragma omp target teams distribute parallel for thread_limit(256)
-  for (int index = 0; index < numElements; index++) {
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int index = 0; index < miniBatch * hiddenSize; index++) {
 
     int batch = index / hiddenSize;
     int gateIndex = (index % hiddenSize) + 4 * batch * hiddenSize;   
@@ -148,6 +150,9 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
   int rEnd = 0;
   int recurBatchSize = 2;
 
+  const int numThreads = 256;
+  const int numTeams = ((numElements + 255)/256);
+
   double ktime = 0.0;
 
   while (true) {
@@ -192,8 +197,9 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
 
     for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
-        elementWise_fp
-        (hiddenSize, miniBatch,
+        elementWise_fp (
+         numTeams, numThreads,
+         hiddenSize, miniBatch,
          tmp_h + 4 * layer * numElements, 
          tmp_i + 4 * i * numElements, 
          bias + 8 * layer * hiddenSize,
