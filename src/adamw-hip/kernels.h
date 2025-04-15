@@ -1,15 +1,15 @@
 #define HOST_DEVICE __host__ __device__
 #define DEVICE __device__
 
-#include <cub/cub.cuh>
+#include <hipcub/hipcub.hpp>
 
 template <typename T>
 __device__ void BlockReduce(T &input1, T &input2) {
-  using BlockReduce = cub::BlockReduce<T, 64>;
+  using BlockReduce = hipcub::BlockReduce<T, 64>;
   __shared__ typename BlockReduce::TempStorage temp_storage1;
   __shared__ typename BlockReduce::TempStorage temp_storage2;
-  input1 = BlockReduce(temp_storage1).Reduce(input1, cub::Max());
-  input2 = BlockReduce(temp_storage2).Reduce(input2, cub::Max());
+  input1 = BlockReduce(temp_storage1).Reduce(input1, hipcub::Max());
+  input2 = BlockReduce(temp_storage2).Reduce(input2, hipcub::Max());
 }
 
 static DEVICE __const__ uint8_t _bitmask = 15;

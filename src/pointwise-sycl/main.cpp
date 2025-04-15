@@ -70,10 +70,10 @@ void elementWise_fp(
     linearGates[gateIndex + i * hiddenSize] = g[i];
   }
 
-  float in_gate     = sigmoidf(g[0]);
-  float forget_gate = sigmoidf(g[1]);
+  float in_gate     = 1.f / (1.f + sycl::exp(-g[0]));
+  float forget_gate = 1.f / (1.f + sycl::exp(-g[1]));
   float in_gate2    = sycl::tanh(g[2]);
-  float out_gate    = sigmoidf(g[3]);
+  float out_gate    = 1.f / (1.f + sycl::exp(-g[3]));
 
   float val = (forget_gate * c_in[index]) + (in_gate * in_gate2);
 
