@@ -48,6 +48,8 @@ void reference(
 }
 
 void tissue(
+    const   int numTeams,
+    const   int numThreads,
     const   int *__restrict d_tisspoints,
     const float *__restrict d_gtt,
     const float *__restrict d_gbartt,
@@ -56,7 +58,8 @@ void tissue(
     const float *__restrict d_qt,
     int nnt, int nntDev, int step, int isp)
 {
-  #pragma omp target teams distribute parallel for thread_limit(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < step * nnt; i++) {
     int jtp,ixyz,ix,iy,iz,jx,jy,jz,istep;
     int nnt2 = 2*nnt;
@@ -124,6 +127,9 @@ int main(int argc, char** argv) {
 
   int step = 4; //a power of two 
 
+  int threadsPerBlock = 256;
+  int blocksPerGrid = (step*nnt + threadsPerBlock - 1) / threadsPerBlock;
+
   #pragma omp target data map (to: h_tisspoints[0:3*nntDev],\
                                    h_gtt[0:nsp*nntDev],\
                                    h_gbartt[0:nsp*nntDev],\
@@ -133,8 +139,8 @@ int main(int argc, char** argv) {
   {
     // quick verification and warmup
     for (int i = 0; i < 2; i++) {
-      tissue(h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,1);
-      tissue(h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,2);
+      tissue(blocksPerGrid, threadsPerBlock, h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,1);
+      tissue(blocksPerGrid, threadsPerBlock, h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,2);
     }
 
     // may take long for a large grid on host
@@ -159,8 +165,8 @@ int main(int argc, char** argv) {
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      tissue(h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,1);
-      tissue(h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,2);
+      tissue(blocksPerGrid, threadsPerBlock, h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,1);
+      tissue(blocksPerGrid, threadsPerBlock, h_tisspoints,h_gtt,h_gbartt,h_ct,h_ctprev,h_qt,nnt,nntDev,step,2);
     }
 
     auto end = std::chrono::steady_clock::now();
