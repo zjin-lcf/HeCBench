@@ -111,11 +111,14 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
   #pragma omp target data map(to: AT[0:AT_SIZE], X[0:X_SIZE]) \
                           map(tofrom: Y[0:Y_SIZE])
   {
+    const int numTeams = 12;
+    const int numThreads = 32;
+
     auto start = std::chrono::steady_clock::now();
 
     for (int n = 0; n < REPEAT; n++) {
-      kernel0(AT, X, Y, alpha_im, alpha_re, beta_im, beta_re);
-      kernel1(AT, X, Y, alpha_im, alpha_re);
+      kernel0(numTeams, numThreads, AT, X, Y, alpha_im, alpha_re, beta_im, beta_re);
+      kernel1(numTeams, numThreads, AT, X, Y, alpha_im, alpha_re);
     }
 
     auto end = std::chrono::steady_clock::now();

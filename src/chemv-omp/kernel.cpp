@@ -1,91 +1,87 @@
 #define ppcg_min(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x < _y ? _x : _y; })
 #define ppcg_max(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x > _y ? _x : _y; })
 
-void kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
+void kernel0(const int numTeams, const int numThreads,
+             struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
              float alpha_im, float alpha_re, float beta_im, float beta_re)
 {
-  #pragma omp target teams num_teams(12) thread_limit(32) 
-  {
-    #pragma omp parallel 
-    {
-    int b0 = omp_get_team_num();
-    int t0 = omp_get_thread_num();
-    float private_var5_Re;
-    float private_var5_Im;
-    float private_var2_Re;
-    float private_var3_Im;
-    float private_var2_Im;
-    float private_var4_Im;
-    float private_var4_Re;
-    float private_var3_Re;
-    float private_var99_Re;
-    float private_var98_Im;
-    float private_var97_Im;
-    float private_var99_Im;
-    float private_var97_Re;
-    float private_var98_Re;
+ #pragma omp target teams distribute parallel for collapse(2) \
+  num_teams(numTeams) num_threads(numThreads)
+  for (int b0 = 0; b0 < numTeams; b0++) {
+    for (int t0 = 0; t0 < numThreads; t0++) {
+      float private_var5_Re;
+      float private_var5_Im;
+      float private_var2_Re;
+      float private_var3_Im;
+      float private_var2_Im;
+      float private_var4_Im;
+      float private_var4_Re;
+      float private_var3_Re;
+      float private_var99_Re;
+      float private_var98_Im;
+      float private_var97_Im;
+      float private_var99_Im;
+      float private_var97_Re;
+      float private_var98_Re;
 
-    for (int c1 = 0; c1 <= ppcg_min(368, 32 * b0 + 30); c1 += 32) {
-      if (32 * b0 + t0 <= 369 && c1 == 0) {
-        private_var5_Re = ((Y[32 * b0 + t0].Re * beta_re) - (Y[32 * b0 + t0].Im * beta_im));
-        private_var5_Im = ((Y[32 * b0 + t0].Im * beta_re) + (Y[32 * b0 + t0].Re * beta_im));
-        Y[32 * b0 + t0].Re = private_var5_Re;
-        Y[32 * b0 + t0].Im = private_var5_Im;
-        private_var2_Re = (alpha_re * AT[11872 * b0 + 371 * t0].Re);
-        private_var2_Im = (alpha_im * AT[11872 * b0 + 371 * t0].Re);
-        private_var3_Re = ((private_var2_Re * X[32 * b0 + t0].Re) - (private_var2_Im * X[32 * b0 + t0].Im));
-        private_var3_Im = ((private_var2_Im * X[32 * b0 + t0].Re) + (private_var2_Re * X[32 * b0 + t0].Im));
-        private_var4_Re = (Y[32 * b0 + t0].Re + private_var3_Re);
-        private_var4_Im = (Y[32 * b0 + t0].Im + private_var3_Im);
-        Y[32 * b0 + t0].Re = private_var4_Re;
-        Y[32 * b0 + t0].Im = private_var4_Im;
-      }
-      if (32 * b0 + t0 <= 369)
-        for (int c3 = 0; c3 <= ppcg_min(31, 32 * b0 + t0 - c1 - 1); c3 += 1) {
-          private_var97_Re = ((alpha_re * AT[32 * b0 + t0 + 370 * c1 + 370 * c3].Re) - (alpha_im * AT[32 * b0 + t0 + 370 * c1 + 370 * c3].Im));
-          private_var97_Im = ((alpha_im * AT[32 * b0 + t0 + 370 * c1 + 370 * c3].Re) + (alpha_re * AT[32 * b0 + t0 + 370 * c1 + 370 * c3].Im));
-          private_var98_Re = ((private_var97_Re * X[c1 + c3].Re) - (private_var97_Im * X[c1 + c3].Im));
-          private_var98_Im = ((private_var97_Im * X[c1 + c3].Re) + (private_var97_Re * X[c1 + c3].Im));
-          private_var99_Re = (Y[32 * b0 + t0].Re + private_var98_Re);
-          private_var99_Im = (Y[32 * b0 + t0].Im + private_var98_Im);
-          Y[32 * b0 + t0].Re = private_var99_Re;
-          Y[32 * b0 + t0].Im = private_var99_Im;
+      for (int c1 = 0; c1 <= ppcg_min(368, 32 * b0 + 30); c1 += 32) {
+        if (32 * b0 + t0 <= 369 && c1 == 0) {
+          private_var5_Re = ((Y[32 * b0 + t0].Re * beta_re) - (Y[32 * b0 + t0].Im * beta_im));
+          private_var5_Im = ((Y[32 * b0 + t0].Im * beta_re) + (Y[32 * b0 + t0].Re * beta_im));
+          Y[32 * b0 + t0].Re = private_var5_Re;
+          Y[32 * b0 + t0].Im = private_var5_Im;
+          private_var2_Re = (alpha_re * AT[11872 * b0 + 371 * t0].Re);
+          private_var2_Im = (alpha_im * AT[11872 * b0 + 371 * t0].Re);
+          private_var3_Re = ((private_var2_Re * X[32 * b0 + t0].Re) - (private_var2_Im * X[32 * b0 + t0].Im));
+          private_var3_Im = ((private_var2_Im * X[32 * b0 + t0].Re) + (private_var2_Re * X[32 * b0 + t0].Im));
+          private_var4_Re = (Y[32 * b0 + t0].Re + private_var3_Re);
+          private_var4_Im = (Y[32 * b0 + t0].Im + private_var3_Im);
+          Y[32 * b0 + t0].Re = private_var4_Re;
+          Y[32 * b0 + t0].Im = private_var4_Im;
         }
-#pragma omp barrier
-    }
+        if (32 * b0 + t0 <= 369)
+          for (int c3 = 0; c3 <= ppcg_min(31, 32 * b0 + t0 - c1 - 1); c3 += 1) {
+            private_var97_Re = ((alpha_re * AT[32 * b0 + t0 + 370 * c1 + 370 * c3].Re) - (alpha_im * AT[32 * b0 + t0 + 370 * c1 + 370 * c3].Im));
+            private_var97_Im = ((alpha_im * AT[32 * b0 + t0 + 370 * c1 + 370 * c3].Re) + (alpha_re * AT[32 * b0 + t0 + 370 * c1 + 370 * c3].Im));
+            private_var98_Re = ((private_var97_Re * X[c1 + c3].Re) - (private_var97_Im * X[c1 + c3].Im));
+            private_var98_Im = ((private_var97_Im * X[c1 + c3].Re) + (private_var97_Re * X[c1 + c3].Im));
+            private_var99_Re = (Y[32 * b0 + t0].Re + private_var98_Re);
+            private_var99_Im = (Y[32 * b0 + t0].Im + private_var98_Im);
+            Y[32 * b0 + t0].Re = private_var99_Re;
+            Y[32 * b0 + t0].Im = private_var99_Im;
+          }
+      }
     }
   }
 }
 
-void kernel1(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
+void kernel1(const int numTeams, const int numThreads,
+             struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
              float alpha_im, float alpha_re)
 {
-  #pragma omp target teams num_teams(12) thread_limit(32) 
-  {
-    #pragma omp parallel 
-    {
-    int b0 = omp_get_team_num();
-    int t0 = omp_get_thread_num();
-    float private_var96_Re;
-    float private_var96_Im;
-    float private_var94_Im;
-    float private_var95_Im;
-    float private_var94_Re;
-    float private_var95_Re;
+ #pragma omp target teams distribute parallel for collapse(2) \
+  num_teams(numTeams) num_threads(numThreads)
+  for (int b0 = 0; b0 < numTeams; b0++) {
+    for (int t0 = 0; t0 < numThreads; t0++) {
+      float private_var96_Re;
+      float private_var96_Im;
+      float private_var94_Im;
+      float private_var95_Im;
+      float private_var94_Re;
+      float private_var95_Re;
 
-    for (int c1 = 5888 * b0; c1 <= ppcg_min(67712, 5856 * b0 + 6016); c1 += 32) {
-      for (int c3 = ppcg_max(0, 5888 * b0 + 184 * t0 - c1); c3 <= ppcg_min(31, 5856 * b0 + 183 * t0 - c1 + 368); c3 += 1) {
-        private_var94_Re = ((alpha_re * AT[5984 * b0 + 187 * t0 + c1 + c3 + 1].Re) - (alpha_im * (-AT[5984 * b0 + 187 * t0 + c1 + c3 + 1].Im)));
-        private_var94_Im = ((alpha_im * AT[5984 * b0 + 187 * t0 + c1 + c3 + 1].Re) + (alpha_re * (-AT[5984 * b0 + 187 * t0 + c1 + c3 + 1].Im)));
-        private_var95_Re = ((private_var94_Re * X[-5856 * b0 - 183 * t0 + c1 + c3 + 1].Re) - (private_var94_Im * X[-5856 * b0 - 183 * t0 + c1 + c3 + 1].Im));
-        private_var95_Im = ((private_var94_Im * X[-5856 * b0 - 183 * t0 + c1 + c3 + 1].Re) + (private_var94_Re * X[-5856 * b0 - 183 * t0 + c1 + c3 + 1].Im));
-        private_var96_Re = (Y[32 * b0 + t0].Re + private_var95_Re);
-        private_var96_Im = (Y[32 * b0 + t0].Im + private_var95_Im);
-        Y[32 * b0 + t0].Re = private_var96_Re;
-        Y[32 * b0 + t0].Im = private_var96_Im;
+      for (int c1 = 5888 * b0; c1 <= ppcg_min(67712, 5856 * b0 + 6016); c1 += 32) {
+        for (int c3 = ppcg_max(0, 5888 * b0 + 184 * t0 - c1); c3 <= ppcg_min(31, 5856 * b0 + 183 * t0 - c1 + 368); c3 += 1) {
+          private_var94_Re = ((alpha_re * AT[5984 * b0 + 187 * t0 + c1 + c3 + 1].Re) - (alpha_im * (-AT[5984 * b0 + 187 * t0 + c1 + c3 + 1].Im)));
+          private_var94_Im = ((alpha_im * AT[5984 * b0 + 187 * t0 + c1 + c3 + 1].Re) + (alpha_re * (-AT[5984 * b0 + 187 * t0 + c1 + c3 + 1].Im)));
+          private_var95_Re = ((private_var94_Re * X[-5856 * b0 - 183 * t0 + c1 + c3 + 1].Re) - (private_var94_Im * X[-5856 * b0 - 183 * t0 + c1 + c3 + 1].Im));
+          private_var95_Im = ((private_var94_Im * X[-5856 * b0 - 183 * t0 + c1 + c3 + 1].Re) + (private_var94_Re * X[-5856 * b0 - 183 * t0 + c1 + c3 + 1].Im));
+          private_var96_Re = (Y[32 * b0 + t0].Re + private_var95_Re);
+          private_var96_Im = (Y[32 * b0 + t0].Im + private_var95_Im);
+          Y[32 * b0 + t0].Re = private_var96_Re;
+          Y[32 * b0 + t0].Im = private_var96_Im;
+        }
       }
-#pragma omp barrier
-    }
     }
   }
 }
