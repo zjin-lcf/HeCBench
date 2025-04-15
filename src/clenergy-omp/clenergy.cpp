@@ -35,6 +35,70 @@ struct int3 {
   int z;
 };
 
+void cenergy(const int numTeams,
+             const int numThreads,
+             const int3 volsize,  
+             const int numatoms, const float gridspacing, 
+             float *energygrid, const float4 *atominfo) 
+{
+  #pragma omp target teams distribute parallel for map(to: volsize) collapse(2) \
+   num_teams(numTeams) num_threads(numThreads)
+  for (unsigned int yindex = 0; yindex < volsize.y; yindex++) { 
+    for (unsigned int xindex = 0; xindex < volsize.x / UNROLLX; xindex++) { 
+    unsigned int outaddr = yindex * volsize.x + xindex; 
+    float coory = gridspacing * yindex;
+    float coorx = gridspacing * xindex;
+
+    float energyvalx1=0.0f;
+    float energyvalx2=0.0f;
+    float energyvalx3=0.0f;
+    float energyvalx4=0.0f;
+    float energyvalx5=0.0f;
+    float energyvalx6=0.0f;
+    float energyvalx7=0.0f;
+    float energyvalx8=0.0f;
+
+    float gridspacing_u = gridspacing * BLOCKSIZEX;
+
+    //
+    // XXX 59/8 FLOPS per atom
+    //
+    int atomid;
+    for (atomid=0; atomid<numatoms; atomid++) {
+      float dy = coory - atominfo[atomid].y;
+      float dyz2 = (dy * dy) + atominfo[atomid].z;
+
+      float dx1 = coorx - atominfo[atomid].x;
+      float dx2 = dx1 + gridspacing_u;
+      float dx3 = dx2 + gridspacing_u;
+      float dx4 = dx3 + gridspacing_u;
+      float dx5 = dx4 + gridspacing_u;
+      float dx6 = dx5 + gridspacing_u;
+      float dx7 = dx6 + gridspacing_u;
+      float dx8 = dx7 + gridspacing_u;
+
+      energyvalx1 += atominfo[atomid].w / sqrtf(dx1*dx1 + dyz2);
+      energyvalx2 += atominfo[atomid].w / sqrtf(dx2*dx2 + dyz2);
+      energyvalx3 += atominfo[atomid].w / sqrtf(dx3*dx3 + dyz2);
+      energyvalx4 += atominfo[atomid].w / sqrtf(dx4*dx4 + dyz2);
+      energyvalx5 += atominfo[atomid].w / sqrtf(dx5*dx5 + dyz2);
+      energyvalx6 += atominfo[atomid].w / sqrtf(dx6*dx6 + dyz2);
+      energyvalx7 += atominfo[atomid].w / sqrtf(dx7*dx7 + dyz2);
+      energyvalx8 += atominfo[atomid].w / sqrtf(dx8*dx8 + dyz2);
+    }
+
+    energygrid[outaddr             ] += energyvalx1;
+    energygrid[outaddr+1*BLOCKSIZEX] += energyvalx2;
+    energygrid[outaddr+2*BLOCKSIZEX] += energyvalx3;
+    energygrid[outaddr+3*BLOCKSIZEX] += energyvalx4;
+    energygrid[outaddr+4*BLOCKSIZEX] += energyvalx5;
+    energygrid[outaddr+5*BLOCKSIZEX] += energyvalx6;
+    energygrid[outaddr+6*BLOCKSIZEX] += energyvalx7;
+    energygrid[outaddr+7*BLOCKSIZEX] += energyvalx8;
+    }
+  }
+}
+
 int copyatoms(float *atoms, int count, float zplane, float4* atominfo) {
 
   if (count > MAXATOMS) {
@@ -105,6 +169,10 @@ int main(int argc, char** argv) {
   volsize.y = 768;
   volsize.z = 1;
 
+  const int numTeams = volsize.x / (BLOCKSIZEX * UNROLLX) * 
+                       volsize.y / (BLOCKSIZEY * UNROLLY); 
+  const int numThreads = BLOCKSIZEX * BLOCKSIZEY;
+
   // set voxel spacing
   float gridspacing = 0.1f;
 
@@ -173,61 +241,8 @@ int main(int argc, char** argv) {
     // RUN the kernel...
     wkf_timer_start(runtimer);
 
-    #pragma omp target teams distribute parallel for map(to:volsize) collapse(2) // nowait
-    for (unsigned int yindex = 0; yindex < volsize.y; yindex++) { 
-      for (unsigned int xindex = 0; xindex < volsize.x / UNROLLX; xindex++) { 
-      unsigned int outaddr = yindex * volsize.x + xindex; 
-      float coory = gridspacing * yindex;
-      float coorx = gridspacing * xindex;
+    cenergy(numTeams, numThreads, volsize, runatoms, 0.1, energy, atominfo);
 
-      float energyvalx1=0.0f;
-      float energyvalx2=0.0f;
-      float energyvalx3=0.0f;
-      float energyvalx4=0.0f;
-      float energyvalx5=0.0f;
-      float energyvalx6=0.0f;
-      float energyvalx7=0.0f;
-      float energyvalx8=0.0f;
-
-      float gridspacing_u = gridspacing * BLOCKSIZEX;
-
-      //
-      // XXX 59/8 FLOPS per atom
-      //
-      int atomid;
-      for (atomid=0; atomid<runatoms; atomid++) {
-        float dy = coory - atominfo[atomid].y;
-        float dyz2 = (dy * dy) + atominfo[atomid].z;
-
-        float dx1 = coorx - atominfo[atomid].x;
-        float dx2 = dx1 + gridspacing_u;
-        float dx3 = dx2 + gridspacing_u;
-        float dx4 = dx3 + gridspacing_u;
-        float dx5 = dx4 + gridspacing_u;
-        float dx6 = dx5 + gridspacing_u;
-        float dx7 = dx6 + gridspacing_u;
-        float dx8 = dx7 + gridspacing_u;
-
-        energyvalx1 += atominfo[atomid].w / sqrtf(dx1*dx1 + dyz2);
-        energyvalx2 += atominfo[atomid].w / sqrtf(dx2*dx2 + dyz2);
-        energyvalx3 += atominfo[atomid].w / sqrtf(dx3*dx3 + dyz2);
-        energyvalx4 += atominfo[atomid].w / sqrtf(dx4*dx4 + dyz2);
-        energyvalx5 += atominfo[atomid].w / sqrtf(dx5*dx5 + dyz2);
-        energyvalx6 += atominfo[atomid].w / sqrtf(dx6*dx6 + dyz2);
-        energyvalx7 += atominfo[atomid].w / sqrtf(dx7*dx7 + dyz2);
-        energyvalx8 += atominfo[atomid].w / sqrtf(dx8*dx8 + dyz2);
-      }
-
-      energy[outaddr             ] += energyvalx1;
-      energy[outaddr+1*BLOCKSIZEX] += energyvalx2;
-      energy[outaddr+2*BLOCKSIZEX] += energyvalx3;
-      energy[outaddr+3*BLOCKSIZEX] += energyvalx4;
-      energy[outaddr+4*BLOCKSIZEX] += energyvalx5;
-      energy[outaddr+5*BLOCKSIZEX] += energyvalx6;
-      energy[outaddr+6*BLOCKSIZEX] += energyvalx7;
-      energy[outaddr+7*BLOCKSIZEX] += energyvalx8;
-      }
-    }
     wkf_timer_stop(runtimer);
     runtotal += wkf_timer_time(runtimer);
   }
