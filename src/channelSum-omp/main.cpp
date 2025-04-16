@@ -12,6 +12,8 @@ typedef int scalar_t;
 
 template <typename T>
 void ChannelSumNCHW(
+    const int numTeams,
+    const int numThreads,
     const int N,
     const int C,
     const int HxW,
@@ -19,11 +21,11 @@ void ChannelSumNCHW(
     T*__restrict sum,
     T*__restrict sumsq)
 {
-  #pragma omp target teams distribute num_teams(C)
+  #pragma omp target teams distribute num_teams(numTeams)
   for (int c = 0; c < C; c++) {
     T m_val = 0, v_val = 0;
     #pragma omp parallel for collapse(2) \
-    reduction(+:m_val, v_val) num_threads(NUM_THREADS)
+    reduction(+:m_val, v_val) num_threads(numThreads)
     for (int n = 0; n < N; n++) {
       for (int hw = 0; hw < HxW; hw++) {
         const int index = (n * C + c) * HxW + hw;
@@ -38,6 +40,8 @@ void ChannelSumNCHW(
 
 template <typename T>
 void ChannelSumNHWC(
+    const int numTeams,
+    const int numThreads,
     const int N,
     const int C,
     const int HxW,
@@ -45,10 +49,10 @@ void ChannelSumNHWC(
     T*__restrict sum,
     T*__restrict sumsq)
 {
-  #pragma omp target teams distribute num_teams(C)
+  #pragma omp target teams distribute num_teams(numTeams)
   for (int c = 0; c < C; c++) {
     T m_val = 0, v_val = 0;
-    #pragma omp parallel for reduction(+:m_val, v_val) num_threads(NUM_THREADS)
+    #pragma omp parallel for reduction(+:m_val, v_val) num_threads(numThreads)
     for (int i = 0; i < N * HxW; i++) {
       const int index = (i * C + c);
       m_val += *(X + index);
@@ -72,7 +76,7 @@ void ComputeChannelSumNCHW (
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    ChannelSumNCHW<scalar_t> (N, C, HxW, X, sum, sumsq);
+    ChannelSumNCHW<scalar_t> (C, NUM_THREADS, N, C, HxW, X, sum, sumsq);
   }
 
   auto end = std::chrono::steady_clock::now();
@@ -92,7 +96,7 @@ void ComputeChannelSumNHWC (
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    ChannelSumNHWC<scalar_t> (N, C, HxW, X, sum, sumsq);
+    ChannelSumNHWC<scalar_t> (C, NUM_THREADS, N, C, HxW, X, sum, sumsq);
   }
 
   auto end = std::chrono::steady_clock::now();
