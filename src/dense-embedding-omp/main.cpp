@@ -26,6 +26,53 @@ void reference(
   }
 }
 
+template <typename T>
+void dense_esuhm(
+    const int numTeams,
+    const int numThreads,
+    const T* input,
+    const T* dense,
+          T* output,
+    int embedding_dim,
+    const int* offset)
+{
+  #pragma omp target teams distribute num_teams(numTeams)
+  for (int batch_idx = 0; batch_idx < numTeams; batch_idx++) {
+    const int range = offset[batch_idx + 1] - offset[batch_idx];
+    #pragma omp parallel for num_threads(numThreads)
+    for (int idx = 0; idx < embedding_dim; idx++) {
+      const auto dense_elem = dense[batch_idx * embedding_dim + idx];
+      for (int nested_idx = idx; nested_idx < range; nested_idx += embedding_dim) {
+        output[offset[batch_idx] + nested_idx] = input[offset[batch_idx] + nested_idx] + dense_elem;
+      }
+    }
+  }
+}
+
+template <typename T>
+void dense_esuhm2(
+    const int numTeams,
+    const int numThreads,
+    const T* input,
+    const T* dense,
+          T* output,
+    int embedding_dim,
+    const int* offset)
+{
+  #pragma omp target teams distribute num_teams(numTeams)
+  for (int batch_idx = 0; batch_idx < numTeams; batch_idx++) {
+    const int start = offset[batch_idx];
+    const int range = offset[batch_idx + 1] - start;
+    #pragma omp parallel for num_threads(numThreads)
+    for (int idx = 0; idx < embedding_dim; idx++) {
+      const auto dense_elem = dense[batch_idx * embedding_dim + idx];
+      for (int nested_idx = idx; nested_idx < range; nested_idx += embedding_dim) {
+        output[start + nested_idx] = input[start + nested_idx] + dense_elem;
+      }
+    }
+  }
+}
+
 int main(int argc, char* argv[])
 {
   if (argc != 4) {
@@ -96,22 +143,7 @@ int main(int argc, char* argv[])
         auto start = std::chrono::steady_clock::now();
 
         for (int i = 0; i < repeat; i++) {
-          #pragma omp target teams num_teams(batch_size)
-          {
-            #pragma omp parallel num_threads(block_size)
-            {
-              const int batch_idx  = omp_get_team_num(); // each batch is handled by a block
-              const int grain_size = omp_get_num_threads();
-              const int tid = omp_get_thread_num();
-              const int range = offset[batch_idx + 1] - offset[batch_idx];
-              for (int idx = tid; idx < ncols; idx += grain_size) {
-                const auto dense_elem = dense[batch_idx * ncols + idx];
-                for (int nested_idx = idx; nested_idx < range; nested_idx += ncols) {
-                  output_k1[offset[batch_idx] + nested_idx] = input[offset[batch_idx] + nested_idx] + dense_elem;
-                }
-              }
-            }
-          }
+          dense_esuhm(batch_size, block_size, input, dense, output_k1, ncols, offset);
         }
 
         auto end = std::chrono::steady_clock::now();
@@ -123,21 +155,7 @@ int main(int argc, char* argv[])
         start = std::chrono::steady_clock::now();
 
         for (int i = 0; i < repeat; i++) {
-          #pragma omp target teams num_teams(batch_size)
-          {
-            #pragma omp parallel num_threads(block_size)
-            {
-              const int batch_idx  = omp_get_team_num(); // each batch is handled by a block
-              const int start = offset[batch_idx];
-              const int range = offset[batch_idx + 1] - start;
-              for (int idx = omp_get_thread_num(); idx < ncols; idx += omp_get_num_threads()) {
-                const auto dense_elem = dense[batch_idx * ncols + idx];
-                for (int nested_idx = idx; nested_idx < range; nested_idx += ncols) {
-                  output_k2[start + nested_idx] = input[start + nested_idx] + dense_elem;
-                }
-              }
-            }
-          }
+          dense_esuhm2(batch_size, block_size, input, dense, output_k2, ncols, offset);
         }
 
         end = std::chrono::steady_clock::now();
