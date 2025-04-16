@@ -91,7 +91,77 @@ void init(const char* work_path, const char* input_filename, const char* weight_
   fclose(fp);
 }
 
-long lstm_n5( const float* x, 
+void lstm_inference(
+  const int numTeams,
+  const int numThreads,
+  const float*__restrict__ x, 
+  const float*__restrict__ inW, 
+  const float*__restrict__ intW, 
+  const float*__restrict__ intB, 
+  const float*__restrict__ outW, 
+  const float*__restrict__ outB, 
+        float*__restrict__ y)
+{
+  #pragma omp target teams distribute parallel for \
+  num_teams(numTeams) num_threads(numThreads)
+  for (int gid = 0; gid < N; gid++) {
+    int t,i,j;
+
+    float h_state[5] = {0,0,0,0,0};
+    float c_state[5] = {0,0,0,0,0};
+    float i_state[5] = {0,0,0,0,0};
+    float f_state[5] = {0,0,0,0,0};
+    float o_state[5] = {0,0,0,0,0};
+    float g_state[5] = {0,0,0,0,0};
+
+    for (t = 0; t < SAMPLE_TEST_LEN; ++t) {
+      float v = x[gid * SAMPLE_TEST_LEN + t];
+      for (j = 0; j < 5; ++j) {
+        i_state[j] = inW[j] * v;
+        for (i = 0; i < 5; ++i)
+          i_state[j] += h_state[i] * intW[j*5+i];
+        i_state[j] += intB[j];
+        i_state[j] = 1.f / (1.f + expf(-i_state[j]));
+      }
+
+      for (j = 0; j < 5; ++j) {
+        f_state[j] = inW[5+j] * v;
+        for (i = 0; i < 5; ++i)
+          f_state[j] += h_state[i] * intW[25+j*5+i];
+        f_state[j] += intB[5+j];
+        f_state[j] = 1.f / (1.f + expf(-f_state[j]));
+      }
+
+      for (j = 0; j < 5; ++j) {
+        o_state[j] = inW[10+j] * v;
+        for (i = 0; i < 5; ++i)
+          o_state[j] += h_state[i] * intW[50+j*5+i];
+        o_state[j] += intB[10+j];
+        o_state[j] = 1.f / (1.f + expf(-o_state[j]));
+      }
+
+      for (j = 0; j < 5; ++j) {
+        g_state[j] = inW[15+j] * v;
+        for (i = 0; i < 5; ++i)
+          g_state[j] += h_state[i] * intW[75+j*5+i];
+        g_state[j] += intB[15+j];
+        g_state[j] = tanhf(g_state[j]);
+      }
+
+      for (j = 0; j < 5; ++j) {
+        c_state[j] = c_state[j] * f_state[j] + g_state[j] * i_state[j];
+        h_state[j] = tanhf(c_state[j]) * o_state[j];
+      }
+
+      float b = outB[0];
+      for (j = 0; j < 5; ++j)
+        b += h_state[j] * outW[j];
+      y[gid * SAMPLE_TEST_LEN + t] = b;
+    }
+  }
+}
+
+long lstm_n5(const float* x, 
     const float* inW, 
     const float* intW, 
     const float* intB, 
@@ -110,63 +180,7 @@ long lstm_n5( const float* x,
   {
     auto start = std::chrono::steady_clock::now();
 
-    #pragma omp target teams distribute parallel for thread_limit(WGS)
-    for (int gid = 0; gid < N; gid++) {
-
-      int t,i,j;
-
-      float h_state[5] = {0,0,0,0,0};
-      float c_state[5] = {0,0,0,0,0};
-      float i_state[5] = {0,0,0,0,0};
-      float f_state[5] = {0,0,0,0,0};
-      float o_state[5] = {0,0,0,0,0};
-      float g_state[5] = {0,0,0,0,0};
-
-      for (t = 0; t < SAMPLE_TEST_LEN; ++t) {
-        float v = x[gid * SAMPLE_TEST_LEN + t];
-        for (j = 0; j < 5; ++j) {
-          i_state[j] = inW[j] * v;
-          for (i = 0; i < 5; ++i)
-            i_state[j] += h_state[i] * intW[j*5+i];
-          i_state[j] += intB[j];
-          i_state[j] = 1.f / (1.f + expf(-i_state[j]));
-        }
-
-        for (j = 0; j < 5; ++j) {
-          f_state[j] = inW[5+j] * v;
-          for (i = 0; i < 5; ++i)
-            f_state[j] += h_state[i] * intW[25+j*5+i];
-          f_state[j] += intB[5+j];
-          f_state[j] = 1.f / (1.f + expf(-f_state[j]));
-        }
-
-        for (j = 0; j < 5; ++j) {
-          o_state[j] = inW[10+j] * v;
-          for (i = 0; i < 5; ++i)
-            o_state[j] += h_state[i] * intW[50+j*5+i];
-          o_state[j] += intB[10+j];
-          o_state[j] = 1.f / (1.f + expf(-o_state[j]));
-        }
-
-        for (j = 0; j < 5; ++j) {
-          g_state[j] = inW[15+j] * v;
-          for (i = 0; i < 5; ++i)
-            g_state[j] += h_state[i] * intW[75+j*5+i];
-          g_state[j] += intB[15+j];
-          g_state[j] = tanhf(g_state[j]);
-        }
-
-        for (j = 0; j < 5; ++j) {
-          c_state[j] = c_state[j] * f_state[j] + g_state[j] * i_state[j];
-          h_state[j] = tanhf(c_state[j]) * o_state[j];
-        }
-
-        float b = outB[0];
-        for (j = 0; j < 5; ++j)
-          b += h_state[j] * outW[j];
-        y[gid * SAMPLE_TEST_LEN + t] = b;
-      }
-    }
+    lstm_inference(N/WGS, WGS, x, inW, intW, intB, outW, outB, y);
 
     auto end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
