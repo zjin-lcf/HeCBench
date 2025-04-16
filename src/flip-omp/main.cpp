@@ -11,6 +11,8 @@
 
 template <typename scalar_t>
 void flip_kernel(
+    const int numTeams,
+    const int numThreads,
     const scalar_t* in_tensor,
           scalar_t* out_tensor,
     int64_t  n,
@@ -21,7 +23,8 @@ void flip_kernel(
     const int64_t* shape,
     const int64_t  total_dims) 
 {
-  #pragma omp target teams distribute parallel for num_threads(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads) 
   for (int64_t linear_index = 0; linear_index < n; linear_index++) {
 
     int64_t cur_indices = linear_index;
@@ -114,8 +117,13 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
                                   d_strides_contiguous[0:num_dims]) \
                           map(alloc: d_output[0:n])
   {
+    const int threadsPerBlock = 256;
+    const int numTeams = (n + threadsPerBlock - 1) / threadsPerBlock;
+    const int numThreads = threadsPerBlock;
+
     // warmup and verify
     flip_kernel<scalar_t>(
+      numTeams, numThreads,
       d_input, d_output, n, d_flip_dims, num_flip_dims,
       d_strides, d_strides_contiguous, d_shape, num_dims);
 
@@ -138,6 +146,8 @@ void flip (const int64_t num_dims, const int64_t num_flip_dims,
 
     for (int i = 0; i < repeat; i++) {
       flip_kernel<scalar_t>(
+        numTeams,
+        numThreads,
         d_input,
         d_output,
         n,
