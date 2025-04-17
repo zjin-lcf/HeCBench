@@ -29,13 +29,16 @@
 
 template<typename T>
 void DetectionOverlayBox(
+  const int numTeams,
+  const int numThreads,
   const T*__restrict input,
         T*__restrict output,
   int imgWidth, int imgHeight,
   int x0, int y0, int boxWidth, int boxHeight,
   const float4 color) 
 {
-  #pragma omp target teams distribute parallel for collapse(2) thread_limit(64)
+  #pragma omp target teams distribute parallel for collapse(2) \
+   map(to:color) num_teams(numTeams) num_threads(numThreads)
   for(int box_y = 0; box_y < boxHeight; box_y++)
     for(int box_x = 0; box_x < boxWidth; box_x++) {
   
@@ -75,8 +78,12 @@ int DetectionOverlay(
     const int boxLeft = detections[n].left;
     const int boxTop = detections[n].top;
     
+    const int numTeams = (boxWidth+7)/8 * (boxHeight+7)/8;
+    const int numThreads = 64;
+
     // launch kernel
     DetectionOverlayBox<T>(
+      numTeams, numThreads,
       input, output, width, height, boxLeft, boxTop, boxWidth, boxHeight, colors);
   }
 
