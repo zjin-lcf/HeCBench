@@ -1,12 +1,13 @@
 void compute_probs(
+  const int numTeams,
+  const int numThreads,
   const double* __restrict alphas,
   const double* __restrict rands,
         double* __restrict probs,
-  int n, int K, int M,
-  int threads, int blocks)
+  int n, int K, int M)
 {
   #pragma omp target teams distribute parallel for \
-  num_teams(blocks) thread_limit(threads)
+  num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < n; i++) {
     double maxval;    
     int m, k;
@@ -44,14 +45,15 @@ void compute_probs(
 }
 
 void compute_probs_unitStrides(
+  const int numTeams,
+  const int numThreads,
   const double* __restrict alphas,
   const double* __restrict rands,
         double* __restrict probs,
-  int n, int K, int M,
-  int threads, int blocks)
+  int n, int K, int M)
 {
   #pragma omp target teams distribute parallel for \
-  num_teams(blocks) thread_limit(threads)
+  num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < n; i++) {
     double maxval;    
     int m, k;
@@ -91,20 +93,21 @@ void compute_probs_unitStrides(
 }
 
 void compute_probs_unitStrides_sharedMem(
+  const int numTeams,
+  const int numThreads,
   const double* __restrict alphas,
   const double* __restrict rands,
         double* __restrict probs,
-  int n, int K, int M,
-  int threads, int blocks)
+  int n, int K, int M)
 {
-  #pragma omp target teams num_teams(blocks) thread_limit(threads)
+  #pragma omp target teams num_teams(numTeams)
   {
     double shared[21 * 96 * 2];  // static
-    #pragma omp parallel 
+    #pragma omp parallel num_threads(numThreads)
     {
       int threadIdx_x = omp_get_thread_num();
-      int threads_per_block = threads;
-      int i = omp_get_team_num() * threads + threadIdx_x;
+      int threads_per_block = numThreads;
+      int i = omp_get_team_num() * numThreads + threadIdx_x;
       if (i < n) {
 
         // set up shared memory: half for probs and half for w
