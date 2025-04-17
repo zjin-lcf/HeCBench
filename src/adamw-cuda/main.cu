@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
     const float correction2_sqrt = sqrtf(1.0f - powf(beta2, step));
     const float step_size = lr / correction1;
 
-    fused_4bit_kernel<float><<<grids, blocks>>>(
+    fused_4bit_kernel<float, threadsPerBlock><<<grids, blocks>>>(
               d_p,
               d_g,
               d_m_qscale,
@@ -145,7 +145,7 @@ int main(int argc, char* argv[])
     const float correction2_sqrt = sqrtf(1.0f - powf(beta2, step));
     const float step_size = lr / correction1;
 
-    fused_4bit_kernel<float><<<grids, blocks>>>(
+    fused_4bit_kernel<float, threadsPerBlock><<<grids, blocks>>>(
               d_p,
               d_g,
               d_m_qscale,

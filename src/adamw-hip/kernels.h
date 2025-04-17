@@ -3,9 +3,9 @@
 
 #include <hipcub/hipcub.hpp>
 
-template <typename T>
+template <typename T, int block_size>
 __device__ void BlockReduce(T &input1, T &input2) {
-  using BlockReduce = hipcub::BlockReduce<T, 64>;
+  using BlockReduce = hipcub::BlockReduce<T, block_size>;
   __shared__ typename BlockReduce::TempStorage temp_storage1;
   __shared__ typename BlockReduce::TempStorage temp_storage2;
   input1 = BlockReduce(temp_storage1).Reduce(input1, hipcub::Max());
@@ -117,7 +117,7 @@ HOST_DEVICE __forceinline__ float q_mapping(const float* __restrict__ qmap,
     return (qmidpt[low-1] < x) ? low : low-1;
 }
 
-template <typename T>
+template <typename T, int block_size = 64>
 __global__ void fused_4bit_kernel(
     T* __restrict__ p,
     const T* __restrict__ g,
@@ -197,7 +197,7 @@ __global__ void fused_4bit_kernel(
       local_absmax_sq = fmaxf(sq_left, sq_right);
 
       // parallel reduction to determine absmax for exp and sq
-      BlockReduce(local_absmax_exp, local_absmax_sq);
+      BlockReduce<T, block_size>(local_absmax_exp, local_absmax_sq);
       if (threadIdx.x ==0) {
           exp_qscale[blockIdx.x] = local_absmax_exp;
           sq_qscale[blockIdx.x] = local_absmax_sq;
