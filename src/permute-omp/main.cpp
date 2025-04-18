@@ -20,24 +20,21 @@ void permuate_cpu(float *inp, float *q, float *k, float *v, int B, int T, int C,
         }}}}
 }
 
-void permute (float* out, const float* inp,
-    int B, int T, int C, int NH,
-    const int block_size) {
-  // inp is (B, T, 3C) QKV
-  int d = C / NH; // head size (HS)
-
-  // permute and separate inp from (B, T, 3, NH, HS) to 3X (B, NH, T, HS)
-  float *Q, *K, *V;
-  Q = out + 0 * B * T * C;
-  K = out + 1 * B * T * C;
-  V = out + 2 * B * T * C;
-  int total_threads = B * T * C;
-  int num_blocks = ceil_div(total_threads, block_size);
-  //permute_kernel<<<num_blocks, block_size>>>(q, k, v, inp, B, T, NH, HS);
+void permute_kernel(
+    const int numTeams,
+    const int numThreads,
+    float* __restrict__ Q,
+    float* __restrict__ K,
+    float* __restrict__ V,
+    const float* inp,
+    int B, int T, int NH, int d) {
+  // okay so now, this kernel wants Q,K,V to all be of shape (B, NH, T, d)
+  // but instead, we have a single tensor QKV (inp) of shape (B, T, 3, NH, d)
   #pragma omp target teams distribute parallel for \
-   num_teams(num_blocks) num_threads(block_size) 
-  for (int idx = 0; idx < B * T * C; idx++) { 
+   num_teams(numTeams) num_threads(numThreads) 
+  for (int idx = 0; idx < B * T * NH * d; idx++) { 
     // Q[b][nh_][n][d_] = inp[b][n][0][nh_][d_]
+    int C = NH * d;
     int b = idx / (C * T);
     int rest = idx % (C * T);
     int nh_ = rest / (T * d);
@@ -56,6 +53,23 @@ void permute (float* out, const float* inp,
     K[idx] = inp[inp_idx + C];
     V[idx] = inp[inp_idx + 2 * C];
   }
+}
+
+
+void permute (float* out, const float* inp,
+    int B, int T, int C, int NH,
+    const int block_size) {
+  // inp is (B, T, 3C) QKV
+  int HS = C / NH; // head size
+
+  // permute and separate inp from (B, T, 3, NH, HS) to 3X (B, NH, T, HS)
+  float *Q, *K, *V;
+  Q = out + 0 * B * T * C;
+  K = out + 1 * B * T * C;
+  V = out + 2 * B * T * C;
+  int total_threads = B * T * C;
+  int num_blocks = ceil_div(total_threads, block_size);
+  permute_kernel(num_blocks, block_size, Q, K, V, inp, B, T, NH, HS);
 }
 
 int main(int argc, char **argv) {
