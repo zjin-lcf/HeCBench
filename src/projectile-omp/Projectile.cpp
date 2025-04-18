@@ -20,6 +20,24 @@ const float kPIValue = 3.1415;
 const float kGValue = 9.81;
 const int BLOCK_SIZE = 256;
 
+void CalculateRange(const int numTeams,
+                    const int numThreads,
+                    const Projectile *obj, Projectile *pObj) {  
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int i = 0; i < num_elements; i++) {
+    float proj_angle = obj[i].getangle();
+    float proj_vel = obj[i].getvelocity();
+    float sin_value = sinf(proj_angle * kPIValue / 180.0f);
+    float cos_value = cosf(proj_angle * kPIValue / 180.0f);
+    float total_time = fabsf((2 * proj_vel * sin_value)) / kGValue;
+    float max_range = fabsf(proj_vel * total_time * cos_value);
+    float max_height = (proj_vel * proj_vel * sin_value * sin_value) / 2.0f *
+                       kGValue;  // h = v^2 * sin^2theta/2g
+    pObj[i].setRangeandTime(max_range, total_time, proj_angle, proj_vel, max_height);
+  }
+}
+
 // in_vect and out_vect are the vectors with N Projectile numbers and are inputs to the
 // parallel function
 void GpuParallel(std::vector<Projectile>& in_vect,
@@ -31,21 +49,13 @@ void GpuParallel(std::vector<Projectile>& in_vect,
 
   #pragma omp target data map(to: obj[0:num_elements]) map(from: pObj[0:num_elements])
   {
+    const int numTeams = (num_elements + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    const int numThreads = BLOCK_SIZE;
+
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
-      for (int i = 0; i < num_elements; i++) {
-        float proj_angle = obj[i].getangle();
-        float proj_vel = obj[i].getvelocity();
-        float sin_value = sinf(proj_angle * kPIValue / 180.0f);
-        float cos_value = cosf(proj_angle * kPIValue / 180.0f);
-        float total_time = fabsf((2 * proj_vel * sin_value)) / kGValue;
-        float max_range = fabsf(proj_vel * total_time * cos_value);
-        float max_height = (proj_vel * proj_vel * sin_value * sin_value) / 2.0f *
-                           kGValue;  // h = v^2 * sin^2theta/2g
-        pObj[i].setRangeandTime(max_range, total_time, proj_angle, proj_vel, max_height);
-      }
+      CalculateRange(numTeams, numThreads, obj, pObj);
     }
 
     auto end = std::chrono::steady_clock::now();
