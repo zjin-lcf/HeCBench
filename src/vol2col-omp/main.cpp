@@ -12,6 +12,8 @@
 // Kernel for fast unfold+copy on volumes
 template <typename T>
 void vol2col_kernel(
+    const int numTeams,
+    const int numThreads,
     const T* data_vol,
     const int channels,
     const int depth,
@@ -35,7 +37,7 @@ void vol2col_kernel(
     T* data_col)
 {
   #pragma omp target teams distribute parallel for collapse(4) \
-  num_threads(threadsPerBlock)
+   num_teams(numTeams) num_threads(numThreads)
   for (int channel_in = 0; channel_in < channels; channel_in++) {
   for (int t_out = 0; t_out < depth_col; t_out++) {
   for (int h_out = 0; h_out < height_col; h_out++) {
@@ -186,10 +188,15 @@ void eval (
   #pragma omp target data map(to: data_vol[0:vol_size]) \
                           map(to: data_col[0:col_size])
   {
+    int64_t n = static_cast<int64_t>(channels) * depth_col * height_col * width_col;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+  
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
       vol2col_kernel<T>(
+        blocksPerGrid,
+        threadsPerBlock,
         data_vol,
         channels, depth, height, width,
         ksize_t, ksize_h, ksize_w,
