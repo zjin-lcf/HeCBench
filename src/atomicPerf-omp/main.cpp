@@ -6,9 +6,10 @@
 #define BLOCK_SIZE 256
 
 template <typename T>
-void BlockRangeAtomicOnGlobalMem(T* data, int n)
+void BlockRangeAtomicOnGlobalMem(const int numTeams, const int numThreads, T* data, int n)
 {
-  #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for ( unsigned int i = 0; i < n; i++) {
     #pragma omp atomic update
     data[i % BLOCK_SIZE]++;  //arbitrary number to add
@@ -16,9 +17,10 @@ void BlockRangeAtomicOnGlobalMem(T* data, int n)
 }
 
 template <typename T>
-void WarpRangeAtomicOnGlobalMem(T* data, int n)
+void WarpRangeAtomicOnGlobalMem(const int numTeams, const int numThreads, T* data, int n)
 {
-  #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for ( unsigned int i = 0; i < n; i++) {
     #pragma omp atomic update
     data[i & 0x1F]++; //arbitrary number to add
@@ -26,9 +28,10 @@ void WarpRangeAtomicOnGlobalMem(T* data, int n)
 }
 
 template <typename T>
-void SingleRangeAtomicOnGlobalMem(T* data, int offset, int n)
+void SingleRangeAtomicOnGlobalMem(const int numTeams, const int numThreads, T* data, int offset, int n)
 {
-  #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for ( unsigned int i = 0; i < n; i++) {
     #pragma omp atomic update
     data[0]++;    //arbitrary number to add
@@ -36,12 +39,12 @@ void SingleRangeAtomicOnGlobalMem(T* data, int offset, int n)
 }
 
 template <typename T>
-void BlockRangeAtomicOnSharedMem(T* data, int n)
+void BlockRangeAtomicOnSharedMem(const int numTeams, const int numThreads, T* data, int n)
 {
-  #pragma omp target teams num_teams(n / BLOCK_SIZE) thread_limit(BLOCK_SIZE)
+  #pragma omp target teams num_teams(numTeams)
   {
     T smem_data[BLOCK_SIZE];
-    #pragma omp parallel 
+    #pragma omp parallel num_threads(numThreads)
     {
       unsigned int blockIdx_x = omp_get_team_num();
       unsigned int gridDim_x = omp_get_num_teams();
@@ -58,12 +61,12 @@ void BlockRangeAtomicOnSharedMem(T* data, int n)
 }
 
 template <typename T>
-void WarpRangeAtomicOnSharedMem(T* data, int n)
+void WarpRangeAtomicOnSharedMem(const int numTeams, const int numThreads, T* data, int n)
 {
-  #pragma omp target teams num_teams(n / BLOCK_SIZE) thread_limit(BLOCK_SIZE)
+  #pragma omp target teams num_teams(numTeams)
   {
     T smem_data[32];
-    #pragma omp parallel 
+    #pragma omp parallel num_threads(numThreads)
     {
       unsigned int blockIdx_x = omp_get_team_num();
       unsigned int gridDim_x = omp_get_num_teams();
@@ -80,12 +83,12 @@ void WarpRangeAtomicOnSharedMem(T* data, int n)
 }
 
 template <typename T>
-void SingleRangeAtomicOnSharedMem(T* data, int offset, int n)
+void SingleRangeAtomicOnSharedMem(const int numTeams, const int numThreads, T* data, int offset, int n)
 {
-  #pragma omp target teams num_teams(n / BLOCK_SIZE) thread_limit(BLOCK_SIZE)
+  #pragma omp target teams num_teams(numTeams)
   {
     T smem_data[BLOCK_SIZE];
-    #pragma omp parallel 
+    #pragma omp parallel num_threads(numThreads)
     {
       unsigned int blockIdx_x = omp_get_team_num();
       unsigned int gridDim_x = omp_get_num_teams();
@@ -113,10 +116,13 @@ void atomicPerf (int n, int t, int repeat)
   #pragma omp target data map(alloc: data[0:t])
   {
     #pragma omp target update to (data[0:t])
+    const int numThreads = BLOCK_SIZE;
+    const int numTeams = n / BLOCK_SIZE;
+
     auto start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
     {
-      BlockRangeAtomicOnGlobalMem<T>(data, n);
+      BlockRangeAtomicOnGlobalMem<T>(numTeams, numThreads, data, n);
     }
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -128,7 +134,7 @@ void atomicPerf (int n, int t, int repeat)
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
     {
-      WarpRangeAtomicOnGlobalMem<T>(data, n);
+      WarpRangeAtomicOnGlobalMem<T>(numTeams, numThreads, data, n);
     }
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -140,7 +146,7 @@ void atomicPerf (int n, int t, int repeat)
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
     {
-      SingleRangeAtomicOnGlobalMem<T>(data, i % BLOCK_SIZE, n);
+      SingleRangeAtomicOnGlobalMem<T>(numTeams, numThreads, data, i % BLOCK_SIZE, n);
     }
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -152,7 +158,7 @@ void atomicPerf (int n, int t, int repeat)
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
     {
-      BlockRangeAtomicOnSharedMem<T>(data, n);
+      BlockRangeAtomicOnSharedMem<T>(numTeams, numThreads, data, n);
     }
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -164,7 +170,7 @@ void atomicPerf (int n, int t, int repeat)
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
     {
-      WarpRangeAtomicOnSharedMem<T>(data, n);
+      WarpRangeAtomicOnSharedMem<T>(numTeams, numThreads, data, n);
     }
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -176,7 +182,7 @@ void atomicPerf (int n, int t, int repeat)
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
     {
-      SingleRangeAtomicOnSharedMem<T>(data, i % BLOCK_SIZE, n);
+      SingleRangeAtomicOnSharedMem<T>(numTeams, numThreads, data, i % BLOCK_SIZE, n);
     }
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
