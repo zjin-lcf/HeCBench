@@ -36,22 +36,57 @@
 #include "parser.hpp"
 #include "su_gather.hpp"
 
-void
-compute_semblances(const real* __restrict h, 
-                   const real* __restrict c, 
-                   const real* __restrict samples, 
-                   real* __restrict num,
-                   real* __restrict stt,
-                   int t_id0, 
-                   int t_idf,
-                   real _idt,
-                   real _dt,
-                   int _tau,
-                   int _w,
-                   int nc,
-                   int ns) 
+void init_c(const int numTeams, const int numThreads,
+            real *c, real inc, real c0) 
 {
-  #pragma omp target teams distribute parallel for thread_limit(NTHREADS)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int i = 0; i < numTeams; i++) 
+    c[i] = c0 + inc*i;
+}
+
+void init_half(const int numTeams,
+               const int numThreads, 
+               const real* __restrict__ scalco, 
+               const real* __restrict__ gx, 
+               const real* __restrict__ gy, 
+               const real* __restrict__ sx, 
+               const real* __restrict__ sy, 
+               real* __restrict__ h) 
+{
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int i = 0; i < numTeams; i++) {
+    real _s = scalco[i];
+
+    if(-EPSILON < _s && _s < EPSILON) _s = 1.0f;
+    else if(_s < 0) _s = 1.0f / _s;
+
+    real hx = (gx[i] - sx[i]) * _s;
+    real hy = (gy[i] - sy[i]) * _s;
+
+    h[i] = 0.25f * (hx * hx + hy * hy) / FACTOR;
+  }
+}
+
+void compute_semblances(const int numTeams,
+                        const int numThreads,
+                        const real* __restrict h, 
+                        const real* __restrict c, 
+                        const real* __restrict samples, 
+                        real* __restrict num,
+                        real* __restrict stt,
+                        int t_id0, 
+                        int t_idf,
+                        real _idt,
+                        real _dt,
+                        int _tau,
+                        int _w,
+                        int nc,
+                        int ns) 
+{
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i< ns*nc; i++) {
 
     real _den = 0.0f, _ac_linear = 0.0f, _ac_squared = 0.0f;
@@ -108,17 +143,19 @@ compute_semblances(const real* __restrict h,
   }
 }
 
-void
-redux_semblances(const real* __restrict num, 
-                 const real* __restrict stt, 
-                 int*  __restrict ctr, 
-                 real* __restrict str, 
-                 real* __restrict stk,
-                 const int nc, 
-                 const int cdp_id,
-                 const int ns) 
+void redux_semblances(const int numTeams,
+                      const int numThreads,
+                      const real* __restrict num, 
+                      const real* __restrict stt, 
+                      int*  __restrict ctr, 
+                      real* __restrict str, 
+                      real* __restrict stk,
+                      const int nc, 
+                      const int cdp_id,
+                      const int ns) 
 {
-  #pragma omp target teams distribute parallel for thread_limit(NTHREADS)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for(int t0 = 0; t0 < ns; t0++)
   {
     real max_sem = 0.0f;
@@ -230,23 +267,10 @@ int main(int argc, const char** argv) {
     beg = std::chrono::high_resolution_clock::now();
 
     // Evaluate Cs - linspace
-    #pragma omp target teams distribute parallel for thread_limit(1)
-    for (int i = 0; i < nc; i++) 
-      d_c[i] = c0 + inc*i;
+    init_c(nc, 1, d_c, inc, c0);
 
     // Evaluate halfoffset points in x and y coordinates
-    #pragma omp target teams distribute parallel for thread_limit(1)
-    for (int i = 0; i < ttraces; i++) {
-      real _s = d_scalco[i];
-
-      if(-EPSILON < _s && _s < EPSILON) _s = 1.0f;
-      else if(_s < 0) _s = 1.0f / _s;
-
-      real hx = (d_gx[i] - d_sx[i]) * _s;
-      real hy = (d_gy[i] - d_sy[i]) * _s;
-
-      d_h[i] = 0.25f * (hx * hx + hy * hy) / FACTOR;
-    }
+    init_half(ttraces, 1, d_scalco, d_gx, d_gy, d_sx, d_sy, d_h);
 
     for(int cdp_id = 0; cdp_id < ncdps; cdp_id++) {
       int t_id0 = cdp_id > 0 ? ntraces_by_cdp_id[cdp_id-1] : 0;
@@ -254,11 +278,13 @@ int main(int argc, const char** argv) {
       int stride = t_idf - t_id0;
 
       // Compute semblances for each c for each sample
-      compute_semblances(d_h, d_c, d_samples + t_id0*ns, d_num, d_stt,
+      compute_semblances((ns*nc+NTHREADS-1)/NTHREADS, NTHREADS,
+                         d_h, d_c, d_samples + t_id0*ns, d_num, d_stt,
                          t_id0, t_idf, idt, dt, tau, w, nc, ns);
 
       // Get max C for max semblance for each sample on this cdp
-      redux_semblances(d_num, d_stt, d_ctr, d_str, d_stk, nc, cdp_id, ns);
+      redux_semblances((ns+NTHREADS-1)/NTHREADS, NTHREADS, d_num, d_stt,
+                       d_ctr, d_str, d_stk, nc, cdp_id, ns);
 
       number_of_semblances += stride;
 
