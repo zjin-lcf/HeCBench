@@ -15,6 +15,9 @@
 /* capacitance fitting factor  */
 #define FACTOR_CHIP  0.5
 
+#define WG_SIZE_X (64)
+#define WG_SIZE_Y (4)
+
 float t_chip      = 0.0005;
 float chip_height = 0.016;
 float chip_width  = 0.016;
@@ -31,6 +34,71 @@ void usage(int argc, char **argv)
   fprintf(stderr, "\t<tempFile>  - name of the file containing the initial temperature values of each cell\n");
   fprintf(stderr, "\t<outputFile - output file\n");
   exit(1);
+}
+
+void hotspot3d(
+    const int numTeams,
+    const int numThreads,
+    const float*__restrict__ tIn, 
+    const float*__restrict__ pIn, 
+          float*__restrict__ tOut,
+    const int numCols, 
+    const int numRows, 
+    const int layers,
+    const float ce, 
+    const float cw,
+    const float cn, 
+    const float cs,
+    const float ct,
+    const float cb,
+    const float cc,
+    const float stepDivCap)
+{
+  #pragma omp target teams distribute parallel for collapse(2) \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int j = 0; j < numRows; j++)  
+  {
+    for (int i = 0; i < numCols; i++)  
+    {
+      float amb_temp = 80.0;
+
+      int c = i + j * numCols;
+      int xy = numCols * numRows;
+
+      int W = (i == 0)        ? c : c - 1;
+      int E = (i == numCols-1)     ? c : c + 1;
+      int N = (j == 0)        ? c : c - numCols;
+      int S = (j == numRows-1)     ? c : c + numCols;
+
+      float temp1, temp2, temp3;
+      temp1 = temp2 = tIn[c];
+      temp3 = tIn[c+xy];
+      tOut[c] = cc * temp2 + cw * tIn[W] + ce * tIn[E] + cs * tIn[S]
+        + cn * tIn[N] + cb * temp1 + ct * temp3 + stepDivCap * pIn[c] + ct * amb_temp;
+      c += xy;
+      W += xy;
+      E += xy;
+      N += xy;
+      S += xy;
+
+      for (int k = 1; k < layers-1; ++k) {
+        temp1 = temp2;
+        temp2 = temp3;
+        temp3 = tIn[c+xy];
+        tOut[c] = cc * temp2 + cw * tIn[W] + ce * tIn[E] + cs * tIn[S]
+          + cn * tIn[N] + cb * temp1 + ct * temp3 + stepDivCap * pIn[c] + ct * amb_temp;
+        c += xy;
+        W += xy;
+        E += xy;
+        N += xy;
+        S += xy;
+      }
+      temp1 = temp2;
+      temp2 = temp3;
+      tOut[c] = cc * temp2 + cw * tIn[W] + ce * tIn[E] + cs * tIn[S]
+        + cn * tIn[N] + cb * temp1 + ct * temp3 + stepDivCap * pIn[c] + ct * amb_temp;
+    }
+  }
 }
 
 int main(int argc, char** argv)
@@ -87,54 +155,16 @@ int main(int argc, char** argv)
 
   #pragma omp target data map(to: tIn[0:size], pIn[0:size]) map(alloc: tOut[0:size])
   {
+    const int numTeams = numCols/WG_SIZE_X * numRows/WG_SIZE_Y;
+    const int numThreads = WG_SIZE_X * WG_SIZE_Y;
+
     auto kstart = std::chrono::steady_clock::now();
 
     for(int j = 0; j < iterations; j++)
     {
-      #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
-      for (int j = 0; j < numRows; j++)  
-      {
-        for (int i = 0; i < numCols; i++)  
-        {
-          float amb_temp = 80.0;
-
-          int c = i + j * numCols;
-          int xy = numCols * numRows;
-
-          int W = (i == 0)        ? c : c - 1;
-          int E = (i == numCols-1)     ? c : c + 1;
-          int N = (j == 0)        ? c : c - numCols;
-          int S = (j == numRows-1)     ? c : c + numCols;
-
-          float temp1, temp2, temp3;
-          temp1 = temp2 = tIn[c];
-          temp3 = tIn[c+xy];
-          tOut[c] = cc * temp2 + cw * tIn[W] + ce * tIn[E] + cs * tIn[S]
-            + cn * tIn[N] + cb * temp1 + ct * temp3 + stepDivCap * pIn[c] + ct * amb_temp;
-          c += xy;
-          W += xy;
-          E += xy;
-          N += xy;
-          S += xy;
-
-          for (int k = 1; k < layers-1; ++k) {
-            temp1 = temp2;
-            temp2 = temp3;
-            temp3 = tIn[c+xy];
-            tOut[c] = cc * temp2 + cw * tIn[W] + ce * tIn[E] + cs * tIn[S]
-              + cn * tIn[N] + cb * temp1 + ct * temp3 + stepDivCap * pIn[c] + ct * amb_temp;
-            c += xy;
-            W += xy;
-            E += xy;
-            N += xy;
-            S += xy;
-          }
-          temp1 = temp2;
-          temp2 = temp3;
-          tOut[c] = cc * temp2 + cw * tIn[W] + ce * tIn[E] + cs * tIn[S]
-            + cn * tIn[N] + cb * temp1 + ct * temp3 + stepDivCap * pIn[c] + ct * amb_temp;
-        }
-      }
+      hotspot3d(numTeams, numThreads,
+                tIn, pIn, tOut, numCols, numRows, layers,
+                ce, cw, cn, cs, ct, cb, cc, stepDivCap);
       auto temp = tIn;
       tIn = tOut;
       tOut = temp;
