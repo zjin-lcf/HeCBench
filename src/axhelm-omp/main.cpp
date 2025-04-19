@@ -22,74 +22,105 @@
 // cpu reference 
 #include "axhelmReference.cpp"
 
+void axhelm(
+    const int numTeams,
+    const int numThreads,
+    const int Nelements,
+    const int offset,
+    const dfloat * __restrict__ ggeo,
+    const dfloat * __restrict__ D,
+    const dfloat * __restrict__ lambda,
+    const dfloat * __restrict__ Q,
+    dfloat * __restrict__ Aq) 
+{
+  #pragma omp target teams num_teams(numTeams)
+        {
+          dfloat s_D[64];
+          dfloat s_q[64];
+          dfloat s_Gqr[64];
+          dfloat s_Gqs[64];
+#pragma omp parallel num_threads(numThreads)
+          {
 
-dfloat *drandAlloc(int Nelem){
+            dfloat r_qt, r_Gqt, r_Auk;
+            dfloat r_q[8];
+            dfloat r_Aq[8];
+            dfloat r_G00, r_G01, r_G02, r_G11, r_G12, r_G22, r_GwJ;
+            dfloat r_lam0, r_lam1;
 
-  dfloat *v = (dfloat*) calloc(Nelem, sizeof(dfloat));
+            int e = omp_get_team_num();
+            int j = omp_get_thread_num() / 8; 
+            int i = omp_get_thread_num() % 8; 
 
-  for(int n=0;n<Nelem;++n){
-    v[n] = drand48();
-  }
-
-  return v;
+            s_D[j*8+i] = D[j*8+i];
+            const int base = i + j * 8 + e * 512;
+            for (int k = 0; k < 8; ++k) {
+              r_q[k] = Q[base + k * 8 * 8];
+              r_Aq[k] = 0;
+            }
+#pragma unroll 8
+            for (int k = 0; k < 8; ++k) {
+              const int id = e * 512 + k * 8 * 8 + j * 8 + i;
+              const int gbase = e * p_Nggeo * 512 + k * 8 * 8 + j * 8 + i;
+              r_G00 = ggeo[gbase + p_G00ID * 512];
+              r_G01 = ggeo[gbase + p_G01ID * 512];
+              r_G02 = ggeo[gbase + p_G02ID * 512];
+              r_G11 = ggeo[gbase + p_G11ID * 512];
+              r_G12 = ggeo[gbase + p_G12ID * 512];
+              r_G22 = ggeo[gbase + p_G22ID * 512];
+              r_GwJ = ggeo[gbase + p_GWJID * 512];
+              r_lam0 = lambda[id + 0 * offset];
+              r_lam1 = lambda[id + 1 * offset];
+#pragma omp barrier
+              s_q[j*8+i] = r_q[k];
+              r_qt = 0;
+#pragma unroll 8
+              for (int m = 0; m < 8; ++m) {
+                r_qt += s_D[k*8+m] * r_q[m];
+              }
+#pragma omp barrier
+              dfloat qr = 0;
+              dfloat qs = 0;
+#pragma unroll 8
+              for (int m = 0; m < 8; ++m) {
+                qr += s_D[i*8+m] * s_q[j*8+m];
+                qs += s_D[j*8+m] * s_q[m*8+i];
+              }
+              s_Gqs[j*8+i] = r_lam0 * (r_G01 * qr + r_G11 * qs + r_G12 * r_qt);
+              s_Gqr[j*8+i] = r_lam0 * (r_G00 * qr + r_G01 * qs + r_G02 * r_qt);
+              r_Gqt = r_lam0 * (r_G02 * qr + r_G12 * qs + r_G22 * r_qt);
+              r_Auk = r_GwJ * r_lam1 * r_q[k];
+#pragma omp barrier
+#pragma unroll 8
+              for (int m = 0; m < 8; ++m) {
+                r_Auk += s_D[m*8+j] * s_Gqs[m*8+i];
+                r_Aq[m] += s_D[k*8+m] * r_Gqt;
+                r_Auk += s_D[m*8+i] * s_Gqr[j*8+m];
+              }
+              r_Aq[k] += r_Auk;
+#pragma omp barrier
+            }
+#pragma unroll 8
+            for (int k = 0; k < 8; ++k) {
+              const int id = e * 512 + k * 8 * 8 + j * 8 + i;
+              Aq[id] = r_Aq[k];
+            }
+          }
+        }
 }
 
-int main(int argc, char **argv){
-
-  if (argc<4) {
-    printf("Usage: ./axhelm Ndim numElements [nRepetitions]\n");
-    return 1;
-  }
-
-  const int Ndim = atoi(argv[1]);
-  const int Nelements = atoi(argv[2]);
-  int Ntests = 1;
-  if(argc>=4)
-    Ntests = atoi(argv[3]);
-
-  const int Nq = POLYNOMIAL_DEGREE + 1;
-  const int Np = Nq*Nq*Nq;
-  const int offset = Nelements*Np;
-
-
-  // build element nodes and operators
-  dfloat *rV, *wV, *DrV;
-  meshJacobiGQ(0,0,POLYNOMIAL_DEGREE, &rV, &wV);
-  meshDmatrix1D(POLYNOMIAL_DEGREE, Nq, rV, &DrV);
-
-  std::cout << "word size: " << sizeof(dfloat) << " bytes\n";
-
-  // populate device arrays
-  dfloat *ggeo = drandAlloc(Np*Nelements*p_Nggeo);
-  dfloat *q    = drandAlloc((Ndim*Np)*Nelements);
-  dfloat *Aq   = drandAlloc((Ndim*Np)*Nelements);
-  dfloat *Aq_d = drandAlloc((Ndim*Np)*Nelements);
-
-  const dfloat lambda1 = 1.1;
-  dfloat *lambda = (dfloat*) calloc(2*offset, sizeof(dfloat));
-  for(int i=0; i<offset; i++) {
-    lambda[i]        = 1.0;
-    lambda[i+offset] = lambda1;
-  }
-
-  for(int n=0;n<Ndim;++n){
-    dfloat *x = q + n*offset;
-    dfloat *Ax = Aq + n*offset; 
-    axhelmReference(Nq, Nelements, lambda1, ggeo, DrV, x, Ax);
-  }
-
-  auto start = std::chrono::high_resolution_clock::now();
-
-#pragma omp target data map(to: ggeo[0:Np*Nelements*p_Nggeo], \
-    q[0:Ndim*Np*Nelements], \
-    DrV[0:Nq*Nq], \
-    lambda[0:2*offset]) \
-  map(from: Aq_d[0:Ndim*Np*Nelements])
-  {
-
-    for(int test = 0; test < Ntests; ++test) {
-      if (Ndim > 1) {
-#pragma omp target teams num_teams(Nelements) thread_limit(64) 
+void axhelm_n3(
+    const int numTeams,
+    const int numThreads,
+    const int Nelements,
+    const int offset,
+    const dfloat * __restrict__ ggeo,
+    const dfloat * __restrict__ D,
+    const dfloat * __restrict__ lambda,
+    const dfloat * __restrict__ Q,
+    dfloat * __restrict__ Aq) 
+{
+  #pragma omp target teams num_teams(numTeams)
         {
           dfloat s_D[64];
           dfloat s_U[64];
@@ -101,7 +132,7 @@ int main(int argc, char **argv){
           dfloat s_GVs[64];
           dfloat s_GWr[64];
           dfloat s_GWs[64];
-#pragma omp parallel 
+#pragma omp parallel num_threads(numThreads)
           {
             dfloat r_Ut, r_Vt, r_Wt;
             dfloat r_U[8], r_V[8], r_W[8];
@@ -113,12 +144,12 @@ int main(int argc, char **argv){
             int j = omp_get_thread_num() / 8; 
             int i = omp_get_thread_num() % 8; 
 
-            s_D[j*8+i] = DrV[j*8+i];
+            s_D[j*8+i] = D[j*8+i];
             const int base = i + j * 8 + e * 512;
             for (int k = 0; k < 8; k++) {
-              r_U[k] = q[base + k * 8 * 8 + 0 * offset];
-              r_V[k] = q[base + k * 8 * 8 + 1 * offset];
-              r_W[k] = q[base + k * 8 * 8 + 2 * offset];
+              r_U[k] = Q[base + k * 8 * 8 + 0 * offset];
+              r_V[k] = Q[base + k * 8 * 8 + 1 * offset];
+              r_W[k] = Q[base + k * 8 * 8 + 2 * offset];
               r_AU[k] = 0;
               r_AV[k] = 0;
               r_AW[k] = 0;
@@ -201,88 +232,85 @@ int main(int argc, char **argv){
 #pragma unroll 8
             for (int k = 0; k < 8; k++) {
               const int id = e * 512 + k * 8 * 8 + j * 8 + i;
-              Aq_d[id + 0 * offset] = r_AU[k];
-              Aq_d[id + 1 * offset] = r_AV[k];
-              Aq_d[id + 2 * offset] = r_AW[k];
+              Aq[id + 0 * offset] = r_AU[k];
+              Aq[id + 1 * offset] = r_AV[k];
+              Aq[id + 2 * offset] = r_AW[k];
             }
           }
         }
-      }  else {
-#pragma omp target teams num_teams(Nelements) thread_limit(64) 
-        {
+}
 
-          dfloat s_D[64];
-          dfloat s_q[64];
-          dfloat s_Gqr[64];
-          dfloat s_Gqs[64];
-#pragma omp parallel
-          {
 
-            dfloat r_qt, r_Gqt, r_Auk;
-            dfloat r_q[8];
-            dfloat r_Aq[8];
-            dfloat r_G00, r_G01, r_G02, r_G11, r_G12, r_G22, r_GwJ;
-            dfloat r_lam0, r_lam1;
+dfloat *drandAlloc(int Nelem){
 
-            int e = omp_get_team_num();
-            int j = omp_get_thread_num() / 8; 
-            int i = omp_get_thread_num() % 8; 
+  dfloat *v = (dfloat*) calloc(Nelem, sizeof(dfloat));
 
-            s_D[j*8+i] = DrV[j*8+i];
-            const int base = i + j * 8 + e * 512;
-            for (int k = 0; k < 8; ++k) {
-              r_q[k] = q[base + k * 8 * 8];
-              r_Aq[k] = 0;
-            }
-#pragma unroll 8
-            for (int k = 0; k < 8; ++k) {
-              const int id = e * 512 + k * 8 * 8 + j * 8 + i;
-              const int gbase = e * p_Nggeo * 512 + k * 8 * 8 + j * 8 + i;
-              r_G00 = ggeo[gbase + p_G00ID * 512];
-              r_G01 = ggeo[gbase + p_G01ID * 512];
-              r_G02 = ggeo[gbase + p_G02ID * 512];
-              r_G11 = ggeo[gbase + p_G11ID * 512];
-              r_G12 = ggeo[gbase + p_G12ID * 512];
-              r_G22 = ggeo[gbase + p_G22ID * 512];
-              r_GwJ = ggeo[gbase + p_GWJID * 512];
-              r_lam0 = lambda[id + 0 * offset];
-              r_lam1 = lambda[id + 1 * offset];
-#pragma omp barrier
-              s_q[j*8+i] = r_q[k];
-              r_qt = 0;
-#pragma unroll 8
-              for (int m = 0; m < 8; ++m) {
-                r_qt += s_D[k*8+m] * r_q[m];
-              }
-#pragma omp barrier
-              dfloat qr = 0;
-              dfloat qs = 0;
-#pragma unroll 8
-              for (int m = 0; m < 8; ++m) {
-                qr += s_D[i*8+m] * s_q[j*8+m];
-                qs += s_D[j*8+m] * s_q[m*8+i];
-              }
-              s_Gqs[j*8+i] = r_lam0 * (r_G01 * qr + r_G11 * qs + r_G12 * r_qt);
-              s_Gqr[j*8+i] = r_lam0 * (r_G00 * qr + r_G01 * qs + r_G02 * r_qt);
-              r_Gqt = r_lam0 * (r_G02 * qr + r_G12 * qs + r_G22 * r_qt);
-              r_Auk = r_GwJ * r_lam1 * r_q[k];
-#pragma omp barrier
-#pragma unroll 8
-              for (int m = 0; m < 8; ++m) {
-                r_Auk += s_D[m*8+j] * s_Gqs[m*8+i];
-                r_Aq[m] += s_D[k*8+m] * r_Gqt;
-                r_Auk += s_D[m*8+i] * s_Gqr[j*8+m];
-              }
-              r_Aq[k] += r_Auk;
-#pragma omp barrier
-            }
-#pragma unroll 8
-            for (int k = 0; k < 8; ++k) {
-              const int id = e * 512 + k * 8 * 8 + j * 8 + i;
-              Aq_d[id] = r_Aq[k];
-            }
-          }
-        }
+  for(int n=0;n<Nelem;++n){
+    v[n] = drand48();
+  }
+
+  return v;
+}
+
+int main(int argc, char **argv){
+
+  if (argc<4) {
+    printf("Usage: ./axhelm Ndim numElements [nRepetitions]\n");
+    return 1;
+  }
+
+  const int Ndim = atoi(argv[1]);
+  const int Nelements = atoi(argv[2]);
+  int Ntests = 1;
+  if(argc>=4)
+    Ntests = atoi(argv[3]);
+
+  const int Nq = POLYNOMIAL_DEGREE + 1;
+  const int Np = Nq*Nq*Nq;
+  const int offset = Nelements*Np;
+
+
+  // build element nodes and operators
+  dfloat *rV, *wV, *DrV;
+  meshJacobiGQ(0,0,POLYNOMIAL_DEGREE, &rV, &wV);
+  meshDmatrix1D(POLYNOMIAL_DEGREE, Nq, rV, &DrV);
+
+  std::cout << "word size: " << sizeof(dfloat) << " bytes\n";
+
+  // populate device arrays
+  dfloat *ggeo = drandAlloc(Np*Nelements*p_Nggeo);
+  dfloat *q    = drandAlloc((Ndim*Np)*Nelements);
+  dfloat *Aq   = drandAlloc((Ndim*Np)*Nelements);
+  dfloat *Aq_d = drandAlloc((Ndim*Np)*Nelements);
+
+  const dfloat lambda1 = 1.1;
+  dfloat *lambda = (dfloat*) calloc(2*offset, sizeof(dfloat));
+  for(int i=0; i<offset; i++) {
+    lambda[i]        = 1.0;
+    lambda[i+offset] = lambda1;
+  }
+
+  for(int n=0;n<Ndim;++n){
+    dfloat *x = q + n*offset;
+    dfloat *Ax = Aq + n*offset; 
+    axhelmReference(Nq, Nelements, lambda1, ggeo, DrV, x, Ax);
+  }
+
+  auto start = std::chrono::high_resolution_clock::now();
+
+#pragma omp target data map(to: ggeo[0:Np*Nelements*p_Nggeo], \
+                                q[0:Ndim*Np*Nelements], \
+                                DrV[0:Nq*Nq], \
+                                lambda[0:2*offset]) \
+                        map(from: Aq_d[0:Ndim*Np*Nelements])
+  {
+    for(int test = 0; test < Ntests; ++test) {
+      if (Ndim > 1) {
+        axhelm_n3(Nelements, 64,
+          Nelements, offset, ggeo, DrV, lambda, q, Aq_d);
+      } else {
+        axhelm(Nelements, 64,
+          Nelements, offset, ggeo, DrV, lambda, q, Aq_d);
       }
     }
   }
