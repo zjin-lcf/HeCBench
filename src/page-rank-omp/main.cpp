@@ -39,6 +39,47 @@
 const int max_iter = 1000;
 const float threshold= 1e-16f;
 
+
+void map(const int numTeams,
+         const int numThreads,
+         const int *__restrict__ pages,
+         const float *__restrict__ page_ranks,
+               float *__restrict__ maps,
+         const unsigned int *__restrict__ noutlinks,
+         const int n)
+{
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int i = 0; i < n; i++) {
+    float outbound_rank = page_ranks[i]/(float)noutlinks[i];
+    for(int j=0; j<n; ++j) 
+      maps[i*n+j] = pages[i*n+j]*outbound_rank;
+  }
+}
+
+void reduce(const int numTeams,
+            const int numThreads,
+                  float *__restrict__ page_ranks,
+            const float *__restrict__ maps,
+            const int n,
+                  float *__restrict__ dif)
+{
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int j = 0; j < n; j++) {
+    float new_rank;
+    float old_rank;
+    old_rank = page_ranks[j];
+    new_rank = 0.0f;
+    for(int i=0; i< n; ++i)
+      new_rank += maps[i*n + j];
+    new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
+    dif[j] = fmaxf(fabsf(new_rank - old_rank), dif[j]);
+    page_ranks[j] = new_rank;
+  }
+}
+
+
 // generates an array of random pages and their links
 int *random_pages(int n, unsigned int *noutlinks, int divisor){
   int i, j, k;
@@ -160,6 +201,7 @@ int main(int argc, char *argv[]) {
   }
 
   size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
+  size_t num_blocks = (n+block_size-1) / block_size;
 
   double ktime = 0.0;
 
@@ -171,25 +213,11 @@ int main(int argc, char *argv[]) {
    {
      for (t=1; t<=iter && max_diff>=thresh; ++t) {
        auto start = std::chrono::high_resolution_clock::now();
-   
-       #pragma omp target teams distribute parallel for thread_limit(block_size) 
-       for (int i = 0; i < n; i++) {
-         float outbound_rank = page_ranks[i]/(float)noutlinks[i];
-         for(int j=0; j<n; ++j) maps[i*n+j] = pages[i*n+j]*outbound_rank;
-       }
-   
-       #pragma omp target teams distribute parallel for thread_limit(block_size) 
-       for (int j = 0; j < n; j++) {
-         float new_rank;
-         float old_rank;
-         old_rank = page_ranks[j];
-         new_rank = 0.0f;
-         for(int i=0; i< n; ++i) new_rank += maps[i*n + j];
-         new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
-         diffs[j] = fmaxf(fabsf(new_rank - old_rank), diffs[j]);
-         page_ranks[j] = new_rank;
-       }
-   
+
+       map(num_blocks, block_size, pages, page_ranks, maps, noutlinks, n);
+
+       reduce(num_blocks, block_size, page_ranks, maps, n, diffs);
+    
        auto end = std::chrono::high_resolution_clock::now();
        ktime += std::chrono::duration_cast<std::chrono::duration<double> >(end - start).count();
    
