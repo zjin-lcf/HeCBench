@@ -107,14 +107,17 @@ double dFunc(double l, double m, double n)
 }
 #pragma omp end declare target
 
-void calculateForce(double phi[][DATAYSIZE][DATAXSIZE], 
+void calculateForce(const int numTeams,
+                    const int numThreads,
+                    double phi[][DATAYSIZE][DATAXSIZE], 
                     double Fx[][DATAYSIZE][DATAXSIZE],
                     double Fy[][DATAYSIZE][DATAXSIZE],
                     double Fz[][DATAYSIZE][DATAXSIZE],
                     double dx, double dy, double dz,
                     double epsilon, double W0, double tau0)
 {
-  #pragma omp target teams distribute parallel for collapse(3) thread_limit(256)
+  #pragma omp target teams distribute parallel for collapse(3) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int ix = 0; ix < DATAXSIZE; ix++) {
     for (int iy = 0; iy < DATAYSIZE; iy++) {
       for (int iz = 0; iz < DATAZSIZE; iz++) {
@@ -148,7 +151,9 @@ void calculateForce(double phi[][DATAYSIZE][DATAXSIZE],
 }
 
 // device function to set the 3D volume
-void allenCahn(double phinew[][DATAYSIZE][DATAXSIZE], 
+void allenCahn(const int numTeams,
+               const int numThreads,
+               double phinew[][DATAYSIZE][DATAXSIZE], 
                double phiold[][DATAYSIZE][DATAXSIZE],
                double uold[][DATAYSIZE][DATAXSIZE],
                double Fx[][DATAYSIZE][DATAXSIZE],
@@ -157,7 +162,8 @@ void allenCahn(double phinew[][DATAYSIZE][DATAXSIZE],
                double epsilon, double W0, double tau0, double lambda,
                double dt, double dx, double dy, double dz)
 {
-  #pragma omp target teams distribute parallel for collapse(3) thread_limit(256)
+  #pragma omp target teams distribute parallel for collapse(3) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int ix = 1; ix < DATAXSIZE-1; ix++) {
     for (int iy = 1; iy < DATAYSIZE-1; iy++) {
       for (int iz = 1; iz < DATAZSIZE-1; iz++) {
@@ -175,9 +181,12 @@ void allenCahn(double phinew[][DATAYSIZE][DATAXSIZE],
   }
 }
 
-void boundaryConditionsPhi(double phinew[][DATAYSIZE][DATAXSIZE])
+void boundaryConditionsPhi(const int numTeams,
+                           const int numThreads,
+                           double phinew[][DATAYSIZE][DATAXSIZE])
 {
-  #pragma omp target teams distribute parallel for collapse(3) thread_limit(256)
+  #pragma omp target teams distribute parallel for collapse(3) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int ix = 0; ix < DATAXSIZE; ix++) {
     for (int iy = 0; iy < DATAYSIZE; iy++) {
       for (int iz = 0; iz < DATAZSIZE; iz++) {
@@ -205,13 +214,16 @@ void boundaryConditionsPhi(double phinew[][DATAYSIZE][DATAXSIZE])
   }
 }
 
-void thermalEquation(double unew[][DATAYSIZE][DATAXSIZE],
+void thermalEquation(const int numTeams,
+                     const int numThreads,
+                     double unew[][DATAYSIZE][DATAXSIZE],
                      double uold[][DATAYSIZE][DATAXSIZE],
                      double phinew[][DATAYSIZE][DATAXSIZE],
                      double phiold[][DATAYSIZE][DATAXSIZE],
                      double D, double dt, double dx, double dy, double dz)
 {
-  #pragma omp target teams distribute parallel for collapse(3) thread_limit(256)
+  #pragma omp target teams distribute parallel for collapse(3) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int ix = 1; ix < DATAXSIZE-1; ix++) {
     for (int iy = 1; iy < DATAYSIZE-1; iy++) {
       for (int iz = 1; iz < DATAZSIZE-1; iz++) {
@@ -225,9 +237,12 @@ void thermalEquation(double unew[][DATAYSIZE][DATAXSIZE],
   }
 }
 
-void boundaryConditionsU(double unew[][DATAYSIZE][DATAXSIZE], double delta)
+void boundaryConditionsU(const int numTeams,
+                         const int numThreads,
+                         double unew[][DATAYSIZE][DATAXSIZE], double delta)
 {
-  #pragma omp target teams distribute parallel for collapse(3) thread_limit(256)
+  #pragma omp target teams distribute parallel for collapse(3) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int ix = 0; ix < DATAXSIZE; ix++) {
     for (int iy = 0; iy < DATAYSIZE; iy++) {
       for (int iz = 0; iz < DATAZSIZE; iz++) {
@@ -255,10 +270,13 @@ void boundaryConditionsU(double unew[][DATAYSIZE][DATAXSIZE], double delta)
   }
 }
 
-void swapGrid(double cnew[][DATAYSIZE][DATAXSIZE],
+void swapGrid(const int numTeams,
+              const int numThreads,
+              double cnew[][DATAYSIZE][DATAXSIZE],
               double cold[][DATAYSIZE][DATAXSIZE])
 {
-  #pragma omp target teams distribute parallel for collapse(3) thread_limit(256)
+  #pragma omp target teams distribute parallel for collapse(3) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int ix = 0; ix < DATAXSIZE; ix++) {
     for (int iy = 0; iy < DATAYSIZE; iy++) {
       for (int iz = 0; iz < DATAZSIZE; iz++) {
@@ -348,6 +366,9 @@ int main(int argc, char *argv[])
   reference(phi_ref, u_ref, vol, num_steps);
 #endif 
 
+  const int numTeams = ((DATAZSIZE+7)/8 * (DATAYSIZE+7)/8 * (DATAXSIZE+3)/4);
+  const int numThreads = 8 * 8 * 4;
+
   auto offload_start = std::chrono::steady_clock::now();
 
   // storage for result computed on device
@@ -373,23 +394,23 @@ int main(int argc, char *argv[])
   
     while (t <= num_steps) {
   
-      calculateForce((nRarray*)d_phiold, (nRarray*)d_Fx,(nRarray*)d_Fy,(nRarray*)d_Fz,
+      calculateForce(numTeams, numThreads, (nRarray*)d_phiold, (nRarray*)d_Fx,(nRarray*)d_Fy,(nRarray*)d_Fz,
                      dx,dy,dz,epsilon,W0,tau0);
   
-      allenCahn((nRarray*)d_phinew,(nRarray*)d_phiold,(nRarray*)d_uold,
+      allenCahn(numTeams, numThreads, (nRarray*)d_phinew,(nRarray*)d_phiold,(nRarray*)d_uold,
                 (nRarray*)d_Fx,(nRarray*)d_Fy,(nRarray*)d_Fz,
                 epsilon,W0,tau0,lambda, dt,dx,dy,dz);
   
-      boundaryConditionsPhi((nRarray*)d_phinew);
+      boundaryConditionsPhi(numTeams, numThreads, (nRarray*)d_phinew);
   
-      thermalEquation((nRarray*)d_unew,(nRarray*)d_uold,(nRarray*)d_phinew,(nRarray*)d_phiold,
-                      D,dt,dx,dy,dz);
+      thermalEquation(numTeams, numThreads, (nRarray*)d_unew,(nRarray*)d_uold,
+                      (nRarray*)d_phinew,(nRarray*)d_phiold, D,dt,dx,dy,dz);
   
-      boundaryConditionsU((nRarray*)d_unew,delta);
+      boundaryConditionsU(numTeams, numThreads, (nRarray*)d_unew,delta);
   
-      swapGrid((nRarray*)d_phinew, (nRarray*)d_phiold);
+      swapGrid(numTeams, numThreads, (nRarray*)d_phinew, (nRarray*)d_phiold);
   
-      swapGrid((nRarray*)d_unew, (nRarray*)d_uold);
+      swapGrid(numTeams, numThreads, (nRarray*)d_unew, (nRarray*)d_uold);
   
       t++;
     }
