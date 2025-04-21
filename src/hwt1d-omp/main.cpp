@@ -114,79 +114,21 @@ int main(int argc, char * argv[])
 
       // Set group size
       unsigned int groupSize = (1 << curLevels) / 2;
+      unsigned int numTeams = (curSignalLength >> 1) / groupSize;
 
       unsigned int totalLevels = levels;
 
       #pragma omp target update to(inData[0:signalLength])
 
-      const int teams = (curSignalLength >> 1) / groupSize;
-
-      #pragma omp target teams num_teams(teams) thread_limit(groupSize)
-      {
-        float lmem [512];
-        #pragma omp parallel 
-        {
-          size_t localId = omp_get_thread_num();
-          size_t groupId = omp_get_team_num();
-          size_t localSize = omp_get_num_threads();
-          
-          /**
-           * Read input signal data from global memory
-           * to shared memory
-           */
-          float t0 = inData[groupId * localSize * 2 + localId];
-          float t1 = inData[groupId * localSize * 2 + localSize + localId];
-          // Divide with signal length for normalized decomposition
-          if(0 == levelsDone)
-          {
-             float r = 1.f / sqrtf((float)curSignalLength);
-             t0 *= r;
-             t1 *= r;
-          }
-          lmem[localId] = t0;
-          lmem[localSize + localId] = t1;
-           
-          #pragma omp barrier
-          
-          unsigned int levels = totalLevels > maxLevelsOnDevice ? maxLevelsOnDevice: totalLevels;
-          unsigned int activeThreads = (1 << levels) / 2;
-          unsigned int midOutPos = curSignalLength / 2;
-          
-          const float rsqrt_two = 0.7071f;
-          for(unsigned int i = 0; i < levels; ++i)
-          {
-
-              float data0, data1;
-              if(localId < activeThreads)
-              {
-                  data0 = lmem[2 * localId];
-                  data1 = lmem[2 * localId + 1];
-              }
-
-              /* make sure all work items have read from lmem before modifying it */
-              #pragma omp barrier
-
-              if(localId < activeThreads)
-              {
-                  lmem[localId] = (data0 + data1) * rsqrt_two;
-                  unsigned int globalPos = midOutPos + groupId * activeThreads + localId;
-                  dOutData[globalPos] = (data0 - data1) * rsqrt_two;
-             
-                  midOutPos >>= 1;
-              }
-              activeThreads >>= 1;
-              #pragma omp barrier
-          }
-      
-          /**
-           * Write 0th element for the next decomposition
-           * steps which are performed on host 
-           */
-          
-           if(0 == localId)
-              dPartialOutData[groupId] = lmem[0];
-        }
-      }
+      dwtHaar1D(numTeams,
+                groupSize,
+                inData,
+                dOutData,
+                dPartialOutData,
+                totalLevels,
+                curSignalLength,
+                levelsDone,
+                maxLevelsOnDevice);
 
       #pragma omp target update from(dOutData[0:signalLength])
       #pragma omp target update from(dPartialOutData[0:signalLength])
