@@ -18,6 +18,126 @@
 #include "FDTD3dGPU.h"
 #include "shrUtils.h"
 
+void finite_difference(
+  const int numTeams,
+  const int numThreads,
+        float*__restrict__ output,
+  const float*__restrict__ input,
+  const float*__restrict__ coeff, 
+  const int dimx, const int dimy, const int dimz,
+  const int padding)
+{
+  #pragma omp target teams num_teams(numTeams)
+  {
+    float tile [localWorkMaxY + 2*k_radius_default][localWorkMaxX + 2*k_radius_default];
+    #pragma omp parallel num_threads(numThreads) 
+    {
+      bool valid = true;
+      const int ltidx = omp_get_thread_num() % k_localWorkX;
+      const int ltidy = omp_get_thread_num() / k_localWorkX;
+      const int workx = k_localWorkX;
+      const int worky = numThreads / k_localWorkX;
+      const int teamX = (dimx + k_localWorkX - 1) / k_localWorkX;
+      const int gtidx = (omp_get_team_num() % teamX) * workx + ltidx;
+      const int gtidy = (omp_get_team_num() / teamX) * worky + ltidy;
+      
+      const int stride_y = dimx + 2 * k_radius_default;
+      const int stride_z = stride_y * (dimy + 2 * k_radius_default);
+
+      int inputIndex  = 0;
+      int outputIndex = 0;
+
+      // Advance inputIndex to start of inner volume
+      inputIndex += k_radius_default * stride_y + k_radius_default + padding;
+      
+      // Advance inputIndex to target element
+      inputIndex += gtidy * stride_y + gtidx;
+
+      float infront[k_radius_default];
+      float behind[k_radius_default];
+      float current;
+
+      const int tx = ltidx + k_radius_default;
+      const int ty = ltidy + k_radius_default;
+
+      if (gtidx >= dimx) valid = false;
+      if (gtidy >= dimy) valid = false;
+
+      // For simplicity we assume that the global size is equal to the actual
+      // problem size; since the global size must be a multiple of the local size
+      // this means the problem size must be a multiple of the local size (or
+      // padded to meet this constraint).
+      // Preload the "infront" and "behind" data
+      for (int i = k_radius_default - 2 ; i >= 0 ; i--)
+      {
+          behind[i] = input[inputIndex];
+          inputIndex += stride_z;
+      }
+
+      current = input[inputIndex];
+      outputIndex = inputIndex;
+      inputIndex += stride_z;
+
+      for (int i = 0 ; i < k_radius_default ; i++)
+      {
+          infront[i] = input[inputIndex];
+          inputIndex += stride_z;
+      }
+
+      // Step through the xy-planes
+      for (int iz = 0 ; iz < dimz ; iz++)
+      {
+          // Advance the slice (move the thread-front)
+          for (int i = k_radius_default - 1 ; i > 0 ; i--)
+              behind[i] = behind[i - 1];
+          behind[0] = current;
+          current = infront[0];
+          for (int i = 0 ; i < k_radius_default - 1 ; i++)
+              infront[i] = infront[i + 1];
+          infront[k_radius_default - 1] = input[inputIndex];
+
+          inputIndex  += stride_z;
+          outputIndex += stride_z;
+          #pragma omp barrier
+
+          // Note that for the work items on the boundary of the problem, the
+          // supplied index when reading the halo (below) may wrap to the
+          // previous/next row or even the previous/next xy-plane. This is
+          // acceptable since a) we disable the output write for these work
+          // items and b) there is at least one xy-plane before/after the
+          // current plane, so the access will be within bounds.
+
+          // Update the data slice in the local tile
+          // Halo above & below
+          if (ltidy < k_radius_default)
+          {
+              tile[ltidy][tx]                  = input[outputIndex - k_radius_default * stride_y];
+              tile[ltidy + worky + k_radius_default][tx] = input[outputIndex + worky * stride_y];
+          }
+          // Halo left & right
+          if (ltidx < k_radius_default)
+          {
+              tile[ty][ltidx]                  = input[outputIndex - k_radius_default];
+              tile[ty][ltidx + workx + k_radius_default] = input[outputIndex + workx];
+          }
+          tile[ty][tx] = current;
+          #pragma omp barrier
+
+          // Compute the output value
+          float value = coeff[0] * current;
+          for (int i = 1 ; i <= k_radius_default ; i++)
+          {
+              value += coeff[i] * (infront[i-1] + behind[i-1] + tile[ty - i][tx] + 
+                       tile[ty + i][tx] + tile[ty][tx - i] + tile[ty][tx + i]);
+          }
+
+          // Store the output value
+          if (valid) output[outputIndex] = value;
+      }
+    }
+  }
+}
+
 bool fdtdGPU(float *output, float *input, const float *coeff, 
              const int dimx, const int dimy, const int dimz, const int radius, 
              const int timesteps, const int argc, const char **argv)
@@ -51,7 +171,7 @@ bool fdtdGPU(float *output, float *input, const float *coeff,
 
     int teamX = teamSize[0];
     int teamY = teamSize[1];
-    int numTeam = teamX * teamY;
+    int numTeams = teamX * teamY;
 
     shrLog(" set thread size to %dx%d\n", threadSize[0], threadSize[1]);
     shrLog(" set team size to %dx%d\n", teamSize[0], teamSize[1]);
@@ -67,114 +187,7 @@ bool fdtdGPU(float *output, float *input, const float *coeff,
 
     for (int it = 0 ; it < timesteps ; it++)
     {
-      #pragma omp target teams num_teams(numTeam) thread_limit(userWorkSize)
-      {
-        float tile [localWorkMaxY + 2*k_radius_default][localWorkMaxX + 2*k_radius_default];
-        #pragma omp parallel 
-	{
-          bool valid = true;
-          const int ltidx = omp_get_thread_num() % k_localWorkX;
-          const int ltidy = omp_get_thread_num() / k_localWorkX;
-          const int workx = k_localWorkX;
-          const int worky = userWorkSize / k_localWorkX;
-          const int gtidx = (omp_get_team_num() % teamX) * workx + ltidx;
-          const int gtidy = (omp_get_team_num() / teamX) * worky + ltidy;
-          
-          const int stride_y = dimx + 2 * k_radius_default;
-          const int stride_z = stride_y * (dimy + 2 * k_radius_default);
-
-          int inputIndex  = 0;
-          int outputIndex = 0;
-
-          // Advance inputIndex to start of inner volume
-          inputIndex += k_radius_default * stride_y + k_radius_default + padding;
-          
-          // Advance inputIndex to target element
-          inputIndex += gtidy * stride_y + gtidx;
-
-          float infront[k_radius_default];
-          float behind[k_radius_default];
-          float current;
-
-          const int tx = ltidx + k_radius_default;
-          const int ty = ltidy + k_radius_default;
-
-          if (gtidx >= dimx) valid = false;
-          if (gtidy >= dimy) valid = false;
-
-          // For simplicity we assume that the global size is equal to the actual
-          // problem size; since the global size must be a multiple of the local size
-          // this means the problem size must be a multiple of the local size (or
-          // padded to meet this constraint).
-          // Preload the "infront" and "behind" data
-          for (int i = k_radius_default - 2 ; i >= 0 ; i--)
-          {
-              behind[i] = bufferIn[inputIndex];
-              inputIndex += stride_z;
-          }
-
-          current = bufferIn[inputIndex];
-          outputIndex = inputIndex;
-          inputIndex += stride_z;
-
-          for (int i = 0 ; i < k_radius_default ; i++)
-          {
-              infront[i] = bufferIn[inputIndex];
-              inputIndex += stride_z;
-          }
-
-          // Step through the xy-planes
-          for (int iz = 0 ; iz < dimz ; iz++)
-          {
-              // Advance the slice (move the thread-front)
-              for (int i = k_radius_default - 1 ; i > 0 ; i--)
-                  behind[i] = behind[i - 1];
-              behind[0] = current;
-              current = infront[0];
-              for (int i = 0 ; i < k_radius_default - 1 ; i++)
-                  infront[i] = infront[i + 1];
-              infront[k_radius_default - 1] = bufferIn[inputIndex];
-
-              inputIndex  += stride_z;
-              outputIndex += stride_z;
-              #pragma omp barrier
-
-              // Note that for the work items on the boundary of the problem, the
-              // supplied index when reading the halo (below) may wrap to the
-              // previous/next row or even the previous/next xy-plane. This is
-              // acceptable since a) we disable the output write for these work
-              // items and b) there is at least one xy-plane before/after the
-              // current plane, so the access will be within bounds.
-
-              // Update the data slice in the local tile
-              // Halo above & below
-              if (ltidy < k_radius_default)
-              {
-                  tile[ltidy][tx]                  = bufferIn[outputIndex - k_radius_default * stride_y];
-                  tile[ltidy + worky + k_radius_default][tx] = bufferIn[outputIndex + worky * stride_y];
-              }
-              // Halo left & right
-              if (ltidx < k_radius_default)
-              {
-                  tile[ty][ltidx]                  = bufferIn[outputIndex - k_radius_default];
-                  tile[ty][ltidx + workx + k_radius_default] = bufferIn[outputIndex + workx];
-              }
-              tile[ty][tx] = current;
-              #pragma omp barrier
-
-              // Compute the output value
-              float value = coeff[0] * current;
-              for (int i = 1 ; i <= k_radius_default ; i++)
-              {
-                  value += coeff[i] * (infront[i-1] + behind[i-1] + tile[ty - i][tx] + 
-                           tile[ty + i][tx] + tile[ty][tx - i] + tile[ty][tx + i]);
-              }
-
-              // Store the output value
-              if (valid) bufferOut[outputIndex] = value;
-          }
-        }
-      }
+      finite_difference(numTeams, userWorkSize, bufferOut, bufferIn, coeff, dimx, dimy, dimz, padding);
 
       // Toggle the buffers
       float* tmp = bufferIn;
