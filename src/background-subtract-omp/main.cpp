@@ -9,6 +9,8 @@
 #define BLOCK_SIZE 256
 
 void findMovingPixels(
+  const int numTeams,
+  const int numThreads,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Img1,
@@ -16,7 +18,8 @@ void findMovingPixels(
   const unsigned char *__restrict Tn,
         unsigned char *__restrict Mp) // moving pixel map
 {
-  #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (size_t i = 0; i < imgSize; i++) {
     if ( abs(Img[i] - Img1[i]) > Tn[i] || abs(Img[i] - Img2[i]) > Tn[i] )
       Mp[i] = 255;
@@ -27,12 +30,15 @@ void findMovingPixels(
 
 // alpha = 0.92
 void updateBackground(
+  const int numTeams,
+  const int numThreads,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Mp,
         unsigned char *__restrict Bn)
 {
-  #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (size_t i = 0; i < imgSize; i++) {
     if ( Mp[i] == 0 ) Bn[i] = 0.92 * Bn[i] + 0.08 * Img[i];
   }
@@ -40,13 +46,16 @@ void updateBackground(
 
 // alpha = 0.92, c = 3
 void updateThreshold(
+  const int numTeams,
+  const int numThreads,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Mp,
   const unsigned char *__restrict Bn,
         unsigned char *__restrict Tn)
 {
-  #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (size_t i = 0; i < imgSize; i++) {
     if (Mp[i] == 0) {
       float th = 0.92 * Tn[i] + 0.24 * (Img[i] - Bn[i]);
@@ -59,6 +68,8 @@ void updateThreshold(
 // merge three kernels into a single kernel
 //
 void merge(
+  const int numTeams,
+  const int numThreads,
   const size_t imgSize,
   const unsigned char *__restrict Img,
   const unsigned char *__restrict Img1,
@@ -66,7 +77,8 @@ void merge(
         unsigned char *__restrict Tn,
         unsigned char *__restrict Bn)
 {
-  #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (size_t i = 0; i < imgSize; i++) {
     if ( abs(Img[i] - Img1[i]) <= Tn[i] && abs(Img[i] - Img2[i]) <= Tn[i] ) {
       // update background
@@ -109,6 +121,9 @@ int main(int argc, char* argv[]) {
     Tn_ref[j] = Tn[j] = 128;
   }
 
+  const int numTeams = (imgSize + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  const int numThreads = BLOCK_SIZE;
+
   long time = 0;
 
   #pragma omp target data map (tofrom: Bn[0:imgSize]) \
@@ -137,15 +152,15 @@ int main(int argc, char* argv[]) {
       if (i >= 2) {
         if (merged) {
           auto start = std::chrono::steady_clock::now();
-          merge ( imgSize, Img, Img1, Img2, Tn, Bn );
+          merge ( numTeams, numThreads, imgSize, Img, Img1, Img2, Tn, Bn );
           auto end = std::chrono::steady_clock::now();
           time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
         }
         else {
           auto start = std::chrono::steady_clock::now();
-          findMovingPixels ( imgSize, Img, Img1, Img2, Tn, Mp );
-          updateBackground ( imgSize, Img, Mp, Bn );
-          updateThreshold ( imgSize, Img, Mp, Bn, Tn );
+          findMovingPixels ( numTeams, numThreads, imgSize, Img, Img1, Img2, Tn, Mp );
+          updateBackground ( numTeams, numThreads, imgSize, Img, Mp, Bn );
+          updateThreshold ( numTeams, numThreads, imgSize, Img, Mp, Bn, Tn );
           auto end = std::chrono::steady_clock::now();
           time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
         }
