@@ -17,6 +17,7 @@ def await_input(prompt: str, is_valid_input) -> str:
 class Benchmark:
     def __init__(self, args, name, res_regex, run_args = [], binary = "main", invert = False):
         if name.endswith('sycl'):
+            logging.info(f"Type of SYCL device to use: {args.sycl_type}")
             self.MAKE_ARGS = ['GCC_TOOLCHAIN="{}"'.format(args.gcc_toolchain)]
             if args.sycl_type == 'cuda':
                 self.MAKE_ARGS.append('CUDA=yes')
@@ -210,7 +211,7 @@ def main():
                             if k+'-'+b not in fails])  # e.g. nbody-sycl
             continue
         # b is a specific benchmark instead
-        ch_index = b.find('-') # find specific character '-'
+        ch_index = b.rfind('-') # find last character '-'
         b_sub = b[:ch_index]
         benches.append(Benchmark(args, b, *benchmarks[b_sub]))
 
