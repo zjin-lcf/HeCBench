@@ -13,7 +13,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = chi2
+program = main
 
 source = chi2.cpp
 
