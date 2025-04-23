@@ -46,7 +46,7 @@ typedef struct {
 
 // Fused kernel
 __global__ 
-void elementWise_fp(int hiddenSize, int miniBatch,
+void elementwise(int hiddenSize, int miniBatch,
     const float *__restrict__ tmp_h, 
     const float *__restrict__ tmp_i, 
     const float *__restrict__ bias,
@@ -201,7 +201,7 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
 
     for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
-        elementWise_fp <<< grids_p, blocks >>> 
+        elementwise <<< grids_p, blocks >>> 
         (hiddenSize, miniBatch,
          tmp_h + 4 * layer * numElements, 
          tmp_i + 4 * i * numElements, 
