@@ -39,10 +39,12 @@ namespace mean_shift::gpu {
                          const float* data,
                                float* data_next)
   {
-    #pragma omp target teams num_teams(numTeams) {
+    #pragma omp target teams num_teams(numTeams)
+    {
       float local_data[TILE_WIDTH * D];
       float valid_data[TILE_WIDTH];
-      #pragma omp parallel num_threads(numThreads) {
+      #pragma omp parallel num_threads(numThreads)
+      {
         int lid = omp_get_thread_num();
         int bid = omp_get_team_num();
         int tid = bid * omp_get_num_threads() + lid;
