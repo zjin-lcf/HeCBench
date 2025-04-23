@@ -42,7 +42,7 @@ inline float sigmoidf(float in) {
 }
 
 // Fused kernel
-void elementWise_fp(
+void elementwise(
     sycl::nd_item<1> &item,
     int hiddenSize, int miniBatch,
     const float *__restrict tmp_h,
@@ -215,7 +215,7 @@ void test(sycl::queue &q, int hiddenSize, int miniBatch, int seqLength, int numL
       for (int i = rStart; i < rEnd; i++)
         q.submit([&] (sycl::handler &cgh) {
           cgh.parallel_for<class pw>(sycl::nd_range<1>(gws_p, lws), [=] (sycl::nd_item<1> item) {
-            elementWise_fp
+            elementwise
             (item,
 	     hiddenSize, miniBatch,
              tmp_h + 4 * layer * numElements,
