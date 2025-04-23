@@ -62,7 +62,7 @@ void kernel3 (
 }
 
 float* attention_device(const float* key, const float* value, const float* query,
-                        const int n, const int d, const int repeat) 
+                        const int n, const int d, const int impl_num, const int repeat) 
 {
   // intermediate
   float* dot_product = (float*) malloc (n * sizeof(float));
@@ -101,13 +101,14 @@ float* attention_device(const float* key, const float* value, const float* query
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
-    printf("Usage: %s <rows> <columns> <repeat>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <rows> <columns> <implementation> <repeat>\n", argv[0]);
     return 1;
   }
   const int n = atoi(argv[1]);
   const int d = atoi(argv[2]);
-  const int r = atoi(argv[3]);
+  const int k = atoi(argv[3]);
+  const int r = atoi(argv[4]);
 
   // input
   float* key = (float*) malloc (n * d * sizeof(float));
@@ -125,7 +126,7 @@ int main(int argc, char* argv[]) {
 
   float* hout = attention_host(key, value, query, n, d);
 
-  float* dout = attention_device(key, value, query, n, d, r);
+  float* dout = attention_device(key, value, query, n, d, k, r);
 
   float rmse = 0;
   for (int i = 0; i < d; i++) 
