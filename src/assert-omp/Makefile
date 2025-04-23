@@ -3,11 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-ARCH      = gfx906
 LAUNCHER  =
 
 #===============================================================================
@@ -16,7 +15,7 @@ LAUNCHER  =
 
 program = main
 
-source = chi2.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -25,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../chi2-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
 
 # Linker Flags
 LDFLAGS = 
@@ -36,21 +35,16 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
-
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS += -target x86_64-pc-linux-gnu \
-          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
-          -Xopenmp-target=amdgcn-amd-amdhsa \
-          -march=$(ARCH)
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
-  CFLAGS +=-fopenmp
+  CFLAGS +=-qopenmp
 endif
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -58,11 +52,11 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../chi2-cuda/reference.h
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 4000 400000 2000 2000 256 1000
+	$(LAUNCHER) ./$(program)
