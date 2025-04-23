@@ -38,7 +38,7 @@ typedef struct {
 
 
 // Fused kernel
-void elementWise_fp(
+void elementwise(
     sycl::queue &q,
     sycl::range<3> &gws,
     sycl::range<3> &lws,
@@ -205,7 +205,7 @@ void test(sycl::queue &q, int hiddenSize, int miniBatch, int seqLength, int numL
 
     for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
-        elementWise_fp
+        elementwise
             (q, gws_p, lws, 0,
 	     hiddenSize, miniBatch,
              tmp_h + 4 * layer * numElements,
