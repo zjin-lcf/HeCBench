@@ -38,7 +38,7 @@ typedef struct {
 } checksum;
 
 // Fused kernel
-void elementWise_fp(int hiddenSize, int miniBatch,
+void elementwise(int hiddenSize, int miniBatch,
     const float *__restrict tmp_h, 
     const float *__restrict tmp_i, 
     const float *__restrict bias,
@@ -192,7 +192,7 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
 
     for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
-        elementWise_fp
+        elementwise
         (hiddenSize, miniBatch,
          tmp_h + 4 * layer * numElements, 
          tmp_i + 4 * i * numElements, 

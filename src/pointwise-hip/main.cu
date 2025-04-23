@@ -46,7 +46,7 @@ typedef struct {
 
 // Fused kernel
 __global__ 
-void elementWise_fp(int hiddenSize, int miniBatch,
+void elementwise(int hiddenSize, int miniBatch,
     const float *__restrict__ tmp_h, 
     const float *__restrict__ tmp_i, 
     const float *__restrict__ bias,
@@ -142,10 +142,10 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
   dim3 grids_tmp_h ((tmp_h_size + 255)/256);
   dim3 grids_tmp_i ((tmp_i_size + 255)/256);
           
-  hipLaunchKernelGGL(init, grids_tmp_h, blocks , 0, 0, tmp_h, tmp_h_size);
-  hipLaunchKernelGGL(init, grids_tmp_i, blocks , 0, 0, tmp_i, tmp_i_size);
-  hipLaunchKernelGGL(init, grids_hc, blocks , 0, 0, c_data, hc_size);
-  hipLaunchKernelGGL(init, grids_b, blocks , 0, 0, bias, bias_size);
+  init <<< grids_tmp_h, blocks >>> (tmp_h, tmp_h_size);
+  init <<< grids_tmp_i, blocks >>> (tmp_i, tmp_i_size);
+  init <<< grids_hc, blocks >>> (c_data, hc_size);
+  init <<< grids_b, blocks >>> (bias, bias_size);
 
   hipDeviceSynchronize();
 
@@ -201,7 +201,8 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
 
     for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
-        hipLaunchKernelGGL(elementWise_fp, grids_p, blocks , 0, 0, hiddenSize, miniBatch,
+        elementwise <<< grids_p, blocks >>> 
+        (hiddenSize, miniBatch,
          tmp_h + 4 * layer * numElements, 
          tmp_i + 4 * i * numElements, 
          bias + 8 * layer * hiddenSize,
