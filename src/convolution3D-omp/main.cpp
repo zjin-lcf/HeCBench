@@ -198,7 +198,7 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time of conv3d reference kernel: %f (us)\n",
+    printf("Average kernel execution time of conv3d_s1 kernel: %f (us)\n",
            (time * 1e-3f) / repeat);
 
     int W_grid = (Wout + TILE_WIDTH - 1) / TILE_WIDTH;
@@ -211,7 +211,7 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time of conv3d_s3 (v1) kernel: %f (us)\n",
+    printf("Average kernel execution time of conv3d_s2 kernel: %f (us)\n",
            (time * 1e-3f) / repeat);
 
     const int numTeams = N * M * H_grid * W_grid;   
@@ -224,7 +224,7 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time of conv3d_s3 (v2) kernel: %f (us)\n",
+    printf("Average kernel execution time of conv3d_s3 kernel: %f (us)\n",
            (time * 1e-3f) / repeat);
   }
   reference(X, W, Y_ref, N, M, C, K, Hin, Win, Hout, Wout);
