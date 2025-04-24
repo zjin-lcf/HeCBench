@@ -16,7 +16,7 @@ def await_input(prompt: str, is_valid_input) -> str:
     return r
 
 class Benchmark:
-    def __init__(self, args, name, res_regex, run_args = [], binary = "main", invert = False):
+    def __init__(self, args, name, res_regex, verif_info, run_args = [], binary = "main", invert = False):
         if name.endswith('sycl'):
             logging.info(f"Type of SYCL device to use: {args.sycl_type}")
             self.MAKE_ARGS = ['GCC_TOOLCHAIN="{}"'.format(args.gcc_toolchain)]
@@ -49,6 +49,9 @@ class Benchmark:
         else:
             self.MAKE_ARGS = []
 
+        if(args.verify ):
+            self.MAKE_ARGS.append('VERIFY=yes')
+
         if args.compiler_name:
             self.MAKE_ARGS.append('CC={}'.format(args.compiler_name))
 
@@ -64,10 +67,15 @@ class Benchmark:
         self.name = name
         self.binary = binary
         self.res_regex = res_regex
+        self.verif_info = verif_info
         self.args = run_args
         self.invert = invert
         self.clean = args.clean
         self.verbose = args.verbose
+
+        self.compilation_status = "not_evaluated"
+        self.run_status = "not_evaluated"
+        self.verification_status = "not_evaluated"
 
     def compile(self, shared_data):
         if self.clean:
@@ -102,7 +110,7 @@ class Benchmark:
         if self.verbose:
             print(proc.stdout)
 
-    def run(self):
+    def run(self, verify = False):
         cmd = ["./" + self.binary] + self.args
         proc = subprocess.run(cmd, cwd=self.path, timeout=600,
                               stdout=subprocess.PIPE, encoding="utf-8")
@@ -118,10 +126,34 @@ class Benchmark:
              print("Position:", e.pos)
         logging.debug(f'Results of re.findall:\n {res}')
         if not res:
+            self.run_status = "failed"
             raise Exception(self.path + ":\nno regex match for " + self.res_regex + " in\n" + out)
+        self.run_status = "success"
         res = sum([float(i) for i in res]) #in case of multiple outputs sum them (e.g. total time)
         if self.invert:
             res = 1/res
+
+        if(verify != True):
+            return res
+
+        verif_type = self.verif_info[0]
+        verif_args = self.verif_info[1]
+
+        if (verif_type == "no_verification"):
+            self.verification_status = "skipped"
+
+        elif (verif_type == "verification_token"):
+            reg_success = verif_args[0]
+            reg_fail = verif_args[1]
+
+            match_success = re.findall(reg_success, out)
+            match_fail = re.findall(reg_fail, out)
+
+            if( match_fail == [] and match_success != [] ):
+                self.verification_status = "success"
+            else:
+                self.verification_status = "failed"
+
         return res
 
 
@@ -144,6 +176,8 @@ def main():
                         help='Repeat benchmark run')
     parser.add_argument('--warmup', '-w', type=bool, default=True,
                         help='Run a warmup iteration')
+    parser.add_argument('--verify', type=bool, default=True,
+                        help='verify benchmark results')
     parser.add_argument('--sycl-type', '-t', choices=['cuda', 'hip', 'opencl', 'cpu'], default='cuda',
                         help='Type of SYCL device to use (default is cuda)')
     parser.add_argument('--nvidia-sm', type=int, default=60,
@@ -280,6 +314,7 @@ def main():
                     ch_index = bench.find('-')
                     if bench[:ch_index] in benchmarks.keys():
                         summary[bench]["run"] = "skipped"
+                        summary[bench]["verification"] = "skipped"
                 outfile.seek(0, 2) # seek to end of the file.
             else:
                 outfile = open(args.output, 'w+t')
@@ -296,19 +331,20 @@ def main():
         try:
             print(f"running {i}/{len(filtered_benches)}: {b.name}", flush=True)
 
-            if args.warmup:
-                b.run()
+            if args.warmup or args.verify:
+                b.run(verify=args.verify)
 
             res = []
             for i in range(args.repeat):
-                res.append(str(b.run()))
+                res.append(str(b.run(verify=False)))
 
             print(b.name + "," + ", ".join(res), file=outfile)
-            summary[b.name]["run"] = "success"
         except Exception as e:
             print("Error running: ", b.name)
             print(e)
-            summary[b.name]["run"] = "failed"
+
+        summary[b.name]["run"] = b.run_status
+        summary[b.name]["verification"] = b.verification_status
 
     if args.output:
         outfile.close()
@@ -325,12 +361,15 @@ def main():
         logging.info(f"Wrote the summary to {args.summary}.")
     else:
         print(json.dumps(summary, indent=4, sort_keys=True))
-    res = sum(('compile' in x.keys() and x['compile'] == 'failed' or
-               'run' in x.keys() and x['run'] == 'failed') for x in summary.values())
-    print(f'Number of benchmark compile or run failures: {res}');
+    failed_compile_run = sum(('compile' in x.keys() and x['compile'] == "failed" or
+                'run' in x.keys() and x['run'] == "failed") for x in summary.values())
+    print(f'Number of benchmark compile or run failures: {failed_compile_run}')
+
+    failed_verif = sum(('verification' in x.keys() and x['verification'] == "failed" )
+                    for x in summary.values())
+    print(f'Number of benchmark verification failures: {failed_verif}')
     print("*****************************************************************************************")
 
 
 if __name__ == "__main__":
     main()
-
