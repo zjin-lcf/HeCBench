@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
                                   dir_cls_input[0:dir_cls_size], \
                                   anchors[0:num_anchors * len_per_anchor], \
                                   anchor_bottom_heights[0:num_classes]) \
-                          map(alloc: box_input[0:box_size], object_counter[1]) \
+                          map(alloc: box_input[0:box_size], object_counter[0:1]) \
                           map(from: bndbox_output[0:bndbox_size])
   {
      
