@@ -76,6 +76,64 @@ int main(int argc, char **argv){
     const int numThreads = BLOCK_X * BLOCK_Y;
 
     // Warmup
+    laplace3d_ref(numTeams, numThreads, NX, NY, NZ, pitch, h_u1, h_u2);
+
+    // Execute GPU kernel
+    auto start = std::chrono::steady_clock::now();
+
+    for (i = 1; i <= REPEAT; ++i) {
+      laplace3d_ref(numTeams, numThreads, NX, NY, NZ, pitch, h_u1, h_u2);
+      std::swap(h_u1, h_u2);
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / REPEAT);
+  }
+  // overwrite the h1_u array on the host after exiting the omp target data region
+
+  if (verify) {
+    // Reference
+    for (i = 1; i <= REPEAT; ++i) {
+      reference(NX, NY, NZ, h_u2, h_u3);
+      std::swap(h_u2, h_u3);
+    }
+
+    // verify (may take long for large grid sizes)
+    float err = 0.f;
+    for (k=0; k<NZ; k++) {
+      for (j=0; j<NY; j++) {
+        for (i=0; i<NX; i++) {
+          int ind = i + j*NX + k*NX*NY;
+          err += (h_u1[ind]-h_u2[ind])*(h_u1[ind]-h_u2[ind]);
+        }
+      }
+    }
+    printf("\n rms error = %f \n",sqrtf(err/ NX*NY*NZ));
+  }
+
+ // evaluate the other kernel implementation
+  for (k=0; k<NZ; k++) {
+    for (j=0; j<NY; j++) {
+      for (i=0; i<NX; i++) {
+        int ind = i + j*NX + k*NX*NY;
+        if (i==0 || i==NX-1 || j==0 || j==NY-1|| k==0 || k==NZ-1)
+          h_u2[ind] = h_u1[ind] = 1.0f;           // Dirichlet b.c.'s
+        else
+          h_u2[ind] = h_u1[ind] = 0.0f;
+      }
+    }
+  }
+
+  #pragma omp target data map (tofrom: h_u1[0:grid3D_size]) \
+                          map (alloc: h_u2[0:grid3D_size])
+  {
+    const int bx = 1 + (NX-1)/BLOCK_X;
+    const int by = 1 + (NY-1)/BLOCK_Y;
+    const int numTeams = bx * by;
+    const int numThreads = BLOCK_X * BLOCK_Y;
+
+    // Warmup
     laplace3d(numTeams, numThreads, NX, NY, NZ, pitch, h_u1, h_u2);
 
     // Execute GPU kernel
