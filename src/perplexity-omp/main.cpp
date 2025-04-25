@@ -25,8 +25,8 @@
 #include "reference.cpp"
 
 template <typename value_idx, typename value_t>
-void sigmas_kernel(const unsigned int numTeams,
-                   const unsigned int numThreads,
+void sigmas_kernel(const int numTeams,
+                   const int numThreads,
                    const value_t* __restrict__ distances,
                          value_t* __restrict__ P,
                    const float perplexity,
@@ -97,8 +97,8 @@ void perplexity_search(const value_t* __restrict distances,
 {
   const float desired_entropy = logf(perplexity);
 
-  const unsigned int numThreads = 256;
-  const unsigned int numTeams = (n+255) / numThreads;
+  const int numThreads = 256;
+  const int numTeams = (n+255) / numThreads;
 
   auto start = std::chrono::steady_clock::now();
 

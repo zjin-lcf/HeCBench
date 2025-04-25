@@ -8,8 +8,8 @@
 typedef float DTYPE;
 
 void maxpool3d(
-  const unsigned int numTeams,
-  const unsigned int numThreads,
+  const int numTeams,
+  const int numThreads,
   const DTYPE* i_img,
         DTYPE* o_img,
   const int Hstride,
@@ -88,10 +88,10 @@ int main(int argc, char** argv)
   const int pool_width  = Hstride;
   const int pool_height = Vstride;
 
-  const unsigned int numThreads = 256;
-  const unsigned int numTeams = (o_img_width + 7) / 8 *
-                                (o_img_height + 7) / 8 *
-                                (i_img_count + 3) / 4;
+  const int numThreads = 256;
+  const int numTeams = (o_img_width + 7) / 8 *
+                       (o_img_height + 7) / 8 *
+                       (i_img_count + 3) / 4;
 
   #pragma omp target data map(to: h_image[0:size_image*i_img_count]) \
                           map(from: d_output[0:size_output*i_img_count])

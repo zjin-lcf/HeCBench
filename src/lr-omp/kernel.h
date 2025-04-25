@@ -1,6 +1,6 @@
 void linear_regression(
-  const unsigned int numTeams,
-  const unsigned int numThreads,
+  const int numTeams,
+  const int numThreads,
   const float2 *__restrict dataset,
         float4 *__restrict result)
 {
@@ -22,8 +22,8 @@ void linear_regression(
 }
 
 void rsquared(
-  const unsigned int numTeams,
-  const unsigned int numThreads,
+  const int numTeams,
+  const int numThreads,
   const float2 *__restrict dataset,
   const float mean,
   const float2 equation, // [a0,a1]

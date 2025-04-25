@@ -7,8 +7,8 @@
 
 #define NUM_THREADS 256
 
-void accuracy_kernel(const unsigned int numTeams,
-                     const unsigned int numThreads,
+void accuracy_kernel(const int numTeams,
+                     const int numThreads,
                      const int N, const int D, const int top_k,
                      const float* Xdata, const int* labelData, int* accuracy)
 {

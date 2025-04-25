@@ -102,7 +102,7 @@ void r_squared(linear_param_t *params, data_t *dataset, sum_t *linreg, result_t 
     #pragma omp target data map (to: dataset[0:size])\
                             map (alloc: results[0:wg_count])
     {
-      const unsigned int nTeams = gpu_global_size / wg_size;
+      const int nTeams = gpu_global_size / wg_size;
 
       auto start = std::chrono::steady_clock::now();
 
@@ -159,7 +159,7 @@ void parallelized_regression(linear_param_t *params, data_t *dataset, result_t *
     #pragma omp target data map (to: dataset[0:size])\
                             map (alloc: results[0:wg_count])
     {
-      const unsigned int nTeams = gpu_global_size / wg_size;
+      const int nTeams = gpu_global_size / wg_size;
 
       auto start = std::chrono::steady_clock::now();
 

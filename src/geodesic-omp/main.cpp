@@ -81,8 +81,8 @@ float  distance_host ( int i, float latitude_1, float longitude_1,
   return dist;
 }
 
-void kernel_distance (const unsigned int numTeams,
-                      const unsigned int numThreads,
+void kernel_distance (const int numTeams,
+                      const int numThreads,
                       const float4 *__restrict__ d_A,
                       float *__restrict__ d_C,
                       const int N)
@@ -151,8 +151,8 @@ void kernel_distance (const unsigned int numTeams,
 
 void distance_device(const float4* VA, float* VC, const size_t N, const int iteration) {
 
-  const unsigned int numTeams = (N+255)/256;
-  const unsigned int numThreads = 256;
+  const int numTeams = (N+255)/256;
+  const int numThreads = 256;
 
   #pragma omp target data map(to: VA[0:N]) map(from: VC[0:N])
   {
