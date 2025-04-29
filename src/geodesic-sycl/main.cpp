@@ -74,7 +74,7 @@ float  distance_host ( int i, float latitude_1, float longitude_1,
   return dist;
 }
 
-void distance_kernel(sycl::queue &q,
+void kernel_distance(sycl::queue &q,
                      sycl::range<3> &gws,
                      sycl::range<3> &lws,
                      const int slm_size,
@@ -88,55 +88,55 @@ void distance_kernel(sycl::queue &q,
       if (i >= N) return;
 
       float  dist, BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
-      D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ;
+      D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y;
 
-      const float rad_latitude_1  = d_A[i].x() * GDC_DEG_TO_RAD;
-      const float rad_longitude_1 = d_A[i].y() * GDC_DEG_TO_RAD;
-      const float rad_latitude_2  = d_A[i].z() * GDC_DEG_TO_RAD;
-      const float rad_longitude_2 = d_A[i].w() * GDC_DEG_TO_RAD;
+      const float rad_lat_1 = d_A[i].x() * GDC_DEG_TO_RAD;
+      const float rad_lon_1 = d_A[i].y() * GDC_DEG_TO_RAD;
+      const float rad_lat_2 = d_A[i].z() * GDC_DEG_TO_RAD;
+      const float rad_lon_2 = d_A[i].w() * GDC_DEG_TO_RAD;
 
-      TU1 = GDC_ECCENTRICITY * sycl::sin ( rad_latitude_1 ) /
-        sycl::cos ( rad_latitude_1 ) ;
-      TU2 = GDC_ECCENTRICITY * sycl::sin ( rad_latitude_2 ) /
-        sycl::cos ( rad_latitude_2 ) ;
+      TU1 = GDC_ECCENTRICITY * sycl::sin ( rad_lat_1 ) /
+        sycl::cos ( rad_lat_1 );
+      TU2 = GDC_ECCENTRICITY * sycl::sin ( rad_lat_2 ) /
+        sycl::cos ( rad_lat_2 );
 
-      CU1 = 1.0f / sycl::sqrt ( TU1 * TU1 + 1.0f ) ;
-      SU1 = CU1 * TU1 ;
-      CU2 = 1.0f / sycl::sqrt ( TU2 * TU2 + 1.0f ) ;
-      dist = CU1 * CU2 ;
-      BAZ = dist * TU2 ;
-      FAZ = BAZ * TU1 ;
-      X = rad_longitude_2 - rad_longitude_1 ;
+      CU1 = 1.0f / sycl::sqrt ( TU1 * TU1 + 1.0f );
+      SU1 = CU1 * TU1;
+      CU2 = 1.0f / sycl::sqrt ( TU2 * TU2 + 1.0f );
+      dist = CU1 * CU2;
+      BAZ = dist * TU2;
+      FAZ = BAZ * TU1;
+      X = rad_lon_2 - rad_lon_1;
 
       do {
-        SX = sycl::sin ( X ) ;
-        CX = sycl::cos ( X ) ;
-        TU1 = CU2 * SX ;
-        TU2 = BAZ - SU1 * CU2 * CX ;
-        SY = sycl::sqrt ( TU1 * TU1 + TU2 * TU2 ) ;
-        CY = dist * CX + FAZ ;
-        Y = sycl::atan2 ( SY, CY ) ;
-        SA = dist * SX / SY ;
+        SX = sycl::sin ( X );
+        CX = sycl::cos ( X );
+        TU1 = CU2 * SX;
+        TU2 = BAZ - SU1 * CU2 * CX;
+        SY = sycl::sqrt ( TU1 * TU1 + TU2 * TU2 );
+        CY = dist * CX + FAZ;
+        Y = sycl::atan2 ( SY, CY );
+        SA = dist * SX / SY;
         C2A = - SA * SA + 1.0f;
-        CZ = FAZ + FAZ ;
-        if ( C2A > 0.0f ) CZ = -CZ / C2A + CY ;
-        E = CZ * CZ * 2.0f - 1.0f ;
+        CZ = FAZ + FAZ;
+        if ( C2A > 0.0f ) CZ = -CZ / C2A + CY;
+        E = CZ * CZ * 2.0f - 1.0f;
         C = ( ( -3.0f * C2A + 4.0f ) * GDC_FLATTENING + 4.0f ) * C2A *
-          GDC_FLATTENING / 16.0f ;
-        D = X ;
-        X = ( ( E * CY * C + CZ ) * SY * C + Y ) * SA ;
-        X = ( 1.0f - C ) * X * GDC_FLATTENING + rad_longitude_2 - rad_longitude_1 ;
-      } while ( sycl::fabs ( D - X ) > EPS ) ;
+          GDC_FLATTENING / 16.0f;
+        D = X;
+        X = ( ( E * CY * C + CZ ) * SY * C + Y ) * SA;
+        X = ( 1.0f - C ) * X * GDC_FLATTENING + rad_lon_2 - rad_lon_1;
+      } while ( sycl::fabs ( D - X ) > EPS );
 
-      X = sycl::sqrt ( GDC_ELLIPSOIDAL * C2A + 1.0f ) + 1.0f ;
-      X = ( X - 2.0f ) / X ;
-      C = 1.0f - X ;
-      C = ( X * X / 4.0f + 1.0f ) / C ;
-      D = ( 0.375f * X * X - 1.0f ) * X ;
-      X = E * CY ;
-      dist = 1.0f - E - E ;
+      X = sycl::sqrt ( GDC_ELLIPSOIDAL * C2A + 1.0f ) + 1.0f;
+      X = ( X - 2.0f ) / X;
+      C = 1.0f - X;
+      C = ( X * X / 4.0f + 1.0f ) / C;
+      D = ( 0.375f * X * X - 1.0f ) * X;
+      X = E * CY;
+      dist = 1.0f - E - E;
       dist = ( ( ( ( SY * SY * 4.0f - 3.0f ) * dist * CZ * D / 6.0f -
-              X ) * D / 4.0f + CZ ) * SY * D + Y ) * C * GC_SEMI_MINOR ;
+              X ) * D / 4.0f + CZ ) * SY * D + Y ) * C * GC_SEMI_MINOR;
       d_C[i] = dist;
     };
     cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
@@ -163,7 +163,7 @@ void distance_device(const sycl::float4* VA, float* VC, const size_t N, const in
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < iteration; n++) {
-    distance_kernel(q, gws, lws, 0, d_A, d_C, N);
+    kernel_distance(q, gws, lws, 0, d_A, d_C, N);
   }
   q.wait();
 
