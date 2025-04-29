@@ -30,7 +30,7 @@ void md (
       if (idx >= nAtom) return;
 
       POSVECTYPE ipos = position[idx];
-      FORCEVECTYPE f = FORCEVECTYPE(0);
+      FORCEVECTYPE f = zero;
 
       int j = 0;
       while (j < maxNeighbors)
