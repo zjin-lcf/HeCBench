@@ -15,6 +15,8 @@
 
 #endif
 
+#define zero FORCEVECTYPE(0)
+
 // Problem Constants
 static const FPTYPE cutsq     = 13.5; // Square of cutoff distance
 static const int maxNeighbors = 128;  // Max number of nearest neighbors
