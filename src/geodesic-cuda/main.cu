@@ -7,6 +7,13 @@
 #include <cmath>
 #include <cuda.h>
 
+const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
+const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ;
+const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ;
+const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
+const float GC_SEMI_MINOR = 6356752.31424518f;
+const float EPS = 0.5e-5f;
+
 float  distance_host ( int i, float latitude_1, float longitude_1,
                        float latitude_2, float longitude_2 )
 {
@@ -18,13 +25,6 @@ float  distance_host ( int i, float latitude_1, float longitude_1,
 
   float  BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
          D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
-
-  const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
-  const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
-  const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ; 
-  const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
-  const float GC_SEMI_MINOR = 6356752.31424518f;
-  const float EPS = 0.5e-5f;
 
   rad_longitude_1 = longitude_1 * GDC_DEG_TO_RAD ;
   rad_latitude_1 = latitude_1 * GDC_DEG_TO_RAD ;
@@ -81,22 +81,16 @@ kernel_distance (const float4 *__restrict__ d_A,
                         float *__restrict__ d_C,
                  const int N)
 {
-  const int wiID = blockIdx.x * blockDim.x + threadIdx.x;
-  if (wiID >= N) return;
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= N) return;
 
-  const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
-  const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
-  const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ; 
-  const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
-  const float GC_SEMI_MINOR = 6356752.31424518f;
-  const float EPS                    = 0.5e-5f;
   float  dist, BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
          D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
 
-  const float rad_latitude_1  = d_A[wiID].x * GDC_DEG_TO_RAD ;
-  const float rad_longitude_1 = d_A[wiID].y * GDC_DEG_TO_RAD ;
-  const float rad_latitude_2  = d_A[wiID].z * GDC_DEG_TO_RAD ;
-  const float rad_longitude_2 = d_A[wiID].w * GDC_DEG_TO_RAD ;
+  const float rad_latitude_1  = d_A[i].x * GDC_DEG_TO_RAD ;
+  const float rad_longitude_1 = d_A[i].y * GDC_DEG_TO_RAD ;
+  const float rad_latitude_2  = d_A[i].z * GDC_DEG_TO_RAD ;
+  const float rad_longitude_2 = d_A[i].w * GDC_DEG_TO_RAD ;
 
   TU1 = GDC_ECCENTRICITY * sinf ( rad_latitude_1 ) /
     cosf ( rad_latitude_1 ) ;
@@ -140,7 +134,7 @@ kernel_distance (const float4 *__restrict__ d_A,
   dist = 1.0f - E - E ;
   dist = ( ( ( ( SY * SY * 4.0f - 3.0f ) * dist * CZ * D / 6.0f -
           X ) * D / 4.0f + CZ ) * SY * D + Y ) * C * GC_SEMI_MINOR ;
-  d_C[wiID] = dist;
+  d_C[i] = dist;
 }
 
 void distance_device(const float4* VA, float* VC, const size_t N, const int iteration) {

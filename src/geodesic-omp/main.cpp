@@ -12,6 +12,13 @@ typedef struct __attribute__((__aligned__(16)))
   float w;
 } float4;
 
+const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
+const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ;
+const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ;
+const float GDC_ELLIPSOIDAL = 1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
+const float GC_SEMI_MINOR = 6356752.31424518f;
+const float EPS = 0.5e-5f;
+
 float  distance_host ( int i, float latitude_1, float longitude_1,
                        float latitude_2, float longitude_2 )
 {
@@ -23,13 +30,6 @@ float  distance_host ( int i, float latitude_1, float longitude_1,
 
   float  BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
          D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
-
-  const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
-  const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
-  const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ; 
-  const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
-  const float GDC_SEMI_MINOR = 6356752.31424518f;
-  const float EPS = 0.5e-5f;
 
   rad_longitude_1 = longitude_1 * GDC_DEG_TO_RAD ;
   rad_latitude_1 = latitude_1 * GDC_DEG_TO_RAD ;
@@ -77,7 +77,7 @@ float  distance_host ( int i, float latitude_1, float longitude_1,
   X = E * CY ;
   dist = 1.0f - E - E ;
   dist = ( ( ( ( SY * SY * 4.0f - 3.0f ) * dist * CZ * D / 6.0f -
-          X ) * D / 4.0f + CZ ) * SY * D + Y ) * C * GDC_SEMI_MINOR ;
+          X ) * D / 4.0f + CZ ) * SY * D + Y ) * C * GC_SEMI_MINOR ;
   return dist;
 }
 
@@ -90,21 +90,15 @@ void distance_device(const float4* VA, float* VC, const size_t N, const int iter
     for (int n = 0; n < iteration; n++) {
 
       #pragma omp target teams distribute parallel for thread_limit(256)
-      for (int wiID = 0; wiID < N; wiID++) {
+      for (int i = 0; i < N; i++) {
 
-        const float GDC_DEG_TO_RAD = 3.141592654 / 180.0 ;  /* Degrees to radians */
-        const float GDC_FLATTENING = 1.0 - ( 6356752.31424518 / 6378137.0 ) ; 
-        const float GDC_ECCENTRICITY = ( 6356752.31424518 / 6378137.0 ) ; 
-        const float GDC_ELLIPSOIDAL =  1.0 / ( 6356752.31414 / 6378137.0 ) / ( 6356752.31414 / 6378137.0 ) - 1.0 ;
-        const float GDC_SEMI_MINOR = 6356752.31424518f;
-        const float EPS = 0.5e-5f;
         float  dist, BAZ , C , C2A , CU1 , CU2 , CX , CY , CZ ,
                D , E , FAZ , SA , SU1 , SX  , SY , TU1 , TU2 , X , Y ; 
 
-        const float rad_latitude_1  = VA[wiID].x * GDC_DEG_TO_RAD ;
-        const float rad_longitude_1 = VA[wiID].y * GDC_DEG_TO_RAD ;
-        const float rad_latitude_2  = VA[wiID].z * GDC_DEG_TO_RAD ;
-        const float rad_longitude_2 = VA[wiID].w * GDC_DEG_TO_RAD ;
+        const float rad_latitude_1  = VA[i].x * GDC_DEG_TO_RAD ;
+        const float rad_longitude_1 = VA[i].y * GDC_DEG_TO_RAD ;
+        const float rad_latitude_2  = VA[i].z * GDC_DEG_TO_RAD ;
+        const float rad_longitude_2 = VA[i].w * GDC_DEG_TO_RAD ;
 
         TU1 = GDC_ECCENTRICITY * sinf ( rad_latitude_1 ) /
           cosf ( rad_latitude_1 ) ;
@@ -147,8 +141,8 @@ void distance_device(const float4* VA, float* VC, const size_t N, const int iter
         X = E * CY ;
         dist = 1.0f - E - E ;
         dist = ( ( ( ( SY * SY * 4.0f - 3.0f ) * dist * CZ * D / 6.0f -
-                X ) * D / 4.0f + CZ ) * SY * D + Y ) * C * GDC_SEMI_MINOR ;
-        VC[wiID] = dist;
+                X ) * D / 4.0f + CZ ) * SY * D + Y ) * C * GC_SEMI_MINOR ;
+        VC[i] = dist;
       }
     }
 
