@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <hip/hip_runtime.h>
 
