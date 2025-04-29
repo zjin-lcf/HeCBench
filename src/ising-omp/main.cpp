@@ -26,6 +26,7 @@
 #include <iostream>
 #include <cmath>
 #include <cstring>
+#include <omp.h>
 
 #define TCRIT 2.26918531421f
 #define THREADS  128
