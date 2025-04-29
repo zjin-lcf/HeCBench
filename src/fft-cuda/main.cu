@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <cstring>
 #include <cuda.h>
 
 #ifdef SINGLE_PRECISION

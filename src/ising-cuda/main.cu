@@ -26,6 +26,7 @@
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <cuda.h>
 
 #ifdef CURAND
 #include <curand.h>
