@@ -38,6 +38,8 @@ typedef struct {
 } checksum;
 
 // Fused kernel
+
+// begin of elementwise
 void elementwise(
     const int numTeams,
     const int numThreads,
@@ -81,6 +83,7 @@ void elementwise(
     i_out[index] = val;
   }
 }
+// end of elementwise
 
 #pragma omp declare target
 float LCG_random(unsigned int * seed) {

@@ -27,6 +27,7 @@ dfloat *drandAlloc(int N){
   return v;
 }
 
+// begin of advCubatureHex3D
 void advCubatureHex3D (
     const int numTeams,
     const int numThreads,
@@ -224,6 +225,7 @@ void advCubatureHex3D (
     }
   }
 }
+// end of advCubatureHex3D
 
 int main(int argc, char **argv) {
 

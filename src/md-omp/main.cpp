@@ -10,6 +10,7 @@
 #include "reference.h"
 #include "utils.h"
 
+// begin of md
 void md (
     const int numTeams,
     const int numThreads,
@@ -58,6 +59,7 @@ void md (
     force[idx] = f;
   }
 }
+// end of md
 
 int main(int argc, char** argv)
 {

@@ -24,6 +24,7 @@
 
 #include "reference.cpp"
 
+// begin of sigmas_kernel
 template <typename value_idx, typename value_t>
 void sigmas_kernel(const int numTeams,
                    const int numThreads,
@@ -84,6 +85,7 @@ void sigmas_kernel(const int numTeams,
     }
   }
 }
+// end of sigmas_kernel
 
 template <typename value_idx, typename value_t>
 void perplexity_search(const value_t* __restrict distances,

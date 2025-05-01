@@ -36,6 +36,7 @@
  * whether
  *  to normalize the output using N-1 or N, for true or false, respectively
  */
+// begin of sopKernel
 template <typename Type, typename IdxType, int TPB, int RowsPerBlk, int ColsPerBlk = 32>
 void sopKernel(
   const int numTeams,
@@ -81,6 +82,7 @@ void sopKernel(
     }
   }
 }
+// end of sopKernel
 
 template <typename Type, typename IdxType = int>
 void stddev(Type *std, const Type *data, IdxType D, IdxType N, bool sample) {

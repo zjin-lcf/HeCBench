@@ -1,3 +1,4 @@
+// begin of linear_regression
 void linear_regression(
   const int numTeams,
   const int numThreads,
@@ -20,7 +21,9 @@ void linear_regression(
     result [ block_id ] = {sum_x, sum_y, sum_z, sum_w}; 
   }
 }
+// end of linear_regression
 
+// begin of rsquared
 void rsquared(
   const int numTeams,
   const int numThreads,
@@ -42,3 +45,4 @@ void rsquared(
     result [ block_id ] = {sum_x, sum_y};
   }
 }
+// end of rsquared

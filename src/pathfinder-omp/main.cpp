@@ -42,6 +42,7 @@ double get_time() {
   return t.tv_sec+t.tv_usec*1e-6;
 }
 
+// begin of pathfinder
 void pathfinder (
     const int numTeams,
     const int numThreads,
@@ -159,6 +160,7 @@ void pathfinder (
     }
   } 
 }
+// end of pathfinder
 
 int main(int argc, char** argv)
 {

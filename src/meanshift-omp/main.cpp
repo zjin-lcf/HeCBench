@@ -34,6 +34,7 @@ namespace mean_shift::gpu {
     }
   }
 
+// begin of mean_shift_tiling
   void mean_shift_tiling(const int numTeams,
                          const int numThreads,
                          const float* data,
@@ -95,6 +96,7 @@ namespace mean_shift::gpu {
       }
     }
   }
+// end of mean_shift_tiling
 }
 
 int main(int argc, char* argv[]) {

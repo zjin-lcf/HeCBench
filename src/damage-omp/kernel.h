@@ -6,6 +6,7 @@
  * n_neigh - An array of the number of neighbours (particles bound) for each node.
  * damage - An array of the damage for each node. 
  */
+// begin of damage_of_node
 void damage_of_node(
   const int numTeams,
   const int numThreads,
@@ -30,3 +31,4 @@ void damage_of_node(
     damage[nid] = 1.0 - (double) neighbours / (double) (family[nid]);
   }
 }
+// end of damage_of_node

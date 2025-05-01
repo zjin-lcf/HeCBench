@@ -81,6 +81,7 @@ float  distance_host ( int i, float latitude_1, float longitude_1,
   return dist;
 }
 
+// begin of kernel_distance
 void kernel_distance (const int numTeams,
                       const int numThreads,
                       const float4 *__restrict__ d_A,
@@ -142,6 +143,7 @@ void kernel_distance (const int numTeams,
     d_C[i] = dist;
   }
 }
+// end of kernel_distance
 
 void distance_device(const float4* VA, float* VC, const size_t N, const int iteration) {
 

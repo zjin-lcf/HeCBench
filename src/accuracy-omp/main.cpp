@@ -7,6 +7,7 @@
 
 #define NUM_THREADS 256
 
+// begin of accuracy_kernel
 void accuracy_kernel(const int numTeams,
                      const int numThreads,
                      const int N, const int D, const int top_k,
@@ -30,6 +31,7 @@ void accuracy_kernel(const int numTeams,
     }
   }
 }
+// end of accuracy_kernel
 
 int main(int argc, char* argv[])
 {

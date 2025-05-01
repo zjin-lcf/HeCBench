@@ -104,6 +104,7 @@ bool knn_serial(const float *ref, int ref_nb, const float *query, int query_nb,
   return true;
 }
 
+// begin of computeDistanceGlobal
 void computeDistanceGlobal(const int numTeams,
                            const int numThreads,
                            const float *__restrict__ A,
@@ -184,6 +185,7 @@ void computeDistanceGlobal(const int numTeams,
     }
   }
 }
+// end of computeDistanceGlobal
 
 void insertionSort(const int numTeams,
                    const int numThreads,

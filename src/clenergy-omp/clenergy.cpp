@@ -35,6 +35,7 @@ struct int3 {
   int z;
 };
 
+// begin of cenergy
 void cenergy(const int numTeams,
              const int numThreads,
              const int3 volsize,  
@@ -98,6 +99,7 @@ void cenergy(const int numTeams,
     }
   }
 }
+// end of cenergy
 
 int copyatoms(float *atoms, int count, float zplane, float4* atominfo) {
 

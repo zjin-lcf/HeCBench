@@ -7,6 +7,7 @@
 
 #define NUM_THREADS 256
 
+// begin of ChannelShuffleNCHWKernel
 template <typename T>
 void ChannelShuffleNCHWKernel(
     const int numTeams,
@@ -26,7 +27,9 @@ void ChannelShuffleNCHWKernel(
       for (int s = 0; s < HxW; s++)
         Y[(n * C + c) * HxW + s] = X[(n * C + (c % G) * K + c / G) * HxW + s];
 }
+// end of ChannelShuffleNCHWKernel
 
+// begin of ChannelShuffleNHWCKernel
 template <typename T>
 void ChannelShuffleNHWCKernel(
     const int numTeams,
@@ -44,6 +47,7 @@ void ChannelShuffleNHWCKernel(
     for (int i = 0; i < C; i++)
       Y[o*C + i] = X[o*C + (i % G) * K + i / G];
 }
+// end of ChannelShuffleNHWCKernel
 
 template <typename T>
 bool ChannelShuffleNCHW (T *X, int N, int C, int G, int numel, T *Y,

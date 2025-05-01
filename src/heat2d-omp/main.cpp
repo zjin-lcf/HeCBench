@@ -39,6 +39,7 @@ void reference(float *out, const float *in, const float delta, const float norm,
   }
 }
 
+// begin of dev_lapl_iter
 void dev_lapl_iter(const int numTeams, const int numThreads, float *out,
                    const float *in, const float delta, const float norm, const int Lx, const int Ly)
 {
@@ -55,6 +56,7 @@ void dev_lapl_iter(const int numTeams, const int numThreads, float *out,
     }
   }
 }
+// end of dev_lapl_iter
 
 int main(int argc, char *argv[]) {
   /* Check the number of command line arguments */

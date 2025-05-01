@@ -53,6 +53,7 @@ void laplace3d_ref (
   }
 }
 
+// begin of laplace3d
 void laplace3d(
   const int numTeams,  
   const int numThreads,  
@@ -166,3 +167,4 @@ void laplace3d(
     }
   }
 }
+// end of laplace3d

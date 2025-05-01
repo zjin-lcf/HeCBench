@@ -21,6 +21,7 @@ void reference(
     const float *__restrict d_qt,
     int nnt, int nntDev, int step, int isp);
 
+// begin of tissue
 void tissue(
     const   int numTeams,
     const   int numThreads,
@@ -59,6 +60,7 @@ void tissue(
       if(itp1 == istep && itp < nnt) d_ct[itp] += p;
   }
 }
+// end of tissue
 
 int main(int argc, char** argv) {
   if (argc != 3) {

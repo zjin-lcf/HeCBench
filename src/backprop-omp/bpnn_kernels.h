@@ -1,3 +1,4 @@
+// begin of kernel_layerforward
 void kernel_layerforward(
   const int numTeams,
   const int numThreads,
@@ -50,7 +51,9 @@ void kernel_layerforward(
       }
     }
 }
+// end of kernel_layerforward
 
+// begin of kernel_adjust_weights
 void kernel_adjust_weights (
   const int numTeams,
   const int numThreads,
@@ -84,3 +87,4 @@ void kernel_adjust_weights (
       } 
     }
 }
+// end of kernel_adjust_weights

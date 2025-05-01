@@ -7,6 +7,7 @@
 
 typedef float DTYPE;
 
+// begin of maxpool3d
 void maxpool3d(
   const int numTeams,
   const int numThreads,
@@ -44,6 +45,7 @@ void maxpool3d(
     }
   }
 }
+// end of maxpool3d
 
 int main(int argc, char** argv)
 {

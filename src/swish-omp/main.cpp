@@ -7,6 +7,7 @@
 
 #define GPU_THREADS 256
 
+// begin of SwishKernel
 template <typename T>
 void SwishKernel(const int numTeams, const int numThreads,
                  const int N, const T* X, T* Y)
@@ -17,7 +18,9 @@ void SwishKernel(const int numTeams, const int numThreads,
     Y[i] = X[i] / (T(1) + exp(-X[i]));
   }
 }
+// end of SwishKernel
 
+// begin of SwishGradientKernel
 template <typename T>
 void SwishGradientKernel(const int numTeams,
                          const int numThreads,
@@ -33,6 +36,7 @@ void SwishGradientKernel(const int numTeams,
     dX[i] = dY[i] * (Y[i] + (T(1) - Y[i]) / (T(1) + exp(-X[i])));
   }
 }
+// end of SwishGradientKernel
 
 template<typename T>
 void eval_swish (const int N, const int repeat) {
