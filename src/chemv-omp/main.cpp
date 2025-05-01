@@ -25,7 +25,7 @@ struct ComplexFloat {
   float Im;
 };
 
-#include "kernel.cpp"
+#include "kernel.h"
 
 void chemv_cpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
                struct ComplexFloat AT[AT_SIZE], struct ComplexFloat X[X_SIZE],
@@ -117,8 +117,8 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
     auto start = std::chrono::steady_clock::now();
 
     for (int n = 0; n < REPEAT; n++) {
-      kernel0(numTeams, numThreads, AT, X, Y, alpha_im, alpha_re, beta_im, beta_re);
-      kernel1(numTeams, numThreads, AT, X, Y, alpha_im, alpha_re);
+      chemv_kernel0(numTeams, numThreads, AT, X, Y, alpha_im, alpha_re, beta_im, beta_re);
+      chemv_kernel1(numTeams, numThreads, AT, X, Y, alpha_im, alpha_re);
     }
 
     auto end = std::chrono::steady_clock::now();

@@ -1,7 +1,8 @@
 #define ppcg_min(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x < _y ? _x : _y; })
 #define ppcg_max(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x > _y ? _x : _y; })
 
-void kernel0(const int numTeams, const int numThreads,
+// begin of chemv_kernel0
+void chemv_kernel0(const int numTeams, const int numThreads,
              struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
              float alpha_im, float alpha_re, float beta_im, float beta_re)
 {
@@ -54,8 +55,10 @@ void kernel0(const int numTeams, const int numThreads,
     }
   }
 }
+// end of chemv_kernel0
 
-void kernel1(const int numTeams, const int numThreads,
+// begin of chemv_kernel1
+void chemv_kernel1(const int numTeams, const int numThreads,
              struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
              float alpha_im, float alpha_re)
 {
@@ -85,3 +88,4 @@ void kernel1(const int numTeams, const int numThreads,
     }
   }
 }
+// end of chemv_kernel1

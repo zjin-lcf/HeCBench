@@ -53,7 +53,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp kernel.cpp
+%.o: %.cpp kernel.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
