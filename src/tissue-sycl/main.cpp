@@ -47,6 +47,7 @@ void reference(
   }
 }
 
+// begin of tissue
 void tissue(
     sycl::queue &q,
     sycl::range<3> &gws,
@@ -90,6 +91,7 @@ void tissue(
   };
   q.submit(cgf);
 }
+// end of tissue
 
 int main(int argc, char** argv) {
   if (argc != 3) {

@@ -22,6 +22,7 @@
 #define BLOCKSIZEY    8
 #define BLOCKSIZE    BLOCKSIZEX * BLOCKSIZEY
 
+// begin of cenergy
 void cenergy(
     sycl::queue &q,
     sycl::range<3> &gws,
@@ -92,6 +93,7 @@ void cenergy(
   };
   q.submit(cgf);
 }
+// end of cenergy
 
 int copyatoms(sycl::queue &q, float *atoms, int count, float zplane, sycl::float4 *atominfo) {
 

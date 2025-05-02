@@ -13,6 +13,7 @@ void BlockReduce(T &input1, sycl::nd_item<3> &item) {
   input1 = sycl::reduce_over_group(item.get_group(), input1, sycl::plus<T>());
 }
 
+// begin of accuracy_kernel
 void accuracy_kernel(
     sycl::queue &q,
     sycl::range<3> &gws,
@@ -52,6 +53,7 @@ void accuracy_kernel(
   };
   q.submit(cgf);
 }
+// end of accuracy_kernel
  
 int main(int argc, char* argv[])
 {

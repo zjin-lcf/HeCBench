@@ -7,6 +7,7 @@
 
 typedef float DTYPE;
 
+// begin of maxpool3d
 void maxpool3d(
   sycl::queue &q,
   sycl::range<3> &gws,
@@ -50,6 +51,7 @@ void maxpool3d(
   };
   q.submit(cgf);
 }
+// end of maxpool3d
 
 int main(int argc, char** argv)
 {

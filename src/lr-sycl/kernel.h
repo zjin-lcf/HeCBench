@@ -1,3 +1,4 @@
+// begin of linear_regression
 void linear_regression(
   sycl::queue &q,
   sycl::range<3> &gws,
@@ -40,7 +41,9 @@ void linear_regression(
   };
   q.submit(cgf);
 }
+// end of linear_regression
 
+// begin of rsquared
 void rsquared(
   sycl::queue &q,
   sycl::range<3> &gws,
@@ -84,3 +87,4 @@ void rsquared(
   };
   q.submit(cgf);
 }
+// end of rsquared

@@ -20,6 +20,7 @@
            index < (range); \
            index += item.get_local_range(2) * item.get_group_range(2))
 
+// begin of SwishKernel
 template <typename T>
 void SwishKernel(
     sycl::queue &q,
@@ -38,7 +39,9 @@ void SwishKernel(
   };
   q.submit(cgf);
 }
+// end of SwishKernel
 
+// begin of SwishGradientKernel
 template <typename T>
 void SwishGradientKernel(
     sycl::queue &q,
@@ -62,6 +65,7 @@ void SwishGradientKernel(
   };
   q.submit(cgf);
 }
+// end of SwishGradientKernel
 
 template<typename T>
 void eval_swish (const int N, const int repeat) {

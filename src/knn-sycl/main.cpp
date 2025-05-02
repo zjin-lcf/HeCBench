@@ -17,6 +17,7 @@
 // Constants used by the program
 #define BLOCK_DIM 16
 
+// begin of computeDistanceGlobal
 void computeDistanceGlobal(sycl::queue &q,
                            sycl::range<3> &gws,
                            sycl::range<3> &lws,
@@ -98,6 +99,7 @@ void computeDistanceGlobal(sycl::queue &q,
   };
   q.submit(cgf);
 }
+// end of computeDistanceGlobal
 
 void insertionSort(sycl::queue &q,
                    sycl::range<3> &gws,

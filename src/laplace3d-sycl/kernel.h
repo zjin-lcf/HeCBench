@@ -26,6 +26,7 @@
 
 // device code
 
+// begin of laplace3d
 void laplace3d(
   sycl::queue &q,
   sycl::range<3> &gws,
@@ -147,3 +148,4 @@ void laplace3d(
   };
   q.submit(cgf);
 }
+// end of laplace3d

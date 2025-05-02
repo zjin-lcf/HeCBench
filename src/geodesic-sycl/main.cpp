@@ -74,6 +74,7 @@ float  distance_host ( int i, float latitude_1, float longitude_1,
   return dist;
 }
 
+// begin of kernel_distance
 void kernel_distance(sycl::queue &q,
                      sycl::range<3> &gws,
                      sycl::range<3> &lws,
@@ -143,6 +144,7 @@ void kernel_distance(sycl::queue &q,
   };
   q.submit(cgf);
 }
+// end of kernel_distance
 
 void distance_device(const sycl::float4* VA, float* VC, const size_t N, const int iteration) {
 #ifdef USE_GPU

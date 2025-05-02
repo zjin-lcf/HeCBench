@@ -44,6 +44,7 @@ void sampleKernel (
 }
 
 // sum of products using atomics
+// begin of sopKernel
 template <typename Type, typename IdxType, int TPB, int ColsPerBlk = 32>
 void sopKernel (
   sycl::queue &q,
@@ -98,6 +99,7 @@ void sopKernel (
   };
   q.submit(cgf);
 }
+// end of sopKernel
 
 /**
  * @brief Compute stddev of the input matrix

@@ -40,6 +40,7 @@ double get_time() {
   return t.tv_sec+t.tv_usec*1e-6;
 }
 
+// begin of pathfinder
 void pathfinder (
     sycl::queue &q,
     sycl::range<3> &gws,
@@ -159,6 +160,7 @@ void pathfinder (
   };
   q.submit(cgf);
 }
+// end of pathfinder
 
 
 int main(int argc, char** argv)

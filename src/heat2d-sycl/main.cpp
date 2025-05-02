@@ -43,6 +43,7 @@ void reference(float *out, const float *in, const float delta, const float norm,
  * Naive implementation of a single iteration of the lapl
  * equation. Each thread takes one site of the output array
  */
+// begin of dev_lapl_iter
 void dev_lapl_iter(sycl::queue &q,
                    sycl::range<3> &gws,
                    sycl::range<3> &lws,
@@ -71,6 +72,7 @@ void dev_lapl_iter(sycl::queue &q,
   };
   q.submit(cgf);
 }
+// end of dev_lapl_iter
 
 int main(int argc, char *argv[]) {
   /* Check the number of command line arguments */

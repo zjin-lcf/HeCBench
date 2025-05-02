@@ -1,3 +1,4 @@
+// begin of advCubatureHex3D
 void advCubatureHex3D (
     sycl::queue &q,
     sycl::range<3> &gws,
@@ -198,3 +199,4 @@ void advCubatureHex3D (
   };
   q.submit(cgf);
 }
+// end of advCubatureHex3D

@@ -38,6 +38,7 @@ typedef struct {
 
 
 // Fused kernel
+// begin of elementwise
 void elementwise(
     sycl::queue &q,
     sycl::range<3> &gws,
@@ -89,6 +90,7 @@ void elementwise(
   };
   q.submit(cgf);
 }
+// end of elementwise
 
 float LCG_random(unsigned int * seed) {
   const unsigned int m = 2147483648;

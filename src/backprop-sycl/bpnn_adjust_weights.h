@@ -1,3 +1,4 @@
+// begin of kernel_adjust_weights
 void kernel_adjust_weights (
   sycl::queue &q,
   sycl::range<3> &gws,
@@ -35,4 +36,5 @@ void kernel_adjust_weights (
   };
   q.submit(cgf);
 }
+// end of kernel_adjust_weights
 

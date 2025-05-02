@@ -8,6 +8,7 @@
 #define NUM_THREADS 256
 #define GridDimMaxY 65536
 
+// begin of ChannelShuffleNCHWKernel
 template <typename T, bool kNFirst>
 void ChannelShuffleNCHWKernel(
     sycl::queue &q,
@@ -37,7 +38,9 @@ void ChannelShuffleNCHWKernel(
   };
   q.submit(cgf);
 }
+// end of ChannelShuffleNCHWKernel
 
+// begin of ChannelShuffleNHWCKernel
 template <typename T, int kSharedSize>
 void ChannelShuffleNHWCKernel(
     sycl::queue &q,
@@ -70,6 +73,7 @@ void ChannelShuffleNHWCKernel(
   };
   q.submit(cgf);
 }
+// end of ChannelShuffleNHWCKernel
 
 template <typename T>
 bool ChannelShuffleNCHW (sycl::queue &q, T *X, int N, int C, int G, int numel, T *Y,

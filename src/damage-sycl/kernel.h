@@ -7,6 +7,7 @@
  * damage - An array of the damage for each node.
  * local_cache - local (local_size) array to store the bond breakages.
  */
+// begin of damage_of_node
 void damage_of_node(
   sycl::queue &q,
   sycl::range<3> &gws,
@@ -54,3 +55,4 @@ void damage_of_node(
   };
   q.submit(cgf);
 }
+// end of damage_of_node

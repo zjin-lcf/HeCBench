@@ -24,6 +24,7 @@
 
 #include "reference.cpp"
 
+// begin of sigmas_kernel
 template <typename value_idx, typename value_t>
 void sigmas_kernel(sycl::queue &q,
                    sycl::range<3> &gws,
@@ -92,6 +93,7 @@ void sigmas_kernel(sycl::queue &q,
   };
   q.submit(cgf);
 }
+// end of sigmas_kernel
 
 // Find the best Gaussian bandwidth for each row in the dataset
 template <typename value_idx, typename value_t>

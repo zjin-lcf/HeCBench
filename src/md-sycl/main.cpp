@@ -10,6 +10,7 @@
 #include "reference.h"
 #include "utils.h"
 
+// begin of md
 void md (
   sycl::queue &q,
   sycl::range<3> &gws,
@@ -65,6 +66,7 @@ void md (
   };
   q.submit(cgf);
 }
+// end of md
 
 int main(int argc, char** argv)
 {

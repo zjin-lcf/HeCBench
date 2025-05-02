@@ -6,6 +6,7 @@ struct ComplexFloat {
 #define ppcg_min(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x < _y ? _x : _y; })
 #define ppcg_max(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x > _y ? _x : _y; })
 
+// begin of chemv_kernel0
 void chemv_kernel0(sycl::queue &q,
              sycl::range<3> &gws,
              sycl::range<3> &lws,
@@ -70,7 +71,9 @@ void chemv_kernel0(sycl::queue &q,
   };
   q.submit(cgf);
 }
+// end of chemv_kernel0
 
+// begin of chemv_kernel1
 void chemv_kernel1(sycl::queue &q,
              sycl::range<3> &gws,
              sycl::range<3> &lws,
@@ -110,3 +113,4 @@ void chemv_kernel1(sycl::queue &q,
   };
   q.submit(cgf);
 }
+// end of chemv_kernel1

@@ -45,6 +45,7 @@ namespace mean_shift::gpu {
     q.submit(cgf);
   }
 
+// begin of mean_shift_tiling
   void mean_shift_tiling(
     sycl::queue &q,
     sycl::range<3> &gws,
@@ -110,6 +111,7 @@ namespace mean_shift::gpu {
     };
     q.submit(cgf);
   }
+// end of mean_shift_tiling
 }
 
 int main(int argc, char* argv[]) {

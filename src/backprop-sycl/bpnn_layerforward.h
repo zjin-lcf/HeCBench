@@ -1,3 +1,4 @@
+// begin of kernel_layerforward
 void kernel_layerforward(
   sycl::queue &q,
   sycl::range<3> &gws,
@@ -51,3 +52,4 @@ void kernel_layerforward(
   };
   q.submit(cgf);
 }
+// end of kernel_layerforward
