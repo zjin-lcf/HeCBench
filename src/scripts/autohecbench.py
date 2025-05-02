@@ -6,6 +6,7 @@ import re, time, datetime, sys, subprocess, multiprocessing, os
 import argparse
 import json
 import logging
+import traceback
 
 def await_input(prompt: str, is_valid_input) -> str:
     """ Wait the user for input until it is valid. """
@@ -17,6 +18,7 @@ def await_input(prompt: str, is_valid_input) -> str:
 class Benchmark:
     def __init__(self, args, name, res_regex, run_args = [], binary = "main", invert = False):
         if name.endswith('sycl'):
+            logging.info(f"Type of SYCL device to use: {args.sycl_type}")
             self.MAKE_ARGS = ['GCC_TOOLCHAIN="{}"'.format(args.gcc_toolchain)]
             if args.sycl_type == 'cuda':
                 self.MAKE_ARGS.append('CUDA=yes')
@@ -33,6 +35,17 @@ class Benchmark:
                 self.MAKE_ARGS.append('GPU=no')
         elif name.endswith('cuda'):
             self.MAKE_ARGS = ['ARCH=sm_{}'.format(args.nvidia_sm)]
+        elif name.endswith('omp'):
+            # a simple way to select one of the Makefiles
+            self.MAKE_ARGS = ['-f']
+            if "nvc" in args.compiler_name:
+                self.MAKE_ARGS.append('Makefile.nvc')
+                self.MAKE_ARGS.append('SM=cc{}'.format(args.nvidia_sm))
+            elif "amdclang" in args.compiler_name:
+                self.MAKE_ARGS.append('Makefile.aomp')
+                self.MAKE_ARGS.append('ARCH={}'.format(args.amd_arch))
+            else:
+                self.MAKE_ARGS.append('Makefile')
         else:
             self.MAKE_ARGS = []
 
@@ -119,12 +132,14 @@ def comp(b, d):
 def main():
     parser = argparse.ArgumentParser(description='HeCBench runner')
     parser.add_argument("--log", choices=["INFO", "DEBUG", "WARNING", "ERROR", "CRITICAL"],
-                        default="INFO", type=str.upper, help="logging level")
+                        default="INFO", type=str.upper,
+                        help="Logging level")
     parser.add_argument('--output', '-o',
                         help='Output file for csv results')
     parser.add_argument('--summary', '-s',
                         help='Output file for a summary of the execution of selected benchmarks')
-    parser.add_argument("--yes-prompt", action="store_true", help="If provided, automatically answer yes to the prompt.")
+    parser.add_argument("--yes-prompt", action="store_true",
+                        help="If provided, automatically answer yes to the prompt.")
     parser.add_argument('--repeat', '-r', type=int, default=1,
                         help='Repeat benchmark run')
     parser.add_argument('--warmup', '-w', type=bool, default=True,
@@ -203,16 +218,23 @@ def main():
 
     # Build benchmark list from the benchmark data file (e.g. subset.json)
     benches = []
-    for b in args.bench:
-        if b in ['sycl', 'cuda', 'hip']:
-            benches.extend([Benchmark(args, k+'-'+b, *v)
-                            for k, v in benchmarks.items()
-                            if k+'-'+b not in fails])  # e.g. nbody-sycl
-            continue
-        # b is a specific benchmark instead
-        ch_index = b.find('-') # find specific character '-'
-        b_sub = b[:ch_index]
-        benches.append(Benchmark(args, b, *benchmarks[b_sub]))
+    try:
+        for b in args.bench:
+            if b in ['sycl', 'cuda', 'hip']:
+                benches.extend([Benchmark(args, k+'-'+b, *v)
+                                for k, v in benchmarks.items()
+                                if k+'-'+b not in fails])  # e.g. nbody-sycl
+                continue
+            # b is a specific benchmark instead
+            ch_index = b.rfind('-') # find last character '-'
+            b_sub = b[:ch_index]
+            benches.append(Benchmark(args, b, *benchmarks[b_sub]))
+    except Exception as e:
+        print("Failed to construct the entire benchmark list:")
+        # https://sqlpey.com/python/solved-how-to-get-detailed-exception-description-and-stack-trace-in-python/
+        tb_exception = traceback.TracebackException.from_exception(e)
+        print(''.join(tb_exception.format()))
+        return # stop compile and run on any exception
 
     summary = {}
     t0 = time.time()
