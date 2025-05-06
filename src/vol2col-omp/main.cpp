@@ -10,8 +10,70 @@
 #define threadsPerBlock 512
 
 // Kernel for fast unfold+copy on volumes
+
+// begin of vol2col_kernel
 template <typename T>
 void vol2col_kernel(
+    const int numTeams,
+    const int numThreads,
+    const int64_t range,
+    const T* data_vol,
+    const int depth,
+    const int height,
+    const int width,
+    const int ksize_t,
+    const int ksize_h,
+    const int ksize_w,
+    const int pad_t,
+    const int pad_h,
+    const int pad_w,
+    const int stride_t,
+    const int stride_h,
+    const int stride_w,
+    const int dilation_t,
+    const int dilation_h,
+    const int dilation_w,
+    const int depth_col,
+    const int height_col,
+    const int width_col,
+    T* data_col)
+{
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int64_t n = 0; n < range; n++) {
+    int w_out = n % width_col;
+    int64_t index = n / width_col;
+    int h_out = index % height_col;
+    index = index / height_col;
+    int t_out = index % depth_col;
+    int channel_in = index / depth_col;
+    int channel_out = channel_in * ksize_t * ksize_h * ksize_w;
+    int t_in = t_out * stride_t - pad_t;
+    int h_in = h_out * stride_h - pad_h;
+    int w_in = w_out * stride_w - pad_w;
+    auto v = data_vol + ((channel_in * depth + t_in) * height + h_in) * width + w_in;
+    auto c = data_col + ((channel_out * depth_col + t_out) * height_col + h_out) * width_col + w_out;
+
+    for (int i = 0; i < ksize_t; ++i) {
+      for (int j = 0; j < ksize_h; ++j) {
+        for (int k = 0; k < ksize_w; ++k) {
+          int t = t_in + i * dilation_t;
+          int h = h_in + j * dilation_h;
+          int w = w_in + k * dilation_w;
+          *c = (t >= 0 && h >= 0 && w >= 0 && t < depth && h < height && w < width)
+              ? v[i * dilation_t * height * width +
+                  j * dilation_h * width + k * dilation_w]
+              : static_cast<T>(0);
+          c += depth_col * height_col * width_col;
+        }
+      }
+    }
+  }
+}
+// end of vol2col_kernel
+
+template <typename T>
+void vol2col_kernel_ref(
     const int numTeams,
     const int numThreads,
     const T* data_vol,
@@ -197,6 +259,20 @@ void eval (
       vol2col_kernel<T>(
         blocksPerGrid,
         threadsPerBlock,
+        n,
+        data_vol,
+        depth, height, width,
+        ksize_t, ksize_h, ksize_w,
+        pad_t, pad_h, pad_w,
+        stride_t, stride_h, stride_w,
+        dilation_t, dilation_h, dilation_w,
+        depth_col, height_col, width_col,
+        data_col);
+    }
+    /*
+      vol2col_kernel_ref<T>(
+        blocksPerGrid,
+        threadsPerBlock,
         data_vol,
         channels, depth, height, width,
         ksize_t, ksize_h, ksize_w,
@@ -206,6 +282,7 @@ void eval (
         depth_col, height_col, width_col,
         data_col);
     }
+    */
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

@@ -2,6 +2,7 @@
 #include <omp.h>
 #include "utils.h"
 
+// begin of winograd_conv2d
 void winograd_conv2d(
     const int numTeams,
     const int numThreads,
@@ -83,6 +84,7 @@ void winograd_conv2d(
     }
   }
 }
+// end of winograd_conv2d
 
 int main(int argc, char* argv[]) {
 

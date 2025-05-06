@@ -35,6 +35,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include "hwt.h"
 
+// begin of dwtHaar1D
 void dwtHaar1D(const int numTeams,
                const int numThreads, 
                const float *__restrict__ inSignal,
@@ -112,4 +113,5 @@ void dwtHaar1D(const int numTeams,
     }
   }
 }
+// end of dwtHaar1D
 

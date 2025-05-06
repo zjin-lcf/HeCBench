@@ -10,6 +10,7 @@
 // choose integer type to avoid floating-point rounding errors
 typedef int scalar_t;
 
+// begin of ChannelSumNCHW
 template <typename T>
 void ChannelSumNCHW(
     const int numTeams,
@@ -37,7 +38,9 @@ void ChannelSumNCHW(
     sumsq[c] = v_val;
   }
 }
+// end of ChannelSumNCHW
 
+// begin of ChannelSumNHWC
 template <typename T>
 void ChannelSumNHWC(
     const int numTeams,
@@ -62,6 +65,7 @@ void ChannelSumNHWC(
     sumsq[c] = v_val;
   }
 }
+// end of ChannelSumNHWC
 
 void ComputeChannelSumNCHW (
     const int N,

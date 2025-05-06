@@ -81,7 +81,7 @@ struct PayoffPut
   HOST_DEVICE_INLINE int is_in_the_money(double S) const { return S < m_K; }
 };
 
-
+// begin of generate_paths_kernel
 template< int NUM_THREADS_PER_BLOCK, typename Payoff >
 void generate_paths_kernel(const int numTeams, 
                            const int numThreads, 
@@ -125,6 +125,7 @@ void generate_paths_kernel(const int numTeams,
     paths[offset] = payoff(S);
   }
 }
+// end of generate_paths_kernel
 
 #pragma omp declare target
 static inline void assemble_R(int m, double4 &sums, double *smem_svds)
@@ -736,6 +737,7 @@ void compute_beta_kernel(const int numTeams,
 // assumes beta has been built either by compute_final_beta_kernel or
 // by atomic operations at the end of compute_partial_beta_kernel.
 
+// begin of update_cashflow_kernel
 template< int NUM_THREADS_PER_BLOCK, typename Payoff >
 void update_cashflow_kernel(const int numTeams, 
                             const int numThreads,
@@ -789,6 +791,7 @@ void update_cashflow_kernel(const int numTeams,
     cashflows[path] = payoff;
   }
 }
+// end of update_cashflow_kernel
 
 template< int NUM_THREADS_PER_BLOCK >
 void compute_sums_kernel(const int numTeams, 

@@ -6,6 +6,7 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of kernel1
 void kernel1 (
     const int numTeams,
     const int numThreads,
@@ -27,7 +28,9 @@ void kernel1 (
      exp_sum[0] += expf(sum);
    }
 }
+// end of kernel1
 
+// begin of kernel2
 void kernel2 (
     const int numTeams,
     const int numThreads,
@@ -41,7 +44,9 @@ void kernel2 (
    for (int i = 0; i < n; i++)
      score[i] = expf(dot_product[i]) / exp_sum[0];
 }
+// end of kernel2
 
+// begin of kernel3
 void kernel3 (
     const int numTeams,
     const int numThreads,
@@ -60,6 +65,7 @@ void kernel3 (
     output[j] = sum;
   }
 }
+// end of kernel3
 
 float* attention_device(const float* key, const float* value, const float* query,
                         const int n, const int d, const int impl_num, const int repeat) 

@@ -9,6 +9,7 @@
 
 #define block_size 256
 
+// begin of glu_kernel
 void glu_kernel(
    const int numTeams,
    const int numThreads,
@@ -32,6 +33,7 @@ void glu_kernel(
     Ydata[i * yOffset + j * N + k] = x1 * (1.f / (1.f + expf(-x2)));
   }
 }
+// end of glu_kernel
 
 int main(int argc, char* argv[])
 {

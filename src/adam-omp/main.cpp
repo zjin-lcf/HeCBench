@@ -6,6 +6,7 @@
 #include <random>
 #include "reference.h"
 
+// begin of adam
 template <typename T, typename G>
 inline void adam (
   const int numTeams,
@@ -43,6 +44,7 @@ inline void adam (
     }
   }
 }
+// end of adam
 
 int main(int argc, char* argv[])
 {

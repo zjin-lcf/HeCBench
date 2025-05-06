@@ -16,6 +16,7 @@ void L2_norm(const int numTeams, const int numThreads,
   }
 }
 
+// begin of compute
 void compute (
     const int numTeams,
     const int numThreads,
@@ -63,6 +64,7 @@ void compute (
     }
   }
 }
+// end of compute
 
 void update(
     const int numTeams,

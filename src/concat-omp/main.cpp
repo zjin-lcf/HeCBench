@@ -5,6 +5,7 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of concat
 template <typename T>
 void concat (const int numTeams,
              const int numThreads,
@@ -35,6 +36,7 @@ void concat (const int numTeams,
     *dst_ptr = *src_ptr;
   }
 }
+// end of concat
 
 int main(int argc, char* argv[])
 {

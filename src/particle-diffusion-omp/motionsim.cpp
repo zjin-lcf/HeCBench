@@ -65,6 +65,7 @@ void print_vector(T* vector, size_t n) {
   std::cout << std::endl;
 }
 
+// begin of Simulation
 void Simulation(const int numTeams,
                 const int numThreads,
                 float*__restrict__ a_particleX,
@@ -131,6 +132,7 @@ void Simulation(const int numTeams,
     a_particleY[ii] = pY;
   }
 }
+// end of Simulation
 
 // This function distributes simulation work across workers
 void motion_device(float* particleX, float* particleY,

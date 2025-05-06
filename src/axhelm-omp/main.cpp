@@ -109,6 +109,7 @@ void axhelm(
         }
 }
 
+// begin of axhelm_n3
 void axhelm_n3(
     const int numTeams,
     const int numThreads,
@@ -239,6 +240,7 @@ void axhelm_n3(
           }
         }
 }
+// end of axhelm_n3
 
 
 dfloat *drandAlloc(int Nelem){

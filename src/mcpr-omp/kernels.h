@@ -44,6 +44,7 @@ void compute_probs(
   }
 }
 
+// begin of compute_probs_unitStrides
 void compute_probs_unitStrides(
   const int numTeams,
   const int numThreads,
@@ -91,6 +92,7 @@ void compute_probs_unitStrides(
     }
   }
 }
+// end of compute_probs_unitStrides
 
 void compute_probs_unitStrides_sharedMem(
   const int numTeams,

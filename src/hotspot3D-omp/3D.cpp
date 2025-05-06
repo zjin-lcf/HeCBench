@@ -36,6 +36,7 @@ void usage(int argc, char **argv)
   exit(1);
 }
 
+// begin of hotspot3d
 void hotspot3d(
     const int numTeams,
     const int numThreads,
@@ -100,6 +101,7 @@ void hotspot3d(
     }
   }
 }
+// end of hotspot3d
 
 int main(int argc, char** argv)
 {

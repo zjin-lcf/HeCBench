@@ -8,6 +8,7 @@
 #define BLOCK_SIZE 256
 
 // measure cost of additions without atomics
+// begin of woAtomicOnGlobalMem
 template <typename T>
 void woAtomicOnGlobalMem(const int numTeams, const int numThreads, T* result, int size, int n)
 {
@@ -19,6 +20,7 @@ void woAtomicOnGlobalMem(const int numTeams, const int numThreads, T* result, in
     }
   }
 }
+// end of woAtomicOnGlobalMem
 
 // measure cost of additions with atomics
 template <typename T>

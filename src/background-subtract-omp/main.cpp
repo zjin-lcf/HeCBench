@@ -8,6 +8,7 @@
 
 #define BLOCK_SIZE 256
 
+// begin of findMovingPixels
 void findMovingPixels(
   const int numTeams,
   const int numThreads,
@@ -27,8 +28,10 @@ void findMovingPixels(
       Mp[i] = 0;
   }
 }
+// end of findMovingPixels
 
 // alpha = 0.92
+// begin of updateBackground
 void updateBackground(
   const int numTeams,
   const int numThreads,
@@ -43,8 +46,10 @@ void updateBackground(
     if ( Mp[i] == 0 ) Bn[i] = 0.92 * Bn[i] + 0.08 * Img[i];
   }
 }
+// end of updateBackground
 
 // alpha = 0.92, c = 3
+// begin of updateThreshold
 void updateThreshold(
   const int numTeams,
   const int numThreads,
@@ -63,10 +68,12 @@ void updateThreshold(
     }
   }
 }
+// end of updateThreshold
 
 //
 // merge three kernels into a single kernel
 //
+// begin of merge
 void merge(
   const int numTeams,
   const int numThreads,
@@ -90,6 +97,7 @@ void merge(
     }
   }
 }
+// end of merge
 
 int main(int argc, char* argv[]) {
   if (argc != 5) {

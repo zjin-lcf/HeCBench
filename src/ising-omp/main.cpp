@@ -45,6 +45,7 @@ void init_spins(const int numTeams, const int numThreads,
   }
 }
 
+// begin of update_lattice
 template<bool is_black>
 void update_lattice(
     const int numTeams,  
@@ -86,6 +87,7 @@ void update_lattice(
       }
     }
 }
+// end of update_lattice
 
 
 void update(signed char* lattice_b, signed char* lattice_w, float* randvals,

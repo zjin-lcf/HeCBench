@@ -1,5 +1,6 @@
 #define idx(i,j)   (i)*x_points+(j)
 
+// begin of core
 void core (
     const int numTeams,
     const int numThreads,
@@ -30,6 +31,7 @@ void core (
     }
   }
 }
+// end of core
 
 
 void bound_h (

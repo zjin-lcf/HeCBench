@@ -80,6 +80,7 @@ void cross2_kernel(
   }
 }
 
+// begin of cross3_kernel
 template <typename T>
 void cross3_kernel(
     const int numTeams,
@@ -114,6 +115,7 @@ void cross3_kernel(
     out_row[2] = val2;
   }
 }
+// end of cross3_kernel
 
 
 template <typename T>

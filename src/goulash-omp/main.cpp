@@ -13,6 +13,7 @@
 #include <omp.h>
 #include "utils.h"
 
+// begin of gate
 void gate(const int numTeams, const int numThreads,
           double* __restrict m_gate, const long nCells, const double* __restrict Vm) 
 {
@@ -45,6 +46,7 @@ void gate(const int numTeams, const int numThreads,
     m_gate[i] += (mhu - m_gate[i])*(1-exp(-tauR));
   }
 }
+// end of gate
 
 int main(int argc, char* argv[]) 
 {

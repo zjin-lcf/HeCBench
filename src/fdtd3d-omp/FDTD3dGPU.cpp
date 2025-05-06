@@ -18,6 +18,7 @@
 #include "FDTD3dGPU.h"
 #include "shrUtils.h"
 
+// begin of finite_difference
 void finite_difference(
   const int numTeams,
   const int numThreads,
@@ -137,6 +138,7 @@ void finite_difference(
     }
   }
 }
+// end of finite_difference
 
 bool fdtdGPU(float *output, float *input, const float *coeff, 
              const int dimx, const int dimy, const int dimz, const int radius, 

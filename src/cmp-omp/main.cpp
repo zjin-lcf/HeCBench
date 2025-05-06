@@ -36,6 +36,7 @@
 #include "parser.hpp"
 #include "su_gather.hpp"
 
+// begin of init_c
 void init_c(const int numTeams, const int numThreads,
             real *c, real inc, real c0) 
 {
@@ -44,7 +45,9 @@ void init_c(const int numTeams, const int numThreads,
   for (int i = 0; i < numTeams; i++) 
     c[i] = c0 + inc*i;
 }
+// end of init_c
 
+// begin of init_half
 void init_half(const int numTeams,
                const int numThreads, 
                const real* __restrict__ scalco, 
@@ -68,7 +71,9 @@ void init_half(const int numTeams,
     h[i] = 0.25f * (hx * hx + hy * hy) / FACTOR;
   }
 }
+// end of init_half
 
+// begin of compute_semblances
 void compute_semblances(const int numTeams,
                         const int numThreads,
                         const real* __restrict h, 
@@ -142,6 +147,7 @@ void compute_semblances(const int numTeams,
     }
   }
 }
+// end of compute_semblances
 
 void redux_semblances(const int numTeams,
                       const int numThreads,

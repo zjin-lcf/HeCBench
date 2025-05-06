@@ -9,6 +9,7 @@
 // Example
 // https://pytorch.org/docs/stable/generated/torch.flip.html
 
+// begin of flip_kernel
 template <typename scalar_t>
 void flip_kernel(
     const int numTeams,
@@ -47,6 +48,7 @@ void flip_kernel(
     out_tensor[linear_index] = in_tensor[dst_offset];
   }
 }
+// end of flip_kernel
 
 // display the values of a property in a tensor
 void property (const char* name, std::vector<int64_t> p)

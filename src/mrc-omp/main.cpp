@@ -6,6 +6,7 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of MRCGradient
 void MRCGradient (
     const int numTeams, const int numThreads,
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
@@ -22,7 +23,9 @@ void MRCGradient (
     }
   }
 }
+// end of MRCGradient
 
+// begin of MRCGradient2
 void MRCGradient2(
     const int numTeams, const int numThreads,
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
@@ -37,6 +40,7 @@ void MRCGradient2(
     dX2[i] = dist < 0.f ? 0.f : y * o;
   }
 }
+// end of MRCGradient2
 
 int main(int argc, char* argv[])
 {

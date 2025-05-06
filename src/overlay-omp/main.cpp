@@ -27,6 +27,7 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of DetectionOverlayBox
 template<typename T>
 void DetectionOverlayBox(
   const int numTeams,
@@ -60,6 +61,7 @@ void DetectionOverlayBox(
       }
     }
 }
+// end of DetectionOverlayBox
 
 template<typename T>
 int DetectionOverlay(

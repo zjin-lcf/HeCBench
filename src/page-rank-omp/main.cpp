@@ -57,6 +57,7 @@ void map(const int numTeams,
   }
 }
 
+// begin of reduce
 void reduce(const int numTeams,
             const int numThreads,
                   float *__restrict__ page_ranks,
@@ -78,6 +79,7 @@ void reduce(const int numTeams,
     page_ranks[j] = new_rank;
   }
 }
+// end of reduce
 
 
 // generates an array of random pages and their links

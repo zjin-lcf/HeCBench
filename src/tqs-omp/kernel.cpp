@@ -35,14 +35,14 @@
 
 #include "kernel.h"
 
-void call_TaskQueue_gpu(int numTeams,
-                        int numThreads,
-                        const task_t *__restrict task_queue,
-                        int *__restrict data_queue,
-                        int *__restrict consumed, 
-                        int iterations,
-                        int offset,
-                        int gpuQueueSize)
+void TaskQueue_gpu(const int numTeams,
+                   const int numThreads,
+                   const task_t *__restrict task_queue,
+                   int *__restrict data_queue,
+                   int *__restrict consumed, 
+                   int iterations,
+                   int offset,
+                   int gpuQueueSize)
 {
   #pragma omp target teams num_teams(numTeams)
   {

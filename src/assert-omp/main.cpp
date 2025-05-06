@@ -26,6 +26,7 @@ void testKernel(const int numTeams, const int numThreads, int N)
 }
 
 // Performance impact of assert()
+// begin of perfKernel
 void perfKernel(const int numTeams, const int numThreads)
 {
   #pragma omp target teams num_teams(numTeams)
@@ -41,6 +42,7 @@ void perfKernel(const int numTeams, const int numThreads)
     }
   }
 }
+// end of perfKernel
 
 void perfKernel2(const int numTeams, const int numThreads)
 {

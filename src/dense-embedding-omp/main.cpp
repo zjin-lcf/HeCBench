@@ -26,6 +26,7 @@ void reference(
   }
 }
 
+// begin of dense_esuhm
 template <typename T>
 void dense_esuhm(
     const int numTeams,
@@ -48,6 +49,7 @@ void dense_esuhm(
     }
   }
 }
+// end of dense_esuhm
 
 template <typename T>
 void dense_esuhm2(

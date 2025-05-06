@@ -110,6 +110,7 @@ void conv3d_s2(const T * __restrict__ X,
   }
 }
 
+// begin of conv3d_s3
 template<typename T>
 void conv3d_s3(const int numTeams,
                const int numThreads,
@@ -154,6 +155,7 @@ void conv3d_s3(const int numTeams,
     }
   }
 }
+// end of conv3d_s3
 
 
 template <typename T>

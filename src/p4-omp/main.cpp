@@ -22,6 +22,7 @@
 #include <omp.h>
 #include "params.h"
 
+// begin of postprocess
 void postprocess (
   const int numTeams,
   const int numThreads,
@@ -126,6 +127,7 @@ void postprocess (
     }
   }
 }
+// end of postprocess
 
 int main(int argc, char* argv[])
 {

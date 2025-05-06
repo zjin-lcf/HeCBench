@@ -4,6 +4,7 @@
 #include <chrono>
 #include <omp.h>
 
+// begin of haccmk_kernel
 void haccmk_kernel (
     const int numTeams,
     const int numThreads,
@@ -62,6 +63,7 @@ void haccmk_kernel (
     vz2[i] += zi * fcoeff;
   }
 }
+// end of haccmk_kernel
 
 template <typename T>
 void haccmk (

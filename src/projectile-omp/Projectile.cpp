@@ -20,9 +20,11 @@ const float kPIValue = 3.1415;
 const float kGValue = 9.81;
 const int BLOCK_SIZE = 256;
 
+// begin of CalculateRange
 void CalculateRange(const int numTeams,
                     const int numThreads,
-                    const Projectile *obj, Projectile *pObj) {  
+                    const Projectile *obj, Projectile *pObj)
+{
   #pragma omp target teams distribute parallel for \
    num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < num_elements; i++) {
@@ -37,6 +39,7 @@ void CalculateRange(const int numTeams,
     pObj[i].setRangeandTime(max_range, total_time, proj_angle, proj_vel, max_height);
   }
 }
+// end of CalculateRange
 
 // in_vect and out_vect are the vectors with N Projectile numbers and are inputs to the
 // parallel function

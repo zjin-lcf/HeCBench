@@ -24,6 +24,7 @@ void softMax_cpu(const int numSlice, const int sliceSize, const float* src, floa
   }
 }
 
+// begin of softMax
 void softMax (const int numTeams, const int numThreads,
               const int numSlice, const int sliceSize,
               const float* src, float* dest)
@@ -44,6 +45,7 @@ void softMax (const int numTeams, const int numThreads,
     }
   }
 }
+// end of softMax
 
 void softMax2 (const int numTeams, const int numThreads,
                const int numSlice, const int sliceSize,

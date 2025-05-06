@@ -6,6 +6,7 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of nll_loss_forward_reduce2d_kernel
 template <typename scalar_t, typename accscalar_t, 
           typename index_t, int NLL_LOSS_THREADS>
 void nll_loss_forward_reduce2d_kernel(
@@ -64,6 +65,7 @@ void nll_loss_forward_reduce2d_kernel(
     }
   }
 }
+// end of nll_loss_forward_reduce2d_kernel
 
 template <typename scalar_t, typename index_t, int GPU_THREADS>
 void eval(const int64_t nframe,

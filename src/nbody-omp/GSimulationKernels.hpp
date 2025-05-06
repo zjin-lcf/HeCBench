@@ -1,3 +1,4 @@
+// begin of accelerate_particles
 void accelerate_particles( const int numTeams, const int numThreads,
                            Particle* p, const int n, const float kSofteningSquared, const float kG )
 {
@@ -33,6 +34,7 @@ void accelerate_particles( const int numTeams, const int numThreads,
     p[i] = pi;
   }
 }
+// end of accelerate_particles
 
 void update_particles(const int numTeams, const int numThreads,
                       Particle *__restrict__ p,

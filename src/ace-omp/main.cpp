@@ -181,6 +181,7 @@ void allenCahn(const int numTeams,
   }
 }
 
+// begin of boundaryConditionsPhi
 void boundaryConditionsPhi(const int numTeams,
                            const int numThreads,
                            double phinew[][DATAYSIZE][DATAXSIZE])
@@ -213,6 +214,7 @@ void boundaryConditionsPhi(const int numTeams,
     }
   }
 }
+// end of boundaryConditionsPhi
 
 void thermalEquation(const int numTeams,
                      const int numThreads,
@@ -270,6 +272,7 @@ void boundaryConditionsU(const int numTeams,
   }
 }
 
+// begin of swapGrid
 void swapGrid(const int numTeams,
               const int numThreads,
               double cnew[][DATAYSIZE][DATAXSIZE],
@@ -287,6 +290,7 @@ void swapGrid(const int numTeams,
     }
   }
 }
+// end of swapGrid
 
 void initializationPhi(double phi[][DATAYSIZE][DATAXSIZE], double r0)
 {

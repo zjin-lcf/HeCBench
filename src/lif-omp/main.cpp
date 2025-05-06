@@ -52,6 +52,7 @@ void reference (
   }
 }
 
+// begin of lif
 void lif (
     const int numTeams,
     const int numThreads,
@@ -103,6 +104,7 @@ void lif (
     spikes[i] = spike;
   }
 }
+// end of lif
 
 int main(int argc, char* argv[]) {
   if (argc != 4) {

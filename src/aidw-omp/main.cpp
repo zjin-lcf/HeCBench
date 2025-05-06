@@ -31,6 +31,8 @@
 
 // Calculate the power parameter, and then weighted interpolating
 // Without using shared memory
+
+// begin of AIDW_Kernel
 void AIDW_Kernel(
     const int numTeams,
     const int numThreads,
@@ -78,6 +80,7 @@ void AIDW_Kernel(
     iz[tid] = z / sum;
   }
 }
+// end of AIDW_Kernel
 
 // Calculate the power parameter, and then weighted interpolating
 // With using shared memory (Tiled version of the stage 2)

@@ -27,6 +27,7 @@ void WarpRangeAtomicOnGlobalMem(const int numTeams, const int numThreads, T* dat
   }
 }
 
+// begin of SingleRangeAtomicOnGlobalMem
 template <typename T>
 void SingleRangeAtomicOnGlobalMem(const int numTeams, const int numThreads, T* data, int offset, int n)
 {
@@ -37,6 +38,7 @@ void SingleRangeAtomicOnGlobalMem(const int numTeams, const int numThreads, T* d
     data[0]++;    //arbitrary number to add
   }
 }
+// end of SingleRangeAtomicOnGlobalMem
 
 template <typename T>
 void BlockRangeAtomicOnSharedMem(const int numTeams, const int numThreads, T* data, int n)

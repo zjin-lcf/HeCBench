@@ -41,6 +41,7 @@ void bitonic_sort_step(const int numTeams, const int numThreads,
   }
 }
 
+// begin of reconstruct_sequence
 void reconstruct_sequence(const int numTeams, const int numThreads,
                           const int*__restrict table, const char*__restrict sequence, 
                           char*__restrict transformed_sequence, int n) {
@@ -50,6 +51,7 @@ void reconstruct_sequence(const int numTeams, const int numThreads,
     transformed_sequence[i] = sequence[(n + table[i] - 1) % n];
   }
 }
+// end of reconstruct_sequence
 
 /* 
    returns a std::pair object

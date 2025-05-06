@@ -20,6 +20,7 @@ void permuate_cpu(float *inp, float *q, float *k, float *v, int B, int T, int C,
         }}}}
 }
 
+// begin of permute_kernel
 void permute_kernel(
     const int numTeams,
     const int numThreads,
@@ -54,6 +55,7 @@ void permute_kernel(
     V[idx] = inp[inp_idx + 2 * C];
   }
 }
+// end of permute_kernel
 
 
 void permute (float* out, const float* inp,

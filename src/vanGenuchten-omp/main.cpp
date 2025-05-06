@@ -5,6 +5,7 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of vanGenuchten
 void vanGenuchten(
   const int numTeams,
   const int numThreads, 
@@ -49,6 +50,7 @@ void vanGenuchten(
       C[i] = 0.0;
   }
 }
+// end of vanGenuchten
 
 int main(int argc, char* argv[])
 {

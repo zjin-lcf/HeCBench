@@ -11,6 +11,8 @@
 
 /** SOR relaxation parameter */
 const Real omega = 1.85f;
+
+// begin of red_kernel
 void red_kernel (const int numTeams,
                  const int numThreads,
                  const Real *__restrict__ aP,
@@ -46,6 +48,7 @@ void red_kernel (const int numTeams,
     }
   }
 }
+// end of red_kernel
 
 void black_kernel (const int numTeams,
                    const int numThreads,

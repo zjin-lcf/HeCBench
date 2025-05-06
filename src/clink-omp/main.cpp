@@ -91,6 +91,7 @@ void init(const char* work_path, const char* input_filename, const char* weight_
   fclose(fp);
 }
 
+// begin of lstm_inference
 void lstm_inference(
   const int numTeams,
   const int numThreads,
@@ -160,6 +161,7 @@ void lstm_inference(
     }
   }
 }
+// end of lstm_inference
 
 long lstm_n5(const float* x, 
     const float* inW, 
