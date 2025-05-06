@@ -35,6 +35,7 @@
 
 #include "kernel.h"
 
+// begin of TaskQueue_gpu
 void TaskQueue_gpu(const int numTeams,
                    const int numThreads,
                    const task_t *__restrict task_queue,
@@ -93,3 +94,4 @@ void TaskQueue_gpu(const int numTeams,
     }
   }
 }
+// end of TaskQueue_gpu
