@@ -6,8 +6,8 @@
 #include <omp.h>
 #include "reference.h"
 
-// begin of kernel1
-void kernel1 (
+// begin of attention_kernel1
+void attention_kernel1 (
     const int numTeams,
     const int numThreads,
     const float*__restrict__ key,
@@ -28,10 +28,10 @@ void kernel1 (
      exp_sum[0] += expf(sum);
    }
 }
-// end of kernel1
+// end of attention_kernel1
 
-// begin of kernel2
-void kernel2 (
+// begin of attention_kernel2
+void attention_kernel2 (
     const int numTeams,
     const int numThreads,
     const float*__restrict__ exp_sum,
@@ -44,10 +44,10 @@ void kernel2 (
    for (int i = 0; i < n; i++)
      score[i] = expf(dot_product[i]) / exp_sum[0];
 }
-// end of kernel2
+// end of attention_kernel2
 
-// begin of kernel3
-void kernel3 (
+// begin of attention_kernel3
+void attention_kernel3 (
     const int numTeams,
     const int numThreads,
     const float*__restrict__ score,
@@ -65,7 +65,7 @@ void kernel3 (
     output[j] = sum;
   }
 }
-// end of kernel3
+// end of attention_kernel3
 
 float* attention_device(const float* key, const float* value, const float* query,
                         const int n, const int d, const int impl_num, const int repeat) 
@@ -88,11 +88,11 @@ float* attention_device(const float* key, const float* value, const float* query
       exp_sum[0] = 0;
       #pragma omp target update to (exp_sum[0:1])
 
-      kernel1((n+255)/256, 256, key, query, dot_product, exp_sum, n, d);
+      attention_kernel1((n+255)/256, 256, key, query, dot_product, exp_sum, n, d);
 
-      kernel2((n+255)/256, 256, exp_sum, dot_product, score, n);
+      attention_kernel2((n+255)/256, 256, exp_sum, dot_product, score, n);
       
-      kernel3((d+255)/256, 256, score, value, output, n, d);
+      attention_kernel3((d+255)/256, 256, score, value, output, n, d);
     }
 
     auto end = std::chrono::steady_clock::now();
