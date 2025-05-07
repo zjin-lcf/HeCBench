@@ -10,11 +10,11 @@
 // measure cost of additions without atomics
 // begin of woAtomicOnGlobalMem
 template <typename T>
-void woAtomicOnGlobalMem(const int numTeams, const int numThreads, T* result, int size, int n)
+void woAtomicOnGlobalMem(const int numTeams, const int numThreads, T* result, int size)
 {
   #pragma omp target teams distribute parallel for \
    num_teams(numTeams) num_threads(numThreads)
-  for (unsigned int tid = 0; tid < n; tid++) {
+  for (unsigned int tid = 0; tid < numTeams * numThreads; tid++) {
     for ( unsigned int i = tid * size; i < (tid + 1) * size; i++) {
       result[tid] += i % 2;
     }
@@ -24,11 +24,11 @@ void woAtomicOnGlobalMem(const int numTeams, const int numThreads, T* result, in
 
 // measure cost of additions with atomics
 template <typename T>
-void wiAtomicOnGlobalMem(const int numTeams, const int numThreads, T* result, int size, int n)
+void wiAtomicOnGlobalMem(const int numTeams, const int numThreads, T* result, int size)
 {
   #pragma omp target teams distribute parallel for \
    num_teams(numTeams) num_threads(numThreads)
-  for (unsigned int tid = 0; tid < n; tid++) {
+  for (unsigned int tid = 0; tid < numTeams * numThreads; tid++) {
     for ( unsigned int i = tid * size; i < (tid + 1) * size; i++) {
       #pragma omp atomic update
       result[tid] += i % 2;
@@ -61,7 +61,7 @@ void atomicCost (int length, int size, int repeat)
     auto start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
     {
-      wiAtomicOnGlobalMem<T>(numTeams, numThreads, result_wi, size, num_threads);
+      wiAtomicOnGlobalMem<T>(numTeams, numThreads, result_wi, size);
     }
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -72,7 +72,7 @@ void atomicCost (int length, int size, int repeat)
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
     {
-      woAtomicOnGlobalMem<T>(numTeams, numThreads, result_wo, size, num_threads);
+      woAtomicOnGlobalMem<T>(numTeams, numThreads, result_wo, size);
     }
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
