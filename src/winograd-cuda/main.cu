@@ -6,6 +6,8 @@ __global__ void winograd_conv2d(
     const DATA_TYPE *__restrict__ input,
     const DATA_TYPE *__restrict__ transformed_filter ,
     DATA_TYPE *__restrict__ output,
+    const int tile_i_size,
+    const int tile_j_size,
     const int offset_i,
     const int offset_j)
 {
@@ -151,7 +153,8 @@ int main(int argc, char* argv[]) {
     double co_start = rtclock();
 
     if (gpu_run) {
-      winograd_conv2d<<<grid, block>>>(d_A, d_C, d_B, global_offset[0], global_offset[1]);
+      winograd_conv2d<<<grid, block>>>(d_A, d_C, d_B, gpu_global_size[0], gpu_global_size[1],
+                                       global_offset[0], global_offset[1]);
     }
 
     if (cpu_run) {
