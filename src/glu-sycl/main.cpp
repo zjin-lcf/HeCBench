@@ -15,11 +15,11 @@ void glu_kernel(
    const float* Xdata,
          float* Ydata)
 {
-  const int xOffset = 2 * split_dim_size * N;
-  const int yOffset = split_dim_size * N;
   int index = item.get_global_id(0);
   if (index >= M * split_dim_size * N) return;
 
+  const int xOffset = 2 * split_dim_size * N;
+  const int yOffset = split_dim_size * N;
   const int i = index / split_dim_size / N;
   const int j = index / N % split_dim_size;
   const int k = index % N;
