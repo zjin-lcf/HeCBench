@@ -34,7 +34,7 @@ void softMax (const int numSlice, const int sliceSize,
   if (i >= numSlice) return;
   float max_ = src[i * sliceSize];
   for (int j = 0; j < sliceSize; j++) {
-    max_ = max(max_, src[i * sliceSize + j]);
+    max_ = fmaxf(max_, src[i * sliceSize + j]);
   }
   float sum = 0;
   for (int j = 0; j < sliceSize; j++) {
@@ -56,7 +56,7 @@ void softMax2 (const int numSlice, const int sliceSize,
   if (i >= numSlice) return;
   float max_ = src[i * sliceSize];
   for (int j = warp.thread_rank(); j < sliceSize; j += warp.size()) {
-    max_ = max(max_, src[i * sliceSize + j]);
+    max_ = fmaxf(max_, src[i * sliceSize + j]);
   }
   max_ = cg::reduce(warp, max_, cg::greater<float>{});
   float sum = 0;
