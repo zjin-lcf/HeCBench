@@ -16,6 +16,9 @@ __global__ void kernel(
   const unsigned char *__restrict__ snpdata,
   float *__restrict__ results)
 {
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  if (tid >= cols) return;
+
   unsigned char y;
   int m, n;
   unsigned int p = 0;
@@ -28,9 +31,6 @@ __global__ void kernel(
   float Cexpected[3];
   float numerator1;
   float numerator2;
-
-  int tid = threadIdx.x + blockIdx.x * blockDim.x;
-  if (tid >= cols) return;
 
   int cases[3] = {1,1,1};
   int controls[3] = {1,1,1};
