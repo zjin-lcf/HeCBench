@@ -30,7 +30,7 @@ void finite_difference(
 {
   #pragma omp target teams num_teams(numTeams)
   {
-    float tile [localWorkMaxY + 2*k_radius_default][localWorkMaxX + 2*k_radius_default];
+    float tile [k_blockDimMaxY + 2*k_radius_default][k_blockDimMaxX + 2*k_radius_default];
     #pragma omp parallel num_threads(numThreads) 
     {
       bool valid = true;
