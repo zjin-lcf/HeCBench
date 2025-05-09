@@ -133,9 +133,10 @@ long lstm_n5( sycl::queue &q,
     cgh.parallel_for<class lstm>(
       sycl::nd_range<1>(sycl::range<1>(N), sycl::range<1>(WGS)),
       [=] (sycl::nd_item<1> item) {
-      int t,i,j;
       int gid = item.get_global_id(0);
+      if (gid >= N) return;
       
+      int t,i,j;
       float h_state[5] = {0,0,0,0,0};
       float c_state[5] = {0,0,0,0,0};
       float i_state[5] = {0,0,0,0,0};
