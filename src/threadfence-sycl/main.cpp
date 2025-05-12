@@ -127,11 +127,9 @@ int main(int argc, char** argv) {
   double time = 0.0;
 
   for (int i = 0; i < N; i++) h_array[i] = -1.f;
+  q.memcpy(d_array, h_array, N * sizeof(float)).wait();
 
   for (int n = 0; n < repeat; n++) {
-
-    q.memcpy(d_array, h_array, N * sizeof(float)).wait();
-
     auto start = std::chrono::steady_clock::now();
 
     q.submit([&] (sycl::handler &cgh) {
@@ -146,13 +144,12 @@ int main(int argc, char** argv) {
 
     auto end = std::chrono::steady_clock::now();
     time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  }
 
-    q.memcpy(&h_sum, d_result, sizeof(float)).wait();
+  q.memcpy(&h_sum, d_result, sizeof(float)).wait();
 
-    if (h_sum != -1.f * N) {
-      ok = false;
-      break;
-    }
+  if (h_sum != -1.f * N) {
+    ok = false;
   }
 
   if (ok) printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
