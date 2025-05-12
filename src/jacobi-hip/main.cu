@@ -11,13 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
-#include <cmath>
 #include <limits>
-#include <ctime>
-#include <chrono>
+#include <utility>
 #include <hip/hip_runtime.h>
 
 // A multiple of thread block size
@@ -125,18 +125,6 @@ __global__ void jacobi_step (float*__restrict__ f,
   }
 }
 
-__global__ void swap_data (const float*__restrict__ f,
-                                 float*__restrict__ f_old) {
-  int i = threadIdx.x + blockIdx.x * blockDim.x;
-  int j = threadIdx.y + blockIdx.y * blockDim.y;
-
-  if (j >= 1 && j <= N-2) {
-    if (i >= 1 && i <= N-2) {
-      f_old[IDX(i,j)] = f[IDX(i,j)];
-    }
-  }
-}
-
 int main () {
   // Begin wall timing
   auto start_time = std::chrono::steady_clock::now();
@@ -182,12 +170,10 @@ int main () {
     hipMemset(d_error, 0, 4);
 
     // Perform a Jacobi relaxation step
-    hipLaunchKernelGGL(jacobi_step, grid, block, 0, 0, d_f, d_f_old, d_error);
+    jacobi_step <<< grid, block, 0, 0 >>> (d_f, d_f_old, d_error);
 
     // Swap the old data and the new data
-    // We're doing this explicitly for pedagogical purposes, even though
-    // in this specific application a std::swap would have been OK
-    hipLaunchKernelGGL(swap_data, grid, block, 0, 0, d_f, d_f_old);
+    std::swap(d_f, d_f_old);
 
     hipMemcpy(&error, d_error, sizeof(float), hipMemcpyDeviceToHost);
 
@@ -228,6 +214,7 @@ int main () {
   free(f_old);
 
   // End wall timing
+  auto end_time = std::chrono::steady_clock::now();
   auto total_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
   double duration = total_time * 1e-9;
   std::cout << "Total elapsed time: " << std::setprecision(4) << duration << " seconds" << std::endl;
