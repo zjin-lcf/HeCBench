@@ -48,6 +48,7 @@ int main(int argc, char* argv[]) {
         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         const int x = item.get_global_id(1);
         const int y = item.get_global_id(0);
+        if (y >= height || x >= width) return;
 
         // value of matrix element ranges from 0 inclusive to 16 exclusive
         char count[16];
@@ -74,11 +75,11 @@ int main(int argc, char* argv[]) {
         } else {
           for(int k = 0; k < 16; k++) {
             float p = sycl::native::divide((float)count[k], (float)total);
-            entropy -= p * sycl::log2(p);
+            entropy -= p * sycl::native::log2(p);
           }
         }
 
-        if(y < height && x < width) d_output[y * width + x] = entropy;
+        d_output[y * width + x] = entropy;
       });
     });
   }
@@ -104,6 +105,8 @@ int main(int argc, char* argv[]) {
         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         const int x = item.get_global_id(1);
         const int y = item.get_global_id(0);
+        if (y >= height || x >= width) return;
+
         const int idx = item.get_local_id(0)*16 + item.get_local_id(1);
 
         for(int i = 0; i < 16;i++) sd_count[i][idx] = 0;
@@ -125,8 +128,8 @@ int main(int argc, char* argv[]) {
         for(int k = 0; k < 16; k++)
           entropy -= d_logTable[sd_count[k][idx]];
         
-        entropy = entropy / total + sycl::log2((float)total);
-        if(y < height && x < width) d_output[y*width+x] = entropy;
+        entropy = entropy / total + sycl::native::log2((float)total);
+        d_output[y*width+x] = entropy;
       });
     });
   }
