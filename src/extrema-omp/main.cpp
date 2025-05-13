@@ -15,115 +15,19 @@
 #include <stdlib.h>
 #include <chrono>
 #include <omp.h>
+#include "reference.h"
 
 #pragma omp declare target
 inline void clip_plus( const bool &clip, const int &n, int &plus ) {
-  if ( clip ) {
-    if ( plus >= n ) {
-      plus = n - 1;
-    }
-  } else {
-    if ( plus >= n ) {
-      plus -= n;
-    }
-  }
+  if ( plus >= n ) plus = clip ? n - 1 : plus - n;
 }
 #pragma omp end declare target
 
 #pragma omp declare target
 inline void clip_minus( const bool &clip, const int &n, int &minus ) {
-  if ( clip ) {
-    if ( minus < 0 ) {
-      minus = 0;
-    }
-  } else {
-    if ( minus < 0 ) {
-      minus += n;
-    }
-  }
+  if ( minus < 0 ) minus = clip ? 0 : minus + n;
 }
 #pragma omp end declare target
-
-///////////////////////////////////////////////////////////////////////////////
-//                          BOOLRELEXTREMA 1D                                //
-///////////////////////////////////////////////////////////////////////////////
-
-template<typename T>
-void cpu_relextrema_1D(
-  const int  n,
-  const int  order,
-  const bool clip,
-  const T * inp,
-  bool * results)
-{
-  for ( int tid = 0; tid < n; tid++ ) {
-
-    const T data = inp[tid];
-    bool    temp = true;
-
-    for ( int o = 1; o < ( order + 1 ); o++ ) {
-      int plus = tid + o;
-      int minus = tid - o;
-
-      clip_plus( clip, n, plus );
-      clip_minus( clip, n, minus );
-
-      temp &= data > inp[plus];
-      temp &= data >= inp[minus];
-    }
-    results[tid] = temp;
-  }
-}
-
-template<typename T>
-void cpu_relextrema_2D(
-  const int  in_x,
-  const int  in_y,
-  const int  order,
-  const bool clip,
-  const int  axis,
-  const T * inp,
-  bool * results) 
-{
-  for (int tx = 0; tx < in_y; tx++)
-    for (int ty = 0; ty < in_x; ty++) {
-
-      int tid = tx * in_x + ty ;
-
-      const T data = inp[tid] ;
-      bool    temp = true ;
-
-      for ( int o = 1; o < ( order + 1 ); o++ ) {
-
-        int plus;
-        int minus;
-
-        if ( axis == 0 ) {
-          plus  = tx + o;
-          minus = tx - o;
-
-          clip_plus( clip, in_y, plus );
-          clip_minus( clip, in_y, minus );
-
-          plus  = plus * in_x + ty;
-          minus = minus * in_x + ty;
-        } else {
-          plus  = ty + o;
-          minus = ty - o;
-
-          clip_plus( clip, in_x, plus );
-          clip_minus( clip, in_x, minus );
-
-          plus  = tx * in_x + plus;
-          minus = tx * in_x + minus;
-        }
-
-        temp &= data > inp[plus] ;
-        temp &= data >= inp[minus] ;
-      }
-      results[tid] = temp;
-    }
-}
 
 template <typename T>
 long test_1D (const int length, const int order, const bool clip,
@@ -147,7 +51,7 @@ long test_1D (const int length, const int order, const bool clip,
         const T data = inp[tid];
         bool    temp = true;
 
-        for ( int o = 1; o < ( order + 1 ); o++ ) {
+        for ( int o = 1; o <= order; o++ ) {
           int plus = tid + o;
           int minus = tid - o;
 
@@ -197,7 +101,7 @@ long test_2D (const int length_x, const int length_y, const int order,
   bool* cpu_r = (bool*) malloc (sizeof(bool)*length);
   bool* gpu_r = (bool*) malloc (sizeof(bool)*length);
 
-  long time;
+  long time = 0;
   #pragma omp target data map(to: inp[0:length]) map(from: gpu_r[0:length])
   {
     auto start = std::chrono::steady_clock::now();
@@ -210,7 +114,7 @@ long test_2D (const int length_x, const int length_y, const int order,
           const T data = inp[tid] ;
           bool    temp = true ;
 
-          for ( int o = 1; o < ( order + 1 ); o++ ) {
+          for ( int o = 1; o <= order; o++ ) {
             int plus;
             int minus;
             if ( axis == 0 ) {
@@ -270,24 +174,24 @@ int main(int argc, char* argv[]) {
 
   long time = 0;
   for (int order = 1; order <= 128; order = order * 2) {
-    test_1D<   int>(1000000, order, true, repeat, "int");
-    test_1D<  long>(1000000, order, true, repeat, "long");
-    test_1D< float>(1000000, order, true, repeat, "float");
-    test_1D<double>(1000000, order, true, repeat, "double");
+    time += test_1D<   int>(1000000, order, true, repeat, "int");
+    time += test_1D<  long>(1000000, order, true, repeat, "long");
+    time += test_1D< float>(1000000, order, true, repeat, "float");
+    time += test_1D<double>(1000000, order, true, repeat, "double");
   }
 
   for (int order = 1; order <= 128; order = order * 2) {
-    test_2D<   int>(1000, 1000, order, true, 1, repeat, "int");
-    test_2D<  long>(1000, 1000, order, true, 1, repeat, "long");
-    test_2D< float>(1000, 1000, order, true, 1, repeat, "float");
-    test_2D<double>(1000, 1000, order, true, 1, repeat, "double");
+    time += test_2D<   int>(1000, 1000, order, true, 1, repeat, "int");
+    time += test_2D<  long>(1000, 1000, order, true, 1, repeat, "long");
+    time += test_2D< float>(1000, 1000, order, true, 1, repeat, "float");
+    time += test_2D<double>(1000, 1000, order, true, 1, repeat, "double");
   }
 
   for (int order = 1; order <= 128; order = order * 2) {
-    test_2D<   int>(1000, 1000, order, true, 0, repeat, "int");
-    test_2D<  long>(1000, 1000, order, true, 0, repeat, "long");
-    test_2D< float>(1000, 1000, order, true, 0, repeat, "float");
-    test_2D<double>(1000, 1000, order, true, 0, repeat, "double");
+    time += test_2D<   int>(1000, 1000, order, true, 0, repeat, "int");
+    time += test_2D<  long>(1000, 1000, order, true, 0, repeat, "long");
+    time += test_2D< float>(1000, 1000, order, true, 0, repeat, "float");
+    time += test_2D<double>(1000, 1000, order, true, 0, repeat, "double");
   }
 
   printf("\n-----------------------------------------------\n");
