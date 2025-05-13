@@ -218,13 +218,15 @@ int main(int argc, char **argv) {
            */
         item.barrier(sycl::access::fence_space::local_space);
 
-        /* Reduction: Thread 0 will add the value of all other threads to
-           its own */ 
-        if(idx == 0) {
-          for(int i = 1; i < THREADS; i++) {
-            dist[0] += dist[i];
+        /* Perform balanced tree reduction across the shared memory */
+        for (int stride = THREADS/2; stride > 0; stride /= 2) {
+          if (idx < stride) {
+            dist[idx] += dist[idx + stride];
           }
+          item.barrier(sycl::access::fence_space::local_space);
+        }
 
+        if(idx == 0) {
           /* Thread 0 will then write the output to global memory. Note that
              this does not need to be performed atomically, because only one
              thread per block is writing to global memory, and each block

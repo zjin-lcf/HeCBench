@@ -110,13 +110,15 @@ __global__ void k2 (const char *data, int *distance) {
    */
   __syncthreads();
 
-  /* Reduction: Thread 0 will add the value of all other threads to
-     its own */ 
-  if(idx == 0) {
-    for(int i = 1; i < THREADS; i++) {
-      dist[0] += dist[i];
+  /* Perform balanced tree reduction across the shared memory */
+  for (int stride = THREADS/2; stride > 0; stride /= 2) {
+    if (idx < stride) {
+      dist[idx] += dist[idx + stride];
     }
+    __syncthreads();
+  }
 
+  if(idx == 0) {
     /* Thread 0 will then write the output to global memory. Note that
        this does not need to be performed atomically, because only one
        thread per block is writing to global memory, and each block
