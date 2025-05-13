@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
+#include "reference.h"
 
 // Forward declarations
 template<typename T>
@@ -24,106 +25,11 @@ template<typename T>
 class extrema2D;
 
 inline void clip_plus( const bool &clip, const int &n, int &plus ) {
-  if ( clip ) {
-    if ( plus >= n ) {
-      plus = n - 1;
-    }
-  } else {
-    if ( plus >= n ) {
-      plus -= n;
-    }
-  }
+  if ( plus >= n ) plus = clip ? n - 1 : plus - n;
 }
 
 inline void clip_minus( const bool &clip, const int &n, int &minus ) {
-  if ( clip ) {
-    if ( minus < 0 ) {
-      minus = 0;
-    }
-  } else {
-    if ( minus < 0 ) {
-      minus += n;
-    }
-  }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-//                          BOOLRELEXTREMA 1D                                //
-///////////////////////////////////////////////////////////////////////////////
-
-template<typename T>
-void cpu_relextrema_1D( const int  n,
-    const int  order,
-    const bool clip,
-    const T * inp,
-    bool * results)
-{
-  for ( int tid = 0; tid < n; tid++ ) {
-
-    const T data = inp[tid];
-    bool    temp = true;
-
-    for ( int o = 1; o < ( order + 1 ); o++ ) {
-      int plus = tid + o;
-      int minus = tid - o;
-
-      clip_plus( clip, n, plus );
-      clip_minus( clip, n, minus );
-
-      temp &= data > inp[plus];
-      temp &= data >= inp[minus];
-    }
-    results[tid] = temp;
-  }
-}
-
-template<typename T>
-void cpu_relextrema_2D( const int  in_x,
-    const int  in_y,
-    const int  order,
-    const bool clip,
-    const int  axis,
-    const T * inp,
-    bool * results) 
-{
-  for (int tx = 0; tx < in_y; tx++)
-    for (int ty = 0; ty < in_x; ty++) {
-
-      int tid = tx * in_x + ty ;
-
-      const T data = inp[tid] ;
-      bool    temp = true ;
-
-      for ( int o = 1; o < ( order + 1 ); o++ ) {
-
-        int plus;
-        int minus;
-
-        if ( axis == 0 ) {
-          plus  = tx + o;
-          minus = tx - o;
-
-          clip_plus( clip, in_y, plus );
-          clip_minus( clip, in_y, minus );
-
-          plus  = plus * in_x + ty;
-          minus = minus * in_x + ty;
-        } else {
-          plus  = ty + o;
-          minus = ty - o;
-
-          clip_plus( clip, in_x, plus );
-          clip_minus( clip, in_x, minus );
-
-          plus  = tx * in_x + plus;
-          minus = tx * in_x + minus;
-        }
-
-        temp &= data > inp[plus] ;
-        temp &= data >= inp[minus] ;
-      }
-      results[tid] = temp;
-    }
+  if ( minus < 0 ) minus = clip ? 0 : minus + n;
 }
 
 template <typename T>
@@ -157,8 +63,8 @@ long test_1D (sycl::queue &q, const int length, const int order, const bool clip
           const T data = d_x[tid];
           bool    temp = true;
 
-          #pragma unroll 8
-          for ( int o = 1; o < ( order + 1 ); o++ ) {
+          //#pragma unroll 8
+          for ( int o = 1; o <= order; o++ ) {
             int plus = tid + o;
             int minus = tid - o;
 
@@ -236,8 +142,8 @@ long test_2D (sycl::queue &q, const int length_x, const int length_y,
           int tid = tx * length_x + ty ;
           const T data = d_x[tid] ;
           bool    temp = true ;
-          #pragma unroll 8
-          for ( int o = 1; o < ( order + 1 ); o++ ) {
+          //#pragma unroll 8
+          for ( int o = 1; o <= order; o++ ) {
             int plus;
             int minus;
             if ( axis == 0 ) {
