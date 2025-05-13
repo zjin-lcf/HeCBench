@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <vector>
 #include <chrono>
@@ -186,6 +187,76 @@ void jaccard_is(
   });
 }
 
+// Reference https://github.com/SPEAR-UIC/CodeGreen/tree/main/lassi_solutions
+template<bool weighted, typename T>
+void jaccard_is_opt(
+  sycl::queue &q,
+  const int n,
+  const int e,
+  int *d_csrPtr,
+  int *d_csrInd,
+  T *d_weight_j,
+  T *d_work,
+  T *d_weight_i,
+  T *d_weight_s)
+{
+  const int y = 4;
+  sycl::range<3> is_gws ((n+7)/8*8, y, 32/y);
+  sycl::range<3> is_lws(8, y, 32/y);
+
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class intersection<weighted,T>>(
+      sycl::nd_range<3>(is_gws, is_lws), [=] (sycl::nd_item<3> item) {
+
+      for(int row = item.get_global_id(0); row < n;
+              row += item.get_group_range(0)*item.get_local_range(0)) {
+        for (int j = d_csrPtr[row]+item.get_global_id(1); j < d_csrPtr[row+1];
+                 j+= item.get_local_range(1) * item.get_group_range(1)) {
+
+          int col = d_csrInd[j];
+          //find which row has least elements (and call it reference row)
+          int Ni = d_csrPtr[row+1] - d_csrPtr[row];
+          int Nj = d_csrPtr[col+1] - d_csrPtr[col];
+          int ref= (Ni < Nj) ? row : col;
+          int cur= (Ni < Nj) ? col : row;
+
+          //compute new sum weights
+          d_weight_s[j] = d_work[row] + d_work[col];
+
+          //compute new intersection weights
+          //search for the element with the same column index in the reference row
+          if (item.get_local_id(2) == 0) {
+            T local_sum = 0;
+            int i_ptr = d_csrPtr[ref];      // pointer in reference row
+            int j_ptr = d_csrPtr[cur];        // pointer in current row
+            int ref_end = d_csrPtr[ref+1];
+            int cur_end = d_csrPtr[cur+1];
+
+            // Two-pointer merge for intersection of the two sorted lists
+            while (i_ptr < ref_end && j_ptr < cur_end) {
+              int ref_col = d_csrInd[i_ptr];
+              int cur_col = d_csrInd[j_ptr];
+              if (ref_col == cur_col) {
+                T ref_val = weighted ? d_weight_j[ref_col] : (T)1.0;
+                local_sum += ref_val;
+                i_ptr++;
+                j_ptr++;
+              } else if (ref_col < cur_col) {
+                i_ptr++;
+              } else {
+                j_ptr++;
+              }
+            }
+            // perform a single atomic update per this j index
+            if (local_sum != 0)
+              atomicAdd(d_weight_i[j], local_sum);
+          }
+        }
+      }
+    });
+  });
+}
+
 template<bool weighted, typename T>
 void jaccard_jw(
   sycl::queue &q,
@@ -277,7 +348,7 @@ void jaccard_weight (sycl::queue &q, const int iteration, const int n, const int
     #endif
 
     // this is the hotspot
-    jaccard_is<weighted,T>(q, n, e, d_csrPtr,
+    jaccard_is_opt<weighted,T>(q, n, e, d_csrPtr,
         d_csrInd, d_weight_j, d_work, d_weight_i, d_weight_s);
 
 #ifdef DEBUG
