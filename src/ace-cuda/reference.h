@@ -5,40 +5,40 @@ double dFphi_ref(double phi, double u, double lambda)
 }
 
 
-double GradientX_ref(double phi[][DATAYSIZE][DATAXSIZE], 
-                 double dx, double dy, double dz, int x, int y, int z)
+double GradientX_ref(double phi[][DATAYSIZE][DATAZSIZE],
+                     double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x+1][y][z] - phi[x-1][y][z]) / (2.0*dx);
 }
 
 
-double GradientY_ref(double phi[][DATAYSIZE][DATAXSIZE], 
-                 double dx, double dy, double dz, int x, int y, int z)
+double GradientY_ref(double phi[][DATAYSIZE][DATAZSIZE],
+                     double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x][y+1][z] - phi[x][y-1][z]) / (2.0*dy);
 }
 
 
-double GradientZ_ref(double phi[][DATAYSIZE][DATAXSIZE], 
-                 double dx, double dy, double dz, int x, int y, int z)
+double GradientZ_ref(double phi[][DATAYSIZE][DATAZSIZE],
+                     double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x][y][z+1] - phi[x][y][z-1]) / (2.0*dz);
 }
 
 
-double Divergence_ref(double phix[][DATAYSIZE][DATAXSIZE], 
-                  double phiy[][DATAYSIZE][DATAXSIZE],
-                  double phiz[][DATAYSIZE][DATAXSIZE], 
-                  double dx, double dy, double dz, int x, int y, int z)
+double Divergence_ref(double phix[][DATAYSIZE][DATAZSIZE],
+                      double phiy[][DATAYSIZE][DATAZSIZE],
+                      double phiz[][DATAYSIZE][DATAZSIZE],
+                      double dx, double dy, double dz, int x, int y, int z)
 {
-  return GradientX_ref(phix,dx,dy,dz,x,y,z) + 
+  return GradientX_ref(phix,dx,dy,dz,x,y,z) +
          GradientY_ref(phiy,dx,dy,dz,x,y,z) +
          GradientZ_ref(phiz,dx,dy,dz,x,y,z);
 }
 
 
-double Laplacian_ref(double phi[][DATAYSIZE][DATAXSIZE],
-                 double dx, double dy, double dz, int x, int y, int z)
+double Laplacian_ref(double phi[][DATAYSIZE][DATAZSIZE],
+                     double dx, double dy, double dz, int x, int y, int z)
 {
   double phixx = (phi[x+1][y][z] + phi[x-1][y][z] - 2.0 * phi[x][y][z]) / SQ(dx);
   double phiyy = (phi[x][y+1][z] + phi[x][y-1][z] - 2.0 * phi[x][y][z]) / SQ(dy);
@@ -85,20 +85,20 @@ double dFunc_ref(double l, double m, double n)
   }
 }
 
-void calculateForce_ref(double phi[][DATAYSIZE][DATAXSIZE], 
-                    double Fx[][DATAYSIZE][DATAXSIZE],
-                    double Fy[][DATAYSIZE][DATAXSIZE],
-                    double Fz[][DATAYSIZE][DATAXSIZE],
-                    double dx, double dy, double dz,
-                    double epsilon, double W0, double tau0)
+void calculateForce_ref(double phi[][DATAYSIZE][DATAZSIZE],
+                        double Fx[][DATAYSIZE][DATAZSIZE],
+                        double Fy[][DATAYSIZE][DATAZSIZE],
+                        double Fz[][DATAYSIZE][DATAZSIZE],
+                        double dx, double dy, double dz,
+                        double epsilon, double W0, double tau0)
 {
   #pragma omp parallel for collapse(3)
   for (int ix = 0; ix < DATAXSIZE; ix++) {
     for (int iy = 0; iy < DATAYSIZE; iy++) {
       for (int iz = 0; iz < DATAZSIZE; iz++) {
 
-        if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) && 
-            (iz < (DATAZSIZE-1)) && (ix > (0)) && 
+        if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) &&
+            (iz < (DATAZSIZE-1)) && (ix > (0)) &&
             (iy > (0)) && (iz > (0))) {
 
           double phix = GradientX_ref(phi,dx,dy,dz,ix,iy,iz);
@@ -108,7 +108,7 @@ void calculateForce_ref(double phi[][DATAYSIZE][DATAXSIZE],
           double c = 16.0 * W0 * epsilon;
           double w = Wn_ref(phix,phiy,phiz,epsilon,W0);
           double w2 = SQ(w);
-          
+
 
           Fx[ix][iy][iz] = w2 * phix + sqGphi * w * c * dFunc_ref(phix,phiy,phiz);
           Fy[ix][iy][iz] = w2 * phiy + sqGphi * w * c * dFunc_ref(phiy,phiz,phix);
@@ -126,14 +126,14 @@ void calculateForce_ref(double phi[][DATAYSIZE][DATAXSIZE],
 }
 
 // device function to set the 3D volume
-void allenCahn_ref(double phinew[][DATAYSIZE][DATAXSIZE], 
-               double phiold[][DATAYSIZE][DATAXSIZE],
-               double uold[][DATAYSIZE][DATAXSIZE],
-               double Fx[][DATAYSIZE][DATAXSIZE],
-               double Fy[][DATAYSIZE][DATAXSIZE],
-               double Fz[][DATAYSIZE][DATAXSIZE],
-               double epsilon, double W0, double tau0, double lambda,
-               double dt, double dx, double dy, double dz)
+void allenCahn_ref(double phinew[][DATAYSIZE][DATAZSIZE],
+                   double phiold[][DATAYSIZE][DATAZSIZE],
+                   double uold[][DATAYSIZE][DATAZSIZE],
+                   double Fx[][DATAYSIZE][DATAZSIZE],
+                   double Fy[][DATAYSIZE][DATAZSIZE],
+                   double Fz[][DATAYSIZE][DATAZSIZE],
+                   double epsilon, double W0, double tau0, double lambda,
+                   double dt, double dx, double dy, double dz)
 {
   #pragma omp parallel for collapse(3)
   for (int ix = 1; ix < DATAXSIZE-1; ix++) {
@@ -142,18 +142,18 @@ void allenCahn_ref(double phinew[][DATAYSIZE][DATAXSIZE],
 
         double phix = GradientX_ref(phiold,dx,dy,dz,ix,iy,iz);
         double phiy = GradientY_ref(phiold,dx,dy,dz,ix,iy,iz);
-        double phiz = GradientZ_ref(phiold,dx,dy,dz,ix,iy,iz); 
+        double phiz = GradientZ_ref(phiold,dx,dy,dz,ix,iy,iz);
 
-        phinew[ix][iy][iz] = phiold[ix][iy][iz] + 
-         (dt / taun_ref(phix,phiy,phiz,epsilon,tau0)) * 
-         (Divergence_ref(Fx,Fy,Fz,dx,dy,dz,ix,iy,iz) - 
+        phinew[ix][iy][iz] = phiold[ix][iy][iz] +
+         (dt / taun_ref(phix,phiy,phiz,epsilon,tau0)) *
+         (Divergence_ref(Fx,Fy,Fz,dx,dy,dz,ix,iy,iz) -
           dFphi_ref(phiold[ix][iy][iz], uold[ix][iy][iz],lambda));
       }
     }
   }
 }
 
-void boundaryConditionsPhi_ref(double phinew[][DATAYSIZE][DATAXSIZE])
+void boundaryConditionsPhi_ref(double phinew[][DATAYSIZE][DATAZSIZE])
 {
   #pragma omp parallel for collapse(3)
   for (int ix = 0; ix < DATAXSIZE; ix++) {
@@ -183,18 +183,18 @@ void boundaryConditionsPhi_ref(double phinew[][DATAYSIZE][DATAXSIZE])
   }
 }
 
-void thermalEquation_ref(double unew[][DATAYSIZE][DATAXSIZE],
-                     double uold[][DATAYSIZE][DATAXSIZE],
-                     double phinew[][DATAYSIZE][DATAXSIZE],
-                     double phiold[][DATAYSIZE][DATAXSIZE],
-                     double D, double dt, double dx, double dy, double dz)
+void thermalEquation_ref(double unew[][DATAYSIZE][DATAZSIZE],
+                         double uold[][DATAYSIZE][DATAZSIZE],
+                         double phinew[][DATAYSIZE][DATAZSIZE],
+                         double phiold[][DATAYSIZE][DATAZSIZE],
+                         double D, double dt, double dx, double dy, double dz)
 {
   #pragma omp parallel for collapse(3)
   for (int ix = 1; ix < DATAXSIZE-1; ix++) {
     for (int iy = 1; iy < DATAYSIZE-1; iy++) {
       for (int iz = 1; iz < DATAZSIZE-1; iz++) {
 
-        unew[ix][iy][iz] = uold[ix][iy][iz] + 
+        unew[ix][iy][iz] = uold[ix][iy][iz] +
           0.5*(phinew[ix][iy][iz]-
                phiold[ix][iy][iz]) +
           dt * D * Laplacian_ref(uold,dx,dy,dz,ix,iy,iz);
@@ -203,7 +203,7 @@ void thermalEquation_ref(double unew[][DATAYSIZE][DATAXSIZE],
   }
 }
 
-void boundaryConditionsU_ref(double unew[][DATAYSIZE][DATAXSIZE], double delta)
+void boundaryConditionsU_ref(double unew[][DATAYSIZE][DATAZSIZE], double delta)
 {
   #pragma omp parallel for collapse(3)
   for (int ix = 0; ix < DATAXSIZE; ix++) {
@@ -233,8 +233,8 @@ void boundaryConditionsU_ref(double unew[][DATAYSIZE][DATAXSIZE], double delta)
   }
 }
 
-void swapGrid_ref(double cnew[][DATAYSIZE][DATAXSIZE],
-              double cold[][DATAYSIZE][DATAXSIZE])
+void swapGrid_ref(double cnew[][DATAYSIZE][DATAZSIZE],
+                  double cold[][DATAYSIZE][DATAZSIZE])
 {
   #pragma omp parallel for collapse(3)
   for (int ix = 0; ix < DATAXSIZE; ix++) {
@@ -281,7 +281,7 @@ void reference(nRarray *phi_ref, nRarray *u_ref, int vol, int num_steps)
   d_Fx = (nRarray*) malloc (vol*sizeof(double));
   d_Fy = (nRarray*) malloc (vol*sizeof(double));
   d_Fz = (nRarray*) malloc (vol*sizeof(double));
-  
+
   memcpy(d_phiold, phi_ref, (vol*sizeof(double)));
   memcpy(d_uold, u_ref, (vol*sizeof(double)));
 
