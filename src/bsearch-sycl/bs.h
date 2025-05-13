@@ -11,25 +11,26 @@ void bs (sycl::queue &q,
          const size_t n,
          const int repeat)
 {
-  sycl::nd_range<1> ndr{sycl::range<1>(zSize), sycl::range<1>(256)};
-
+  sycl::nd_range<1> ndr {sycl::range<1>((zSize + 255) / 256 * 256),
+                         sycl::range<1>(256)};
   q.wait();
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class BS<T>>(ndr, [=](sycl::nd_item<1> item) {
         size_t i = item.get_global_id(0);
-         T z = d_z[i];
-         size_t low = 0;
-         size_t high = n;
-          while (high - low > 1) {
-            size_t mid = low + (high - low)/2;
-            if (z < d_a[mid])
-              high = mid;
-            else
-              low = mid;
-          }
-          d_r[i] = low;
+        if (i >= zSize) return;
+        T z = d_z[i];
+        size_t low = 0;
+        size_t high = n;
+        while (high - low > 1) {
+          size_t mid = low + (high - low)/2;
+          if (z < d_a[mid])
+            high = mid;
+          else
+            low = mid;
+        }
+        d_r[i] = low;
       });
     });
   }

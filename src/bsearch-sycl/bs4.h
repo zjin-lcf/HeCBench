@@ -11,15 +11,16 @@ void bs4 (sycl::queue &q,
           const size_t n,
           const int repeat)
 {
-  sycl::nd_range<1> ndr{sycl::range<1>(zSize), sycl::range<1>(256)};
-
+  sycl::nd_range<1> ndr {sycl::range<1>((zSize + 255) / 256 * 256),
+                         sycl::range<1>(256)};
   q.wait();
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler& cgh) {
       sycl::local_accessor<size_t, 1> k (sycl::range<1>(1), cgh);
       cgh.parallel_for<class BS4<T>>(ndr, [=](sycl::nd_item<1> item) {
-         size_t gid = item.get_global_id(0);
+         size_t i = item.get_global_id(0);
+         if (i >= zSize) return;
          size_t lid = item.get_local_id(0);
 
          if (lid == 0) {
@@ -30,7 +31,7 @@ void bs4 (sycl::queue &q,
          item.barrier(sycl::access::fence_space::local_space);
 
          size_t p = k[0];
-         T z = d_z[gid];
+         T z = d_z[i];
          size_t idx = (d_a[p] <= z) ? p : 0;
          while (p >>= 1) {
            size_t r = idx | p;
@@ -39,7 +40,7 @@ void bs4 (sycl::queue &q,
              idx = r;
            }
          }
-         d_r[gid] = idx;
+         d_r[i] = idx;
       });
     });
   }
