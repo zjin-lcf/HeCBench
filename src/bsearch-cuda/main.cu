@@ -12,9 +12,11 @@ __global__ void
 kernel_BS (const T* __restrict__ acc_a,
            const T* __restrict__ acc_z,
             size_t* __restrict__ acc_r,
+           const size_t zSize,
            const size_t n)
 { 
   size_t i = blockIdx.x*blockDim.x+threadIdx.x;
+  if (i >= zSize) return;
   T z = acc_z[i];
   size_t low = 0;
   size_t high = n;
@@ -33,9 +35,11 @@ __global__ void
 kernel_BS2 (const T* __restrict__ acc_a,
             const T* __restrict__ acc_z,
              size_t* __restrict__ acc_r,
+            const size_t zSize,
             const size_t n)
 {
   size_t i = blockIdx.x*blockDim.x+threadIdx.x;
+  if (i >= zSize) return;
   unsigned  nbits = 0;
   while (n >> nbits) nbits++;
   size_t k = 1ULL << (nbits - 1);
@@ -55,9 +59,11 @@ __global__ void
 kernel_BS3 (const T* __restrict__ acc_a,
             const T* __restrict__ acc_z,
              size_t* __restrict__ acc_r,
+           const size_t zSize,
             const size_t n)
 {
   size_t i = blockIdx.x*blockDim.x+threadIdx.x;
+  if (i >= zSize) return;
   unsigned nbits = 0;
   while (n >> nbits) nbits++;
   size_t k = 1ULL << (nbits - 1);
@@ -78,11 +84,13 @@ __global__ void
 kernel_BS4 (const T* __restrict__ acc_a,
             const T* __restrict__ acc_z,
              size_t* __restrict__ acc_r,
+            const size_t zSize,
             const size_t n)
 {
   __shared__  size_t k;
 
-  size_t gid = blockIdx.x*blockDim.x+threadIdx.x;
+  size_t i = blockIdx.x*blockDim.x+threadIdx.x;
+  if (i >= zSize) return;
   size_t lid = threadIdx.x; 
 
   if (lid == 0) {
@@ -93,7 +101,7 @@ kernel_BS4 (const T* __restrict__ acc_a,
   __syncthreads();
 
   size_t p = k;
-  T z = acc_z[gid];
+  T z = acc_z[i];
   size_t idx = (acc_a[p] <= z) ? p : 0;
   while (p >>= 1) {
     size_t r = idx | p;
@@ -102,7 +110,7 @@ kernel_BS4 (const T* __restrict__ acc_a,
       idx = r;
     }
   }
-  acc_r[gid] = idx;
+  acc_r[i] = idx;
 }
 
 template <typename T>
@@ -114,10 +122,12 @@ void bs ( const size_t aSize,
     const size_t n,
     const int repeat )
 {
+  dim3 grids ((zSize + 255) / 256);
+  dim3 blocks (256);
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    kernel_BS<<<zSize/256, 256>>>(d_a, d_z, d_r, n);
+    kernel_BS<<<grids, blocks>>>(d_a, d_z, d_r, zSize, n);
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
@@ -134,10 +144,12 @@ void bs2 ( const size_t aSize,
     const size_t n,
     const int repeat )
 {
+  dim3 grids ((zSize + 255) / 256);
+  dim3 blocks (256);
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    kernel_BS2<<<zSize/256, 256>>>(d_a, d_z, d_r, n);
+    kernel_BS2<<<grids, blocks>>>(d_a, d_z, d_r, zSize, n);
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
@@ -154,10 +166,12 @@ void bs3 ( const size_t aSize,
     const size_t n,
     const int repeat )
 {
+  dim3 grids ((zSize + 255) / 256);
+  dim3 blocks (256);
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    kernel_BS3<<<zSize/256, 256>>>(d_a, d_z, d_r, n);
+    kernel_BS3<<<grids, blocks>>>(d_a, d_z, d_r, zSize, n);
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
@@ -174,10 +188,12 @@ void bs4 ( const size_t aSize,
     const size_t n,
     const int repeat )
 {
+  dim3 grids ((zSize + 255) / 256);
+  dim3 blocks (256);
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    kernel_BS4<<<zSize/256, 256>>>(d_a, d_z, d_r, n);
+    kernel_BS4<<<grids, blocks>>>(d_a, d_z, d_r, zSize, n);
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
