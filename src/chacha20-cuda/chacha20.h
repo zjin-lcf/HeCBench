@@ -74,6 +74,7 @@ struct Chacha20Block {
     x[a] += x[b]; x[d] = rotl32(x[d] ^ x[a], 8); \
     x[c] += x[d]; x[b] = rotl32(x[b] ^ x[c], 7);
 
+    #pragma unroll
     for (int i = 0; i < 10; i++) {
         CHACHA20_QUARTERROUND(result, 0, 4, 8, 12)
         CHACHA20_QUARTERROUND(result, 1, 5, 9, 13)
@@ -85,6 +86,7 @@ struct Chacha20Block {
         CHACHA20_QUARTERROUND(result, 3, 4, 9, 14)
     }
 
+    //#pragma unroll
     for (int i = 0; i < 16; i++) result[i] += state[i];
 
     uint32_t *counter = state + 12;
@@ -108,6 +110,7 @@ struct Chacha20Block {
     
     next(temp32);
     
+    //#pragma unroll
     for (size_t i = 0; i < 16; i++) unpack4(temp32[i], result8 + i*4);
   }
 };
