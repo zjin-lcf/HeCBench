@@ -129,9 +129,9 @@ int main(int argc, char **argv) {
       gettimeofday(&tp, &tzp);
       stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
       elapsedTime += stop_gpu - start_gpu;
-  
-      #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
     }
+  
+    #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
   
     printf("Average kernel execution time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
     status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
@@ -208,9 +208,9 @@ int main(int argc, char **argv) {
       gettimeofday(&tp, &tzp);
       stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
       elapsedTime += stop_gpu - start_gpu;
-  
-      #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
     }
+  
+    #pragma omp target update from (gpu_distance[0:INSTANCES * INSTANCES])
   
     printf("Average kernel execution time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
     status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));

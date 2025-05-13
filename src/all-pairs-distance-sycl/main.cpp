@@ -110,9 +110,7 @@ int main(int argc, char **argv) {
   elapsedTime = 0; 
   for (int n = 0; n < iterations; n++) {
     /* register GPU kernel */
-    bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
-
-    q.memcpy(d_distance, gpu_distance, distance_bytes).wait();
+    q.memset(d_distance, 0, distance_bytes).wait();
 
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
@@ -155,9 +153,9 @@ int main(int argc, char **argv) {
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
-
-    q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
   }
+
+  q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
@@ -167,9 +165,7 @@ int main(int argc, char **argv) {
   elapsedTime = 0; 
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
-    bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
-
-    q.memcpy(d_distance, gpu_distance, distance_bytes).wait();
+    q.memset(d_distance, 0, distance_bytes).wait();
 
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
@@ -240,9 +236,9 @@ int main(int argc, char **argv) {
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
-
-    q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
   }
+
+  q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
@@ -252,9 +248,7 @@ int main(int argc, char **argv) {
   elapsedTime = 0; 
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
-    bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
-
-    q.memcpy(d_distance, gpu_distance, distance_bytes).wait();
+    q.memset(d_distance, 0, distance_bytes).wait();
 
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
@@ -297,9 +291,9 @@ int main(int argc, char **argv) {
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
-
-    q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
   }
+
+  q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
