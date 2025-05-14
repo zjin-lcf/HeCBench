@@ -166,9 +166,10 @@ Some host programs contain platform-specific intrinsics, so they may cause compi
 When double-precision floating-point operations are not supported on certain Intel GPU devices, software emulation may be enabled. [FP64 emulation](https://github.com/intel/compute-runtime/blob/master/opencl/doc/FAQ.md#feature-double-precision-emulation-fp64)
 
 # Feedback from the papers
-Faqir-Rhazoui, Y. and García, C., 2024. SYCL in the edge: performance and energy evaluation for heterogeneous acceleration. The Journal of Supercomputing, pp.1-21.
 
-Dearing, M.T., Tao, Y., Wu, X., Lan, Z. and Taylor, V., 2024. LASSI: An LLM-based Automated Self-Correcting Pipeline for Translating Parallel Scientific Codes. arXiv preprint arXiv:2407.01638.
+Dearing, M.T., Tao, Y., Wu, X., Lan, Z. and Taylor, V., 2025. Leveraging LLMs to Automate Energy-Aware Refactoring of Parallel Scientific Codes. arXiv preprint arXiv:2505.02184.
+
+Faqir-Rhazoui, Y. and García, C., 2024. SYCL in the edge: performance and energy evaluation for heterogeneous acceleration. The Journal of Supercomputing, pp.1-21.
 
 Marzen, L., Dutta, A. and Jannesari, A., 2024. Static Generation of Efficient OpenMP Offload Data Mappings. arXiv preprint arXiv:2406.13881.
 
