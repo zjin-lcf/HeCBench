@@ -69,14 +69,13 @@ int main(int argc, char* argv[]) {
       }
 
       end = std::chrono::steady_clock::now();
-      time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       auto timeD2H = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       std::cout << "Copy " << size[i] << " bytes from device to host takes "
                 << (timeD2H * 1e-3f) / repeat <<  " us" << std::endl;
+      std::cout << "Timing gap in nanoseconds per byte: "
+                << (float)std::abs(timeH2D - timeD2H) / (repeat * size[i]);
     }
     free(A);
-    std::cout << "Timing gap in nanoseconds per byte: "
-              << (float)std::abs(timeH2D - timeD2H) / (repeat * size[i]);
     std::cout << std::endl << std::endl;
   }
   return 0;
