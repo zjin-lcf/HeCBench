@@ -141,15 +141,15 @@ int main(int argc, char** argv){
   printf("Average execution time of FFT: %lf ms\n", avg_time);
 
   for(int i = 0; i < N*N; i++){
-    outputData[i] =
-        fftData[i].real() * fftData[i].real() + fftData[i].imag() * fftData[i].imag();
+    outputData[i] = fftData[i].real() * fftData[i].real() +
+                    fftData[i].imag() * fftData[i].imag();
   }
 
   reference(inputData_ref, outputData_ref, N);
 
   bool ok = true;
-  for (int i = 0;i < N * N; i++) {
-    if (outputData[i] - outputData_ref[i] > 1e-3) {
+  for (int i = 0; i < N * N; i++) {
+    if (fabs(outputData[i] - outputData_ref[i]) > 1e-3) {
       ok = false;
       break;
     }
