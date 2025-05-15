@@ -212,9 +212,14 @@ double computePValue(
   const int nRandomGenerations,
   const int blocksPerGrid,
   const int threadsPerBlock, 
-  const double averageSetScore, const int setSize, const int signatureByRNGs, const double UCmax,
+  const double averageSetScore,
+  const int setSize,
+  const int signatureByRNGs,
+  const double UCmax,
   int *device_aboveThresholdAccumulator,
-  const float *device_randomIndexArray, const int *device_refRegNum, float *device_arraysAdded) {
+  const float *device_randomIndexArray,
+  const int *device_refRegNum,
+  float *device_arraysAdded) {
 
 
   // Compute scores of random gene signatures
