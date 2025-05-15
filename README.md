@@ -167,6 +167,8 @@ When double-precision floating-point operations are not supported on certain Int
 
 # Feedback from the papers
 
+Bolet, G., Georgakoudis, G., Menon, H., Parasyris, K., Hasabnis, N., Estes, H., Cameron, K.W. and Oren, G., 2025. Can Large Language Models Predict Parallel Code Performance?. arXiv preprint arXiv:2505.03988.
+
 Dearing, M.T., Tao, Y., Wu, X., Lan, Z. and Taylor, V., 2025. Leveraging LLMs to Automate Energy-Aware Refactoring of Parallel Scientific Codes. arXiv preprint arXiv:2505.02184.
 
 Faqir-Rhazoui, Y. and García, C., 2024. SYCL in the edge: performance and energy evaluation for heterogeneous acceleration. The Journal of Supercomputing, pp.1-21.
