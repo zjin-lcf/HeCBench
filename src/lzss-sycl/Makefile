@@ -80,4 +80,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) -i ../lzss-cuda/tpch/tpch@1.0-15.bin
+	$(LAUNCHER) ./$(program) -i ../lzss-cuda/QCLOUDf48.bin.f32.errctrl.1e-3
