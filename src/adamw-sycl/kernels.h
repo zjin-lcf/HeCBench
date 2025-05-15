@@ -94,7 +94,6 @@ float q_mapping(const float *__restrict__ qmap,
     if (x <= qmap[low]) return low;
     if (qmap[high] <=x) return high;
 
-    #pragma unroll
     // replace with for loop?
     while (low < high) {
         int mid = (low + high) >> 1;
@@ -137,17 +136,13 @@ void fused_4bit_kernel(
     float &absmax_exp,
     float &absmax_sq)
 {
+    float local_absmax_exp = 0;
+    float local_absmax_sq = 0;
+    int8_t local_packed_exp = 0;
+    int8_t local_packed_sq = 0;
 
     int64_t global_id = item.get_global_id(0);
     if (global_id < total_size) {
-
-      int64_t group_id = item.get_group(0);
-      int local_id = item.get_local_id(0);
-
-      if (local_id == 0) {
-          absmax_exp = 0;
-          absmax_sq = 0;
-      }
 
       const int8_t exp_full = exp[global_id];
       const int8_t sq_full = sq[global_id];
@@ -163,12 +158,12 @@ void fused_4bit_kernel(
       p2.x() = p2.x() * weight_decay_update;
 
       // left exp and sq updates
-      float exp_avg_qscale = exp_qscale[group_id];
+      float exp_avg_qscale = exp_qscale[item.get_group(0)];
 
       float exp_left = _exp_qmap[exp_left_index] * exp_avg_qscale;
       exp_left = beta1 * exp_left + resid_beta1 * g2.x();
 
-      float sq_left = _sq_qmap[sq_left_index] * sq_qscale[group_id];
+      float sq_left = _sq_qmap[sq_left_index] * sq_qscale[item.get_group(0)];
       sq_left = beta2 * sq_left + resid_beta2 * (g2.x() * g2.x());
 
       // param update
@@ -186,51 +181,42 @@ void fused_4bit_kernel(
       exp_right = beta1 * exp_right + resid_beta1 * g2.y();
 
       float sq_right =
-          _sq_qmap[sq_right_index] * sq_qscale[group_id];
+          _sq_qmap[sq_right_index] * sq_qscale[item.get_group(0)];
       sq_right = beta2 * sq_right + resid_beta2 * (g2.y() * g2.y());
 
       // param update
       p[global_id * 2 + 1] = p2.y() - (step_size * (exp_right / (sycl::sqrt(sq_right) / correction2_sqrt + eps)));
 
       // prepare quantization info - update absmax scales
-      float local_absmax_exp = sycl::max((float)exp_left, (float)exp_right);
-      float local_absmax_sq = sycl::max((float)sq_left, (float)sq_right);
+      local_absmax_exp = sycl::max((float)exp_left, (float)exp_right);
+      local_absmax_sq = sycl::max((float)sq_left, (float)sq_right);
 
-      // --- sequential threads parallel reduction to
-      // determine global absmax for exp
+      // parallel reduction to determine absmax for exp and sq
       auto g = item.get_group();
       local_absmax_exp = sycl::reduce_over_group(g, local_absmax_exp, sycl::maximum<float>{});
-      if (local_id == 0) {
-          exp_qscale[group_id] = local_absmax_exp;
-          absmax_exp = local_absmax_exp;
-      }
-
-      // same for sq
       local_absmax_sq = sycl::reduce_over_group(g, local_absmax_sq, sycl::maximum<float>{});
-      if (local_id == 0) {
-          sq_qscale[group_id] = local_absmax_sq;
+      if (item.get_local_id(0) == 0) {
+          exp_qscale[item.get_group(0)] = local_absmax_exp;
+          sq_qscale[item.get_group(0)] = local_absmax_sq;
+          absmax_exp = local_absmax_exp;
           absmax_sq = local_absmax_sq;
       }
+
       sycl::group_barrier(g);
 
-      int8_t local_packed_exp = 0;
-      int8_t local_packed_sq = 0;
-
       // quantize and pack
-      const int8_t q_exp_left = (int8_t)q_mapping(_exp_qmap, _exp_qmidpt, (float)exp_left / absmax_exp);
-      const int8_t q_sq_left = (int8_t)q_mapping(_sq_qmap, _sq_qmidpt, (float)sq_left / absmax_sq);
+      const int8_t q_exp_left = (int8_t)q_mapping(_exp_qmap, _exp_qmidpt, exp_left / absmax_exp);
+      const int8_t q_sq_left = (int8_t)q_mapping(_sq_qmap, _sq_qmidpt, sq_left / absmax_sq);
       local_packed_exp |= (q_exp_left & _bitmask);
       local_packed_sq |= (q_sq_left & _bitmask);
 
-      const int8_t q_exp_right = (int8_t)q_mapping(_exp_qmap, _exp_qmidpt, (float)exp_right / absmax_exp);
-      const int8_t q_sq_right = (int8_t)q_mapping(_sq_qmap, _sq_qmidpt, (float)sq_right / absmax_sq);
+      const int8_t q_exp_right = (int8_t)q_mapping(_exp_qmap, _exp_qmidpt, exp_right / absmax_exp);
+      const int8_t q_sq_right = (int8_t)q_mapping(_sq_qmap, _sq_qmidpt, sq_right / absmax_sq);
       local_packed_exp |= (q_exp_right & _right_pack_bitmask);
       local_packed_sq |= (q_sq_right & _right_pack_bitmask);
 
       // store updated exp and sq
       exp[global_id] = local_packed_exp;
       sq[global_id] = local_packed_sq;
-
-      sycl::group_barrier(g);
    }
 }

@@ -23,8 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../adamw-cuda \
-          -DHIP_ENABLE_WARP_SYNC_BUILTINS=1
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../adamw-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -47,11 +46,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../adamw-cuda/kernels.h Makefile
+%.o: %.cu kernels.h ../adamw-cuda/reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 100000000 100
+	$(LAUNCHER) ./$(program) 1000000 100

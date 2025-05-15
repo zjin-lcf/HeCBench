@@ -37,13 +37,8 @@ typedef struct {
   double i, c, h;
 } checksum;
 
-// Device functions
-inline float sigmoidf(float in) {
-  return 1.f / (1.f + expf(-in));  
-}
-
 // Fused kernel
-void elementWise_fp(int hiddenSize, int miniBatch,
+void elementwise(int hiddenSize, int miniBatch,
     const float *__restrict tmp_h, 
     const float *__restrict tmp_i, 
     const float *__restrict bias,
@@ -69,10 +64,10 @@ void elementWise_fp(int hiddenSize, int miniBatch,
       linearGates[gateIndex + i * hiddenSize] = g[i];
     }   
 
-    float in_gate     = sigmoidf(g[0]);
-    float forget_gate = sigmoidf(g[1]);
+    float in_gate     = 1.f / (1.f + expf(-g[0]));
+    float forget_gate = 1.f / (1.f + expf(-g[1]));
     float in_gate2    = tanhf(g[2]);
-    float out_gate    = sigmoidf(g[3]);
+    float out_gate    = 1.f / (1.f + expf(-g[3]));
 
     float val = (forget_gate * c_in[index]) + (in_gate * in_gate2);
 
@@ -121,6 +116,7 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
   int bias_size = numLayers * hiddenSize * 8;
   int tmp_h_size = 4 * numLayers * numElements;
   int tmp_i_size = 4 * seqLength * numElements;
+  int act_size = 4 * seqLength * numLayers * numElements;
 
   h_data = (float*) malloc (hc_size * sizeof(float));
   i_data = (float*) malloc (i_size * sizeof(float));
@@ -132,14 +128,15 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
   tmp_i = (float*) malloc (tmp_i_size * sizeof(float));
 
   // Activations
-  linearGates = (float*) malloc (4 * seqLength * numLayers * numElements * sizeof(float));  
+  linearGates = (float*) malloc (act_size * sizeof(float));  
 
 #pragma omp target data map (alloc: h_data[0:hc_size], \
                                     i_data[0:i_size],\
                                     c_data[0:hc_size],\
                                     bias[0:bias_size],\
                                     tmp_h[0:tmp_h_size],\
-                                    tmp_i[0:tmp_i_size])
+                                    tmp_i[0:tmp_i_size],\
+                                    linearGates[0:act_size])
   {
   // Initialise with random values on a device
   init(tmp_h, tmp_h_size);
@@ -197,7 +194,7 @@ void test(int hiddenSize, int miniBatch, int seqLength, int numLayers,
 
     for (int layer = lStart; layer < lEnd; layer++) {
       for (int i = rStart; i < rEnd; i++)
-        elementWise_fp
+        elementwise
         (hiddenSize, miniBatch,
          tmp_h + 4 * layer * numElements, 
          tmp_i + 4 * i * numElements, 

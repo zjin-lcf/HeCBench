@@ -57,11 +57,13 @@ void tissue(
     const float *__restrict d_qt,
     int nnt, int nntDev, int step, int isp)
 {
+  const int i = item.get_global_id(0);
+  if (i >= step * nnt) return;
+
   int jtp,ixyz,ix,iy,iz,jx,jy,jz,istep;
   int nnt2 = 2*nnt;
   float p = 0.f;
 
-  const int i = item.get_global_id(0);
   const int itp = i/step;
   const int itp1 = i%step;
   if(itp < nnt) {

@@ -13,10 +13,10 @@ lstm_inference(
   const float*__restrict__ d_outB, 
         float*__restrict__ d_y)
 {
+  int gid = blockDim.x * blockIdx.x + threadIdx.x;
+  if (gid >= N) return;
 
   int t,i,j;
-  int gid = blockDim.x * blockIdx.x + threadIdx.x;
-
   float h_state[5] = {0,0,0,0,0};
   float c_state[5] = {0,0,0,0,0};
   float i_state[5] = {0,0,0,0,0};

@@ -1,4 +1,3 @@
-#include <sycl/sycl.hpp>
 /** Problem size along one side; total number of cells is this squared */
 #define NUM 1024
 
@@ -39,6 +38,7 @@ void red_kernel (const Real *__restrict__ aP,
 {
   int row = 1 + item.get_global_id(1);
   int col = 1 + item.get_global_id(0);
+  if (row > NUM / 2 || col > NUM) return;
 
   int ind_red = col * ((NUM >> 1) + 2) + row; // local (red) index
   int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1); // global index
@@ -86,6 +86,7 @@ void black_kernel (const Real *__restrict__ aP,
 {
   int row = 1 + item.get_global_id(1);
   int col = 1 + item.get_global_id(0);
+  if (row > NUM / 2 || col > NUM) return;
 
   int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
   int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1); // global index

@@ -15,11 +15,11 @@ void glu_kernel(
    const float* Xdata,
          float* Ydata)
 {
-  const int xOffset = 2 * split_dim_size * N;
-  const int yOffset = split_dim_size * N;
   int index = blockIdx.x * blockDim.x + threadIdx.x; 
   if (index >= M * split_dim_size * N) return;
 
+  const int xOffset = 2 * split_dim_size * N;
+  const int yOffset = split_dim_size * N;
   const int i = index / split_dim_size / N;
   const int j = index / N % split_dim_size;
   const int k = index % N;

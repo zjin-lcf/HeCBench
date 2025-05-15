@@ -479,14 +479,13 @@ int main(int argc, char* argv[]) {
     }
     if (ind[i] == knn_index[i]) {
       nb_correct_indexes++;
-    } else {
-      printf("Mismatch @%d: %d %d\n", i, ind[i], knn_index[i]);
     }
   }
 
   float precision_accuracy = nb_correct_precisions / ((float)query_nb * k);
   float index_accuracy = nb_correct_indexes / ((float)query_nb * k);
   printf("Precision accuracy %f\nIndex accuracy %f\n", precision_accuracy, index_accuracy);
+  printf("%s\n", (precision_accuracy == 1.f) ? "PASS" : "FAIL");
 
   free(ind);
   free(dist);

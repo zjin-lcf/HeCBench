@@ -73,6 +73,10 @@ int main(int argc, char* argv[]) {
     q.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class chi2>(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+
+        int tid  = item.get_global_id(0);
+        if (tid >= cols) return;
+
         unsigned char y;
         int m, n;
         unsigned int p = 0;
@@ -85,9 +89,6 @@ int main(int argc, char* argv[]) {
         float Cexpected[3];
         float numerator1;
         float numerator2;
-
-        int tid  = item.get_global_id(0);
-        if (tid >= cols) return;
 
         int cases[3] = {1,1,1};
         int controls[3] = {1,1,1};

@@ -11,14 +11,15 @@ void bs2 (sycl::queue &q,
           const size_t n,
           const int repeat)
 {
-  sycl::nd_range<1> ndr{sycl::range<1>(zSize), sycl::range<1>(256)};
-
+  sycl::nd_range<1> ndr {sycl::range<1>((zSize + 255) / 256 * 256),
+                         sycl::range<1>(256)};
   q.wait();
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class BS2<T>>(ndr, [=](sycl::nd_item<1> item) {
         size_t i = item.get_global_id(0);
+        if (i >= zSize) return;
         unsigned  nbits = 0;
         while (n >> nbits) nbits++;
         size_t k = 1ULL << (nbits - 1);
