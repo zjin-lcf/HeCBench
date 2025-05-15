@@ -10,6 +10,7 @@
  */
 
 #include <stdio.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include <hip/hip_cooperative_groups.h>
 
