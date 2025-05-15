@@ -13,7 +13,7 @@
 #include <chrono>
 
 #include <hip/hip_runtime.h>
-#include <hipfft.h>
+#include <hipfft/hipfft.h>
 #include <hip/hip_complex.h>
 #include "reference.h"
 
@@ -125,8 +125,8 @@ int main(int argc, char** argv){
   reference(inputData_ref, outputData_ref, N);
 
   bool ok = true;
-  for (int i = 0;i < N * N; i++) {
-    if (outputData[i] - outputData_ref[i] > 1e-3) {
+  for (int i = 0; i < N * N; i++) {
+    if (fabs(outputData[i] - outputData_ref[i]) > 1e-3) {
       ok = false;
       break;
     }
