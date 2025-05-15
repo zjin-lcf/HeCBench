@@ -39,14 +39,14 @@ int main(int argc, char* argv[])
   const uint teamX = (width + tile_cols - 1) / tile_cols;
   const uint teamY = (height + tile_rows - 1) / tile_rows;
 
-  #pragma omp target data map(to: input[0:numPix]) map(from: output[0:numPix])
+  #pragma omp target data map(to: input[0:numPix]) map(from: output[0:4*numPix])
   {
     auto start = std::chrono::steady_clock::now();
 
     //this version takes a tile (z=1) and each tile job does 4 line median sorts
     for (int i = 0; i < repeat; i++) {
       memset(output, 0, output_image_size);
-      #pragma omp target update to(output[0:numPix])
+      #pragma omp target update to(output[0:4*numPix])
       malvar_he_cutler_demosaic (
         teamX, teamY,
         height, width, 
