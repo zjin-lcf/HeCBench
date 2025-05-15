@@ -9,7 +9,7 @@
 #define DATAYSIZE 400
 #define DATAZSIZE 400
 
-typedef double nRarray[DATAYSIZE][DATAXSIZE];
+typedef double nRarray[DATAYSIZE][DATAZSIZE];
 
 // square
 #define SQ(x) ((x)*(x))
@@ -26,39 +26,39 @@ double dFphi(double phi, double u, double lambda)
 }
 
 __device__
-double GradientX(double phi[][DATAYSIZE][DATAXSIZE], 
+double GradientX(double phi[][DATAYSIZE][DATAZSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x+1][y][z] - phi[x-1][y][z]) / (2.0*dx);
 }
 
 __device__
-double GradientY(double phi[][DATAYSIZE][DATAXSIZE], 
+double GradientY(double phi[][DATAYSIZE][DATAZSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x][y+1][z] - phi[x][y-1][z]) / (2.0*dy);
 }
 
 __device__
-double GradientZ(double phi[][DATAYSIZE][DATAXSIZE], 
+double GradientZ(double phi[][DATAYSIZE][DATAZSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x][y][z+1] - phi[x][y][z-1]) / (2.0*dz);
 }
 
 __device__
-double Divergence(double phix[][DATAYSIZE][DATAXSIZE], 
-                  double phiy[][DATAYSIZE][DATAXSIZE],
-                  double phiz[][DATAYSIZE][DATAXSIZE], 
+double Divergence(double phix[][DATAYSIZE][DATAZSIZE],
+                  double phiy[][DATAYSIZE][DATAZSIZE],
+                  double phiz[][DATAYSIZE][DATAZSIZE],
                   double dx, double dy, double dz, int x, int y, int z)
 {
-  return GradientX(phix,dx,dy,dz,x,y,z) + 
+  return GradientX(phix,dx,dy,dz,x,y,z) +
          GradientY(phiy,dx,dy,dz,x,y,z) +
          GradientZ(phiz,dx,dy,dz,x,y,z);
 }
 
 __device__
-double Laplacian(double phi[][DATAYSIZE][DATAXSIZE],
+double Laplacian(double phi[][DATAYSIZE][DATAZSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   double phixx = (phi[x+1][y][z] + phi[x-1][y][z] - 2.0 * phi[x][y][z]) / SQ(dx);
@@ -107,10 +107,10 @@ double dFunc(double l, double m, double n)
 }
 
 __global__
-void calculateForce(double phi[][DATAYSIZE][DATAXSIZE], 
-                    double Fx[][DATAYSIZE][DATAXSIZE],
-                    double Fy[][DATAYSIZE][DATAXSIZE],
-                    double Fz[][DATAYSIZE][DATAXSIZE],
+void calculateForce(double phi[][DATAYSIZE][DATAZSIZE],
+                    double Fx[][DATAYSIZE][DATAZSIZE],
+                    double Fy[][DATAYSIZE][DATAZSIZE],
+                    double Fz[][DATAYSIZE][DATAZSIZE],
                     double dx, double dy, double dz,
                     double epsilon, double W0, double tau0)
 {
@@ -119,8 +119,8 @@ void calculateForce(double phi[][DATAYSIZE][DATAXSIZE],
   unsigned iy = blockIdx.y*blockDim.y + threadIdx.y;
   unsigned ix = blockIdx.z*blockDim.z + threadIdx.z;
 
-  if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) && 
-      (iz < (DATAZSIZE-1)) && (ix > (0)) && 
+  if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) &&
+      (iz < (DATAZSIZE-1)) && (ix > (0)) &&
       (iy > (0)) && (iz > (0))) {
 
     double phix = GradientX(phi,dx,dy,dz,ix,iy,iz);
@@ -130,7 +130,7 @@ void calculateForce(double phi[][DATAYSIZE][DATAXSIZE],
     double c = 16.0 * W0 * epsilon;
     double w = Wn(phix,phiy,phiz,epsilon,W0);
     double w2 = SQ(w);
-    
+
 
     Fx[ix][iy][iz] = w2 * phix + sqGphi * w * c * dFunc(phix,phiy,phiz);
     Fy[ix][iy][iz] = w2 * phiy + sqGphi * w * c * dFunc(phiy,phiz,phix);
@@ -147,12 +147,12 @@ void calculateForce(double phi[][DATAYSIZE][DATAXSIZE],
 
 // device function to set the 3D volume
 __global__
-void allenCahn(double phinew[][DATAYSIZE][DATAXSIZE], 
-               double phiold[][DATAYSIZE][DATAXSIZE],
-               double uold[][DATAYSIZE][DATAXSIZE],
-               double Fx[][DATAYSIZE][DATAXSIZE],
-               double Fy[][DATAYSIZE][DATAXSIZE],
-               double Fz[][DATAYSIZE][DATAXSIZE],
+void allenCahn(double phinew[][DATAYSIZE][DATAZSIZE],
+               double phiold[][DATAYSIZE][DATAZSIZE],
+               double uold[][DATAYSIZE][DATAZSIZE],
+               double Fx[][DATAYSIZE][DATAZSIZE],
+               double Fy[][DATAYSIZE][DATAZSIZE],
+               double Fz[][DATAYSIZE][DATAZSIZE],
                double epsilon, double W0, double tau0, double lambda,
                double dt, double dx, double dy, double dz)
 {
@@ -160,27 +160,28 @@ void allenCahn(double phinew[][DATAYSIZE][DATAXSIZE],
   unsigned iy = blockIdx.y*blockDim.y + threadIdx.y;
   unsigned ix = blockIdx.z*blockDim.z + threadIdx.z;
 
-  if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) && 
-      (iz < (DATAZSIZE-1)) && (ix > (0)) && 
+  if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) &&
+      (iz < (DATAZSIZE-1)) && (ix > (0)) &&
       (iy > (0)) && (iz > (0))) {
 
     double phix = GradientX(phiold,dx,dy,dz,ix,iy,iz);
     double phiy = GradientY(phiold,dx,dy,dz,ix,iy,iz);
-    double phiz = GradientZ(phiold,dx,dy,dz,ix,iy,iz); 
+    double phiz = GradientZ(phiold,dx,dy,dz,ix,iy,iz);
 
-    phinew[ix][iy][iz] = phiold[ix][iy][iz] + 
-     (dt / taun(phix,phiy,phiz,epsilon,tau0)) * 
-     (Divergence(Fx,Fy,Fz,dx,dy,dz,ix,iy,iz) - 
+    phinew[ix][iy][iz] = phiold[ix][iy][iz] +
+     (dt / taun(phix,phiy,phiz,epsilon,tau0)) *
+     (Divergence(Fx,Fy,Fz,dx,dy,dz,ix,iy,iz) -
       dFphi(phiold[ix][iy][iz], uold[ix][iy][iz],lambda));
   }
 }
 
 __global__
-void boundaryConditionsPhi(double phinew[][DATAYSIZE][DATAXSIZE])
+void boundaryConditionsPhi(double phinew[][DATAYSIZE][DATAZSIZE])
 {
   unsigned iz = blockIdx.x*blockDim.x + threadIdx.x;
   unsigned iy = blockIdx.y*blockDim.y + threadIdx.y;
   unsigned ix = blockIdx.z*blockDim.z + threadIdx.z;
+  if (iz >= DATAZSIZE || iy >= DATAYSIZE || ix >= DATAXSIZE) return;
 
   if (ix == 0){
     phinew[ix][iy][iz] = -1.0;
@@ -203,31 +204,32 @@ void boundaryConditionsPhi(double phinew[][DATAYSIZE][DATAXSIZE])
 }
 
 __global__
-void thermalEquation(double unew[][DATAYSIZE][DATAXSIZE],
-                     double uold[][DATAYSIZE][DATAXSIZE],
-                     double phinew[][DATAYSIZE][DATAXSIZE],
-                     double phiold[][DATAYSIZE][DATAXSIZE],
+void thermalEquation(double unew[][DATAYSIZE][DATAZSIZE],
+                     double uold[][DATAYSIZE][DATAZSIZE],
+                     double phinew[][DATAYSIZE][DATAZSIZE],
+                     double phiold[][DATAYSIZE][DATAZSIZE],
                      double D, double dt, double dx, double dy, double dz)
 {
   unsigned iz = blockIdx.x*blockDim.x + threadIdx.x;
   unsigned iy = blockIdx.y*blockDim.y + threadIdx.y;
   unsigned ix = blockIdx.z*blockDim.z + threadIdx.z;
 
-  if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) && 
-      (iz < (DATAZSIZE-1)) && (ix > (0)) && 
+  if ((ix < (DATAXSIZE-1)) && (iy < (DATAYSIZE-1)) &&
+      (iz < (DATAZSIZE-1)) && (ix > (0)) &&
       (iy > (0)) && (iz > (0))){
-    unew[ix][iy][iz] = uold[ix][iy][iz] + 
+    unew[ix][iy][iz] = uold[ix][iy][iz] +
       0.5*(phinew[ix][iy][iz]- phiold[ix][iy][iz]) +
       dt * D * Laplacian(uold,dx,dy,dz,ix,iy,iz);
   }
 }
 
 __global__
-void boundaryConditionsU(double unew[][DATAYSIZE][DATAXSIZE], double delta)
+void boundaryConditionsU(double unew[][DATAYSIZE][DATAZSIZE], double delta)
 {
   unsigned iz = blockIdx.x*blockDim.x + threadIdx.x;
   unsigned iy = blockIdx.y*blockDim.y + threadIdx.y;
   unsigned ix = blockIdx.z*blockDim.z + threadIdx.z;
+  if (iz >= DATAZSIZE || iy >= DATAYSIZE || ix >= DATAXSIZE) return;
 
   if (ix == 0){
     unew[ix][iy][iz] =  -delta;
@@ -250,23 +252,20 @@ void boundaryConditionsU(double unew[][DATAYSIZE][DATAXSIZE], double delta)
 }
 
 __global__
-void swapGrid(double cnew[][DATAYSIZE][DATAXSIZE],
-              double cold[][DATAYSIZE][DATAXSIZE])
+void swapGrid(double cnew[][DATAYSIZE][DATAZSIZE],
+              double cold[][DATAYSIZE][DATAZSIZE])
 {
   unsigned iz = blockIdx.x*blockDim.x + threadIdx.x;
   unsigned iy = blockIdx.y*blockDim.y + threadIdx.y;
   unsigned ix = blockIdx.z*blockDim.z + threadIdx.z;
+  if (iz >= DATAZSIZE || iy >= DATAYSIZE || ix >= DATAXSIZE) return;
 
-  if ((ix < (DATAXSIZE)) && 
-      (iy < (DATAYSIZE)) &&
-      (iz < (DATAZSIZE))) {
-    double tmp = cnew[ix][iy][iz];
-    cnew[ix][iy][iz] = cold[ix][iy][iz];
-    cold[ix][iy][iz] = tmp;
-  }
+  double tmp = cnew[ix][iy][iz];
+  cnew[ix][iy][iz] = cold[ix][iy][iz];
+  cold[ix][iy][iz] = tmp;
 }
 
-void initializationPhi(double phi[][DATAYSIZE][DATAXSIZE], double r0)
+void initializationPhi(double phi[][DATAYSIZE][DATAZSIZE], double r0)
 {
 #ifdef _OPENMP
   #pragma omp parallel for collapse(3)
@@ -287,7 +286,7 @@ void initializationPhi(double phi[][DATAYSIZE][DATAXSIZE], double r0)
   }
 }
 
-void initializationU(double u[][DATAYSIZE][DATAXSIZE], double r0, double delta)
+void initializationU(double u[][DATAYSIZE][DATAZSIZE], double r0, double delta)
 {
 #ifdef _OPENMP
   #pragma omp parallel for collapse(3)
@@ -357,7 +356,7 @@ int main(int argc, char *argv[])
   memcpy(phi_ref, phi_host, vol_in_bytes);
   memcpy(u_ref, u_host, vol_in_bytes);
   reference(phi_ref, u_ref, vol, num_steps);
-#endif 
+#endif
 
   auto offload_start = std::chrono::steady_clock::now();
 
@@ -384,24 +383,24 @@ int main(int argc, char *argv[])
 
   while (t <= num_steps) {
 
-    hipLaunchKernelGGL(calculateForce, grid, block, 0, 0, d_phiold,d_Fx,d_Fy,d_Fz,
+    calculateForce<<<grid, block>>>(d_phiold,d_Fx,d_Fy,d_Fz,
                                     dx,dy,dz,epsilon,W0,tau0);
 
-    hipLaunchKernelGGL(allenCahn, grid, block, 0, 0, d_phinew,d_phiold,d_uold,
+    allenCahn<<<grid, block>>>(d_phinew,d_phiold,d_uold,
                                d_Fx,d_Fy,d_Fz,
                                epsilon,W0,tau0,lambda,
                                dt,dx,dy,dz);
 
-    hipLaunchKernelGGL(boundaryConditionsPhi, grid, block, 0, 0, d_phinew);
+    boundaryConditionsPhi<<<grid, block>>>(d_phinew);
 
-    hipLaunchKernelGGL(thermalEquation, grid, block, 0, 0, d_unew,d_uold,d_phinew,d_phiold,
+    thermalEquation<<<grid, block>>>(d_unew,d_uold,d_phinew,d_phiold,
                                      D,dt,dx,dy,dz);
 
-    hipLaunchKernelGGL(boundaryConditionsU, grid, block, 0, 0, d_unew,delta);
+    boundaryConditionsU<<<grid, block>>>(d_unew,delta);
 
-    hipLaunchKernelGGL(swapGrid, grid, block, 0, 0, d_phinew, d_phiold);
+    swapGrid<<<grid, block>>>(d_phinew, d_phiold);
 
-    hipLaunchKernelGGL(swapGrid, grid, block, 0, 0, d_unew, d_uold);
+    swapGrid<<<grid, block>>>(d_unew, d_uold);
 
     t++;
   }

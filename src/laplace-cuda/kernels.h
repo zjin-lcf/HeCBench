@@ -35,8 +35,9 @@ void red_kernel (const Real *__restrict__ aP,
                        Real *__restrict__ temp_red,
                        Real *__restrict__ norm_L2)
 {
-  int row = 1 + (blockIdx.x * blockDim.x) + threadIdx.x;
-  int col = 1 + (blockIdx.y * blockDim.y) + threadIdx.y;
+  int row = 1 + blockIdx.x * blockDim.x + threadIdx.x;
+  int col = 1 + blockIdx.y * blockDim.y + threadIdx.y;
+  if (row > NUM / 2 || col > NUM) return;
 
   int ind_red = col * ((NUM >> 1) + 2) + row; // local (red) index
   int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1); // global index
@@ -81,8 +82,9 @@ void black_kernel (const Real *__restrict__ aP,
                          Real *__restrict__ temp_black,
                          Real *__restrict__ norm_L2)
 {
-  int row = 1 + (blockIdx.x * blockDim.x) + threadIdx.x;
-  int col = 1 + (blockIdx.y * blockDim.y) + threadIdx.y;
+  int row = 1 + blockIdx.x * blockDim.x + threadIdx.x;
+  int col = 1 + blockIdx.y * blockDim.y + threadIdx.y;
+  if (row > NUM / 2 || col > NUM) return;
 
   int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
   int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1); // global index

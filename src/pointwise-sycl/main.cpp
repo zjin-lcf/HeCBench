@@ -42,7 +42,7 @@ inline float sigmoidf(float in) {
 }
 
 // Fused kernel
-void elementWise_fp(
+void elementwise(
     sycl::nd_item<1> &item,
     int hiddenSize, int miniBatch,
     const float *__restrict tmp_h,
@@ -70,10 +70,10 @@ void elementWise_fp(
     linearGates[gateIndex + i * hiddenSize] = g[i];
   }
 
-  float in_gate     = sigmoidf(g[0]);
-  float forget_gate = sigmoidf(g[1]);
+  float in_gate     = 1.f / (1.f + sycl::exp(-g[0]));
+  float forget_gate = 1.f / (1.f + sycl::exp(-g[1]));
   float in_gate2    = sycl::tanh(g[2]);
-  float out_gate    = sigmoidf(g[3]);
+  float out_gate    = 1.f / (1.f + sycl::exp(-g[3]));
 
   float val = (forget_gate * c_in[index]) + (in_gate * in_gate2);
 
@@ -215,7 +215,7 @@ void test(sycl::queue &q, int hiddenSize, int miniBatch, int seqLength, int numL
       for (int i = rStart; i < rEnd; i++)
         q.submit([&] (sycl::handler &cgh) {
           cgh.parallel_for<class pw>(sycl::nd_range<1>(gws_p, lws), [=] (sycl::nd_item<1> item) {
-            elementWise_fp
+            elementwise
             (item,
 	     hiddenSize, miniBatch,
              tmp_h + 4 * layer * numElements,

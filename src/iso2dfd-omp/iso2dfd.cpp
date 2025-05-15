@@ -18,6 +18,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <omp.h>
 #include "iso2dfd.h"
 
 #define MIN(a, b) (a) < (b) ? (a) : (b)

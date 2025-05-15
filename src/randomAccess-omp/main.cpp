@@ -92,37 +92,34 @@ int main(int argc, char** argv) {
   fprintf(stdout, "Main table size   = 2^%llu = %llu words\n", logTableSize,TableSize);
   fprintf(stdout, "Number of updates = %llu\n", NUPDATE);
 
-  u64Int ran[128];
-
-#pragma omp target enter data map(alloc:Table[0:TableSize], ran[0:128])
-{
-  auto start = std::chrono::steady_clock::now();
-
-  for (int i = 0; i < repeat; i++) {
-    /* initialize the table */
-    #pragma omp target teams distribute parallel for thread_limit (256)
-    for (i=0; i<TableSize; i++) {
-      Table[i] = i;
-    }
-
-    /* update the table */
-    #pragma omp target teams distribute parallel for num_teams(1) thread_limit(128)
-    for (int j=0; j<128; j++) {
-      ran[j] = HPCC_starts ((NUPDATE/128) * j);
-      for (u64Int i=0; i<NUPDATE/128; i++) {
-        ran[j] = (ran[j] << 1) ^ ((s64Int) ran[j] < 0 ? POLY : 0);
-        #pragma omp atomic update
-        Table[ran[j] & (TableSize-1)] ^= ran[j];
+  #pragma omp target enter data map(alloc:Table[0:TableSize])
+  {
+    auto start = std::chrono::steady_clock::now();
+  
+    for (int i = 0; i < repeat; i++) {
+      /* initialize the table */
+      #pragma omp target teams distribute parallel for thread_limit (256)
+      for (i=0; i<TableSize; i++) {
+        Table[i] = i;
+      }
+  
+      /* update the table */
+      #pragma omp target teams distribute parallel for num_teams(1) thread_limit(128)
+      for (int j=0; j<128; j++) {
+        u64Int ran = HPCC_starts ((NUPDATE/128) * j);
+        for (u64Int i=0; i<NUPDATE/128; i++) {
+          ran = (ran << 1) ^ ((s64Int) ran < 0 ? POLY : 0);
+          #pragma omp atomic update
+          Table[ran & (TableSize-1)] ^= ran;
+        }
       }
     }
+  
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
   }
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
-
-}
-#pragma omp target exit data map(from: Table[0:TableSize]) map(delete: ran[0:128]) 
+  #pragma omp target exit data map(from: Table[0:TableSize])
 
   /* validation */
   temp = 0x1;
@@ -138,12 +135,11 @@ int main(int argc, char** argv) {
     }
 
   fprintf( stdout, "Found %llu errors in %llu locations (%s).\n",
-           temp, TableSize, (temp <= 0.01*TableSize) ? "passed" : "failed");
+           temp, TableSize, (temp <= 0.01*TableSize) ? "PASS" : "FAIL");
   if (temp <= 0.01*TableSize) failure = 0;
   else failure = 1;
 
   free( Table );
   return failure;
-
 }
 

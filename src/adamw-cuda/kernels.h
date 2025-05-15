@@ -1,10 +1,19 @@
 #define HOST_DEVICE __host__ __device__
 #define DEVICE __device__
 
+#include <cub/cub.cuh>
+
+template <typename T, int block_size>
+__device__ void BlockReduce(T &input1, T &input2) {
+  using BlockReduce = cub::BlockReduce<T, block_size>;
+  __shared__ typename BlockReduce::TempStorage temp_storage1;
+  __shared__ typename BlockReduce::TempStorage temp_storage2;
+  input1 = BlockReduce(temp_storage1).Reduce(input1, cub::Max());
+  input2 = BlockReduce(temp_storage2).Reduce(input2, cub::Max());
+}
+
 static DEVICE __const__ uint8_t _bitmask = 15;
 static DEVICE __const__ uint8_t _right_pack_bitmask = _bitmask << 4;
-
-static __shared__ float _exp_reducer [64];
 
 static DEVICE __const__ float _exp_qmap [] = {
                 -0.8875,
@@ -93,7 +102,6 @@ HOST_DEVICE __forceinline__ float q_mapping(const float* __restrict__ qmap,
     if (x <= qmap[low]) return low;
     if (qmap[high] <=x) return high;
 
-    #pragma unroll
     // replace with for loop?
     while (low < high) {
         int mid = (low + high) >> 1;
@@ -106,48 +114,10 @@ HOST_DEVICE __forceinline__ float q_mapping(const float* __restrict__ qmap,
             high = mid;
         }
     }
-
     return (qmidpt[low-1] < x) ? low : low-1;
-
 }
 
-
-// multi-warp shuffle down synch parallel reduction to determine max value for each block for exp and sq
-__device__ __forceinline__ void seq_threads_max_reducer(int tid, float* local_val) {
-
-        //unsigned mask = 0xFFFFFFFFU;
-        int lane = tid % 32;
-        int warpId = tid / 32;
-        float val = *local_val;
-        int offset = 16;
-
-        for (offset = 16; offset > 0; offset >>=1) {
-            val = max(val, __shfl_down_sync(__activemask(), val, offset));
-        }
-
-        if (lane==0) {
-            _exp_reducer[warpId] = val;
-        }
-        __syncthreads();
-
-        // final warp reduction with warp 0 only
-
-        // careful - this assumes q block size of 128...expand to loop if larger
-        if (warpId ==0) {
-            if (tid < 2) val = _exp_reducer[lane];
-
-            offset = 1;
-            val = max(val, __shfl_down_sync(__activemask(), val, offset));
-
-            if (tid==0) {
-                *local_val = val;
-            }
-        }
-
-}
-
-
-template <typename T>
+template <typename T, int block_size = 64>
 __global__ void fused_4bit_kernel(
     T* __restrict__ p,
     const T* __restrict__ g,
@@ -172,13 +142,13 @@ __global__ void fused_4bit_kernel(
     __shared__ float absmax_exp;
     __shared__ float absmax_sq;
 
+    float local_absmax_exp = 0;
+    float local_absmax_sq = 0;
+    int8_t local_packed_exp = 0;
+    int8_t local_packed_sq = 0;
+
     int64_t global_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (global_id < total_size) {
-
-      if (threadIdx.x == 0) {
-          absmax_exp = 0;
-          absmax_sq = 0;
-      }
 
       const int8_t exp_full = exp[global_id];
       const int8_t sq_full = sq[global_id];
@@ -223,43 +193,32 @@ __global__ void fused_4bit_kernel(
       p[global_id*2+1] = p2.y - (step_size * (exp_right/(sqrtf(sq_right) / correction2_sqrt + eps)));
 
       // prepare quantization info - update absmax scales
-      float local_absmax_exp = max((float)exp_left, (float)exp_right);
-      float local_absmax_sq = max((float)sq_left, (float)sq_right);
+      local_absmax_exp = fmaxf(exp_left, exp_right);
+      local_absmax_sq = fmaxf(sq_left, sq_right);
 
-      // --- sequential threads parallel reduction to
-      // determine global absmax for exp
-      seq_threads_max_reducer(threadIdx.x, &local_absmax_exp);
+      // parallel reduction to determine absmax for exp and sq
+      BlockReduce<T, block_size>(local_absmax_exp, local_absmax_sq);
       if (threadIdx.x ==0) {
           exp_qscale[blockIdx.x] = local_absmax_exp;
-          absmax_exp = local_absmax_exp;
-      }
-
-      // same for sq
-      seq_threads_max_reducer(threadIdx.x, &local_absmax_sq);
-      if (threadIdx.x ==0) {
           sq_qscale[blockIdx.x] = local_absmax_sq;
+          absmax_exp = local_absmax_exp;
           absmax_sq = local_absmax_sq;
       }
       __syncthreads();
 
-      int8_t local_packed_exp = 0;
-      int8_t local_packed_sq = 0;
-
       // quantize and pack
-      const int8_t q_exp_left = (int8_t)q_mapping(_exp_qmap, _exp_qmidpt, (float)exp_left / absmax_exp);
-      const int8_t q_sq_left = (int8_t)q_mapping(_sq_qmap, _sq_qmidpt, (float)sq_left / absmax_sq);
+      const int8_t q_exp_left = (int8_t)q_mapping(_exp_qmap, _exp_qmidpt, exp_left / absmax_exp);
+      const int8_t q_sq_left = (int8_t)q_mapping(_sq_qmap, _sq_qmidpt, sq_left / absmax_sq);
       local_packed_exp |= (q_exp_left & _bitmask);
       local_packed_sq |= (q_sq_left & _bitmask);
 
-      const int8_t q_exp_right = (int8_t)q_mapping(_exp_qmap, _exp_qmidpt, (float)exp_right / absmax_exp);
-      const int8_t q_sq_right = (int8_t)q_mapping(_sq_qmap, _sq_qmidpt, (float)sq_right / absmax_sq);
+      const int8_t q_exp_right = (int8_t)q_mapping(_exp_qmap, _exp_qmidpt, exp_right / absmax_exp);
+      const int8_t q_sq_right = (int8_t)q_mapping(_sq_qmap, _sq_qmidpt, sq_right / absmax_sq);
       local_packed_exp |= (q_exp_right & _right_pack_bitmask);
       local_packed_sq |= (q_sq_right & _right_pack_bitmask);
 
       // store updated exp and sq
       exp[global_id] = local_packed_exp;
       sq[global_id] = local_packed_sq;
-
-      __syncthreads();
    }
 }

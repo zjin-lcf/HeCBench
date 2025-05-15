@@ -61,15 +61,13 @@ __global__ void initTable (u64Int* Table, const u64Int TableSize) {
   if (i < TableSize) Table[i] = i;
 }
 
-__global__ void update (u64Int*__restrict__ Table,
-                        u64Int*__restrict__ ran,
-                        const u64Int TableSize)
+__global__ void update (u64Int*__restrict__ Table, const u64Int TableSize)
 {
   int j = threadIdx.x;
-  ran[j] = HPCC_starts ((NUPDATE/128) * j);
+  u64Int ran = HPCC_starts ((NUPDATE/128) * j);
   for (u64Int i=0; i<NUPDATE/128; i++) {
-    ran[j] = (ran[j] << 1) ^ ((s64Int) ran[j] < 0 ? POLY : 0);
-    atomicXor(&Table[ran[j] & (TableSize-1)], ran[j]);
+    ran = (ran << 1) ^ ((s64Int) ran < 0 ? POLY : 0);
+    atomicXor(&Table[ran & (TableSize-1)], ran);
   }
 }
 
@@ -113,9 +111,6 @@ int main(int argc, char** argv) {
   u64Int* d_Table;
   hipMalloc((void**)&d_Table, TableSize * sizeof(u64Int));
 
-  u64Int *d_ran;
-  hipMalloc((void**)&d_ran, 128 * sizeof(u64Int));
-
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
@@ -123,7 +118,7 @@ int main(int argc, char** argv) {
     initTable<<<(TableSize+K1_BLOCKSIZE-1) / K1_BLOCKSIZE, K1_BLOCKSIZE>>>(d_Table, TableSize);
 
     /* update the table */
-    update<<<1, K2_BLOCKSIZE>>>(d_Table, d_ran, TableSize);
+    update<<<1, K2_BLOCKSIZE>>>(d_Table, TableSize);
   }
 
   hipDeviceSynchronize();
@@ -153,6 +148,5 @@ int main(int argc, char** argv) {
 
   free( Table );
   hipFree(d_Table);
-  hipFree(d_ran);
   return failure;
 }

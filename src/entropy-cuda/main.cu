@@ -13,6 +13,7 @@ void entropy(
 {
   const int x = threadIdx.x + blockIdx.x * blockDim.x;
   const int y = threadIdx.y + blockIdx.y * blockDim.y;
+  if (y >= height || x >= width) return;
 
   // value of matrix element ranges from 0 inclusive to 16 exclusive
   char count[16];
@@ -39,11 +40,11 @@ void entropy(
   } else {
     for(int k = 0; k < 16; k++) {
       float p = __fdividef((float)count[k], (float)total);
-      entropy -= p * log2f(p);
+      entropy -= p * __log2f(p);
     }
   }
 
-  if(y < height && x < width) d_entropy[y * width + x] = entropy;
+  d_entropy[y * width + x] = entropy;
 }
 
 template<int bsize_x, int bsize_y>
@@ -51,12 +52,14 @@ __global__ void entropy_opt(
        float *__restrict__ d_entropy,
   const  char*__restrict__ d_val, 
   const float*__restrict__ d_logTable,
-  int m, int n)
+  int height, int width)
 {
   __shared__ int sd_count[16][bsize_y*bsize_x];
 
   const int x = threadIdx.x + blockIdx.x * blockDim.x;
   const int y = threadIdx.y + blockIdx.y * blockDim.y;
+  if (y >= height || x >= width) return;
+
   const int idx = threadIdx.y*bsize_x + threadIdx.x;
 
   for(int i = 0; i < 16;i++) sd_count[i][idx] = 0;
@@ -67,8 +70,8 @@ __global__ void entropy_opt(
       int xx = x + dx,
           yy = y + dy;
 
-      if(xx >= 0 && yy >= 0 && yy < m && xx < n) {
-        sd_count[d_val[yy*n+xx]][idx]++;
+      if(xx >= 0 && yy >= 0 && yy < height && xx < width) {
+        sd_count[d_val[yy*width+xx]][idx]++;
         total++;
       }
     }
@@ -78,8 +81,8 @@ __global__ void entropy_opt(
   for(int k = 0; k < 16; k++)
     entropy -= d_logTable[sd_count[k][idx]];
   
-  entropy = entropy / total + log2f(total);
-  if(y < m && x < n) d_entropy[y*n+x] = entropy;
+  entropy = entropy / total + __log2f(total);
+  d_entropy[y*width+x] = entropy;
 }
 
 int main(int argc, char* argv[]) {

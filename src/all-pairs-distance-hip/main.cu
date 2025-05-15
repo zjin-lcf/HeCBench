@@ -110,13 +110,15 @@ __global__ void k2 (const char *data, int *distance) {
    */
   __syncthreads();
 
-  /* Reduction: Thread 0 will add the value of all other threads to
-     its own */ 
-  if(idx == 0) {
-    for(int i = 1; i < THREADS; i++) {
-      dist[0] += dist[i];
+  /* Perform balanced tree reduction across the shared memory */
+  for (int stride = THREADS/2; stride > 0; stride /= 2) {
+    if (idx < stride) {
+      dist[idx] += dist[idx + stride];
     }
+    __syncthreads();
+  }
 
+  if(idx == 0) {
     /* Thread 0 will then write the output to global memory. Note that
        this does not need to be performed atomically, because only one
        thread per block is writing to global memory, and each block
@@ -242,9 +244,8 @@ int main(int argc, char **argv) {
   elapsedTime = 0; 
   for (int n = 0; n < iterations; n++) {
     /* register GPU kernel */
-    bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
-    hipMemcpy(distance_device, gpu_distance,
-               INSTANCES * INSTANCES * sizeof(int), hipMemcpyHostToDevice);
+    hipMemset(distance_device, 0, INSTANCES * INSTANCES * sizeof(int));
+    hipDeviceSynchronize();
 
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
@@ -255,10 +256,10 @@ int main(int argc, char **argv) {
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
-
-    hipMemcpy(gpu_distance, distance_device,
-               INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost); 
   }
+
+  hipMemcpy(gpu_distance, distance_device,
+             INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost); 
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
@@ -268,9 +269,8 @@ int main(int argc, char **argv) {
   elapsedTime = 0; 
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
-    bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
-    hipMemcpy(distance_device, gpu_distance,
-               INSTANCES * INSTANCES * sizeof(int), hipMemcpyHostToDevice);
+    hipMemset(distance_device, 0, INSTANCES * INSTANCES * sizeof(int));
+    hipDeviceSynchronize();
 
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
@@ -281,10 +281,10 @@ int main(int argc, char **argv) {
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
-
-    hipMemcpy(gpu_distance, distance_device,
-               INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost); 
   }
+
+  hipMemcpy(gpu_distance, distance_device,
+             INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost); 
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
@@ -294,9 +294,8 @@ int main(int argc, char **argv) {
   elapsedTime = 0; 
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
-    bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
-    hipMemcpy(distance_device, gpu_distance,
-               INSTANCES * INSTANCES * sizeof(int), hipMemcpyHostToDevice);
+    hipMemset(distance_device, 0, INSTANCES * INSTANCES * sizeof(int));
+    hipDeviceSynchronize();
 
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
@@ -307,10 +306,10 @@ int main(int argc, char **argv) {
     gettimeofday(&tp, &tzp);
     stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
     elapsedTime += stop_gpu - start_gpu;
-
-    hipMemcpy(gpu_distance, distance_device,
-               INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost); 
   }
+
+  hipMemcpy(gpu_distance, distance_device,
+             INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost); 
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
