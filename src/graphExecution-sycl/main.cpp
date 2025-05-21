@@ -10,6 +10,7 @@
  */
 
 #include <stdio.h>
+#include <chrono>
 #include <sycl/sycl.hpp>
 
 #define THREADS_PER_BLOCK 256

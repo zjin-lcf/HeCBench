@@ -11,12 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
-#include <cmath>
 #include <limits>
-#include <ctime>
+#include <utility>
 #include <sycl/sycl.hpp>
 
 // A multiple of thread block size
@@ -38,11 +39,103 @@ void initialize_data (float* f) {
       else {
         f[IDX(i,j)] = 0.0f;
       }
+
     }
   }
 }
 
-int main () {
+void jacobi_step (float*__restrict__ f, 
+                  const float*__restrict__ f_old, 
+                  float*__restrict__ error,
+                  const sycl::nd_item<2> &item,
+                  float f_old_tile[18][18],
+                  float *reduction_array) {
+
+  int i = item.get_global_id(1);
+  int j = item.get_global_id(0);
+  int tx = item.get_local_id(1);
+  int ty = item.get_local_id(0);
+
+  // First read in the "interior" data, one value per thread
+  // Note the offset by 1, to reserve space for the "left"/"bottom" halo
+
+  f_old_tile[ty + 1][tx + 1] = f_old[IDX(i, j)];
+
+  // Now read in the halo data; we'll pick the "closest" thread
+  // to each element. When we do this, make sure we don't fall
+  // off the end of the global memory array. Note that this
+  // code does not fill the corners, as they are not used in
+  // this stencil.
+
+  if (tx == 0 && i >= 1) {
+    f_old_tile[ty + 1][tx + 0] = f_old[IDX(i - 1, j)];
+  }
+  if (tx == 15 && i <= N - 2) {
+    f_old_tile[ty + 1][tx + 2] = f_old[IDX(i + 1, j)];
+  }
+  if (ty == 0 && j >= 1) {
+    f_old_tile[ty + 0][tx + 1] = f_old[IDX(i, j - 1)];
+  }
+  if (ty == 15 && j <= N - 2) {
+    f_old_tile[ty + 2][tx + 1] = f_old[IDX(i, j + 1)];
+  }
+
+  // Synchronize all threads
+  item.barrier(sycl::access::fence_space::local_space);
+
+  float err = 0.0f;
+
+  if (j >= 1 && j <= N-2) {
+    if (i >= 1 && i <= N-2) {
+      // Perform the read from shared memory
+      f[IDX(i, j)] = 0.25f * (f_old_tile[ty + 1][tx + 2] +
+                              f_old_tile[ty + 1][tx + 0] +
+                              f_old_tile[ty + 2][tx + 1] +
+                              f_old_tile[ty + 0][tx + 1]);
+      float df = f[IDX(i, j)] - f_old_tile[ty + 1][tx + 1];
+      err = df * df;
+    }
+  }
+
+  // Sum over threads in the warp
+  // For simplicity, we do this outside the above conditional
+  // so that all threads participate
+  auto sg = item.get_sub_group();
+  for (int offset = 8; offset > 0; offset /= 2) {
+    err += sycl::shift_group_left(sg, err, offset);
+  }
+
+  // If we're thread 0 in the warp, update our value to shared memory
+  // Note that we're assuming exactly a 16x16 block and that the warp ID
+  // is equivalent to threadIdx.y. For the general case, we would have to
+  // write more careful code.
+
+  if (tx == 0) {
+    reduction_array[ty] = err;
+  }
+
+  // Synchronize the block before reading any values from smem
+  item.barrier(sycl::access::fence_space::local_space);
+
+  // Using the first warp in the block, reduce over the partial sums
+  // in the shared memory array.
+  if (ty == 0) {
+    err = reduction_array[tx];
+    for (int offset = 8; offset > 0; offset /= 2) {
+      err += sycl::shift_group_left(sg, err, offset);
+    }
+    if (tx == 0) {
+      //dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(error, err);
+      auto ao = sycl::atomic_ref<float,
+               sycl::memory_order::relaxed,
+               sycl::memory_scope::device,
+               sycl::access::address_space::global_space> (error[0]);
+      ao.fetch_add(err);
+    }
+  }
+}
+
+int main() {
   // Begin wall timing
   auto start_time = std::chrono::steady_clock::now();
 
@@ -86,113 +179,21 @@ int main () {
 
   while (error > tolerance && num_iters < max_iters) {
     // Initialize error to zero (we'll add to it the following step)
-    q.memset(d_error, 0, sizeof(float));
+    q.memset(d_error, 0, 4);
 
     // Perform a Jacobi relaxation step
-    q.submit([&] (sycl::handler &cgh) {
-      sycl::local_accessor<float, 2> f_old_tile(sycl::range<2>{18,18}, cgh);
+    q.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<float[18][18], 0> f_old_tile (cgh);
       sycl::local_accessor<float, 1> reduction_array(sycl::range<1>(16), cgh);
-      cgh.parallel_for<class step>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-        int i = item.get_global_id(1);
-        int j = item.get_global_id(0);
-
-        int tx = item.get_local_id(1);
-        int ty = item.get_local_id(0);
-
-        // First read in the "interior" data, one value per thread
-        // Note the offset by 1, to reserve space for the "left"/"bottom" halo
-
-        f_old_tile[ty+1][tx+1] = d_f[IDX(i,j)];
-
-        // Now read in the halo data; we'll pick the "closest" thread
-        // to each element. When we do this, make sure we don't fall
-        // off the end of the global memory array. Note that this
-        // code does not fill the corners, as they are not used in
-        // this stencil.
-
-        if (tx == 0 && i >= 1) {
-          f_old_tile[ty+1][tx+0] = d_f[IDX(i-1,j)];
-        }
-        if (tx == 15 && i <= N-2) {
-          f_old_tile[ty+1][tx+2] = d_f[IDX(i+1,j)];
-        }
-        if (ty == 0 && j >= 1) {
-          f_old_tile[ty+0][tx+1] = d_f[IDX(i,j-1)];
-        }
-        if (ty == 15 && j <= N-2) {
-          f_old_tile[ty+2][tx+1] = d_f[IDX(i,j+1)];
-        }
-
-        // Synchronize all threads
-        item.barrier(sycl::access::fence_space::local_space);
-
-        float err = 0.0f;
-
-        if (j >= 1 && j <= N-2) {
-          if (i >= 1 && i <= N-2) {
-            // Perform the read from shared memory
-            d_f[IDX(i,j)] = 0.25f * (f_old_tile[ty+1][tx+2] +
-                                     f_old_tile[ty+1][tx+0] +
-                                     f_old_tile[ty+2][tx+1] +
-                                     f_old_tile[ty+0][tx+1]);
-            float df = d_f[IDX(i,j)] - f_old_tile[ty+1][tx+1];
-            err = df * df;
-          }
-        }
-
-        // Sum over threads in the warp
-        // For simplicity, we do this outside the above conditional
-        // so that all threads participate
-        auto sg = item.get_sub_group();
-        for (int offset = 8; offset > 0; offset /= 2) {
-          err += sycl::shift_group_left(sg, err,offset);
-        }
-
-        // If we're thread 0 in the warp, update our value to shared memory
-        // Note that we're assuming exactly a 16x16 block and that the warp ID
-        // is equivalent to ty. For the general case, we would have to
-        // write more careful code.
-        if (tx == 0) {
-          reduction_array[ty] = err;
-        }
-
-        // Synchronize the block before reading any values from smem
-        item.barrier(sycl::access::fence_space::local_space);
-
-        // Using the first warp in the block, reduce over the partial sums
-        // in the shared memory array.
-        if (ty == 0) {
-          err = reduction_array[tx];
-          for (int offset = 8; offset > 0; offset /= 2) {
-            err += sycl::shift_group_left(sg, err,offset);
-          }
-          if (tx == 0) {
-            auto ao = sycl::atomic_ref<float,
-                     sycl::memory_order::relaxed,
-                     sycl::memory_scope::device,
-                     sycl::access::address_space::global_space> (d_error[0]);
-            ao.fetch_add(err);
-          }
-        }
+      cgh.parallel_for(
+        sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item) {
+          jacobi_step(d_f, d_f_old, d_error, item, f_old_tile,
+                      reduction_array.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
 
     // Swap the old data and the new data
-    // We're doing this explicitly for pedagogical purposes, even though
-    // in this specific application a std::swap would have been OK
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class swap_data>(
-        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-        int i = item.get_global_id(1);
-        int j = item.get_global_id(0);
-
-        if (j >= 1 && j <= N-2) {
-          if (i >= 1 && i <= N-2) {
-            d_f[IDX(i,j)] = d_f[IDX(i,j)];
-          }
-        }
-      });
-    });
+    std::swap(d_f, d_f_old);
 
     q.memcpy(&error, d_error, sizeof(float)).wait();
 

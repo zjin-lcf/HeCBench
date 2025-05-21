@@ -1,4 +1,3 @@
-#include <sycl/sycl.hpp>
 /** Problem size along one side; total number of cells is this squared */
 #define NUM 1024
 
@@ -44,6 +43,7 @@ void red_kernel (sycl::queue &q,
     auto kfn = [=] (sycl::nd_item<3> item) {
       int row = 1 + item.get_global_id(2);
       int col = 1 + item.get_global_id(1);
+      if (row > NUM / 2 || col > NUM) return;
 
       int ind_red = col * ((NUM >> 1) + 2) + row; // local (red) index
       int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1); // global index
@@ -99,6 +99,7 @@ void black_kernel (sycl::queue &q,
     auto kfn = [=] (sycl::nd_item<3> item) {
       int row = 1 + item.get_global_id(2);
       int col = 1 + item.get_global_id(1);
+      if (row > NUM / 2 || col > NUM) return;
 
       int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
       int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1); // global index

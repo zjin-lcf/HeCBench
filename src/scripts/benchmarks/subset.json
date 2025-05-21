@@ -684,6 +684,16 @@
     "laplace": [
         "(?:iterations: )([0-9.+-e]+)(?: s)"
     ],
+    "laplace3d": [
+        "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
+        [
+            "128",
+            "128",
+            "128",
+            "100",
+            "1"
+        ]
+    ],
     "lavaMD": [
         "(?:Device offloading time:\\s)([0-9.+-e]+)(?: s)",
         [
@@ -941,6 +951,13 @@
             "8",
             "100"
         ]
+    ],
+    "perplexity": [
+        "(?:Average kernel execution time: )([0-9.+-e]+)(?: \\(s\\))",
+        [
+            "10000",
+            "50",
+            "100"]
     ],
     "pns": [
         "(?:Total device execution time: )([0-9.+-e]+)(?: s)",

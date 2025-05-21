@@ -5,11 +5,11 @@
 #include <sycl/sycl.hpp>
 
 //define the data set size (cubic volume)
-#define DATAXSIZE 400
-#define DATAYSIZE 400
+#define DATAXSIZE 200
+#define DATAYSIZE 300
 #define DATAZSIZE 400
 
-typedef double nRarray[DATAYSIZE][DATAXSIZE];
+typedef double nRarray[DATAYSIZE][DATAZSIZE];
 
 // square
 #define SQ(x) ((x)*(x))
@@ -25,30 +25,30 @@ double dFphi(double phi, double u, double lambda)
 }
 
 
-double GradientX(double phi[][DATAYSIZE][DATAXSIZE],
+double GradientX(double phi[][DATAYSIZE][DATAZSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x+1][y][z] - phi[x-1][y][z]) / (2.0*dx);
 }
 
 
-double GradientY(double phi[][DATAYSIZE][DATAXSIZE],
+double GradientY(double phi[][DATAYSIZE][DATAZSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x][y+1][z] - phi[x][y-1][z]) / (2.0*dy);
 }
 
 
-double GradientZ(double phi[][DATAYSIZE][DATAXSIZE],
+double GradientZ(double phi[][DATAYSIZE][DATAZSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   return (phi[x][y][z+1] - phi[x][y][z-1]) / (2.0*dz);
 }
 
 
-double Divergence(double phix[][DATAYSIZE][DATAXSIZE],
-                  double phiy[][DATAYSIZE][DATAXSIZE],
-                  double phiz[][DATAYSIZE][DATAXSIZE],
+double Divergence(double phix[][DATAYSIZE][DATAZSIZE],
+                  double phiy[][DATAYSIZE][DATAZSIZE],
+                  double phiz[][DATAYSIZE][DATAZSIZE],
                   double dx, double dy, double dz, int x, int y, int z)
 {
   return GradientX(phix,dx,dy,dz,x,y,z) +
@@ -57,7 +57,7 @@ double Divergence(double phix[][DATAYSIZE][DATAXSIZE],
 }
 
 
-double Laplacian(double phi[][DATAYSIZE][DATAXSIZE],
+double Laplacian(double phi[][DATAYSIZE][DATAZSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
   double phixx = (phi[x+1][y][z] + phi[x-1][y][z] - 2.0 * phi[x][y][z]) / SQ(dx);
@@ -109,10 +109,10 @@ void calculateForce(sycl::queue &q,
                     sycl::range<3> &gws,
                     sycl::range<3> &lws,
                     const int slm_size,
-                    double phi[][DATAYSIZE][DATAXSIZE],
-                    double Fx[][DATAYSIZE][DATAXSIZE],
-                    double Fy[][DATAYSIZE][DATAXSIZE],
-                    double Fz[][DATAYSIZE][DATAXSIZE],
+                    double phi[][DATAYSIZE][DATAZSIZE],
+                    double Fx[][DATAYSIZE][DATAZSIZE],
+                    double Fy[][DATAYSIZE][DATAZSIZE],
+                    double Fz[][DATAYSIZE][DATAZSIZE],
                     double dx, double dy, double dz,
                     double epsilon, double W0, double tau0)
 {
@@ -133,7 +133,6 @@ void calculateForce(sycl::queue &q,
         double c = 16.0 * W0 * epsilon;
         double w = Wn(phix,phiy,phiz,epsilon,W0);
         double w2 = SQ(w);
-
 
         Fx[ix][iy][iz] = w2 * phix + sqGphi * w * c * dFunc(phix,phiy,phiz);
         Fy[ix][iy][iz] = w2 * phiy + sqGphi * w * c * dFunc(phiy,phiz,phix);
@@ -156,12 +155,12 @@ void allenCahn(sycl::queue &q,
                sycl::range<3> &gws,
                sycl::range<3> &lws,
                const int slm_size,
-               double phinew[][DATAYSIZE][DATAXSIZE],
-               double phiold[][DATAYSIZE][DATAXSIZE],
-               double uold[][DATAYSIZE][DATAXSIZE],
-               double Fx[][DATAYSIZE][DATAXSIZE],
-               double Fy[][DATAYSIZE][DATAXSIZE],
-               double Fz[][DATAYSIZE][DATAXSIZE],
+               double phinew[][DATAYSIZE][DATAZSIZE],
+               double phiold[][DATAYSIZE][DATAZSIZE],
+               double uold[][DATAYSIZE][DATAZSIZE],
+               double Fx[][DATAYSIZE][DATAZSIZE],
+               double Fy[][DATAYSIZE][DATAZSIZE],
+               double Fz[][DATAYSIZE][DATAZSIZE],
                double epsilon, double W0, double tau0, double lambda,
                double dt, double dx, double dy, double dz)
 {
@@ -195,13 +194,14 @@ void boundaryConditionsPhi(sycl::queue &q,
                            sycl::range<3> &gws,
                            sycl::range<3> &lws,
                            const int slm_size,
-                           double phinew[][DATAYSIZE][DATAXSIZE])
+                           double phinew[][DATAYSIZE][DATAZSIZE])
 {
   auto cgf = [&] (sycl::handler &cgh) {
     auto kfn = [=] (sycl::nd_item<3> item) {
       unsigned iz = item.get_global_id(2);
       unsigned iy = item.get_global_id(1);
       unsigned ix = item.get_global_id(0);
+      if (iz >= DATAZSIZE || iy >= DATAYSIZE || ix >= DATAXSIZE) return;
 
       if (ix == 0){
         phinew[ix][iy][iz] = -1.0;
@@ -232,10 +232,10 @@ void thermalEquation(sycl::queue &q,
                      sycl::range<3> &gws,
                      sycl::range<3> &lws,
                      const int slm_size,
-                     double unew[][DATAYSIZE][DATAXSIZE],
-                     double uold[][DATAYSIZE][DATAXSIZE],
-                     double phinew[][DATAYSIZE][DATAXSIZE],
-                     double phiold[][DATAYSIZE][DATAXSIZE],
+                     double unew[][DATAYSIZE][DATAZSIZE],
+                     double uold[][DATAYSIZE][DATAZSIZE],
+                     double phinew[][DATAYSIZE][DATAZSIZE],
+                     double phiold[][DATAYSIZE][DATAZSIZE],
                      double D, double dt, double dx, double dy, double dz)
 {
   auto cgf = [&] (sycl::handler &cgh) {
@@ -262,7 +262,7 @@ void boundaryConditionsU(sycl::queue &q,
                          sycl::range<3> &gws,
                          sycl::range<3> &lws,
                          const int slm_size,
-                         double unew[][DATAYSIZE][DATAXSIZE],
+                         double unew[][DATAYSIZE][DATAZSIZE],
                          double delta)
 {
   auto cgf = [&] (sycl::handler &cgh) {
@@ -270,6 +270,8 @@ void boundaryConditionsU(sycl::queue &q,
       unsigned iz = item.get_global_id(2);
       unsigned iy = item.get_global_id(1);
       unsigned ix = item.get_global_id(0);
+
+      if (iz >= DATAZSIZE || iy >= DATAYSIZE || ix >= DATAXSIZE) return;
 
       if (ix == 0){
         unew[ix][iy][iz] =  -delta;
@@ -300,29 +302,26 @@ void swapGrid(sycl::queue &q,
               sycl::range<3> &gws,
               sycl::range<3> &lws,
               const int slm_size,
-              double cnew[][DATAYSIZE][DATAXSIZE],
-              double cold[][DATAYSIZE][DATAXSIZE])
+              double cnew[][DATAYSIZE][DATAZSIZE],
+              double cold[][DATAYSIZE][DATAZSIZE])
 {
   auto cgf = [&] (sycl::handler &cgh) {
     auto kfn = [=] (sycl::nd_item<3> item) {
       unsigned iz = item.get_global_id(2);
       unsigned iy = item.get_global_id(1);
       unsigned ix = item.get_global_id(0);
+      if (iz >= DATAZSIZE || iy >= DATAYSIZE || ix >= DATAXSIZE) return;
 
-      if ((ix < (DATAXSIZE)) &&
-          (iy < (DATAYSIZE)) &&
-          (iz < (DATAZSIZE))) {
-        double tmp = cnew[ix][iy][iz];
-        cnew[ix][iy][iz] = cold[ix][iy][iz];
-        cold[ix][iy][iz] = tmp;
-      }
+      double tmp = cnew[ix][iy][iz];
+      cnew[ix][iy][iz] = cold[ix][iy][iz];
+      cold[ix][iy][iz] = tmp;
     };
     cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
   };
   q.submit(cgf);
 }
 
-void initializationPhi(double phi[][DATAYSIZE][DATAXSIZE], double r0)
+void initializationPhi(double phi[][DATAYSIZE][DATAZSIZE], double r0)
 {
 #ifdef _OPENMP
   #pragma omp parallel for collapse(3)
@@ -343,7 +342,7 @@ void initializationPhi(double phi[][DATAYSIZE][DATAXSIZE], double r0)
   }
 }
 
-void initializationU(double u[][DATAYSIZE][DATAXSIZE], double r0, double delta)
+void initializationU(double u[][DATAYSIZE][DATAZSIZE], double r0, double delta)
 {
 #ifdef _OPENMP
   #pragma omp parallel for collapse(3)

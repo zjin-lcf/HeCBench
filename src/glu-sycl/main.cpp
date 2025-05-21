@@ -20,11 +20,11 @@ void glu_kernel(
 {
   auto cgf = [&] (sycl::handler &cgh) {
     auto kfn = [=] (sycl::nd_item<3> item) {
-      const int xOffset = 2 * split_dim_size * N;
-      const int yOffset = split_dim_size * N;
       int index = item.get_global_id(2);
       if (index >= M * split_dim_size * N) return;
 
+      const int xOffset = 2 * split_dim_size * N;
+      const int yOffset = split_dim_size * N;
       const int i = index / split_dim_size / N;
       const int j = index / N % split_dim_size;
       const int k = index % N;

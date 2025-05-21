@@ -63,11 +63,13 @@ void tissue(
 {
   auto cgf = [&] (sycl::handler &cgh) {
     auto kfn = [=] (sycl::nd_item<3> item) {
+      const int i = item.get_global_id(2);
+      if (i >= step * nnt) return;
+
       int jtp,ixyz,ix,iy,iz,jx,jy,jz,istep;
       int nnt2 = 2*nnt;
       float p = 0.f;
 
-      const int i = item.get_global_id(2);
       const int itp = i/step;
       const int itp1 = i%step;
       if(itp < nnt) {

@@ -22,6 +22,10 @@ void chi_kernel(
 {
   auto cgf = [&] (sycl::handler &cgh) {
     auto kfn = [=] (sycl::nd_item<3> item) {
+
+      int tid = item.get_global_id(2);
+      if (tid >= cols) return;
+
       unsigned char y;
       int m, n;
       unsigned int p = 0;
@@ -34,9 +38,6 @@ void chi_kernel(
       float Cexpected[3];
       float numerator1;
       float numerator2;
-
-      int tid = item.get_global_id(2);
-      if (tid >= cols) return;
 
       int cases[3] = {1,1,1};
       int controls[3] = {1,1,1};

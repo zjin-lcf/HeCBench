@@ -15,22 +15,23 @@
  */
 
 #include <stdio.h>
-#include <algorithm> 
-#include <iostream> 
-#include <vector> 
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <vector>
 #include <hip/hip_runtime.h>
 
-using namespace std; 
+using namespace std;
 
 #define MAX_KERNEL_THREADS 256
 
-// float or double 
+// float or double
 typedef float vtype;
-typedef vector<vector<vtype>> matrix; 
+typedef vector<vector<vtype>> matrix;
 
 template<typename T>
 __device__
-T parallel_prefix_sum(const int n, const int *ind, const T *w) 
+T parallel_prefix_sum(const int n, const int *ind, const T *w)
 {
 
   T sum = 0.0;
@@ -74,20 +75,20 @@ T parallel_prefix_sum(const int n, const int *ind, const T *w)
 
 // Volume of neighboors (*weight_s)
 template<bool weighted, typename T>
-__global__ void 
+__global__ void
 jaccard_row_sum(const int n,
                 const int *__restrict__ csrPtr,
                 const int *__restrict__ csrInd,
                 const T *__restrict__ w,
-                      T *__restrict__ work) 
+                      T *__restrict__ work)
 {
   for (int row=threadIdx.y+blockIdx.y*blockDim.y; row<n; row+=gridDim.y*blockDim.y) {
     int start = csrPtr[row];
     int end   = csrPtr[row+1];
     int length= end-start;
-    //compute row sums 
+    //compute row sums
     if (weighted) {
-      T sum = parallel_prefix_sum(length, csrInd + start, w); 
+      T sum = parallel_prefix_sum(length, csrInd + start, w);
       if (threadIdx.x == 0) work[row] = sum;
     }
     else {
@@ -99,17 +100,17 @@ jaccard_row_sum(const int n,
 // Volume of intersections (*weight_i) and cumulated volume of neighboors (*weight_s)
 // Note the number of columns is constrained by the number of rows
 template<bool weighted, typename T>
-__global__ void 
+__global__ void
 jaccard_is(const int n, const int e,
            const int *__restrict__ csrPtr,
-           const int *__restrict__ csrInd, 
+           const int *__restrict__ csrInd,
            const T *__restrict__ v,
            const T *__restrict__ work,
                  T *__restrict__ weight_i,
-                 T *__restrict__ weight_s) 
+                 T *__restrict__ weight_s)
 {
-  for (int row=threadIdx.z+blockIdx.z*blockDim.z; row<n; row+=gridDim.z*blockDim.z) {  
-    for (int j=csrPtr[row]+threadIdx.y+blockIdx.y*blockDim.y; j<csrPtr[row+1]; j+=gridDim.y*blockDim.y) { 
+  for (int row=threadIdx.z+blockIdx.z*blockDim.z; row<n; row+=gridDim.z*blockDim.z) {
+    for (int j=csrPtr[row]+threadIdx.y+blockIdx.y*blockDim.y; j<csrPtr[row+1]; j+=gridDim.y*blockDim.y) {
       int col = csrInd[j];
       //find which row has least elements (and call it reference row)
       int Ni = csrPtr[row+1] - csrPtr[row];
@@ -120,18 +121,18 @@ jaccard_is(const int n, const int e,
       //compute new sum weights
       weight_s[j] = work[row] + work[col];
 
-      //compute new intersection weights 
+      //compute new intersection weights
       //search for the element with the same column index in the reference row
       for (int i=csrPtr[ref]+threadIdx.x+blockIdx.x*blockDim.x; i<csrPtr[ref+1]; i+=gridDim.x*blockDim.x) {
-        int match  =-1;           
+        int match  =-1;
         int ref_col = csrInd[i];
         T ref_val = weighted ? v[ref_col] : (T)1.0;
 
         //binary search (column indices are sorted within each row)
-        int left = csrPtr[cur]; 
-        int right= csrPtr[cur+1]-1; 
+        int left = csrPtr[cur];
+        int right= csrPtr[cur+1]-1;
         while(left <= right){
-          int middle = (left+right)>>1; 
+          int middle = (left+right)>>1;
           int cur_col= csrInd[middle];
           if (cur_col > ref_col) {
             right=middle-1;
@@ -140,10 +141,10 @@ jaccard_is(const int n, const int e,
             left=middle+1;
           }
           else {
-            match = middle; 
-            break; 
+            match = middle;
+            break;
           }
-        }            
+        }
 
         //if the element with the same column index in the reference row has been found
         if (match != -1){
@@ -154,16 +155,71 @@ jaccard_is(const int n, const int e,
   }
 }
 
+// Reference https://github.com/SPEAR-UIC/CodeGreen/tree/main/lassi_solutions
 template<bool weighted, typename T>
-__global__ void 
+__global__ void
+jaccard_is_opt(const int n, const int e,
+               const int *__restrict__ csrPtr,
+               const int *__restrict__ csrInd,
+               const T *__restrict__ v,
+               const T *__restrict__ work,
+                     T *__restrict__ weight_i,
+                     T *__restrict__ weight_s)
+{
+  for (int row=threadIdx.z+blockIdx.z*blockDim.z; row<n; row+=gridDim.z*blockDim.z) {
+    for (int j=csrPtr[row]+threadIdx.y+blockIdx.y*blockDim.y;
+             j<csrPtr[row+1]; j+=gridDim.y*blockDim.y) {
+      int col = csrInd[j];
+      //find which row has least elements (and call it reference row)
+      int Ni = csrPtr[row+1] - csrPtr[row];
+      int Nj = csrPtr[col+1] - csrPtr[col];
+      int ref= (Ni < Nj) ? row : col;
+      int cur= (Ni < Nj) ? col : row;
+
+      //compute new sum weights
+      weight_s[j] = work[row] + work[col];
+
+      //compute new intersection weights
+      //search for the element with the same column index in the reference row
+      if (threadIdx.x == 0) {
+        T local_sum = 0;
+        int i_ptr = csrPtr[ref];      // pointer in reference row
+        int j_ptr = csrPtr[cur];        // pointer in current row
+        int ref_end = csrPtr[ref+1];
+        int cur_end = csrPtr[cur+1];
+
+        // Two-pointer merge for intersection of the two sorted lists
+        while (i_ptr < ref_end && j_ptr < cur_end) {
+          int ref_col = csrInd[i_ptr];
+          int cur_col = csrInd[j_ptr];
+          if (ref_col == cur_col) {
+            T ref_val = weighted ? v[ref_col] : (T)1.0;
+            local_sum += ref_val;
+            i_ptr++;
+            j_ptr++;
+          } else if (ref_col < cur_col) {
+            i_ptr++;
+          } else {
+            j_ptr++;
+          }
+        }
+        // perform a single atomic update per this j index
+        if (local_sum != 0)
+          atomicAdd(&weight_i[j], local_sum);
+      }
+    }
+  }
+}
+template<bool weighted, typename T>
+__global__ void
 jaccard_jw(const int e,
     const T *__restrict__ csrVal,
-    const T gamma, 
+    const T gamma,
     const T *__restrict__ weight_i,
-    const T *__restrict__ weight_s, 
-          T *__restrict__ weight_j) 
+    const T *__restrict__ weight_s,
+          T *__restrict__ weight_j)
 {
-  for (int j=threadIdx.x+blockIdx.x*blockDim.x; j<e; j+=gridDim.x*blockDim.x) {  
+  for (int j=threadIdx.x+blockIdx.x*blockDim.x; j<e; j+=gridDim.x*blockDim.x) {
     T Wi =  weight_i[j];
     T Ws =  weight_s[j];
     weight_j[j] = (gamma*csrVal[j])* (Wi/(Ws-Wi));
@@ -171,27 +227,27 @@ jaccard_jw(const int e,
 }
 
 template <bool weighted, typename T>
-__global__ void 
-fill(const int e, T* w, const T value) 
+__global__ void
+fill(const int e, T* w, const T value)
 {
-  for (int j=threadIdx.x+blockIdx.x*blockDim.x; j<e; j+=gridDim.x*blockDim.x) {  
-    // e.g. w[0] is the weight of a non-zeron element when csr_ind[i] equals 0. 
-    // So multiple non-zero elements on different rows of a matrix may share 
+  for (int j=threadIdx.x+blockIdx.x*blockDim.x; j<e; j+=gridDim.x*blockDim.x) {
+    // e.g. w[0] is the weight of a non-zeron element when csr_ind[i] equals 0.
+    // So multiple non-zero elements on different rows of a matrix may share
     // the same weight value
-    w[j] = weighted ? (T)(j+1)/e : value; 
+    w[j] = weighted ? (T)(j+1)/e : value;
   }
 }
 
 template <bool weighted, typename T>
-void jaccard_weight (const int iteration, const int n, const int e, 
+void jaccard_weight (const int iteration, const int n, const int e,
     int* csr_ptr, int* csr_ind, T* csr_val)
 {
 
   const T gamma = (T)0.46;  // arbitrary
 
-  T *d_weight_i, 
-    *d_weight_s, 
-    *d_weight_j, 
+  T *d_weight_i,
+    *d_weight_s,
+    *d_weight_j,
     *d_work;
   int *d_csrInd;
   int *d_csrPtr;
@@ -223,11 +279,11 @@ void jaccard_weight (const int iteration, const int n, const int e,
     dim3 nthreads, nblocks; // reuse for multiple kernels
 
     nthreads.x = MAX_KERNEL_THREADS;
-    nthreads.y = 1; 
-    nthreads.z = 1; 
+    nthreads.y = 1;
+    nthreads.z = 1;
     nblocks.x  = (e+MAX_KERNEL_THREADS-1) / MAX_KERNEL_THREADS;
     nblocks.y  = 1;
-    nblocks.z  = 1; 
+    nblocks.z  = 1;
 
     hipLaunchKernelGGL(HIP_KERNEL_NAME(fill<weighted, T>), dim3(nblocks), dim3(nthreads), 0, 0, e, d_weight_j, (T)1.0);
 #ifdef DEBUG
@@ -241,11 +297,11 @@ void jaccard_weight (const int iteration, const int n, const int e,
     // compute row sum with prefix sum
     const int y = 4;
     nthreads.x = 64/y;
-    nthreads.y = y; 
-    nthreads.z = 1; 
-    nblocks.x  = 1; 
+    nthreads.y = y;
+    nthreads.z = 1;
+    nblocks.x  = 1;
     nblocks.y  = (n + nthreads.y - 1) / nthreads.y;  // less than MAX CUDA BLOCKs
-    nblocks.z  = 1; 
+    nblocks.z  = 1;
     hipLaunchKernelGGL(HIP_KERNEL_NAME(jaccard_row_sum<weighted,T>), dim3(nblocks), dim3(nthreads), 0, 0, n, d_csrPtr, d_csrInd, d_weight_j, d_work);
 
 #ifdef DEBUG
@@ -261,7 +317,7 @@ void jaccard_weight (const int iteration, const int n, const int e,
     nblocks.x  = 1;
     nblocks.y  = 1;
     nblocks.z  = (n + nthreads.z - 1)/nthreads.z; // less than CUDA_MAX_BLOCKS);
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(jaccard_is<weighted,T>), dim3(nblocks), dim3(nthreads), 0, 0, n, e, d_csrPtr,
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(jaccard_is_opt<weighted,T>), dim3(nblocks), dim3(nthreads), 0, 0, n, e, d_csrPtr,
         d_csrInd, d_weight_j, d_work, d_weight_i, d_weight_s);
 
 #ifdef DEBUG
@@ -272,13 +328,13 @@ void jaccard_weight (const int iteration, const int n, const int e,
 #endif
 
     // compute jaccard weights
-    nthreads.x = std::min(e, MAX_KERNEL_THREADS); 
-    nthreads.y = 1; 
-    nthreads.z = 1;  
+    nthreads.x = std::min(e, MAX_KERNEL_THREADS);
+    nthreads.y = 1;
+    nthreads.z = 1;
     nblocks.x  = (e + nthreads.x - 1)/nthreads.x;  // less than MAX CUDA BLOCKs
-    nblocks.y  = 1; 
+    nblocks.y  = 1;
     nblocks.z  = 1;
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(jaccard_jw<weighted,T>), dim3(nblocks), dim3(nthreads), 0, 0, e, 
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(jaccard_jw<weighted,T>), dim3(nblocks), dim3(nthreads), 0, 0, e,
         d_csrVal, gamma, d_weight_i, d_weight_s, d_weight_j);
 
   }
@@ -291,7 +347,7 @@ void jaccard_weight (const int iteration, const int n, const int e,
   hipMemcpy(weight_j, d_weight_j, sizeof(T) * e, hipMemcpyDeviceToHost);
 #ifdef DEBUG
   // verify using known values when weighted is true
-  float error; 
+  float error;
 
   if (weighted)
     error = std::fabs(weight_j[0] - 0.306667) +
@@ -334,37 +390,37 @@ void jaccard_weight (const int iteration, const int n, const int e,
 }
 
 // Utilities
-void printMatrix(const matrix& M) 
-{ 
-  int m = M.size(); 
-  int n = M[0].size(); 
-  for (int i = 0; i < m; i++) { 
-    for (int j = 0; j < n; j++) 
-      cout << M[i][j] << " ";     
-    cout << endl; 
-  } 
-} 
+void printMatrix(const matrix& M)
+{
+  int m = M.size();
+  int n = M[0].size();
+  for (int i = 0; i < m; i++) {
+    for (int j = 0; j < n; j++)
+      cout << M[i][j] << " ";
+    cout << endl;
+  }
+}
 
   template <typename T>
-void printVector(const vector<T>& V, char* msg) 
-{ 
-  cout << msg << "[ "; 
-  for_each(V.begin(), V.end(), [](int a) { cout << a << " "; }); 
-  cout << "]" << endl; 
-} 
+void printVector(const vector<T>& V, char* msg)
+{
+  cout << msg << "[ ";
+  for_each(V.begin(), V.end(), [](int a) { cout << a << " "; });
+  cout << "]" << endl;
+}
 
 // Reference: https://www.geeksforgeeks.org/sparse-matrix-representations-set-3-csr/
-int main(int argc, char** argv) 
-{ 
+int main(int argc, char** argv)
+{
   int iteration = 10;
 
 #ifdef DEBUG
-  matrix M  = { 
-    { 0, 0, 0, 1}, 
-    { 5, 8, 0, 0}, 
-    { 0, 0, 3, 0}, 
-    { 0, 6, 0, 1} 
-  }; 
+  matrix M  = {
+    { 0, 0, 0, 1},
+    { 5, 8, 0, 0},
+    { 0, 0, 3, 0},
+    { 0, 6, 0, 1}
+  };
 #else
 
   int numRow = atoi(argv[1]);
@@ -386,32 +442,32 @@ int main(int argc, char** argv)
   int col = M[0].size();
   printf("Number of matrix rows and cols: %d %d\n", row, col);
   vector<vtype> csr_val;
-  vector<int> csr_ptr = { 0 }; // require -std=c++11  
+  vector<int> csr_ptr = { 0 }; // require -std=c++11
   vector<int> csr_ind;
   int nnz = 0; // count Number of non-zero elements in each row
 
-  for (int i = 0; i < row; i++) { 
-    for (int j = 0; j < col; j++) { 
-      if (M[i][j] != (vtype)0) { 
-        csr_val.push_back(M[i][j]); 
-        csr_ind.push_back(j); 
-        nnz++; 
-      } 
-    } 
-    csr_ptr.push_back(nnz); 
-  } 
+  for (int i = 0; i < row; i++) {
+    for (int j = 0; j < col; j++) {
+      if (M[i][j] != (vtype)0) {
+        csr_val.push_back(M[i][j]);
+        csr_ind.push_back(j);
+        nnz++;
+      }
+    }
+    csr_ptr.push_back(nnz);
+  }
 
   // print when the matrix is small
   if (row <= 16 && col <= 16) {
-    printMatrix(M); 
-    printVector(csr_val, (char*)"values = "); 
-    printVector(csr_ptr, (char*)"row pointer = "); 
-    printVector(csr_ind, (char*)"col indices = "); 
+    printMatrix(M);
+    printVector(csr_val, (char*)"values = ");
+    printVector(csr_ptr, (char*)"row pointer = ");
+    printVector(csr_ind, (char*)"col indices = ");
   }
 
   jaccard_weight<true, vtype>(iteration, row, nnz, csr_ptr.data(), csr_ind.data(), csr_val.data());
   jaccard_weight<false, vtype>(iteration, row, nnz, csr_ptr.data(), csr_ind.data(), csr_val.data());
 
-  return 0; 
-} 
+  return 0;
+}
 

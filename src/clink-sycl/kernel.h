@@ -25,8 +25,10 @@ void lstm_inference(
 {
   auto cgf = [&] (sycl::handler &cgh) {
     auto kfn = [=] (sycl::nd_item<3> item) {
-      int t,i,j;
       int gid = item.get_global_id(2);
+      if ( gid >= N ) return;
+
+      int t,i,j;
 
       float h_state[5] = {0,0,0,0,0};
       float c_state[5] = {0,0,0,0,0};
