@@ -177,7 +177,7 @@ void modulateGPU(sycl::queue &q, float *a, const float *b, int N)
 {
     sycl::range<1> gws (128*256);
     sycl::range<1> lws (256);
-    float rcpN = 1.0f / (float)N;
+    const float rcpN = 1.0f / (float)N;
 
     q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class modulate>(

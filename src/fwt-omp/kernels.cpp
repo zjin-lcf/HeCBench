@@ -194,7 +194,7 @@ void fwtBatchGPU(float *d_Data, int M, int log2N)
 // Modulate two arrays
 void modulateGPU(float *__restrict d_A, const float *__restrict d_B, int N)
 {
-    float     rcpN = 1.0f / (float)N;
+    const float rcpN = 1.0f / (float)N;
     #pragma omp target teams distribute parallel for num_teams(128) thread_limit(256)
     for (int pos = 0; pos < N; pos++)
     {
