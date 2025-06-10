@@ -153,11 +153,11 @@ void fwtBatchGPU(float *d_Data, int M, int log2N)
 __global__ 
 void modulateKernel(      float *__restrict__ d_A, 
                     const float *__restrict__ d_B, 
-                          int N)
+                          int N,
+                    const float rcpN)
 {
     int        tid = blockIdx.x * blockDim.x + threadIdx.x;
     int numThreads = blockDim.x * gridDim.x;
-    float     rcpN = 1.0f / (float)N;
 
     for (int pos = tid; pos < N; pos += numThreads)
     {
@@ -168,5 +168,6 @@ void modulateKernel(      float *__restrict__ d_A,
 //Interface to modulateKernel()
 void modulateGPU(float *d_A, float *d_B, int N)
 {
-    modulateKernel<<<128, 256>>>(d_A, d_B, N);
+    const float rcpN = 1.0f / (float)N;
+    modulateKernel<<<128, 256>>>(d_A, d_B, N, rcpN);
 }
