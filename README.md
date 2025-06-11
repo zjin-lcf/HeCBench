@@ -31,7 +31,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, bitcracker, bitpermute, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fpc, histogram, lzss, minmax, mpc, mtf, quantAQLM, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, scatter, segment-reduce
+    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fpc, histogram, lzss, minmax, mpc, mtf, quantAQLM, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, scatter, scatterAdd, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, kiss, ldpc, md5hash, murmurhash3
@@ -1363,6 +1363,9 @@ Early results are shown [here](results/README.md)
 
 ### scatter (cuda)
   Reduce values at the indices specified in a index tensor (https://github.com/rusty1s/pytorch_scatter/tree/master)
+
+### scatterAdd (cuda)
+  Add values from a source tensor at the indices specified in a index tensor (https://github.com/awslabs/vip-token-centric-compression)
 
 ### scel (cuda)
   Sigmoid cross-entropy with logits (https://pytorch.org/)
