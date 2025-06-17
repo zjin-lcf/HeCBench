@@ -1,7 +1,7 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
  * Copyright (c) 2011-2021, NVIDIA CORPORATION.  All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
  *     * Neither the name of the NVIDIA CORPORATION nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -71,7 +71,7 @@ public:
     struct TempStorage : Uninitialized<_TempStorage> {};
 
     inline BlockAdjacentDifference(TempStorage &temp_storage,
-                                   const sycl::nd_item<3> &item) 
+                                   const sycl::nd_item<3> &item)
         : temp_storage(temp_storage.Alias())
         , linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z, item))
         , item(item)
@@ -103,6 +103,38 @@ public:
       {
         output[0] = difference_op(input[0],
                                   temp_storage.last_items[linear_tid - 1]);
+      }
+    }
+
+    template <int ITEMS_PER_THREAD,
+              typename OutputType,
+              typename DifferenceOpT>
+    inline void
+    SubtractRight(T (&input)[ITEMS_PER_THREAD],
+                  OutputType (&output)[ITEMS_PER_THREAD],
+                  DifferenceOpT difference_op)
+    {
+      // share first item
+      temp_storage.first_items[linear_tid] = input[0];
+
+      CTA_SYNC();
+
+      #pragma unroll
+      // data overwritten for (int item = ITEMS_PER_THREAD - 2; item >= 0; item--) 
+      for (int item = 0; item < ITEMS_PER_THREAD - 1; item++)
+      {
+        output[item] = difference_op(input[item], input[item + 1]);
+      }
+
+      if (linear_tid == BLOCK_THREADS - 1)
+      {
+        output[ITEMS_PER_THREAD - 1] = input[ITEMS_PER_THREAD - 1];
+      }
+      else
+      {
+        output[ITEMS_PER_THREAD - 1] =
+          difference_op(input[ITEMS_PER_THREAD - 1],
+                        temp_storage.first_items[linear_tid + 1]);
       }
     }
 };

@@ -27,6 +27,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <hipcub/hipcub.hpp>
 
@@ -46,7 +47,7 @@ struct CustomDifference
  * Simple kernel for performing a block-wide adjacent difference.
  */
 template <int BLOCK_THREADS>
-__global__ void BlockAdjDiffKernel(const int* d_in, int* d_out)
+__global__ void BlockAdjDiffKernel(const int* d_in, int* d_out, bool subtract_left)
 {
   // Specialize BlockAdjacentDifference for a 1D block of threads of type int
    using BlockAdjacentDifferenceT = hipcub::BlockAdjacentDifference<int, BLOCK_THREADS>;
@@ -59,10 +60,18 @@ __global__ void BlockAdjDiffKernel(const int* d_in, int* d_out)
    int thread_data[4];
    reinterpret_cast<int4*>(thread_data)[0] = reinterpret_cast<const int4*>(d_in)[idx];
 
-   BlockAdjacentDifferenceT(temp_storage).SubtractLeft(
-       thread_data,
-       thread_data,
-       CustomDifference());
+   if (subtract_left) {
+     BlockAdjacentDifferenceT(temp_storage).SubtractLeft(
+         thread_data,
+         thread_data,
+         CustomDifference());
+   }
+   else {
+     BlockAdjacentDifferenceT(temp_storage).SubtractRight(
+         thread_data,
+         thread_data,
+         CustomDifference());
+   }
 
    reinterpret_cast<int4*>(d_out)[idx] = reinterpret_cast<int4*>(thread_data)[0];
 }
@@ -86,7 +95,8 @@ template <int BLOCK_THREADS>
 void Test(int num_items, int repeat)
 {
   const int ITEMS_PER_THREAD = 4;
-  num_items = (num_items + BLOCK_THREADS - 1) / BLOCK_THREADS * BLOCK_THREADS;
+  const int items_per_block = BLOCK_THREADS * ITEMS_PER_THREAD;
+  num_items = (num_items + items_per_block - 1) / items_per_block * items_per_block;
 
   int* h_in = new int[num_items];
   int* h_out = new int[num_items];
@@ -99,15 +109,15 @@ void Test(int num_items, int repeat)
   hipMalloc((void**) &d_in, sizeof(int) * num_items);
   hipMalloc((void**) &d_out, sizeof(int) * num_items);
 
-  int items_per_block = BLOCK_THREADS * ITEMS_PER_THREAD;
   int grid_size = num_items / items_per_block;
 
   dim3 grid (grid_size);
   dim3 block (BLOCK_THREADS);
 
+  // verify the SubtractLeft
   hipMemcpy(d_in, h_in, sizeof(int) * num_items, hipMemcpyHostToDevice);
   for (int i = 0; i < repeat; i++) {
-    BlockAdjDiffKernel<BLOCK_THREADS><<<grid, block>>>(d_in, d_out);
+    BlockAdjDiffKernel<BLOCK_THREADS><<<grid, block>>>(d_in, d_out, true);
   }
   hipMemcpy(h_out, d_out, sizeof(int) * num_items, hipMemcpyDeviceToHost);
 
@@ -117,21 +127,40 @@ void Test(int num_items, int repeat)
     for (int i = 0; i < items_per_block; i++) {
       out[i] = (i - 1) < 0 ? in[i] : in[i] - in[i-1];
     }
-  } 
+  }
 
   int compare = memcmp(r_out, h_out, sizeof(int) * num_items);
+  printf("%s\n", compare ? "FAIL" : "PASS");
+
+  // verify the SubtractRight
+  hipMemcpy(d_in, h_in, sizeof(int) * num_items, hipMemcpyHostToDevice);
+  for (int i = 0; i < repeat; i++) {
+    BlockAdjDiffKernel<BLOCK_THREADS><<<grid, block>>>(d_in, d_out, false);
+  }
+  hipMemcpy(h_out, d_out, sizeof(int) * num_items, hipMemcpyDeviceToHost);
+
+  for (int b = 0; b < grid_size; b++) {
+    auto in = h_in + b * items_per_block;
+    auto out = r_out + b * items_per_block;
+    for (int i = 0; i < items_per_block; i++) {
+      out[i] = (i + 1) >= items_per_block ? in[i] : in[i] - in[i+1];
+    }
+  }
+  compare = memcmp(r_out, h_out, sizeof(int) * num_items);
   printf("%s\n", compare ? "FAIL" : "PASS");
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    BlockAdjDiffKernel<BLOCK_THREADS><<<grid, block>>>(d_in, d_out);
+    BlockAdjDiffKernel<BLOCK_THREADS><<<grid, block>>>(d_in, d_out, true);
+    BlockAdjDiffKernel<BLOCK_THREADS><<<grid, block>>>(d_out, d_out, false);
   }
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average execution time of the kernel: %f (us)\n", (time * 1e-3f) / repeat);
+  printf("Average execution time of the kernels (thread block size = %4d): %f (us)\n",
+         BLOCK_THREADS, (time * 1e-3f) / repeat);
 
   if (h_in) delete[] h_in;
   if (h_out) delete[] h_out;

@@ -27,6 +27,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <sycl/sycl.hpp>
 #include "block.h"
@@ -47,7 +48,7 @@ struct CustomDifference
  * Simple kernel for performing a block-wide adjacent difference.
  */
 template <int BLOCK_THREADS>
-void BlockAdjDiffKernel(const int* d_in, int* d_out,
+void BlockAdjDiffKernel(const int* d_in, int* d_out, bool subtract_left,
                         const sycl::nd_item<3> &item)
 {
   // Specialize BlockAdjacentDifference for a 1D block of threads of type int
@@ -66,8 +67,14 @@ void BlockAdjDiffKernel(const int* d_in, int* d_out,
    reinterpret_cast<sycl::int4 *>(thread_data)[0] =
        reinterpret_cast<const sycl::int4 *>(d_in)[idx];
 
-   BlockAdjacentDifferenceT(*temp_storage, item)
-       .SubtractLeft(thread_data, thread_data, CustomDifference());
+   if (subtract_left) {
+     BlockAdjacentDifferenceT(*temp_storage, item)
+         .SubtractLeft(thread_data, thread_data, CustomDifference());
+   }
+   else {
+     BlockAdjacentDifferenceT(*temp_storage, item)
+         .SubtractRight(thread_data, thread_data, CustomDifference());
+   }
 
    reinterpret_cast<sycl::int4 *>(d_out)[idx] =
        reinterpret_cast<sycl::int4 *>(thread_data)[0];
@@ -92,7 +99,8 @@ template <int BLOCK_THREADS>
 void Test(sycl::queue &q, int num_items, int repeat)
 {
   const int ITEMS_PER_THREAD = 4;
-  num_items = (num_items + BLOCK_THREADS - 1) / BLOCK_THREADS * BLOCK_THREADS;
+  const int items_per_block = BLOCK_THREADS * ITEMS_PER_THREAD;
+  num_items = (num_items + items_per_block - 1) / items_per_block * items_per_block;
 
   int* h_in = new int[num_items];
   int* h_out = new int[num_items];
@@ -105,17 +113,16 @@ void Test(sycl::queue &q, int num_items, int repeat)
   d_in = sycl::malloc_device<int>(num_items, q);
   d_out = sycl::malloc_device<int>(num_items, q);
 
-  int items_per_block = BLOCK_THREADS * ITEMS_PER_THREAD;
   int grid_size = num_items / items_per_block;
 
   sycl::range<3> gws (1, 1, grid_size * BLOCK_THREADS);
   sycl::range<3> lws (1, 1, BLOCK_THREADS);
 
-  q.memcpy(d_in, h_in, sizeof(int) * num_items).wait();
+  q.memcpy(d_in, h_in, sizeof(int) * num_items);
   for (int i = 0; i < repeat; i++) {
     q.parallel_for(
         sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
-          BlockAdjDiffKernel<BLOCK_THREADS>(d_in, d_out, item);
+          BlockAdjDiffKernel<BLOCK_THREADS>(d_in, d_out, true, item);
     });
   }
   q.memcpy(h_out, d_out, sizeof(int) * num_items).wait();
@@ -126,9 +133,29 @@ void Test(sycl::queue &q, int num_items, int repeat)
     for (int i = 0; i < items_per_block; i++) {
       out[i] = (i - 1) < 0 ? in[i] : in[i] - in[i-1];
     }
-  } 
+  }
 
   int compare = memcmp(r_out, h_out, sizeof(int) * num_items);
+  printf("%s\n", compare ? "FAIL" : "PASS");
+
+  q.memcpy(d_in, h_in, sizeof(int) * num_items);
+  for (int i = 0; i < repeat; i++) {
+    q.parallel_for(
+        sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
+          BlockAdjDiffKernel<BLOCK_THREADS>(d_in, d_out, false, item);
+    });
+  }
+  q.memcpy(h_out, d_out, sizeof(int) * num_items).wait();
+
+  for (int b = 0; b < grid_size; b++) {
+    auto in = h_in + b * items_per_block;
+    auto out = r_out + b * items_per_block;
+    for (int i = 0; i < items_per_block; i++) {
+      out[i] = (i + 1) >= items_per_block ? in[i] : in[i] - in[i+1];
+    }
+  }
+
+  compare = memcmp(r_out, h_out, sizeof(int) * num_items);
   printf("%s\n", compare ? "FAIL" : "PASS");
 
   auto start = std::chrono::steady_clock::now();
@@ -136,14 +163,19 @@ void Test(sycl::queue &q, int num_items, int repeat)
   for (int i = 0; i < repeat; i++) {
     q.parallel_for(
         sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
-          BlockAdjDiffKernel<BLOCK_THREADS>(d_in, d_out, item);
+          BlockAdjDiffKernel<BLOCK_THREADS>(d_in, d_out, true, item);
+    });
+    q.parallel_for(
+        sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
+          BlockAdjDiffKernel<BLOCK_THREADS>(d_out, d_out, false, item);
     });
   }
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average execution time of the kernel: %f (us)\n", (time * 1e-3f) / repeat);
+  printf("Average execution time of the kernels (thread block size = %4d): %f (us)\n",
+         BLOCK_THREADS, (time * 1e-3f) / repeat);
 
   if (h_in) delete[] h_in;
   if (h_out) delete[] h_out;
