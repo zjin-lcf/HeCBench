@@ -8,6 +8,12 @@ import json
 import logging
 import traceback
 
+class Status():
+    FAILED = "failed"
+    SUCCESS = "success"
+    SKIPPED = "skipped"
+    NOT_EVALUATED = "not_evaluated"
+
 def await_input(prompt: str, is_valid_input) -> str:
     """ Wait the user for input until it is valid. """
     r = input(prompt)
@@ -73,9 +79,9 @@ class Benchmark:
         self.clean = args.clean
         self.verbose = args.verbose
 
-        self.compilation_status = "not_evaluated"
-        self.run_status = "not_evaluated"
-        self.verification_status = "not_evaluated"
+        self.compilation_status = Status.NOT_EVALUATED
+        self.run_status = Status.NOT_EVALUATED
+        self.verification_status = Status.NOT_EVALUATED
 
     def compile(self, shared_data):
         if self.clean:
@@ -91,7 +97,7 @@ class Benchmark:
 
         try:
             proc.check_returncode()
-            shared_data[self.name] = "success"
+            shared_data[self.name] = Status.SUCCESS
         except subprocess.CalledProcessError as e:
             print(f'Failed compilation in {self.path}.\n{e}')
             if e.stderr:
@@ -104,7 +110,7 @@ class Benchmark:
             print(cause.stdout)
             print(cause.stderr)
             print("*****************************************************************************************")
-            shared_data[self.name] = "failed"
+            shared_data[self.name] = Status.FAILED
             #raise(e)
 
         if self.verbose:
@@ -126,9 +132,9 @@ class Benchmark:
              print("Position:", e.pos)
         logging.debug(f'Results of re.findall:\n {res}')
         if not res:
-            self.run_status = "failed"
+            self.run_status = Status.FAILED
             raise Exception(self.path + ":\nno regex match for " + self.res_regex + " in\n" + out)
-        self.run_status = "success"
+        self.run_status = Status.SUCCESS
         res = sum([float(i) for i in res]) #in case of multiple outputs sum them (e.g. total time)
         if self.invert:
             res = 1/res
@@ -140,7 +146,7 @@ class Benchmark:
         verif_args = self.verif_info[1]
 
         if (verif_type == "no_verification"):
-            self.verification_status = "skipped"
+            self.verification_status = Status.SKIPPED
 
         elif (verif_type == "verification_token"):
             reg_success = verif_args[0]
@@ -150,9 +156,9 @@ class Benchmark:
             match_fail = re.findall(reg_fail, out)
 
             if( match_fail == [] and match_success != [] ):
-                self.verification_status = "success"
+                self.verification_status = Status.SUCCESS
             else:
-                self.verification_status = "failed"
+                self.verification_status = Status.FAILED
 
         return res
 
@@ -313,8 +319,8 @@ def main():
                     # record the status only when it is in the input benchmark list
                     ch_index = bench.find('-')
                     if bench[:ch_index] in benchmarks.keys():
-                        summary[bench]["run"] = "skipped"
-                        summary[bench]["verification"] = "skipped"
+                        summary[bench]["run"] = Status.SKIPPED
+                        summary[bench]["verification"] = Status.SKIPPED
                 outfile.seek(0, 2) # seek to end of the file.
             else:
                 outfile = open(args.output, 'w+t')
@@ -361,11 +367,11 @@ def main():
         logging.info(f"Wrote the summary to {args.summary}.")
     else:
         print(json.dumps(summary, indent=4, sort_keys=True))
-    failed_compile_run = sum(('compile' in x.keys() and x['compile'] == "failed" or
-                'run' in x.keys() and x['run'] == "failed") for x in summary.values())
+    failed_compile_run = sum(('compile' in x.keys() and x['compile'] == Status.FAILED or
+                'run' in x.keys() and x['run'] == Status.FAILED) for x in summary.values())
     print(f'Number of benchmark compile or run failures: {failed_compile_run}')
 
-    failed_verif = sum(('verification' in x.keys() and x['verification'] == "failed" )
+    failed_verif = sum(('verification' in x.keys() and x['verification'] == Status.FAILED )
                     for x in summary.values())
     print(f'Number of benchmark verification failures: {failed_verif}')
     print("*****************************************************************************************")
