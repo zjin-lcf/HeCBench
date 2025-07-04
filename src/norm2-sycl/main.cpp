@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <algorithm>
 #include <chrono>
 #include <vector>
 #include <oneapi/mkl.hpp>
@@ -13,7 +14,7 @@ int main(int argc, char *argv[]) {
   }
 
   // repeat at least once
-  const int repeat = max(1, atoi(argv[1]));
+  const int repeat = std::max(1, atoi(argv[1]));
 
   bool ok = true;
 
@@ -74,7 +75,7 @@ int main(int argc, char *argv[]) {
     try {
       for (j = 0; j < repeat; j++) {
         status[j] = oneapi::mkl::blas::column_major::nrm2(q, n, d_a, 1, d_result+j);
-        q.memcpy(h_result, d_result, repeat * sizeof(float), status[j]);
+        q.memcpy(h_result + j, d_result + j, sizeof(float), status[j]);
       }
     } catch(sycl::exception const& e) {
       std::cout << "\t\tCaught synchronous SYCL exception during NRM2:\n"
