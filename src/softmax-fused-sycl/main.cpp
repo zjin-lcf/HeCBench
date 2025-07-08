@@ -336,6 +336,7 @@ int main(int argc, char *argv[]) {
   int repeat = atoi(argv[5]);
 
   fused_softmax<Half>(batches, attn_heads, query_seq_len, key_seq_len, repeat);
+  fused_softmax<BFloat16>(batches, attn_heads, query_seq_len, key_seq_len, repeat);
 
   return 0;
 }
