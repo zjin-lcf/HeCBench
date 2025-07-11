@@ -5,8 +5,11 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <sycl/sycl.hpp>
+#include "reference.h"
+
 
 #define C10_WARP_SIZE 32
 typedef sycl::ext::oneapi::bfloat16 BFloat16;
@@ -97,13 +100,10 @@ void scaled_masked_softmax_warp_forward(output_t *dst, const input_t *src,
   constexpr int WARP_BATCH = (next_power_of_two <= 128) ? 2 : 1;
   constexpr int ELEMENTS_PER_LDG_STG = (WARP_ITERATIONS < 4) ? 1 : 4;
 
-  int first_batch = (item.get_local_range(1) *
-                         (item.get_group(2) +
-                          item.get_group_range(2) *
-                              (item.get_group(1) +
-                               item.get_group_range(1) * item.get_group(0))) +
-                     item.get_local_id(1)) *
-                    WARP_BATCH;
+  int first_batch = (item.get_local_range(1) * (item.get_group(2) +
+                     item.get_group_range(2) * (item.get_group(1) +
+                     item.get_group_range(1) * item.get_group(0))) +
+                     item.get_local_id(1)) * WARP_BATCH;
   int pad_first_batch;
   if (pad_batches != 1) { // bert style
     pad_first_batch =
@@ -280,13 +280,31 @@ void scaled_masked_softmax_forward(sycl::queue &q, output_t *dst, const input_t 
 
 template <typename scalar_t>
 void fused_softmax(int batches, int attn_heads, int query_seq_len,
-                   int key_seq_len, int repeat) {
+                   int key_seq_len, int pad_batches, int repeat) {
   uint64_t num_data_elems =
       (uint64_t)batches * attn_heads * query_seq_len * key_seq_len;
   scalar_t scale_factor = 1.f / std::sqrt(key_seq_len);
-  int pad_batches = 0;
-  scalar_t *output =
-      (scalar_t *)aligned_alloc(1024, sizeof(scalar_t) * num_data_elems);
+  uint8_t *mask = (uint8_t*) malloc (sizeof(uint8_t) * num_data_elems);
+
+  srand(123);
+  for (size_t i = 0; i < (uint64_t)batches * attn_heads * query_seq_len; i++) {
+    uint8_t* mask_row = mask + i * key_seq_len;
+    int len = rand() % (key_seq_len / 2);
+    memset(mask_row, 1, sizeof(uint8_t) * len); // mask
+    memset(mask_row + len, 0, sizeof(uint8_t) * (key_seq_len - len));
+  }
+
+  scalar_t *input = make_random<scalar_t>(num_data_elems);
+
+  const int* outliers = make_random_int((uint64_t)batches * attn_heads * query_seq_len, key_seq_len);
+  for(int k = 0; k < query_seq_len; ++k) {
+    for(int j = 0; j < batches * attn_heads; ++j) {
+      input[j * key_seq_len + outliers[j* query_seq_len + k]] *= scalar_t(20);
+    }
+  }
+
+  scalar_t *output = (scalar_t *)aligned_alloc(1024, sizeof(scalar_t) * num_data_elems);
+  scalar_t *output_ref = (scalar_t *)aligned_alloc(1024, sizeof(scalar_t) * num_data_elems);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -297,8 +315,27 @@ void fused_softmax(int batches, int attn_heads, int query_seq_len,
   scalar_t *d_input = sycl::malloc_device<scalar_t>(num_data_elems, q);
   scalar_t *d_output = sycl::malloc_device<scalar_t>(num_data_elems, q);
   uint8_t *d_mask = sycl::malloc_device<uint8_t>(num_data_elems, q);
-  q.memset(d_mask, 0, sizeof(uint8_t) * num_data_elems);
-  q.memset(d_input, 0x3bff, sizeof(scalar_t) * num_data_elems);
+
+  q.memcpy(d_mask, mask, sizeof(uint8_t) * num_data_elems);
+  q.memcpy(d_input, input, sizeof(scalar_t) * num_data_elems);
+
+  scaled_masked_softmax_forward<scalar_t, scalar_t, float>(
+      q, d_output, d_input, d_mask, scale_factor, query_seq_len, key_seq_len,
+      batches, attn_heads, pad_batches);
+
+  q.memcpy(output, d_output, sizeof(scalar_t) * num_data_elems);
+
+  reference<scalar_t, scalar_t, float>(output_ref, input, mask, scale_factor,
+                                       pad_batches, batches, attn_heads, query_seq_len, key_seq_len);
+  bool ok = true;
+  for (size_t i = 0; i < num_data_elems; i++) {
+    if (fabsf((float)output[i] - (float)output_ref[i]) > 1e-3f) {
+      printf("Mismatch at index %zu: %f %f\n", i, (float)output[i], (float)output_ref[i]);
+      ok = false;
+      break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
@@ -314,9 +351,11 @@ void fused_softmax(int batches, int attn_heads, int query_seq_len,
   auto time =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
-  q.memcpy(output, d_output, sizeof(scalar_t) * num_data_elems).wait();
 
   free(output);
+  free(output_ref);
+  free(input);
+  free(mask);
   sycl::free(d_input, q);
   sycl::free(d_output, q);
   sycl::free(d_mask, q);
@@ -335,8 +374,12 @@ int main(int argc, char *argv[]) {
   int key_seq_len = atoi(argv[4]);
   int repeat = atoi(argv[5]);
 
-  fused_softmax<Half>(batches, attn_heads, query_seq_len, key_seq_len, repeat);
-  fused_softmax<BFloat16>(batches, attn_heads, query_seq_len, key_seq_len, repeat);
+  // bert mask
+  fused_softmax<Half>(batches, attn_heads, query_seq_len, key_seq_len, 0, repeat);
+  // gpt2 mask
+  fused_softmax<Half>(batches, attn_heads, query_seq_len, key_seq_len, 1, repeat);
+  fused_softmax<BFloat16>(batches, attn_heads, query_seq_len, key_seq_len, 0, repeat);
+  fused_softmax<BFloat16>(batches, attn_heads, query_seq_len, key_seq_len, 1, repeat);
 
   return 0;
 }
