@@ -63,13 +63,12 @@ struct TestBench {
             ComputeType Cscale = ComputeType{1.0f}, ComputeType Dscale = ComputeType{1.0f}) :
         m(m), n(n), k(k), N(N), alpha(alpha), beta(beta), workspaceSize(workspaceSize), 
         Ahost(m * k * N), Bhost(n * k * N), Chost(m * n * N), Dhost(m * n * N),
-        biasHost(m * N), AscaleHost(Ascale), BscaleHost(Bscale), CscaleHost(Cscale), DscaleHost(Dscale) {
+        AscaleHost(Ascale), BscaleHost(Bscale), CscaleHost(Cscale), DscaleHost(Dscale) {
         checkCublasStatus(cublasLtCreate(&ltHandle));
         checkCudaStatus(cudaMalloc(reinterpret_cast<void**>(&Adev), m * k * N * sizeof(InType)));
         checkCudaStatus(cudaMalloc(reinterpret_cast<void**>(&Bdev), n * k * N  * sizeof(InType)));
         checkCudaStatus(cudaMalloc(reinterpret_cast<void**>(&Cdev), m * n * N  * sizeof(CType)));
         checkCudaStatus(cudaMalloc(reinterpret_cast<void**>(&Ddev), m * n * N  * sizeof(OutType)));
-        checkCudaStatus(cudaMalloc(reinterpret_cast<void**>(&biasDev), m * N * sizeof(OutType)));
         checkCudaStatus(cudaMalloc(&workspace, workspaceSize));
         checkCudaStatus(cudaStreamCreate(&stream));
 
@@ -93,7 +92,6 @@ struct TestBench {
         checkCudaStatus(cudaFree(Bdev));
         checkCudaStatus(cudaFree(Cdev));
         checkCudaStatus(cudaFree(Ddev));
-        checkCudaStatus(cudaFree(biasDev));
         checkCudaStatus(cudaFree(workspace));
         if (perTensorScalingEnabled) {
             checkCudaStatus(cudaFree(AscaleDev));
@@ -109,14 +107,12 @@ struct TestBench {
         for (int i = 0; i < m * k * N; i++) Ahost[i] = InType(i);
         for (int i = 0; i < n * k * N; i++) Bhost[i] = InType(i);
         for (int i = 0; i < m * n * N; i++) Chost[i] = CType(-i);
-        for (int i = 0; i < m * N; i++) biasHost[i] = InType(i + 1);
     }
 
     void copyDataToDevice() {
         checkCudaStatus(cudaMemcpyAsync(Adev, Ahost.data(), Ahost.size() * sizeof(Ahost[0]), cudaMemcpyHostToDevice, stream));
         checkCudaStatus(cudaMemcpyAsync(Bdev, Bhost.data(), Bhost.size() * sizeof(Bhost[0]), cudaMemcpyHostToDevice, stream));
         checkCudaStatus(cudaMemcpyAsync(Cdev, Chost.data(), Chost.size() * sizeof(Chost[0]), cudaMemcpyHostToDevice, stream));
-        checkCudaStatus(cudaMemcpyAsync(biasDev, biasHost.data(), biasHost.size() * sizeof(biasHost[0]), cudaMemcpyHostToDevice));
         if (perTensorScalingEnabled) {
             checkCudaStatus(cudaMemcpyAsync(AscaleDev, &AscaleHost, sizeof(AscaleHost), cudaMemcpyHostToDevice));
             checkCudaStatus(cudaMemcpyAsync(BscaleDev, &BscaleHost, sizeof(BscaleHost), cudaMemcpyHostToDevice));
@@ -149,11 +145,11 @@ struct TestBench {
     size_t workspaceSize;
     std::vector<InType> Ahost, Bhost;
     std::vector<CType> Chost;
-    std::vector<OutType> Dhost, biasHost;
+    std::vector<OutType> Dhost;
     void *workspace;
     InType *Adev, *Bdev;
     CType *Cdev;
-    OutType *Ddev, *biasDev;
+    OutType *Ddev;
     cudaStream_t stream;
     cublasLtHandle_t ltHandle;
     ComputeType AscaleHost, BscaleHost, CscaleHost, DscaleHost, DamaxHost;
@@ -165,7 +161,6 @@ inline void TestBench<__half, __half,  __half, float>::fillData() {
     for (int i = 0; i < m * k * N; i++) Ahost[i] = __float2half_rn(i);
     for (int i = 0; i < n * k * N; i++) Bhost[i] = __float2half_rn(i);
     for (int i = 0; i < n * k * N; i++) Chost[i] = __float2half_rn(-i);
-    for (int i = 0; i < m * N; i++) biasHost[i] = __float2half_rn(i + 1);
 }
 
 template <>
@@ -173,5 +168,4 @@ inline void TestBench<__half, __half, __half, cuComplex>::fillData() {
     for (int i = 0; i < m * k * N; i++) Ahost[i] = __float2half_rn(i/100.);
     for (int i = 0; i < n * k * N; i++) Bhost[i] = __float2half_rn(i/100.);
     for (int i = 0; i < n * k * N; i++) Chost[i] = __float2half_rn(-i/100.);
-    for (int i = 0; i < m * N; i++) biasHost[i] = __float2half_rn(i + 1);
 }
