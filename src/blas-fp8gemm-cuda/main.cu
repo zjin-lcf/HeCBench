@@ -25,6 +25,7 @@ void LtFp8Matmul(const int repeat,
                  int ldc,
                  const float *d_scale, /* device pointer */
                  __nv_fp8_e4m3 *D,
+                 //__nv_bfloat16 *D,
                  float *amax_d, /* device pointer */
                  void *workspace,
                  size_t workspaceSize) {
@@ -62,6 +63,7 @@ void LtFp8Matmul(const int repeat,
     checkCublasStatus(cublasLtMatrixLayoutCreate(&Bdesc, CUDA_R_8F_E4M3, transb == CUBLAS_OP_N ? k : n, transb == CUBLAS_OP_N ? n : k, ldb));
     checkCublasStatus(cublasLtMatrixLayoutCreate(&Cdesc, CUDA_R_16BF, m, n, ldc));
     checkCublasStatus(cublasLtMatrixLayoutCreate(&Ddesc, CUDA_R_8F_E4M3, m, n, ldc));
+    //checkCublasStatus(cublasLtMatrixLayoutCreate(&Ddesc, CUDA_R_16BF, m, n, ldc));
 
     // create preference handle; here we could use extra attributes to disable tensor ops or to make sure algo selected
     // will work with badly aligned A, B, C; here for simplicity we just assume A,B,C are always well aligned (e.g.
@@ -130,9 +132,10 @@ int main(int argc, char *argv[])
      printf("Matrix dimension (M, N, K) = (%d, %d, %d)\n", m, n, k);
 
      TestBench<__nv_fp8_e4m3,
-               __nv_bfloat16, // cublasLtMatrixLayoutCreate
-               __nv_fp8_e4m3,
-               float> props(m, n, k, 1.0f, 1.0f, 32ULL * 1024 * 1024);
+               __nv_bfloat16, // C type
+               __nv_fp8_e4m3, // output type
+               //__nv_bfloat16, // output type
+               float> props(m, n, k, 1.0f, 0.0f, 32ULL * 1024 * 1024);
 
      props.run([&props, repeat] {
           LtFp8Matmul(repeat,
