@@ -47,12 +47,12 @@ inline void checkCudaStatus(cudaError_t status) {
 
 inline void checkCublasStatus(cublasStatus_t status) {
     if (status != CUBLAS_STATUS_SUCCESS) {
-        printf("cuBLAS API failed with status %d\n", status);
+        printf("cuBLAS API failed with status %d", status);
         throw std::logic_error("cuBLAS API failed");
     }
 }
 
-template <typename InType, typename CType, typename OutType = InType, typename ComputeType = OutType>
+template <typename InType, typename CType, typename OutType, typename ComputeType>
 struct TestBench {
     using SampleRunner = std::function<void()>;
 
