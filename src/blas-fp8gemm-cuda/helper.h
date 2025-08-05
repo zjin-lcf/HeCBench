@@ -59,7 +59,7 @@ struct TestBench {
     TestBench(int m, int n, int k,
             ComputeType alpha = ComputeType{0.0f}, ComputeType beta = ComputeType{0.0f},
             size_t workspaceSize = 1024 * 1024 * 4, int N = 1,
-            ComputeType Ascale = ComputeType{2.0f}, ComputeType Bscale = ComputeType{0.5f},
+            ComputeType Ascale = ComputeType{1.0f}, ComputeType Bscale = ComputeType{1.0f},
             ComputeType Cscale = ComputeType{1.0f}, ComputeType Dscale = ComputeType{1.0f}) :
         m(m), n(n), k(k), N(N), alpha(alpha), beta(beta), workspaceSize(workspaceSize), 
         Ahost(m * k * N), Bhost(n * k * N), Chost(m * n * N), Dhost(m * n * N),
