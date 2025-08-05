@@ -21,11 +21,12 @@ void LtFp8Matmul(const int repeat,
                  const hipblaslt_f8_fnuz *B,
                  int ldb,
                  const float *c_scale, /* device pointer */
-                 const hipblasLtBfloat16 *C,
-                 //const hipblaslt_f8_fnuz *C,
+                 const hipblaslt_f8_fnuz *C,
+                 //const hipblasLtBfloat16 *C,
                  int ldc,
                  const float *d_scale, /* device pointer */
                  hipblaslt_f8_fnuz *D,
+                 //hipblasLtBfloat16 *D,
                  float *amax_d, /* device pointer */
                  void *workspace,
                  size_t workspaceSize) {
@@ -62,6 +63,7 @@ void LtFp8Matmul(const int repeat,
     checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Bdesc, HIP_R_8F_E4M3_FNUZ, transb == HIPBLAS_OP_N ? k : n, transb == HIPBLAS_OP_N ? n : k, ldb));
     // no heuristic function available for current configuration
     //checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Cdesc, HIP_R_16BF, m, n, ldc));
+    //checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Ddesc, HIP_R_16BF, m, n, ldc));
     checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Cdesc, HIP_R_8F_E4M3_FNUZ, m, n, ldc));
     checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Ddesc, HIP_R_8F_E4M3_FNUZ, m, n, ldc));
 
@@ -133,9 +135,11 @@ int main(int argc, char *argv[])
      printf("Matrix dimension (M, N, K) = (%d, %d, %d)\n", m, n, k);
 
      TestBench<hipblaslt_f8_fnuz,
-               hipblasLtBfloat16, // ( hipblasLtMatrixLayoutCreate)
                hipblaslt_f8_fnuz,
-               float> props(m, n, k, 1.0f, 1.0f, 32ULL * 1024 * 1024);
+               //hipblasLtBfloat16,
+               hipblaslt_f8_fnuz,
+               //hipblasLtBfloat16,
+               float> props(m, n, k, 1.0f, 0.0f, 32ULL * 1024 * 1024);
 
      props.run([&props, repeat] {
           LtFp8Matmul(repeat,
