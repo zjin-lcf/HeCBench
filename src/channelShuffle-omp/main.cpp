@@ -6,9 +6,14 @@
 #include "reference.h"
 
 #define NUM_THREADS 256
+#define GridDimMaxY 65536
+
+#ifdef V2
 
 template <typename T>
-void ChannelShuffleNCHWKernel(
+void ChannelShuffleNCHWKernel_opt(
+    const int numTeams,
+    const int numThreads,
     const int N,
     const int G,
     const int K,
@@ -17,7 +22,8 @@ void ChannelShuffleNCHWKernel(
           T* Y)
 {
   const int C = G * K;
-  #pragma omp target teams distribute parallel for collapse(3) num_threads(NUM_THREADS)
+  #pragma omp target teams distribute parallel for collapse(3) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int n = 0; n < N; n++)
     for (int c = 0; c < C; c++)
       for (int s = 0; s < HxW; s++)
@@ -25,15 +31,92 @@ void ChannelShuffleNCHWKernel(
 }
 
 template <typename T>
-void
-ChannelShuffleNHWCKernel(const int O, const int G, const int K, const T* X, T* Y)
+void ChannelShuffleNHWCKernel_opt(
+    const int numTeams,
+    const int numThreads,
+    const int O,
+    const int G,
+    const int K,
+    const T* X,
+          T* Y)
 {
   const int C = G * K;
-  #pragma omp target teams distribute parallel for collapse(2) num_threads(NUM_THREADS)
+  #pragma omp target teams distribute parallel for collapse(2) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int o = 0; o < O; o++)
     for (int i = 0; i < C; i++)
       Y[o*C + i] = X[o*C + (i % G) * K + i / G];
 }
+
+#else
+
+// begin of ChannelShuffleNHWCKernel
+template <typename T, int kSharedSize>
+void ChannelShuffleNHWCKernel(
+    const int numTeams,
+    const int numThreads,
+    const int G,
+    const int K,
+    const T* X,
+          T* Y)
+{
+  #pragma omp target teams num_teams(numTeams) 
+  {
+    T sdata[kSharedSize];
+    #pragma omp parallel num_threads(numThreads)
+    {
+      const int C = G * K;
+      const int offset = omp_get_team_num() * C;
+      for (int i = omp_get_thread_num(); i < C; i += omp_get_num_threads()) {
+        sdata[i] = X[offset + i];
+      }
+      #pragma omp barrier
+      for (int i = omp_get_thread_num(); i < C; i += omp_get_num_threads()) {
+        const int g = i % G;
+        const int k = i / G;
+        Y[offset + i] = sdata[g * K + k];
+      }
+    }
+  }
+}
+// end of ChannelShuffleNHWCKernel
+
+// begin of ChannelShuffleNCHWKernel
+template <typename T, bool kNFirst >
+void ChannelShuffleNCHWKernel (
+    const int numTeams,
+    const int numThreads,
+    const int S,
+    const int N,
+    const int C,
+    const int G,
+    const int K,
+    const int HxW,
+    const T* X,
+          T* Y)
+{
+  #pragma omp target teams num_teams(numTeams) 
+  {
+    #pragma omp parallel num_threads(numThreads)
+    {
+      const int blockIdx_x = omp_get_team_num() % S;
+      const int blockIdx_y = omp_get_team_num() / S % N;
+      const int blockIdx_z = omp_get_team_num() / (S * N);
+      const int n = kNFirst ? blockIdx_x : blockIdx_y;
+      const int s = kNFirst ? blockIdx_y : blockIdx_x;
+      const int g = blockIdx_z % G ;
+      const int k = blockIdx_z / G ;
+      const int offset = s * NUM_THREADS + omp_get_thread_num();
+      if (offset < HxW) {
+        Y[(n * C + blockIdx_z) * HxW + offset] =
+            X[(n * C + g * K + k) * HxW + offset];
+      }
+    }
+  }
+}
+// end of ChannelShuffleNCHWKernel
+
+#endif
 
 template <typename T>
 bool ChannelShuffleNCHW (T *X, int N, int C, int G, int numel, T *Y,
@@ -43,12 +126,26 @@ bool ChannelShuffleNCHW (T *X, int N, int C, int G, int numel, T *Y,
 
   const int K = C / G;
   const int HxW = numel / (N * C);
+  const int S = (HxW + NUM_THREADS - 1) / NUM_THREADS;
+
+  const int numTeams = S * N * C; 
+  const int numThreads = NUM_THREADS;
 
   auto start = std::chrono::steady_clock::now();
 
+#ifdef V2
   for (int i = 0; i < repeat; i++) {
-    ChannelShuffleNCHWKernel<float>(N, G, K, HxW, X, Y);
+    ChannelShuffleNCHWKernel_opt<float>(numTeams, numThreads, N, G, K, HxW, X, Y);
   }
+#else
+  if (N <= GridDimMaxY) {
+    for (int i = 0; i < repeat; i++)
+      ChannelShuffleNCHWKernel<float, false>(numTeams, numThreads, S, N, C, G, K, HxW, X, Y);
+  } else {
+    for (int i = 0; i < repeat; i++)
+      ChannelShuffleNCHWKernel<float, true>(numTeams, numThreads, N, S, C, G, K, HxW, X, Y);
+  }
+#endif
 
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -65,12 +162,27 @@ bool ChannelShuffleNHWC (T *X, int N, int C, int G, int numel, T *Y,
   const int K = C / G;
   const int HxW = numel / (N * C);
   const int O = N * HxW;
+  const int numTeams = O;
+  const int numThreads = NUM_THREADS;
 
   auto start = std::chrono::steady_clock::now();
 
+#ifdef V2
   for (int i = 0; i < repeat; i++) {
-    ChannelShuffleNHWCKernel<float>(O, G, K, X, Y);
+    ChannelShuffleNHWCKernel_opt<float>(numTeams, numThreads, O, G, K, X, Y);
   }
+#else
+  if (C <= 32) {
+    for (int i = 0; i < repeat; i++)
+      ChannelShuffleNHWCKernel<float, 32>(numTeams, numThreads, G, K, X, Y);
+  } else if (C <= 128) {
+    for (int i = 0; i < repeat; i++)
+      ChannelShuffleNHWCKernel<float, 128>(numTeams, numThreads, G, K, X, Y);
+  } else if (C <= 512) {
+    for (int i = 0; i < repeat; i++)
+      ChannelShuffleNHWCKernel<float, 512>(numTeams, numThreads, G, K, X, Y);
+  }
+#endif
 
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

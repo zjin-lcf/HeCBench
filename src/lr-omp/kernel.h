@@ -1,96 +1,48 @@
-inline void operator+=(float2 &a, const float2 &b)
-{
-    a.x += b.x;
-    a.y += b.y;
-}
-
-inline void operator+=(float4 &a, const float4 &b)
-{
-    a.x += b.x;
-    a.y += b.y;
-    a.z += b.z;
-    a.w += b.w;
-}
-
+// begin of linear_regression
 void linear_regression(
-  const int nTeams,
+  const int numTeams,
+  const int numThreads,
   const float2 *__restrict dataset,
         float4 *__restrict result)
 {
-  #pragma omp target teams num_teams(nTeams) thread_limit(TEMP_WORKGROUP_SIZE)
-  {
-    float4 interns[TEMP_WORKGROUP_SIZE];
-    #pragma omp parallel
-    {
-      size_t loc_id   = omp_get_thread_num();
-      size_t blk_id   = omp_get_team_num();
-      size_t loc_size = TEMP_WORKGROUP_SIZE; 
-      size_t glob_id  = blk_id * loc_size + loc_id;
-
-      /* Initialize local buffer */
-      interns[loc_id].x = dataset[glob_id].x;
-      interns[loc_id].y = dataset[glob_id].y;
-      interns[loc_id].z = (dataset[glob_id].x * dataset[glob_id].y);
-      interns[loc_id].w = (dataset[glob_id].x * dataset[glob_id].x);
-      
-      #pragma omp barrier
-
-      for (size_t i = (loc_size / 2), old_i = loc_size; i > 0; old_i = i, i /= 2)
-      {
-        if (loc_id < i) {
-          // Only first half of workitems on each workgroup
-          interns[loc_id] += interns[loc_id + i];
-          if (loc_id == (i - 1) && old_i % 2 != 0) {
-            // If there is an odd number of data
-            interns[loc_id] += interns[old_i - 1];
-          }
-        }
-        #pragma omp barrier
-      }
-
-      if (loc_id == 0) result[blk_id] = interns[0];
+  #pragma omp target teams distribute num_teams(numTeams) 
+  for ( size_t block_id = 0 ; block_id < numTeams ; ++ block_id ) {
+    float sum_x = 0, sum_y = 0, sum_z = 0, sum_w = 0;
+    #pragma omp parallel for reduction (+ : sum_x, sum_y, sum_z, sum_w) num_threads(numThreads)
+    for ( size_t thread_id = 0 ; thread_id < numThreads ; ++ thread_id ) {
+      size_t glob_id = block_id * numThreads + thread_id ;
+      float x = dataset [ glob_id ].x ;
+      float y = dataset [ glob_id ].y ;
+      sum_x += x ;
+      sum_y += y ;
+      sum_z += x * y ;
+      sum_w += x * x ;
     }
+    result [ block_id ] = {sum_x, sum_y, sum_z, sum_w}; 
   }
 }
+// end of linear_regression
 
+// begin of rsquared
 void rsquared(
-  const int nTeams,
+  const int numTeams,
+  const int numThreads,
   const float2 *__restrict dataset,
   const float mean,
   const float2 equation, // [a0,a1]
   float2 *__restrict result)
 {
-  #pragma omp target teams num_teams(nTeams) thread_limit(TEMP_WORKGROUP_SIZE)
-  {
-    float2 dist[TEMP_WORKGROUP_SIZE];
-    #pragma omp parallel 
-    {
-      size_t loc_id   = omp_get_thread_num();
-      size_t blk_id   = omp_get_team_num();
-      size_t loc_size = TEMP_WORKGROUP_SIZE; 
-      size_t glob_id  = blk_id * loc_size + loc_id;
-
-      dist[loc_id].x = powf((dataset[glob_id].y - mean), 2.f);
-
+  #pragma omp target teams distribute num_teams(numTeams)
+  for ( size_t block_id = 0 ; block_id < numTeams ; ++ block_id ) {
+    float sum_x = 0, sum_y = 0;
+    #pragma omp parallel for reduction (+ : sum_x, sum_y) num_threads(numThreads)
+    for ( size_t thread_id = 0 ; thread_id < numThreads ; ++ thread_id ) {
+      size_t glob_id = block_id * numThreads + thread_id ;
+      sum_x += powf((dataset[glob_id].y - mean), 2.f);
       float y_estimated = dataset[glob_id].x * equation.y + equation.x;
-      dist[loc_id].y = powf((y_estimated - mean), 2.f);
-
-      #pragma omp barrier
-
-      for (size_t i = (loc_size / 2), old_i = loc_size; i > 0; old_i = i, i /= 2)
-      {
-        if (loc_id < i) {
-          // Only first half of workitems on each workgroup
-          dist[loc_id] += dist[loc_id + i];
-          if (loc_id == (i - 1) && old_i % 2 != 0) {
-            // If there is an odd number of data
-            dist[loc_id] += dist[old_i - 1];
-          }
-        }
-        #pragma omp barrier
-      }
-
-      if (loc_id == 0) result[blk_id] = dist[0];
+      sum_y += powf((y_estimated - mean), 2.f);
     }
+    result [ block_id ] = {sum_x, sum_y};
   }
 }
+// end of rsquared

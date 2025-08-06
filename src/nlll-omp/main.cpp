@@ -6,9 +6,12 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of nll_loss_forward_reduce2d_kernel
 template <typename scalar_t, typename accscalar_t, 
           typename index_t, int NLL_LOSS_THREADS>
 void nll_loss_forward_reduce2d_kernel(
+    const int numTeams,
+    const int numThreads,
     scalar_t* __restrict__ output,
     scalar_t* __restrict__ total_weight,
     const scalar_t* __restrict__ input,
@@ -19,11 +22,11 @@ void nll_loss_forward_reduce2d_kernel(
     int64_t kdim,
     int64_t ignore_index)
 {
-  #pragma omp target teams num_teams(1) thread_limit(NLL_LOSS_THREADS)
+  #pragma omp target teams num_teams(numTeams)
   {
     accscalar_t sm_inputs[NLL_LOSS_THREADS],
                 acc_weight[NLL_LOSS_THREADS];
-    #pragma omp parallel
+    #pragma omp parallel num_threads(numThreads)
     {
       int tid = omp_get_thread_num();
       int nthreads = omp_get_num_threads();
@@ -62,6 +65,7 @@ void nll_loss_forward_reduce2d_kernel(
     }
   }
 }
+// end of nll_loss_forward_reduce2d_kernel
 
 template <typename scalar_t, typename index_t, int GPU_THREADS>
 void eval(const int64_t nframe,
@@ -87,11 +91,16 @@ void eval(const int64_t nframe,
                                   h_target[0:target_size]) \
                           map(from: h_output[0:1], h_total_weight[0:1])
   {
+    const int numTeams = 1;
+    const int numThreads = GPU_THREADS;
+
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
       nll_loss_forward_reduce2d_kernel
         <scalar_t, scalar_t, index_t, GPU_THREADS>(
+        numTeams,
+        numThreads,
         h_output,
         h_total_weight,
         h_input,

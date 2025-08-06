@@ -6,8 +6,69 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of attention_kernel1
+void attention_kernel1 (
+    const int numTeams,
+    const int numThreads,
+    const float*__restrict__ key,
+    const float*__restrict__ query,
+    float*__restrict__ dot_product,
+    float*__restrict__ exp_sum,
+    const int n,
+    const int d)
+{
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+   for (int i = 0; i < n; i++) {
+     float sum = 0;
+     for (int j = 0; j < d; j++)
+        sum += key[i * d + j] * query[j];
+     dot_product[i] = sum;
+     #pragma omp atomic update  
+     exp_sum[0] += expf(sum);
+   }
+}
+// end of attention_kernel1
+
+// begin of attention_kernel2
+void attention_kernel2 (
+    const int numTeams,
+    const int numThreads,
+    const float*__restrict__ exp_sum,
+    const float*__restrict__ dot_product,
+    float*__restrict__ score,
+    const int n)
+{
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+   for (int i = 0; i < n; i++)
+     score[i] = expf(dot_product[i]) / exp_sum[0];
+}
+// end of attention_kernel2
+
+// begin of attention_kernel3
+void attention_kernel3 (
+    const int numTeams,
+    const int numThreads,
+    const float*__restrict__ score,
+    const float*__restrict__ value,
+    float*__restrict__ output,
+    const int n,
+    const int d)
+{
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int j = 0; j < d; j++) {
+    float sum = 0;
+    for (int i = 0; i < n; i++)
+       sum += score[i] * value[i * d + j];
+    output[j] = sum;
+  }
+}
+// end of attention_kernel3
+
 float* attention_device(const float* key, const float* value, const float* query,
-                        const int n, const int d, const int repeat) 
+                        const int n, const int d, const int impl_num, const int repeat) 
 {
   // intermediate
   float* dot_product = (float*) malloc (n * sizeof(float));
@@ -27,27 +88,11 @@ float* attention_device(const float* key, const float* value, const float* query
       exp_sum[0] = 0;
       #pragma omp target update to (exp_sum[0:1])
 
-      #pragma omp target teams distribute parallel for thread_limit(256)
-      for (int i = 0; i < n; i++) {
-        float sum = 0;
-        for (int j = 0; j < d; j++)
-           sum += key[i * d + j] * query[j];
-        dot_product[i] = sum;
-        #pragma omp atomic update  
-        exp_sum[0] += expf(sum);
-      }
+      attention_kernel1((n+255)/256, 256, key, query, dot_product, exp_sum, n, d);
 
-      #pragma omp target teams distribute parallel for thread_limit(256)
-      for (int i = 0; i < n; i++)
-        score[i] = expf(dot_product[i]) / exp_sum[0];
+      attention_kernel2((n+255)/256, 256, exp_sum, dot_product, score, n);
       
-      #pragma omp target teams distribute parallel for thread_limit(256)
-      for (int j = 0; j < d; j++) {
-        float sum = 0;
-        for (int i = 0; i < n; i++)
-           sum += score[i] * value[i * d + j];
-        output[j] = sum;
-      }
+      attention_kernel3((d+255)/256, 256, score, value, output, n, d);
     }
 
     auto end = std::chrono::steady_clock::now();
@@ -62,13 +107,14 @@ float* attention_device(const float* key, const float* value, const float* query
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
-    printf("Usage: %s <rows> <columns> <repeat>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <rows> <columns> <implementation> <repeat>\n", argv[0]);
     return 1;
   }
   const int n = atoi(argv[1]);
   const int d = atoi(argv[2]);
-  const int r = atoi(argv[3]);
+  const int k = atoi(argv[3]);
+  const int r = atoi(argv[4]);
 
   // input
   float* key = (float*) malloc (n * d * sizeof(float));
@@ -86,7 +132,7 @@ int main(int argc, char* argv[]) {
 
   float* hout = attention_host(key, value, query, n, d);
 
-  float* dout = attention_device(key, value, query, n, d, r);
+  float* dout = attention_device(key, value, query, n, d, k, r);
 
   float rmse = 0;
   for (int i = 0; i < d; i++) 

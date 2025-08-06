@@ -5,7 +5,10 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of vanGenuchten
 void vanGenuchten(
+  const int numTeams,
+  const int numThreads, 
   const double *__restrict Ksat,
   const double *__restrict psi,
         double *__restrict C,
@@ -13,7 +16,8 @@ void vanGenuchten(
         double *__restrict K,
   const int size)
 {
-  #pragma omp target teams distribute parallel for thread_limit(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < size; i++) {
 
     double Se, _theta, _psi, lambda, m, t;
@@ -46,6 +50,7 @@ void vanGenuchten(
       C[i] = 0.0;
   }
 }
+// end of vanGenuchten
 
 int main(int argc, char* argv[])
 {
@@ -86,10 +91,13 @@ int main(int argc, char* argv[])
   #pragma omp target data map(to: Ksat[0:size], psi[0:size]) \
                           map(from: C[0:size], theta[0:size], K[0:size])
   {
+    const int numTeams = (size+255)/256;
+    const int numThreads = 256;
+
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++)
-      vanGenuchten(Ksat, psi, C, theta, K, size);
+      vanGenuchten(numTeams, numThreads, Ksat, psi, C, theta, K, size);
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

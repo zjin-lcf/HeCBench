@@ -31,7 +31,11 @@
 
 // Calculate the power parameter, and then weighted interpolating
 // Without using shared memory
+
+// begin of AIDW_Kernel
 void AIDW_Kernel(
+    const int numTeams,
+    const int numThreads,
     const float *__restrict dx, 
     const float *__restrict dy,
     const float *__restrict dz,
@@ -44,7 +48,8 @@ void AIDW_Kernel(
     const float *__restrict avg_dist) 
 
 {
-  #pragma omp target teams distribute parallel for thread_limit(BLOCK_SIZE)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int tid = 0; tid < inum; tid++) {
     float sum = 0.f, dist = 0.f, t = 0.f, z = 0.f, alpha = 0.f;
 
@@ -75,10 +80,13 @@ void AIDW_Kernel(
     iz[tid] = z / sum;
   }
 }
+// end of AIDW_Kernel
 
 // Calculate the power parameter, and then weighted interpolating
 // With using shared memory (Tiled version of the stage 2)
 void AIDW_Kernel_Tiled(
+    const int numTeams,
+    const int numThreads,
     const float *__restrict dx, 
     const float *__restrict dy,
     const float *__restrict dz,
@@ -90,12 +98,12 @@ void AIDW_Kernel_Tiled(
     const float area,
     const float *__restrict avg_dist)
 {
-  #pragma omp target teams num_teams((inum+BLOCK_SIZE-1)/BLOCK_SIZE) thread_limit(BLOCK_SIZE)
+  #pragma omp target teams num_teams(numTeams) thread_limit(numThreads)
   {
     float sdx[BLOCK_SIZE];
     float sdy[BLOCK_SIZE];
     float sdz[BLOCK_SIZE];
-    #pragma omp parallel
+    #pragma omp parallel num_threads(numThreads)
     {
       int lid = omp_get_thread_num();
       int tid = omp_get_team_num() * BLOCK_SIZE + lid;
@@ -222,8 +230,11 @@ int main(int argc, char *argv[])
                                 d_avg_dist[0:dnum]) \
                         map(alloc: d_iz[0:inum])
   {
+    const int numThreads = BLOCK_SIZE;
+    const int numTeams = (inum + BLOCK_SIZE - 1) / BLOCK_SIZE;
+
     // Weighted Interpolate using AIDW
-    AIDW_Kernel(d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
+    AIDW_Kernel(numTeams, numThreads, d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
     #pragma omp target update from (d_iz[0:inum])
 
     if (check) {
@@ -231,7 +242,7 @@ int main(int argc, char *argv[])
       printf("%s\n", ok ? "PASS" : "FAIL");
     }
 
-    AIDW_Kernel_Tiled(d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
+    AIDW_Kernel_Tiled(numTeams, numThreads, d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
     #pragma omp target update from (d_iz[0:inum])
     if (check) {
       bool ok = verify (iz.data(), h_iz.data(), inum, EPS);
@@ -241,7 +252,7 @@ int main(int argc, char *argv[])
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < iterations; i++)
-      AIDW_Kernel(d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
+      AIDW_Kernel(numTeams, numThreads, d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -250,7 +261,7 @@ int main(int argc, char *argv[])
     start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < iterations; i++)
-      AIDW_Kernel_Tiled(d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
+      AIDW_Kernel_Tiled(numTeams, numThreads, d_dx, d_dy, d_dz, dnum, d_ix, d_iy, d_iz, inum, area, d_avg_dist);
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

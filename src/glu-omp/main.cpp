@@ -9,14 +9,18 @@
 
 #define block_size 256
 
+// begin of glu_kernel
 void glu_kernel(
+   const int numTeams,
+   const int numThreads,
    const int M,
    const int split_dim_size,
    const int N,
    const float* Xdata,
          float* Ydata)
 {
-  #pragma omp target teams distribute parallel for num_threads(block_size)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads) 
   for (int index = 0; index < M * split_dim_size * N; index++) {
     const int xOffset = 2 * split_dim_size * N;
     const int yOffset = split_dim_size * N;
@@ -29,6 +33,7 @@ void glu_kernel(
     Ydata[i * yOffset + j * N + k] = x1 * (1.f / (1.f + expf(-x2)));
   }
 }
+// end of glu_kernel
 
 int main(int argc, char* argv[])
 {
@@ -85,10 +90,13 @@ int main(int argc, char* argv[])
 
       ComputeGlu(m, split_dim_size, n, X, Y_ref);
 
+      const int numTeams = (m * split_dim_size * n + block_size - 1) / block_size;
+      const int numThreads = block_size;
+
       auto start = std::chrono::steady_clock::now();
 
       for (int i = 0; i < repeat; i++) {
-        glu_kernel(m, split_dim_size, n, X, Y);
+        glu_kernel(numTeams, numThreads, m, split_dim_size, n, X, Y);
       }
 
       auto end = std::chrono::steady_clock::now();

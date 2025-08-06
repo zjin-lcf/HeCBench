@@ -10,6 +10,8 @@
 
 template <typename T, typename StrideType>
 void cross_kernel(
+    const int numTeams,
+    const int numThreads,
     int numel,
           T* out,
     const T* x1,
@@ -18,7 +20,8 @@ void cross_kernel(
     StrideType x1stride,
     StrideType x2stride)
 {
-  #pragma omp target teams distribute parallel for num_threads(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < numel; i++) {
     auto* out_row = out + 3*i;
     const auto* x1_row = x1 + 3*i;
@@ -41,6 +44,8 @@ void cross_kernel(
 
 template <typename T, typename StrideType>
 void cross2_kernel(
+    const int numTeams,
+    const int numThreads,
     int numel,
           T* out,
     const T* x1,
@@ -49,7 +54,8 @@ void cross2_kernel(
     StrideType x1stride,
     StrideType x2stride)
 {
-  #pragma omp target teams distribute parallel for num_threads(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < numel; i++) {
     auto* out_row = out + 3*i;
     const auto* x1_row = x1 + 3*i;
@@ -74,14 +80,18 @@ void cross2_kernel(
   }
 }
 
+// begin of cross3_kernel
 template <typename T>
 void cross3_kernel(
+    const int numTeams,
+    const int numThreads,
     int numel,
           T* out,
     const T* x1,
     const T* x2)
 {
-  #pragma omp target teams distribute parallel for num_threads(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < numel; i++) {
     auto* out_row = out + 3*i;
     const auto* x1_row = x1 + 3*i;
@@ -105,6 +115,7 @@ void cross3_kernel(
     out_row[2] = val2;
   }
 }
+// end of cross3_kernel
 
 
 template <typename T>
@@ -132,10 +143,13 @@ void eval(const int nrows, const int repeat) {
                                     o2[0:num_elems], \
                                     o3[0:num_elems])
   {
+    const int numTeams = ((nrows + 255) / 256);
+    const int numThreads = 256;
+
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) 
-      cross_kernel(nrows, o, a, b, 1, 1, 1);
+      cross_kernel(numTeams, numThreads, nrows, o, a, b, 1, 1, 1);
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -144,7 +158,7 @@ void eval(const int nrows, const int repeat) {
     start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) 
-      cross2_kernel(nrows, o2, a, b, 1, 1, 1);
+      cross2_kernel(numTeams, numThreads, nrows, o2, a, b, 1, 1, 1);
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -153,7 +167,7 @@ void eval(const int nrows, const int repeat) {
     start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) 
-      cross3_kernel(nrows, o3, a, b);
+      cross3_kernel(numTeams, numThreads, nrows, o3, a, b);
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

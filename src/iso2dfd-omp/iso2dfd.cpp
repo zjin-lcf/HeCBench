@@ -21,6 +21,7 @@
 #include <omp.h>
 #include "iso2dfd.h"
 
+#define BLOCK_SIZE 16
 #define MIN(a, b) (a) < (b) ? (a) : (b)
 
 /*
@@ -145,9 +146,18 @@ void iso_2dfd_iteration_cpu(float* next, float* prev, float* vel,
  * Range kernel is used to spawn work-items in x, y dimension
  *
  */
-void iso_2dfd_kernel(float* next, const float* prev, const float* vel, 
-                     const float dtDIVdxy, const size_t nRows, const size_t nCols) {
-  #pragma omp target teams distribute parallel for simd collapse(2) thread_limit(256) 
+// begin of iso_2dfd_kernel
+void iso_2dfd_kernel(const int numTeams,
+                     const int numThreads,
+                           float*__restrict next,
+                     const float*__restrict prev,
+                     const float*__restrict vel, 
+                     const float dtDIVdxy,
+                     const size_t nRows,
+                     const size_t nCols)
+{
+  #pragma omp target teams distribute parallel for collapse(2) \
+   num_teams(numTeams) num_threads(numThreads)
   for (size_t gidRow = 0; gidRow < nRows ; gidRow++)
     for (size_t gidCol = 0; gidCol < nCols ; gidCol++) {
       size_t gid = (gidRow)*nCols + gidCol;
@@ -167,6 +177,7 @@ void iso_2dfd_kernel(float* next, const float* prev, const float* vel,
       }
   }
 }
+// end of iso_2dfd_kernel
 
 int main(int argc, char* argv[]) {
   // Arrays used to update the wavefield
@@ -218,13 +229,18 @@ int main(int argc, char* argv[]) {
   #pragma omp target data map(next_base[0:nsize], prev_base[0:nsize]) \
                           map(to: vel_base[0:nsize])
   {
+    unsigned int grid_cols = (nCols + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    unsigned int grid_rows = (nRows + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    const int numTeams = grid_cols * grid_rows;
+    const int numThreads = BLOCK_SIZE * BLOCK_SIZE;
     auto kstart = std::chrono::steady_clock::now();
   
     // Iterate over time steps
     for (unsigned int k = 0; k < nIterations; k += 1) {
       // alternating the 'next' and 'prev' parameters which effectively
       //    swaps their content at every iteration.
-      iso_2dfd_kernel((k % 2) ? prev_base : next_base,
+      iso_2dfd_kernel(numTeams, numThreads,
+                      (k % 2) ? prev_base : next_base,
                       (k % 2) ? next_base : prev_base,
                       vel_base, dtDIVdxy, nRows, nCols);
     }  // end for

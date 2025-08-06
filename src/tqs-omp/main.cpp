@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
             #pragma omp target update to (d_data_queues[0:p.queue_size * p.n_gpu_threads])
 
             // Kernel launch
-            call_TaskQueue_gpu(p.n_gpu_blocks, p.n_gpu_threads, h_task_queues, d_data_queues, h_consumed, 
+            TaskQueue_gpu(p.n_gpu_blocks, p.n_gpu_threads, h_task_queues, d_data_queues, h_consumed, 
                 p.iterations, n_consumed_tasks, p.queue_size);
 
             #pragma omp target update from (d_data_queues[0:p.queue_size * p.n_gpu_threads])

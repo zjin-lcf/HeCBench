@@ -6,8 +6,11 @@
 #include <random>
 #include "reference.h"
 
+// begin of adam
 template <typename T, typename G>
 inline void adam (
+  const int numTeams,
+  const int numThreads,
         T* __restrict p,
         T* __restrict m,
         T* __restrict v,
@@ -22,7 +25,8 @@ inline void adam (
   adamMode_t mode,
   const float decay)
 {
-  #pragma omp target teams distribute parallel for thread_limit(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (size_t j = 0; j < vector_size; j++) {
     for (int t = 1; t <= time_step; t++) {
       T scaled_grad = g[j]/grad_scale;
@@ -40,6 +44,7 @@ inline void adam (
     }
   }
 }
+// end of adam
 
 int main(int argc, char* argv[])
 {
@@ -77,6 +82,10 @@ int main(int argc, char* argv[])
   const float eps = 1e-10f;
   const float grad_scale = 256.f;
 
+  const int threadsPerBlock = 256;
+  const int numTeams = (vector_size+threadsPerBlock-1) / threadsPerBlock;
+  const int numThreads = threadsPerBlock;
+
   adamMode_t mode = ADAM_MODE_0;
 
   #pragma omp target data map (to: m[0:vector_size], v[0:vector_size], g[0:vector_size]) \
@@ -86,6 +95,7 @@ int main(int argc, char* argv[])
 
     for (int i = 0; i < repeat; i++) {
       adam<float, float>(
+        numTeams, numThreads,
         p, m, v, g,
         beta1, beta2,
         eps,

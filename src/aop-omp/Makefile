@@ -50,10 +50,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -61,4 +61,3 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) -runs 100
-

@@ -7,28 +7,36 @@
 
 #define GPU_THREADS 256
 
+// begin of SwishKernel
 template <typename T>
-void SwishKernel(const int N, const T* X, T* Y)
+void SwishKernel(const int numTeams, const int numThreads,
+                 const int N, const T* X, T* Y)
 {
-  #pragma omp target teams distribute parallel for num_threads(GPU_THREADS)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < N; i++) {
     Y[i] = X[i] / (T(1) + exp(-X[i]));
   }
 }
+// end of SwishKernel
 
+// begin of SwishGradientKernel
 template <typename T>
-void SwishGradientKernel(
-    const int N,
-    const T* X,
-    const T* Y,
-    const T* dY,
-          T* dX)
+void SwishGradientKernel(const int numTeams,
+                         const int numThreads,
+                         const int N,
+                         const T* X,
+                         const T* Y,
+                         const T* dY,
+                               T* dX)
 {
-  #pragma omp target teams distribute parallel for num_threads(GPU_THREADS)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < N; i++) {
     dX[i] = dY[i] * (Y[i] + (T(1) - Y[i]) / (T(1) + exp(-X[i])));
   }
 }
+// end of SwishGradientKernel
 
 template<typename T>
 void eval_swish (const int N, const int repeat) {
@@ -49,13 +57,16 @@ void eval_swish (const int N, const int repeat) {
     h_dY[i] = distr(gen);
   }
 
+  const int numTeams = (N + GPU_THREADS - 1) / GPU_THREADS;
+  const int numThreads = GPU_THREADS;
+
   #pragma omp target data map(to: h_X[0:N], h_dY[0:N]) \
                           map(from: h_Y[0:N], h_dX[0:N]) 
   {
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) 
-      SwishKernel(N, h_X, h_Y);
+      SwishKernel(numTeams, numThreads, N, h_X, h_Y);
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -64,7 +75,7 @@ void eval_swish (const int N, const int repeat) {
     start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) 
-      SwishGradientKernel(N, h_X, h_Y, h_dY, h_dX);
+      SwishGradientKernel(numTeams, numThreads, N, h_X, h_Y, h_dY, h_dX);
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

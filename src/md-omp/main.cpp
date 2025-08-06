@@ -10,7 +10,10 @@
 #include "reference.h"
 #include "utils.h"
 
+// begin of md
 void md (
+    const int numTeams,
+    const int numThreads,
     const POSVECTYPE* __restrict position,
     FORCEVECTYPE* __restrict force,
     const int* __restrict neighborList, 
@@ -20,7 +23,8 @@ void md (
     const FPTYPE lj2_t,
     const FPTYPE cutsq_t )
 {
-  #pragma omp target teams distribute parallel for thread_limit(256) 
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (uint idx = 0; idx < nAtom; idx++) {
     POSVECTYPE ipos = position[idx];
     FORCEVECTYPE f = zero;
@@ -55,6 +59,7 @@ void md (
     force[idx] = f;
   }
 }
+// end of md
 
 int main(int argc, char** argv)
 {
@@ -102,8 +107,12 @@ int main(int argc, char** argv)
                                   neighborList[0:nAtom * maxNeighbors]) \
                           map(alloc: force[0:nAtom])
   {
+    const int numTeams = (nAtom+255) / 256;
+    const int numThreads = 256;
     // warmup and result verification
-    md(position,
+    md(numTeams,
+       numThreads,
+       position,
        force,
        neighborList,
        nAtom,
@@ -121,7 +130,9 @@ int main(int argc, char** argv)
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < iteration; i++) {
-      md(position,
+      md(numTeams,
+         numThreads,
+         position,
          force,
          neighborList,
          nAtom,

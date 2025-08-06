@@ -35,19 +35,20 @@
 
 #include "kernel.h"
 
-void call_TaskQueue_gpu(int blocks,
-                        int threads,
-                        const task_t *__restrict task_queue,
-                        int *__restrict data_queue,
-                        int *__restrict consumed, 
-                        int iterations,
-                        int offset,
-                        int gpuQueueSize)
+// begin of TaskQueue_gpu
+void TaskQueue_gpu(const int numTeams,
+                   const int numThreads,
+                   const task_t *__restrict task_queue,
+                   int *__restrict data_queue,
+                   int *__restrict consumed, 
+                   int iterations,
+                   int offset,
+                   int gpuQueueSize)
 {
-  #pragma omp target teams num_teams(blocks) thread_limit(threads)
+  #pragma omp target teams num_teams(numTeams)
   {
     int l_mem[3];
-    #pragma omp parallel 
+    #pragma omp parallel num_threads(numThreads)
     {
       int& next = l_mem[0];
       task_t* t = (task_t*)&l_mem[1];
@@ -93,3 +94,4 @@ void call_TaskQueue_gpu(int blocks,
     }
   }
 }
+// end of TaskQueue_gpu

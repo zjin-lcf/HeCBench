@@ -39,6 +39,64 @@
 double solution(const double t, const double x, const double y, const double alpha, const double length);
 double l2norm(const int n, const double * __restrict u, const int nsteps, const double dt, const double alpha, const double dx, const double length);
 
+// begin of initial_value
+void initial_value(const int numTeams,
+                   const int numThreads,
+                   const unsigned int n,
+                   const double dx,
+                   const double length,
+                   double * u)
+{
+  // Sets the mesh to an initial value, determined by the MMS scheme
+  #pragma omp target teams distribute parallel for collapse(2) \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int j = 0; j < n; ++j) {
+    for (int i = 0; i < n; ++i) {
+      double y = (j+1)*dx; // Physical y position
+      double x = (i+1)*dx; // Physical x position
+      u[i+j*n] = sin(acos(-1.0) * x / length) * sin(acos(-1.0) * y / length);
+    }
+  }
+}
+// end of initial_value
+
+void zero(const int numTeams,
+          const int numThreads,
+          const unsigned int n, double * u)
+{
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int i = 0; i < n * n; ++i) {
+    u[i] = 0.0;
+  }
+}
+
+void solve(const int numTeams,
+           const int numThreads,
+           const unsigned int n,
+           const double alpha,
+           const double dx,
+           const double dt, 
+           const double r,
+           const double r2,
+           const double * __restrict u,
+           double * __restrict u_tmp)
+{
+  #pragma omp target teams distribute parallel for collapse(2) \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int j = 0; j < n; ++j) {
+    for (int i = 0; i < n; ++i) {
+      // Update the 5-point stencil, using boundary conditions on the edges of the domain.
+      // Boundaries are zero because the MMS solution is zero there.
+      u_tmp[i+j*n] =  r2 * u[i+j*n] +
+      r * ((i < n-1) ? u[i+1+j*n] : 0.0) +
+      r * ((i > 0)   ? u[i-1+j*n] : 0.0) +
+      r * ((j < n-1) ? u[i+(j+1)*n] : 0.0) +
+      r * ((j > 0)   ? u[i+(j-1)*n] : 0.0);
+    }
+  }
+}
+
 int main(int argc, char *argv[]) {
 
   // Start the total program runtime timer
@@ -110,62 +168,41 @@ int main(int argc, char *argv[]) {
   double tic, toc;
   const int block_size = 256;
 
-#pragma omp target data map(tofrom: u[0:n*n], u_tmp[0:n*n]) 
-{
-  // Set the initial value of the grid under the MMS scheme
-  #pragma omp target teams distribute parallel for simd collapse(2) thread_limit(block_size)
-  for (int j = 0; j < n; ++j) {
-    for (int i = 0; i < n; ++i) {
-      double y = (j+1)*dx; // Physical y position
-      double x = (i+1)*dx; // Physical x position
-      u[i+j*n] = sin(acos(-1.0) * x / length) * sin(acos(-1.0) * y / length);
+  #pragma omp target data map(tofrom: u[0:n*n], u_tmp[0:n*n]) 
+  {
+    int n_ceil = (n*n+block_size-1) / block_size;
+  
+    // Set the initial value of the grid under the MMS scheme
+    initial_value(n_ceil, block_size, n, dx, length, u);
+  
+    zero(n_ceil, block_size, n, u_tmp);
+
+    //
+    // Run through timesteps under the explicit scheme
+    //
+
+    // Finite difference constant multiplier
+    const double r2 = 1.0 - 4.0*r;
+
+    // Start the solve timer
+    tic = omp_get_wtime();
+
+    for (int t = 0; t < nsteps; ++t) {
+
+      // Call the solve kernel
+      // Computes u_tmp at the next timestep
+      // given the value of u at the current timestep
+      // Loop over the nxn grid
+      solve(n_ceil, block_size, n, alpha, dx, dt, r, r2, u, u_tmp);
+
+      // Pointer swap
+      double *tmp = u;
+      u = u_tmp;
+      u_tmp = tmp;
     }
+    // Stop solve timer
+    toc = omp_get_wtime();
   }
-
-  #pragma omp target teams distribute parallel for simd collapse(2) thread_limit(block_size)
-  for (int j = 0; j < n; ++j) {
-    for (int i = 0; i < n; ++i) {
-      u_tmp[i+j*n] = 0.0;
-    }
-  }
-
-  //
-  // Run through timesteps under the explicit scheme
-  //
-
-  // Finite difference constant multiplier
-  const double r2 = 1.0 - 4.0*r;
-
-  // Start the solve timer
-  tic = omp_get_wtime();
-
-  for (int t = 0; t < nsteps; ++t) {
-
-    // Call the solve kernel
-    // Computes u_tmp at the next timestep
-    // given the value of u at the current timestep
-    // Loop over the nxn grid
-    #pragma omp target teams distribute parallel for simd collapse(2) thread_limit(block_size)
-    for (int j = 0; j < n; ++j) {
-      for (int i = 0; i < n; ++i) {
-        // Update the 5-point stencil, using boundary conditions on the edges of the domain.
-        // Boundaries are zero because the MMS solution is zero there.
-        u_tmp[i+j*n] =  r2 * u[i+j*n] +
-        r * ((i < n-1) ? u[i+1+j*n] : 0.0) +
-        r * ((i > 0)   ? u[i-1+j*n] : 0.0) +
-        r * ((j < n-1) ? u[i+(j+1)*n] : 0.0) +
-        r * ((j > 0)   ? u[i+(j-1)*n] : 0.0);
-      }
-    }
-
-    // Pointer swap
-    double *tmp = u;
-    u = u_tmp;
-    u_tmp = tmp;
-  }
-  // Stop solve timer
-  toc = omp_get_wtime();
-}
 
   //
   // Check the L2-norm of the computed solution

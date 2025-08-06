@@ -5,16 +5,18 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of concat
 template <typename T>
-void concat (const T *__restrict inp1,
+void concat (const int numTeams,
+             const int numThreads,
+             const T *__restrict inp1,
              const T *__restrict inp2,
                    T *output,
              int sz0, int sz2, int sz1_1, int sz1_2)
 {
-  int nele = sz0 * sz2 * (sz1_1 + sz1_2);
-
-  #pragma omp target teams distribute parallel for thread_limit(256)
-  for (int idx = 0; idx < nele; idx++) {
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads) 
+  for (int idx = 0; idx < sz0 * sz2 * (sz1_1 + sz1_2); idx++) {
     float *dst_ptr = (float *)output + idx;
     int idx2 = idx % sz2;
     idx = idx / sz2;
@@ -34,6 +36,7 @@ void concat (const T *__restrict inp1,
     *dst_ptr = *src_ptr;
   }
 }
+// end of concat
 
 int main(int argc, char* argv[])
 {
@@ -89,8 +92,11 @@ int main(int argc, char* argv[])
     #pragma omp target data map (to: inp1[0:inp1_size], inp2[0:inp2_size]) \
                             map (alloc: outp[0:outp_size])
     {
+      const size_t n = batch_size * beam_size * nhead * head_dim * (sl1 + sl2);
+      const size_t nblock = (n + 255) / 256;
+
       // warmup and verify
-      concat(inp1, inp2, outp, batch_size * beam_size * nhead, head_dim, sl1, sl2);
+      concat(nblock, 256, inp1, inp2, outp, batch_size * beam_size * nhead, head_dim, sl1, sl2);
       #pragma omp target update from (outp[0:outp_size])
 
       concat_cpu(
@@ -101,7 +107,7 @@ int main(int argc, char* argv[])
       auto start = std::chrono::steady_clock::now();
 
       for (int i = 0; i < repeat; i++) {
-        concat(inp1, inp2, outp, batch_size * beam_size * nhead, head_dim, sl1, sl2);
+        concat(nblock, 256, inp1, inp2, outp, batch_size * beam_size * nhead, head_dim, sl1, sl2);
       }
 
       auto end = std::chrono::steady_clock::now();

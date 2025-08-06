@@ -5,6 +5,7 @@
 // =============================================================
 
 #include "GSimulation.hpp"
+#include "GSimulationKernels.hpp"
 
 /* Default Constructor for the GSimulation class which sets up the default
  * values for number of particles, number of integration steps, time steo and
@@ -107,67 +108,21 @@ void GSimulation::Start() {
 
   #pragma omp target data map (to: p[0:n]) map(alloc: e[0:n])
   {
+    const int numTeams = (n+255)/256;
+    const int numThreads = 256;
+
     // Looping across integration steps
     for (int s = 1; s <= nsteps; ++s) {
       TimeInterval ts0;
 
       // computes acceleration of all particles
-      #pragma omp target teams distribute parallel for thread_limit(256)
-      for (int i = 0; i < n; i++) {
-        auto pi = p[i];
-        RealType acc0 = pi.acc[0];
-        RealType acc1 = pi.acc[1];
-        RealType acc2 = pi.acc[2];
-
-        for (int j = 0; j < n; j++) {
-          RealType dx, dy, dz;
-          RealType distance_sqr = 0.0f;
-          RealType distance_inv = 0.0f;
-
-          auto pj = p[j];
-          dx = pj.pos[0] - pi.pos[0];  // 1flop
-          dy = pj.pos[1] - pi.pos[1];  // 1flop
-          dz = pj.pos[2] - pi.pos[2];  // 1flop
-
-          distance_sqr =
-            dx * dx + dy * dy + dz * dz + kSofteningSquared;  // 6flops
-          distance_inv = 1.0f / sqrtf(distance_sqr);       // 1div+1sqrt
-
-          acc0 += dx * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
-          acc1 += dy * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
-          acc2 += dz * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
-        }
-        pi.acc[0] = acc0;
-        pi.acc[1] = acc1;
-        pi.acc[2] = acc2;
-        p[i] = pi;
-      }
+      accelerate_particles(numTeams, numThreads, p, n, kSofteningSquared, kG);
 
       // Second kernel updates the velocity and position for all particles
-      #pragma omp target teams distribute parallel for thread_limit(256)
-      for (int i = 0; i < n; i++) {
-        auto pi = p[i];
-        pi.vel[0] += pi.acc[0] * dt;  // 2flops
-        pi.vel[1] += pi.acc[1] * dt;  // 2flops
-        pi.vel[2] += pi.acc[2] * dt;  // 2flops
+      update_particles(numTeams, numThreads, p, e, n, dt);
 
-        pi.pos[0] += pi.vel[0] * dt;  // 2flops
-        pi.pos[1] += pi.vel[1] * dt;  // 2flops
-        pi.pos[2] += pi.vel[2] * dt;  // 2flops
-
-        pi.acc[0] = 0.f;
-        pi.acc[1] = 0.f;
-        pi.acc[2] = 0.f;
-
-        e[i] = pi.mass *
-          (pi.vel[0] * pi.vel[0] + pi.vel[1] * pi.vel[1] +
-           pi.vel[2] * pi.vel[2]);  // 7flops
-
-        p[i] = pi;
-      }
       // Third kernel accumulates the energy of this Nbody system
-      #pragma omp target 
-      for (int i = 1; i < n; i++) e[0] += e[i];
+      accumulate_energy(e, n);
 
       double elapsed_seconds = ts0.Elapsed();
 

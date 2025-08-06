@@ -104,6 +104,153 @@ bool knn_serial(const float *ref, int ref_nb, const float *query, int query_nb,
   return true;
 }
 
+// begin of computeDistanceGlobal
+void computeDistanceGlobal(const int numTeams,
+                           const int numThreads,
+                           const float *__restrict__ A,
+                           int wA,
+                           const float *__restrict__ B,
+                           int wB,
+                           int dim,
+                           float *__restrict__ AB)
+{
+  #pragma omp target teams num_teams(numTeams) 
+  {
+    float shared_A[BLOCK_DIM*BLOCK_DIM];
+    float shared_B[BLOCK_DIM*BLOCK_DIM];
+    int begin_A;
+    int begin_B;
+    int step_A;
+    int step_B;
+    int end_A;
+    
+    #pragma omp parallel num_threads(numThreads)
+    {
+      // Thread index
+      int tx = omp_get_thread_num() % 16;
+      int ty = omp_get_thread_num() / 16;
+  
+      // Other variables
+      float tmp;
+      float ssd = 0;
+  
+      // Loop parameters
+      begin_A = BLOCK_DIM * (omp_get_team_num() / ((wB+15)/16));
+      begin_B = BLOCK_DIM * (omp_get_team_num() % ((wB+15)/16));
+      step_A  = BLOCK_DIM * wA;
+      step_B  = BLOCK_DIM * wB;
+      end_A   = begin_A + (dim - 1) * wA;
+  
+      // Conditions
+      int cond0 = (begin_A + tx < wA); // used to write in shared memory
+      int cond1 = (begin_B + tx < wB); // used to write in shared memory & to
+                                       // computations and to write in output matrix
+      int cond2 =
+          (begin_A + ty < wA); // used to computations and to write in output matrix
+  
+      // Loop over all the sub-matrices of A and B required to compute the block
+      // sub-matrix
+      for (int a = begin_A, b = begin_B; 
+               a <= end_A; a += step_A, b += step_B) {
+        // Load the matrices from device memory to shared memory; each thread loads
+        // one element of each matrix
+        if (a / wA + ty < dim) {
+          shared_A[ty*BLOCK_DIM+tx] = (cond0) ? A[a + wA * ty + tx] : 0;
+          shared_B[ty*BLOCK_DIM+tx] = (cond1) ? B[b + wB * ty + tx] : 0;
+        } else {
+          shared_A[ty*BLOCK_DIM+tx] = 0;
+          shared_B[ty*BLOCK_DIM+tx] = 0;
+        }
+  
+        // Synchronize to make sure the matrices are loaded
+        #pragma omp barrier
+  
+        // Compute the difference between the two matrixes; each thread computes one
+        // element of the block sub-matrix
+        if (cond2 && cond1) {
+          for (int k = 0; k < BLOCK_DIM; ++k) {
+            tmp = shared_A[k*BLOCK_DIM+ty] - shared_B[k*BLOCK_DIM+tx];
+            ssd += tmp * tmp;
+          }
+        }
+  
+        // Synchronize to make sure that the preceding computation is done before
+        // loading two new sub-matrices of A and B in the next iteration
+        #pragma omp barrier
+      }
+  
+      // Write the block sub-matrix to device memory; each thread writes one element
+      if (cond2 && cond1)
+        AB[(begin_A + ty) * wB + begin_B + tx] = ssd;
+    }
+  }
+}
+// end of computeDistanceGlobal
+
+void insertionSort(const int numTeams,
+                   const int numThreads,
+                   float *__restrict__ dist,
+                   int *__restrict__ ind,
+                   int width, int height, int k)
+{
+  // Kernel 2: Sort each column
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (unsigned int xIndex = 0; xIndex < width; xIndex++) {
+    // Pointer shift, initialization, and max value
+    float* p_dist = &dist[xIndex];
+    int* p_ind = &ind[xIndex];
+    float max_dist = p_dist[0];
+    p_ind[0] = 0;
+  
+    // Part 1 : sort kth firt elementZ
+    for (int l = 1; l < k; l++) {
+      int curr_row = l * width;
+      float curr_dist = p_dist[curr_row];
+      if (curr_dist < max_dist) {
+        int i = l - 1;
+        for (int a = 0; a < l - 1; a++) {
+          if (p_dist[a * width] > curr_dist) {
+            i = a;
+            break;
+          }
+        }
+        for (int j = l; j > i; j--) {
+          p_dist[j * width] = p_dist[(j - 1) * width];
+          p_ind[j * width] = p_ind[(j - 1) * width];
+        }
+        p_dist[i * width] = curr_dist;
+        p_ind[i * width] = l;
+      } else {
+        p_ind[l * width] = l;
+      }
+      max_dist = p_dist[curr_row];
+    }
+  
+    // Part 2 : insert element in the k-th first lines
+    int max_row = (k - 1) * width;
+    for (int l = k; l < height; l++) {
+      float curr_dist = p_dist[l * width];
+      if (curr_dist < max_dist) {
+        int i = k - 1;
+        for (int a = 0; a < k - 1; a++) {
+          if (p_dist[a * width] > curr_dist) {
+            i = a;
+            break;
+          }
+        }
+        for (int j = k - 1; j > i; j--) {
+          p_dist[j * width] = p_dist[(j - 1) * width];
+          p_ind[j * width] = p_ind[(j - 1) * width];
+        }
+        p_dist[i * width] = curr_dist;
+        p_ind[i * width] = l;
+        max_dist = p_dist[max_row];
+      }
+    }
+  }
+}
+
 int main(int argc, char* argv[]) {
   if (argc != 2) {
     printf("Usage: %s <repeat>\n", argv[0]);
@@ -174,137 +321,20 @@ int main(int argc, char* argv[]) {
   printf("on GPU: \n");
   gettimeofday(&tic, NULL);
 
+  const int k1_numTeams = (query_nb + 15) / 16 * (ref_nb + 15) / 16;
+  const int k1_numThreads = 256;
+  const int k2_numTeams = (query_nb + 255) / 256;
+  const int k2_numThreads = 256;
+
   for (i = 0; i < iterations; i++) {
     #pragma omp target data map(to: ref[0:ref_nb * dim], query[0:query_nb * dim]) \
-                          map(alloc: dist[0:query_nb * ref_nb], ind[0:query_nb * k])
+                            map(alloc: dist[0:query_nb * ref_nb], ind[0:query_nb * k])
     {
       // Kernel 1: Compute all the distances
-      #pragma omp target teams num_teams((ref_nb + 15)*(query_nb + 15)/256) thread_limit(256) 
-      {
-        float shared_A[BLOCK_DIM*BLOCK_DIM];
-        float shared_B[BLOCK_DIM*BLOCK_DIM];
-        int begin_A;
-        int begin_B;
-        int step_A;
-        int step_B;
-        int end_A;
-        
-        #pragma omp parallel 
-        {
-          // Thread index
-          int tx = omp_get_thread_num() % 16;
-          int ty = omp_get_thread_num() / 16;
-      
-          // Other variables
-          float tmp;
-          float ssd = 0;
-      
-          // Loop parameters
-          begin_A = BLOCK_DIM * (omp_get_team_num() / ((query_nb+15)/16));
-          begin_B = BLOCK_DIM * (omp_get_team_num() % ((query_nb+15)/16));
-          step_A  = BLOCK_DIM * ref_nb;
-          step_B  = BLOCK_DIM * query_nb;
-          end_A   = begin_A + (dim - 1) * ref_nb;
-      
-          // Conditions
-          int cond0 = (begin_A + tx < ref_nb); // used to write in shared memory
-          int cond1 = (begin_B + tx < query_nb); // used to write in shared memory & to
-                                           // computations and to write in output matrix
-          int cond2 =
-              (begin_A + ty < ref_nb); // used to computations and to write in output matrix
-      
-          // Loop over all the sub-matrices of A and B required to compute the block
-          // sub-matrix
-          for (int a = begin_A, b = begin_B; 
-                   a <= end_A; a += step_A, b += step_B) {
-            // Load the matrices from device memory to shared memory; each thread loads
-            // one element of each matrix
-            if (a / ref_nb + ty < dim) {
-              shared_A[ty*BLOCK_DIM+tx] = (cond0) ? ref[a + ref_nb * ty + tx] : 0;
-              shared_B[ty*BLOCK_DIM+tx] = (cond1) ? query[b + query_nb * ty + tx] : 0;
-            } else {
-              shared_A[ty*BLOCK_DIM+tx] = 0;
-              shared_B[ty*BLOCK_DIM+tx] = 0;
-            }
-      
-            // Synchronize to make sure the matrices are loaded
-            #pragma omp barrier
-      
-            // Compute the difference between the two matrixes; each thread computes one
-            // element of the block sub-matrix
-            if (cond2 && cond1) {
-              for (int k = 0; k < BLOCK_DIM; ++k) {
-                tmp = shared_A[k*BLOCK_DIM+ty] - shared_B[k*BLOCK_DIM+tx];
-                ssd += tmp * tmp;
-              }
-            }
-      
-            // Synchronize to make sure that the preceding computation is done before
-            // loading two new sub-matrices of A and B in the next iteration
-            #pragma omp barrier
-          }
-      
-          // Write the block sub-matrix to device memory; each thread writes one element
-          if (cond2 && cond1) dist[(begin_A + ty) * query_nb + begin_B + tx] = ssd;
-        }
-      }
-      
-      // Kernel 2: Sort each column
-      #pragma omp target teams distribute parallel for thread_limit(256)
-      for (unsigned int xIndex = 0; xIndex < query_nb; xIndex++) {
-        // Pointer shift, initialization, and max value
-        float* p_dist = &dist[xIndex];
-        int* p_ind = &ind[xIndex];
-        float max_dist = p_dist[0];
-        p_ind[0] = 0;
-      
-        // Part 1 : sort kth firt elementZ
-        for (int l = 1; l < k; l++) {
-          int curr_row = l * query_nb;
-          float curr_dist = p_dist[curr_row];
-          if (curr_dist < max_dist) {
-            int i = l - 1;
-            for (int a = 0; a < l - 1; a++) {
-              if (p_dist[a * query_nb] > curr_dist) {
-                i = a;
-                break;
-              }
-            }
-            for (int j = l; j > i; j--) {
-              p_dist[j * query_nb] = p_dist[(j - 1) * query_nb];
-              p_ind[j * query_nb] = p_ind[(j - 1) * query_nb];
-            }
-            p_dist[i * query_nb] = curr_dist;
-            p_ind[i * query_nb] = l;
-          } else {
-            p_ind[l * query_nb] = l;
-          }
-          max_dist = p_dist[curr_row];
-        }
-      
-        // Part 2 : insert element in the k-th first lines
-        int max_row = (k - 1) * query_nb;
-        for (int l = k; l < ref_nb; l++) {
-          float curr_dist = p_dist[l * query_nb];
-          if (curr_dist < max_dist) {
-            int i = k - 1;
-            for (int a = 0; a < k - 1; a++) {
-              if (p_dist[a * query_nb] > curr_dist) {
-                i = a;
-                break;
-              }
-            }
-            for (int j = k - 1; j > i; j--) {
-              p_dist[j * query_nb] = p_dist[(j - 1) * query_nb];
-              p_ind[j * query_nb] = p_ind[(j - 1) * query_nb];
-            }
-            p_dist[i * query_nb] = curr_dist;
-            p_ind[i * query_nb] = l;
-            max_dist = p_dist[max_row];
-          }
-        }
-      }
-      
+      computeDistanceGlobal(k1_numTeams, k1_numThreads, ref, ref_nb, query, query_nb, dim, dist);
+
+      insertionSort(k2_numTeams, k2_numThreads, dist, ind, query_nb, ref_nb, k);
+
       // Kernel 3: Compute square root of k first elements
       #pragma omp target teams distribute parallel for thread_limit(256)
       for (unsigned int i = 0; i < query_nb * k; i++)

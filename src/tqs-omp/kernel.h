@@ -39,5 +39,5 @@
 void host_insert_tasks(task_t *task_queue, int *data_queue, task_t *task_pool, int *data, int *num_written_tasks,
     int gpuQueueSize, int offset, int n_work_items);
 
-void call_TaskQueue_gpu(int blocks, int threads, const task_t *__restrict task_queue, int *__restrict data_queue,
+void TaskQueue_gpu(const int numTeams, const int numThreads, const task_t *__restrict task_queue, int *__restrict data_queue,
                         int *__restrict consumed, int iterations, int offset, int gpuQueueSize);

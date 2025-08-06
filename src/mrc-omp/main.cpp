@@ -6,10 +6,13 @@
 #include <omp.h>
 #include "reference.h"
 
+// begin of MRCGradient
 void MRCGradient (
+    const int numTeams, const int numThreads,
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
     const float margin, float*__restrict dX1, float*__restrict dX2) {
-  #pragma omp target teams distribute parallel for num_threads(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < N; i++) {
     float dist = -Y[i] * (X1[i] - X2[i]) + margin;
     if (dist < 0.f) {
@@ -20,11 +23,15 @@ void MRCGradient (
     }
   }
 }
+// end of MRCGradient
 
+// begin of MRCGradient2
 void MRCGradient2(
+    const int numTeams, const int numThreads,
     const int N, const int* Y, const float* X1, const float* X2, const float* dOutput,
     const float margin, float*__restrict dX1, float*__restrict dX2) {
-  #pragma omp target teams distribute parallel for num_threads(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < N; i++) {
     float y = Y[i];
     float o = dOutput[i];
@@ -33,6 +40,7 @@ void MRCGradient2(
     dX2[i] = dist < 0.f ? 0.f : y * o;
   }
 }
+// end of MRCGradient2
 
 int main(int argc, char* argv[])
 {
@@ -72,16 +80,19 @@ int main(int argc, char* argv[])
                           map(from: h_dX1[0:length],\
                                     h_dX2[0:length])
   {
+    const int numTeams = (length + 255) / 256;
+    const int numThreads = 256;
+
     // warmup
     for (int i = 0; i < repeat; i++) {
-      MRCGradient(length, h_Y, h_X1, h_X2, h_O, m, h_dX1, h_dX2);
-      MRCGradient2(length, h_Y, h_X1, h_X2, h_O, m, h_dX1, h_dX2);
+      MRCGradient(numTeams, numThreads, length, h_Y, h_X1, h_X2, h_O, m, h_dX1, h_dX2);
+      MRCGradient2(numTeams, numThreads, length, h_Y, h_X1, h_X2, h_O, m, h_dX1, h_dX2);
     }
 
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) 
-      MRCGradient(length, h_Y, h_X1, h_X2, h_O, m, h_dX1, h_dX2);
+      MRCGradient(numTeams, numThreads, length, h_Y, h_X1, h_X2, h_O, m, h_dX1, h_dX2);
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -90,7 +101,7 @@ int main(int argc, char* argv[])
     start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) 
-      MRCGradient2(length, h_Y, h_X1, h_X2, h_O, m, h_dX1, h_dX2);
+      MRCGradient2(numTeams, numThreads, length, h_Y, h_X1, h_X2, h_O, m, h_dX1, h_dX2);
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

@@ -4,8 +4,7 @@
 #include <math.h>
 #include <chrono>
 #include <omp.h>
-
-#define idx(i,j)   (i)*x_points+(j)
+#include "kernels.h"
 
 int main(int argc, char* argv[])
 {
@@ -26,7 +25,8 @@ int main(int argc, char* argv[])
   const double del_x = x_len/(x_points-1);
   const double del_y = y_len/(y_points-1);
 
-  const int grid_size = sizeof(double) * x_points * y_points;
+  const int grid_elems = x_points * y_points;
+  const int grid_size = sizeof(double) * grid_elems;
 
   double *x = (double*) malloc (sizeof(double) * x_points);
   double *y = (double*) malloc (sizeof(double) * y_points);
@@ -70,50 +70,24 @@ int main(int argc, char* argv[])
 #pragma omp target data map (to: u_new[0:x_points*y_points], v_new[0:x_points*y_points]) \
                         map (tofrom: u[0:x_points*y_points], v[0:x_points*y_points])
 {
+  const int numThreads = 256;
+  const int numTeams1 = (x_points-2+15)/16 * (y_points-2+15)/16;
+  const int numTeams2 = (x_points+255)/256;
+  const int numTeams3 = (y_points+255)/256;
+  const int numTeams4 = (grid_elems+255)/256;
+
   auto start = std::chrono::steady_clock::now();
 
   for(int itr = 0; itr < num_itrs; itr++){
-
-    #pragma omp target teams distribute parallel for collapse(2) thread_limit(256) nowait
-    for(int i = 1; i < y_points-1; i++){
-      for(int j = 1; j < x_points-1; j++){
-        u_new[idx(i,j)] = u[idx(i,j)] + (nu*del_t/(del_x*del_x)) * (u[idx(i,j+1)] + u[idx(i,j-1)] - 2 * u[idx(i,j)]) + 
-                                        (nu*del_t/(del_y*del_y)) * (u[idx(i+1,j)] + u[idx(i-1,j)] - 2 * u[idx(i,j)]) - 
-                                                (del_t/del_x)*u[idx(i,j)] * (u[idx(i,j)] - u[idx(i,j-1)]) - 
-                                                (del_t/del_y)*v[idx(i,j)] * (u[idx(i,j)] - u[idx(i-1,j)]);
-
-        v_new[idx(i,j)] = v[idx(i,j)] + (nu*del_t/(del_x*del_x)) * (v[idx(i,j+1)] + v[idx(i,j-1)] - 2 * v[idx(i,j)]) + 
-                                        (nu*del_t/(del_y*del_y)) * (v[idx(i+1,j)] + v[idx(i-1,j)] - 2 * v[idx(i,j)]) -
-                                                  (del_t/del_x)*u[idx(i,j)] * (v[idx(i,j)] - v[idx(i,j-1)]) - 
-                                                  (del_t/del_y)*v[idx(i,j)] * (v[idx(i,j)] - v[idx(i-1,j)]);
-      }
-    }
+    core(numTeams1, numThreads, u_new, v_new, u, v, x_points, y_points, nu, del_t, del_x, del_y);
 
     // Boundary conditions
-    #pragma omp target teams distribute parallel for thread_limit(256) nowait
-    for(int i = 0; i < x_points; i++){
-      u_new[idx(0,i)] = 1.0;
-      v_new[idx(0,i)] = 1.0;
-      u_new[idx(y_points-1,i)] = 1.0;
-      v_new[idx(y_points-1,i)] = 1.0;
-    }
+    bound_h(numTeams2, numThreads, u_new, v_new, x_points, y_points);
 
-    #pragma omp target teams distribute parallel for thread_limit(256) nowait
-    for(int j = 0; j < y_points; j++){
-      u_new[idx(j,0)] = 1.0;
-      v_new[idx(j,0)] = 1.0;
-      u_new[idx(j,x_points-1)] = 1.0;
-      v_new[idx(j,x_points-1)] = 1.0;
-    }
+    bound_v(numTeams3, numThreads, u_new, v_new, x_points, y_points);
 
     // Updating older values to newer ones
-    #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
-    for(int i = 0; i < y_points; i++){
-      for(int j = 0; j < x_points; j++){
-        u[idx(i,j)] = u_new[idx(i,j)];
-        v[idx(i,j)] = v_new[idx(i,j)];
-      }
-    }
+    update(numTeams1, numThreads, u, v, u_new, v_new, grid_elems);
   }
 
   auto end = std::chrono::steady_clock::now();

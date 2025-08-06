@@ -39,9 +39,12 @@ void reference(float *out, const float *in, const float delta, const float norm,
   }
 }
 
-void dev_lapl_iter(float *out, const float *in, const float delta, const float norm, const int Lx, const int Ly)
+// begin of dev_lapl_iter
+void dev_lapl_iter(const int numTeams, const int numThreads, float *out,
+                   const float *in, const float delta, const float norm, const int Lx, const int Ly)
 {
-  #pragma omp target teams distribute parallel for collapse(2) thread_limit(256)
+  #pragma omp target teams distribute parallel for collapse(2) \
+   num_teams(numTeams) num_threads(numThreads)
   for (int y = 0; y < Ly; y++) {
     for (int x = 0; x < Lx; x++) {
       int v00 = y*Lx + x;
@@ -53,6 +56,7 @@ void dev_lapl_iter(float *out, const float *in, const float delta, const float n
     }
   }
 }
+// end of dev_lapl_iter
 
 int main(int argc, char *argv[]) {
   /* Check the number of command line arguments */
@@ -111,13 +115,17 @@ int main(int argc, char *argv[]) {
   memcpy(d_in, buffer, sizeof(float)*Lx*Ly);
 
   double t0;
+
+  const int numTeams = Lx/NTX * Ly/NTY;
+  const int numThreads = NTX*NTY;
+
   /* Fixed number of threads per block (in x- and y-direction), number
      of blocks per direction determined by dimensions Lx, Ly */
   #pragma omp target data map (tofrom: d_in[0:Lx*Ly]) map(alloc: d_out[0:Lx*Ly])
   {
     t0 = stop_watch(0);
     for(i=0; i<niter; i++) {
-      dev_lapl_iter(d_out, d_in, xdelta, xnorm, Lx, Ly);
+      dev_lapl_iter(numTeams, numThreads, d_out, d_in, xdelta, xnorm, Lx, Ly);
       std::swap(d_out, d_in);
     }
     t0 = stop_watch(t0)/(double)niter;

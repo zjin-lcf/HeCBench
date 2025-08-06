@@ -24,15 +24,64 @@ void softMax_cpu(const int numSlice, const int sliceSize, const float* src, floa
   }
 }
 
+// begin of softMax
+void softMax (const int numTeams, const int numThreads,
+              const int numSlice, const int sliceSize,
+              const float* src, float* dest)
+{
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
+  for (int i = 0; i < numSlice; i++) {
+    float max_ = src[i * sliceSize];
+    for (int j = 0; j < sliceSize; j++) {
+      max_ = fmaxf(max_, src[i * sliceSize + j]);
+    }
+    float sum = 0;
+    for (int j = 0; j < sliceSize; j++) {
+      sum += expf(src[i * sliceSize + j] - max_);
+    }
+    for (int j = 0; j < sliceSize; j++) {
+      dest[i * sliceSize + j] = expf(src[i * sliceSize + j] - max_) / sum;
+    }
+  }
+}
+// end of softMax
+
+void softMax2 (const int numTeams, const int numThreads,
+               const int numSlice, const int sliceSize,
+               const float* src, float* dest)
+{
+  #pragma omp target teams distribute num_teams(numTeams)
+  for (int i = 0; i < numSlice; i++) {
+    float max_ = src[i * sliceSize];
+    #pragma omp parallel for reduction(max:max_) num_threads(numThreads)
+    for (int j = 1; j < sliceSize; j++) {
+      max_ = fmaxf(max_, src[i * sliceSize + j]);
+    }
+    float sum = 0;
+    #pragma omp parallel for reduction(+:sum) num_threads(numThreads)
+    for (int j = 0; j < sliceSize; j++) {
+      sum += expf(src[i * sliceSize + j] - max_);
+    }
+    #pragma omp parallel for num_threads(numThreads)
+    for (int j = 0; j < sliceSize; j++) {
+      dest[i * sliceSize + j] = expf(src[i * sliceSize + j] - max_) / sum;
+    }
+  }
+}
+
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
-    printf("Usage: %s <number of slices> <slice size> <repeat>\n", argv[0]);
+  if (argc != 5) {
+    printf("Usage: %s <number of slices> <slice size> <implementations> <repeat>\n", argv[0]);
+    printf("implementation 0: naive\n");
+    printf("implementation 1: optimized\n");
     return 1;
   }
    
   int numSlice = atoi(argv[1]);
   int sliceSize = atoi(argv[2]);
-  int repeat = atoi(argv[3]);
+  int kernel = atoi(argv[3]);
+  int repeat = atoi(argv[4]);
   int numElem = numSlice * sliceSize;
 
   float* input = (float*) aligned_alloc(1024, sizeof(float) * numElem);
@@ -46,28 +95,34 @@ int main(int argc, char* argv[]) {
 
   #pragma omp target data map(to: input[0:numElem]) map(from: output_gpu[0:numElem])
   {
-    auto start = std::chrono::steady_clock::now();
-  
-    for (int n = 0; n < repeat; n++) {
-      #pragma omp target teams distribute parallel for simd thread_limit(BLOCK_SIZE)
-      for (int i = 0; i < numSlice; i++) {
-        float max_ = input[i * sliceSize];
-        for (int j = 1; j < sliceSize; j++) {
-          max_ = (max_ < input[i * sliceSize + j]) ? input[i * sliceSize + j] : max_;
-        }
-        float sum = 0;
-        for (int j = 0; j < sliceSize; j++) {
-          sum += expf(input[i * sliceSize + j] - max_);
-        }
-        for (int j = 0; j < sliceSize; j++) {
-          output_gpu[i * sliceSize + j] = expf(input[i * sliceSize + j] - max_) / sum;
-        }
+    if (kernel == 1) {
+      const int numTeams = (numSlice+BLOCK_SIZE/32-1)/(BLOCK_SIZE/32);
+      const int numThreads = 32;
+
+      auto start = std::chrono::steady_clock::now();
+    
+      for (int n = 0; n < repeat; n++) {
+        softMax2(numTeams, numThreads, numSlice, sliceSize, input, output_gpu);
       }
+    
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
     }
-  
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
+    else {
+      const int numTeams = (numSlice+BLOCK_SIZE-1)/BLOCK_SIZE;
+      const int numThreads = BLOCK_SIZE;
+
+      auto start = std::chrono::steady_clock::now();
+    
+      for (int n = 0; n < repeat; n++) {
+        softMax(numTeams, numThreads, numSlice, sliceSize, input, output_gpu);
+      }
+    
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
+    }
   }
 
   // verification

@@ -36,6 +36,54 @@
  * whether
  *  to normalize the output using N-1 or N, for true or false, respectively
  */
+// begin of sopKernel
+template <typename Type, typename IdxType, int TPB, int RowsPerBlk, int ColsPerBlk = 32>
+void sopKernel(
+  const int numTeams,
+  const int numThreads,
+        Type *__restrict std,
+  const Type *__restrict data, 
+  IdxType D,
+  IdxType N) 
+{
+  #pragma omp target teams num_teams(numTeams)
+  {
+    Type sstd[ColsPerBlk];
+    #pragma omp parallel num_threads(numThreads)
+    {
+      int threadIdx_x = omp_get_thread_num();
+      int teamX = ((N + (IdxType)RowsPerBlk - 1) / (IdxType)RowsPerBlk);
+      int blockIdx_x = omp_get_team_num() % teamX;
+      int blockIdx_y = omp_get_team_num() / teamX;
+ 
+      const int RowsPerBlkPerIter = TPB / ColsPerBlk;
+      IdxType thisColId = threadIdx_x % ColsPerBlk;
+      IdxType thisRowId = threadIdx_x / ColsPerBlk;
+      IdxType colId = thisColId + ((IdxType)blockIdx_y * ColsPerBlk);
+      IdxType rowId = thisRowId + ((IdxType)blockIdx_x * RowsPerBlkPerIter);
+      Type thread_data = Type(0);
+      const IdxType stride = RowsPerBlkPerIter * teamX;
+      for (IdxType i = rowId; i < N; i += stride) {
+        Type val = (colId < D) ? data[i * D + colId] : Type(0);
+        thread_data += val * val;
+      }
+      if (threadIdx_x < ColsPerBlk) sstd[threadIdx_x] = Type(0);
+      #pragma omp barrier
+
+      #pragma omp atomic update
+      sstd[thisColId] += thread_data;
+
+      #pragma omp barrier
+
+      if (threadIdx_x < ColsPerBlk) {
+        #pragma omp atomic update
+        std[colId] += sstd[thisColId];
+      }
+    }
+  }
+}
+// end of sopKernel
+
 template <typename Type, typename IdxType = int>
 void stddev(Type *std, const Type *data, IdxType D, IdxType N, bool sample) {
   static const int TPB = 256;
@@ -52,46 +100,26 @@ void stddev(Type *std, const Type *data, IdxType D, IdxType N, bool sample) {
   for (int i = 0; i < D; i++)
     std[i] = (Type)0;
 
-  #pragma omp target teams num_teams(Teams) thread_limit(TPB)
-  {
-    Type sstd[ColsPerBlk];
-    #pragma omp parallel
-    {
-      int tx = omp_get_thread_num();
-      int bx = omp_get_team_num() % TeamX;
-      int by = omp_get_team_num() / TeamX;
-      int gridDim_x = TeamX;
- 
-      const int RowsPerBlkPerIter = TPB / ColsPerBlk;
-      IdxType thisColId = tx % ColsPerBlk;
-      IdxType thisRowId = tx / ColsPerBlk;
-      IdxType colId = thisColId + ((IdxType)by * ColsPerBlk);
-      IdxType rowId = thisRowId + ((IdxType)bx * RowsPerBlkPerIter);
-      Type thread_data = Type(0);
-      const IdxType stride = RowsPerBlkPerIter * gridDim_x;
-      for (IdxType i = rowId; i < N; i += stride) {
-        Type val = (colId < D) ? data[i * D + colId] : Type(0);
-        thread_data += val * val;
-      }
-      if (tx < ColsPerBlk) sstd[tx] = Type(0);
-      #pragma omp barrier
-
-      #pragma omp atomic update
-      sstd[thisColId] += thread_data;
-
-      #pragma omp barrier
-
-      if (tx < ColsPerBlk) {
-        #pragma omp atomic update
-        std[colId] += sstd[thisColId];
-      }
-    }
-  }
+  sopKernel<Type, IdxType, TPB, RowsPerBlk, ColsPerBlk>(Teams, TPB, std, data, D, N);
 
   IdxType sampleSize = sample ? N-1 : N;
   #pragma omp target teams distribute parallel for thread_limit(TPB)
   for (int i = 0; i < D; i++)
     std[i] = sqrtf(std[i] / sampleSize);
+}
+
+template <typename Type, typename IdxType = int>
+void stddev_fused(Type *std, const Type *data, IdxType D, IdxType N, bool sample)
+{
+  #pragma omp target teams distribute num_teams(D)
+  for (IdxType c = 0; c < D; c++) {
+    Type sum = 0;
+    #pragma omp parallel for reduction(+:sum) num_threads(256)
+    for (IdxType r = 0; r < N; r++)
+      sum += data[r*D+c] * data[r*D+c];
+    IdxType sampleSize = sample ? N-1 : N;
+    std[c] = sqrtf(sum / sampleSize);
+  }
 }
 
 int main(int argc, char* argv[]) {
@@ -149,6 +177,35 @@ int main(int argc, char* argv[]) {
   }
 
   printf("%s\n", ok ? "PASS" : "FAIL");
+
+  #pragma omp target data map (to: data[0:inputSize]) map (from: std[0:outputSize])
+  {
+    // warmup
+    stddev_fused(std, data, D, N, sample);
+
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      stddev_fused(std, data, D, N, sample);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of stddev_fused kernels: %f (s)\n", (time * 1e-9f) / repeat);
+  }
+
+  // verify
+  stddev_ref(std_ref, data, D, N, sample);
+
+  ok = true;
+  for (int i = 0; i < D; i++) {
+    if (fabsf(std_ref[i] - std[i]) > 1e-3) {
+      ok = false;
+      break;
+    }
+  }
+
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
   free(std_ref);
   free(std);
   free(data);

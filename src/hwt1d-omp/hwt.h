@@ -33,11 +33,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 int getLevels(unsigned int length, unsigned int* levels);
 void calApproxFinalOnHost(float *inData, float *hOutData, unsigned int signalLength);
 
-int runKernel(
-    float *inData, 
-    float *dOutData, 
-    float *hOutData, 
-    float *dPartialOutData,
-    const unsigned int signalLength);
-
+void dwtHaar1D(const int numTeams,
+               const int numThreads, 
+               const float *__restrict__ inSignal,
+                     float *__restrict__ coefsSignal,
+                     float *__restrict__ AverageSignal,
+                     const unsigned int tLevels,
+                     const unsigned int signalLength,
+                     const unsigned int levelsDone,
+                     const unsigned int mLevels);
+              
 #endif

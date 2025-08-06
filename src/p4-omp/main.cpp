@@ -22,9 +22,10 @@
 #include <omp.h>
 #include "params.h"
 
-#pragma omp declare target
-
+// begin of postprocess
 void postprocess (
+  const int numTeams,
+  const int numThreads,
   const float *__restrict cls_input,
         float *__restrict box_input,
   const float *__restrict dir_cls_input,
@@ -44,84 +45,89 @@ void postprocess (
   const float score_thresh,
   const float dir_offset)
 {
-  int loc_index = omp_get_team_num();
-  int itanchor = omp_get_thread_num();
-  if (itanchor >= num_anchors) return;
-
-  int col = loc_index % feature_x_size;
-  int row = loc_index / feature_x_size;
-  float x_offset = min_x_range + col * (max_x_range - min_x_range) / (feature_x_size - 1);
-  float y_offset = min_y_range + row * (max_y_range - min_y_range) / (feature_y_size - 1);
-  int cls_offset = loc_index * num_anchors * num_classes + itanchor * num_classes;
-  float dev_cls[2] = {-1.f, 0.f};
-
-  const float *scores = cls_input + cls_offset;
-  float max_score = 1.f / (1.f + expf(-scores[0]));
-  int cls_id = 0;
-  for (int i = 1; i < num_classes; i++) {
-    float cls_score = 1.f / (1.f + expf(-scores[i]));
-    if (cls_score > max_score) {
-      max_score = cls_score;
-      cls_id = i;
-    }
-  }
-  dev_cls[0] = static_cast<float>(cls_id);
-  dev_cls[1] = max_score;
-
-  if (dev_cls[1] >= score_thresh)
+  #pragma omp target teams num_teams(numTeams) 
   {
-    int box_offset = loc_index * num_anchors * num_box_values + itanchor * num_box_values;
-    int dir_cls_offset = loc_index * num_anchors * 2 + itanchor * 2;
-    const float *anchor_ptr = anchors + itanchor * 4;
-    float z_offset = anchor_ptr[2] / 2 + anchor_bottom_heights[itanchor / 2];
-    float anchor[7] = {x_offset, y_offset, z_offset, anchor_ptr[0], anchor_ptr[1], anchor_ptr[2], anchor_ptr[3]};
-    float *box_encodings = box_input + box_offset;
-
-    float xa = anchor[0];
-    float ya = anchor[1];
-    float za = anchor[2];
-    float dxa = anchor[3];
-    float dya = anchor[4];
-    float dza = anchor[5];
-    float ra = anchor[6];
-    float diagonal = sqrtf(dxa * dxa + dya * dya);
-    box_encodings[0] = box_encodings[0] * diagonal + xa;
-    box_encodings[1] = box_encodings[1] * diagonal + ya;
-    box_encodings[2] = box_encodings[2] * dza + za;
-    box_encodings[3] = expf(box_encodings[3]) * dxa;
-    box_encodings[4] = expf(box_encodings[4]) * dya;
-    box_encodings[5] = expf(box_encodings[5]) * dza;
-    box_encodings[6] = box_encodings[6] + ra;
-
-    float yaw;
-    int dir_label = dir_cls_input[dir_cls_offset] > dir_cls_input[dir_cls_offset + 1] ? 0 : 1;
-    const float period = (float)M_PI;
-    float val = box_input[box_offset + 6] - dir_offset;
-    float dir_rot = val - floorf(val / (period + 1e-8f)) * period;
-    yaw = dir_rot + dir_offset + period * dir_label;
-
-    int resCount;
-
-    #pragma omp atomic capture
+    #pragma omp parallel num_threads(numThreads)
     {
-      resCount = object_counter[0]; object_counter[0]++;
-    }
+      int loc_index = omp_get_team_num();
+      int itanchor = omp_get_thread_num();
+      if (itanchor < num_anchors) {
+        int col = loc_index % feature_x_size;
+        int row = loc_index / feature_x_size;
+        float x_offset = min_x_range + col * (max_x_range - min_x_range) / (feature_x_size - 1);
+        float y_offset = min_y_range + row * (max_y_range - min_y_range) / (feature_y_size - 1);
+        int cls_offset = loc_index * num_anchors * num_classes + itanchor * num_classes;
+        float dev_cls[2] = {-1.f, 0.f};
 
-    bndbox_output[0] = resCount+1;
-    float *data = bndbox_output + 1 + resCount * 9;
-    data[0] = box_input[box_offset];
-    data[1] = box_input[box_offset + 1];
-    data[2] = box_input[box_offset + 2];
-    data[3] = box_input[box_offset + 3];
-    data[4] = box_input[box_offset + 4];
-    data[5] = box_input[box_offset + 5];
-    data[6] = yaw;
-    data[7] = dev_cls[0];
-    data[8] = dev_cls[1];
+        const float *scores = cls_input + cls_offset;
+        float max_score = 1.f / (1.f + expf(-scores[0]));
+        int cls_id = 0;
+        for (int i = 1; i < num_classes; i++) {
+          float cls_score = 1.f / (1.f + expf(-scores[i]));
+          if (cls_score > max_score) {
+            max_score = cls_score;
+            cls_id = i;
+          }
+        }
+        dev_cls[0] = static_cast<float>(cls_id);
+        dev_cls[1] = max_score;
+
+        if (dev_cls[1] >= score_thresh)
+        {
+          int box_offset = loc_index * num_anchors * num_box_values + itanchor * num_box_values;
+          int dir_cls_offset = loc_index * num_anchors * 2 + itanchor * 2;
+          const float *anchor_ptr = anchors + itanchor * 4;
+          float z_offset = anchor_ptr[2] / 2 + anchor_bottom_heights[itanchor / 2];
+          float anchor[7] = {x_offset, y_offset, z_offset, anchor_ptr[0], anchor_ptr[1], anchor_ptr[2], anchor_ptr[3]};
+          float *box_encodings = box_input + box_offset;
+
+          float xa = anchor[0];
+          float ya = anchor[1];
+          float za = anchor[2];
+          float dxa = anchor[3];
+          float dya = anchor[4];
+          float dza = anchor[5];
+          float ra = anchor[6];
+          float diagonal = sqrtf(dxa * dxa + dya * dya);
+          box_encodings[0] = box_encodings[0] * diagonal + xa;
+          box_encodings[1] = box_encodings[1] * diagonal + ya;
+          box_encodings[2] = box_encodings[2] * dza + za;
+          box_encodings[3] = expf(box_encodings[3]) * dxa;
+          box_encodings[4] = expf(box_encodings[4]) * dya;
+          box_encodings[5] = expf(box_encodings[5]) * dza;
+          box_encodings[6] = box_encodings[6] + ra;
+
+          float yaw;
+          int dir_label = dir_cls_input[dir_cls_offset] > dir_cls_input[dir_cls_offset + 1] ? 0 : 1;
+          const float period = (float)M_PI;
+          float val = box_input[box_offset + 6] - dir_offset;
+          float dir_rot = val - floorf(val / (period + 1e-8f)) * period;
+          yaw = dir_rot + dir_offset + period * dir_label;
+
+          int resCount;
+
+          #pragma omp atomic capture
+          {
+            resCount = object_counter[0]; object_counter[0]++;
+          }
+
+          bndbox_output[0] = resCount+1;
+          float *data = bndbox_output + 1 + resCount * 9;
+          data[0] = box_input[box_offset];
+          data[1] = box_input[box_offset + 1];
+          data[2] = box_input[box_offset + 2];
+          data[3] = box_input[box_offset + 3];
+          data[4] = box_input[box_offset + 4];
+          data[5] = box_input[box_offset + 5];
+          data[6] = yaw;
+          data[7] = dev_cls[0];
+          data[8] = dev_cls[1];
+        }
+      }
+    }
   }
 }
-
-#pragma omp end declare target
+// end of postprocess
 
 int main(int argc, char* argv[])
 {
@@ -183,48 +189,45 @@ int main(int argc, char* argv[])
                           map(alloc: box_input[0:box_size], object_counter[0:1]) \
                           map(from: bndbox_output[0:bndbox_size])
   {
-     
-  double time = 0.0;
+    double time = 0.0;
 
-  for (int i = 0; i < repeat; i++) {
-    #pragma omp target update to (box_input[0:box_size])
+    const int numTeams = feature_size;
+    const int numThreads = num_anchors;
 
-    object_counter[0] = 0;
-    #pragma omp target update to (object_counter[0:1])
+    for (int i = 0; i < repeat; i++) {
+      #pragma omp target update to (box_input[0:box_size])
 
-    auto start = std::chrono::steady_clock::now();
+      object_counter[0] = 0;
+      #pragma omp target update to (object_counter[0:1])
 
-    #pragma omp target teams num_teams(feature_size) thread_limit(num_anchors)
-    {
-      #pragma omp parallel 
-      {
-        postprocess(cls_input,
-                    box_input,
-                    dir_cls_input,
-                    anchors,
-                    anchor_bottom_heights,
-                    bndbox_output,
-                    object_counter,
-                    min_x_range,
-                    max_x_range,
-                    min_y_range,
-                    max_y_range,
-                    feature_x_size,
-                    feature_y_size,
-                    num_anchors,
-                    num_classes,
-                    num_box_values,
-                    score_thresh,
-                    dir_offset);
-      }
+      auto start = std::chrono::steady_clock::now();
+
+      postprocess(numTeams,
+                  numThreads,
+                  cls_input,
+                  box_input,
+                  dir_cls_input,
+                  anchors,
+                  anchor_bottom_heights,
+                  bndbox_output,
+                  object_counter,
+                  min_x_range,
+                  max_x_range,
+                  min_y_range,
+                  max_y_range,
+                  feature_x_size,
+                  feature_y_size,
+                  num_anchors,
+                  num_classes,
+                  num_box_values,
+                  score_thresh,
+                  dir_offset);
+      
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }
 
-    auto end = std::chrono::steady_clock::now();
-    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  }
-
-  printf("Average execution time of postprocess kernel: %f (us)\n", (time * 1e-3f) / repeat);
-
+    printf("Average execution time of postprocess kernel: %f (us)\n", (time * 1e-3f) / repeat);
   }
 
   double checksum = 0.0;

@@ -16,7 +16,7 @@ LAUNCHER  =
 
 program = main
 
-source = main.cpp reference.cpp
+source = main.cpp kernel.cpp reference.cpp
 
 obj = $(source:.cpp=.o)
 

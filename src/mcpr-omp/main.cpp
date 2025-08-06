@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++)
-      compute_probs(alphas, rands, probs, n, K, M, threads_per_block, num_blocks);
+      compute_probs(num_blocks, threads_per_block, alphas, rands, probs, n, K, M);
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -98,12 +98,12 @@ int main(int argc, char* argv[]) {
     start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++)
-      compute_probs_unitStrides(alphas, rands, probs, n, K, M,
-                                threads_per_block, num_blocks);
+      compute_probs_unitStrides(num_blocks, threads_per_block,
+                                alphas, rands, probs, n, K, M);
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+    printf("Average execution time of compute_probs_unitStrides kernel: %f (s)\n", (time * 1e-9f) / repeat);
 
     #pragma omp target update from (probs[0:alphas_size])
 
@@ -116,12 +116,12 @@ int main(int argc, char* argv[]) {
     start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++)
-      compute_probs_unitStrides_sharedMem(alphas, rands, probs, n, K, M,
-                                          threads_per_block, num_blocks);
+      compute_probs_unitStrides_sharedMem(num_blocks, threads_per_block,
+                                          alphas, rands, probs, n, K, M);
 
     end = std::chrono::steady_clock::now();
     time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time: %f (s)\n", (time * 1e-9f) / repeat);
+    printf("Average execution time of compute_probs_unitStrides_sharedMem kernel: %f (s)\n", (time * 1e-9f) / repeat);
 
     #pragma omp target update from (probs[0:alphas_size])
 

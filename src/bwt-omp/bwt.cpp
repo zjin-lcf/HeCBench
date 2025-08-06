@@ -5,8 +5,9 @@
 
 const int blockSize = 256;
 
-void generate_table(int* table, int table_size, int n) {
-  #pragma omp target teams distribute parallel for thread_limit(blockSize)
+void generate_table(const int numTeams, const int numThreads, int* table, int table_size, int n) {
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for(int i = 0; i < table_size; i++)
     table[i] = (i < n) ? i : -1;
 }
@@ -22,9 +23,11 @@ bool compare_rotations(const int& a, const int& b, const char* genome, int n) {
   return false;
 }
 
-void bitonic_sort_step(int*__restrict table, int table_size, 
+void bitonic_sort_step(const int numTeams, const int numThreads,
+                       int*__restrict table, int table_size, 
                        int j, int k, const char*__restrict genome, int n) {
-  #pragma omp target teams distribute parallel for thread_limit(blockSize)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for(int i = 0; i < table_size; i++) {
     int ixj = i ^ j;
     if (i < ixj) {
@@ -39,13 +42,17 @@ void bitonic_sort_step(int*__restrict table, int table_size,
   }
 }
 
-void reconstruct_sequence(const int*__restrict table, const char*__restrict sequence, 
+// begin of reconstruct_sequence
+void reconstruct_sequence(const int numTeams, const int numThreads,
+                          const int*__restrict table, const char*__restrict sequence, 
                           char*__restrict transformed_sequence, int n) {
-  #pragma omp target teams distribute parallel for thread_limit(blockSize)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for(int i = 0; i < n; i ++) {
     transformed_sequence[i] = sequence[(n + table[i] - 1) % n];
   }
 }
+// end of reconstruct_sequence
 
 /* 
    returns a std::pair object
@@ -75,14 +82,16 @@ std::pair<std::string,int*> bwt_with_suffix_array(const std::string sequence) {
   #pragma omp target data map(from: d_table[0:table_size], d_transformed_sequence[0:n]) \
                           map(to: d_sequence[0:n])
   {
-    generate_table(d_table, table_size, n);
+    int numTeams = (table_size + blockSize - 1) / blockSize;
+
+    generate_table(numTeams, blockSize, d_table, table_size, n);
 
     for (int k = 2; k <= table_size; k <<= 1) {
       for (int j = k >> 1; j > 0; j = j >> 1) {
-        bitonic_sort_step(d_table, table_size, j, k, d_sequence, n);
+        bitonic_sort_step(numTeams, blockSize, d_table, table_size, j, k, d_sequence, n);
       }
     }
-    reconstruct_sequence(d_table, d_sequence, d_transformed_sequence, n);
+    reconstruct_sequence(numTeams, blockSize, d_table, d_sequence, d_transformed_sequence, n);
   }
 
   std::string transformed_sequence(d_transformed_sequence, n);

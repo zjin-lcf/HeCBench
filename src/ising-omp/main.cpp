@@ -33,10 +33,11 @@
 
 
 // Initialize lattice spins
-void init_spins( signed char* lattice, const float* randvals,
-                           const long long nx,
-                           const long long ny) {
-  #pragma omp target teams distribute parallel for simd thread_limit(THREADS)
+void init_spins(const int numTeams, const int numThreads,
+                signed char* lattice, const float* randvals,
+                const long long nx, const long long ny) {
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (long long tid = 0; tid < nx * ny; tid++) {
     float randval = randvals[tid];
     signed char val = (randval < 0.5f) ? -1 : 1;
@@ -44,15 +45,20 @@ void init_spins( signed char* lattice, const float* randvals,
   }
 }
 
+// begin of update_lattice
 template<bool is_black>
-void update_lattice(signed char *lattice,
+void update_lattice(
+    const int numTeams,  
+    const int numThreads,  
+    signed char *lattice,
     signed char *op_lattice,
     float* randvals,
     const float inv_temp,
     const long long nx,
     const long long ny) {
 
-  #pragma omp target teams distribute parallel for collapse(2) thread_limit(THREADS)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < nx; i++)
     for (int j = 0; j < ny; j++) {
       // Set stencil indices with periodicity
@@ -81,16 +87,19 @@ void update_lattice(signed char *lattice,
       }
     }
 }
+// end of update_lattice
 
 
 void update(signed char* lattice_b, signed char* lattice_w, float* randvals,
 	          const float inv_temp, const long long nx, const long long ny) {
 
+  int blocks = (nx * ny/2 + THREADS - 1) / THREADS;
+
   // Update black
-  update_lattice<true>(lattice_b, lattice_w, randvals, inv_temp, nx, ny / 2);
+  update_lattice<true>(blocks, THREADS, lattice_b, lattice_w, randvals, inv_temp, nx, ny / 2);
 
   // Update white
-  update_lattice<false>(lattice_w, lattice_b, randvals, inv_temp, nx, ny / 2);
+  update_lattice<false>(blocks, THREADS, lattice_w, lattice_b, randvals, inv_temp, nx, ny / 2);
 
 }
 
@@ -198,9 +207,10 @@ int main(int argc, char **argv) {
                               map(alloc: lattice_b[0:nx*ny/2]) \
                               map(alloc: lattice_w[0:nx*ny/2])
 {
+  int blocks = (nx * ny/2 + THREADS - 1) / THREADS;
 
-  init_spins(lattice_b, randvals, nx, ny / 2);
-  init_spins(lattice_w, randvals, nx, ny / 2);
+  init_spins(blocks, THREADS, lattice_b, randvals, nx, ny / 2);
+  init_spins(blocks, THREADS, lattice_w, randvals, nx, ny / 2);
 
   // Warmup iterations
   printf("Starting warmup...\n");

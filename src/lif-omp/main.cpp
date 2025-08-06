@@ -52,7 +52,10 @@ void reference (
   }
 }
 
-void test (
+// begin of lif
+void lif (
+    const int numTeams,
+    const int numThreads,
     int numNeurons, int neurons_per_item, float dt, 
     float*__restrict encode_result,
     float*__restrict voltage_array,
@@ -62,7 +65,8 @@ void test (
     float*__restrict gain,
     float*__restrict spikes)
 {
-  #pragma omp target teams distribute parallel for thread_limit(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (int i = 0; i < numNeurons; i++)
   {
     int neuron_index = i % neurons_per_item;
@@ -100,6 +104,7 @@ void test (
     spikes[i] = spike;
   }
 }
+// end of lif
 
 int main(int argc, char* argv[]) {
   if (argc != 4) {
@@ -153,10 +158,14 @@ int main(int argc, char* argv[]) {
                         map(tofrom: voltage[0:num_neurons],\
                                     reftime[0:num_neurons])
 {
+  const int numThreads = 256;
+  const int numTeams = (num_neurons + 255) / 256;
+
   auto start = std::chrono::steady_clock::now();
 
   for(int step = 0; step < num_steps; step++) {
-    test(
+    lif(numTeams,
+        numThreads,
         num_neurons, 
         neurons_per_item,
         dt,

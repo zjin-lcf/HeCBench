@@ -44,6 +44,120 @@ void reference(const T * __restrict__ X,
         }
 }
 
+// based on the reference implementation
+template<typename T>
+void conv3d_s1(const T * __restrict__ X,
+               const T * __restrict__ W,
+                     T * __restrict__ Y,
+               const int C,
+               const int N,
+               const int M,
+               const int K,
+               const int Hin,
+               const int Win,
+               const int Hout,
+               const int Wout)
+{
+  #pragma omp target teams distribute parallel for collapse(4)
+  for(int n = 0; n < N; n++)
+  for(int m = 0; m < M; m++)
+  for(int h = 0; h < Hout; h++)
+  for(int w = 0; w < Wout; w++) {
+    T s = 0;
+    for(int c = 0; c < C; c++)
+      for(int p = 0; p < K; p++)
+        for(int q = 0; q < K; q++)
+          s += X[II(n, c, h+p, w+q)] * W[WI(m, c, p, q)];
+    Y[OI(n, m, h, w)] = s;
+  }
+}
+
+template<typename T>
+void conv3d_s2(const T * __restrict__ X,
+               const T * __restrict__ W,
+                     T * __restrict__ Y,
+               const int C,
+               const int N,
+               const int M,
+               const int K,
+               const int Hin,
+               const int Win,
+               const int Hout,
+               const int Wout,
+               const int H_grid,
+               const int W_grid)
+{
+  #pragma omp target teams distribute parallel for collapse(6)
+  for (int n = 0; n < N; n++)
+  for (int m = 0; m < M; m++)
+  for (int i = 0; i < H_grid; i++)
+  for (int j = 0; j < W_grid; j++)
+  for (int y = 0; y < TILE_WIDTH; y++)
+  for (int x = 0; x < TILE_WIDTH; x++) {
+    int h = i * TILE_WIDTH + y;
+    int w = j * TILE_WIDTH + x;
+    if (h < Hout && w < Wout) {
+      T s = 0;
+      for (int c = 0; c < C; c++) {
+        for (int p = 0; p < K; p++) {
+          for (int q = 0; q < K; q++) {
+            s += X[II(n, c, h+p, w+q)] * W[WI(m, c, p, q)];
+          }
+        }
+      }
+      Y[OI(n, m, h, w)] = s;
+    }
+  }
+}
+
+// begin of conv3d_s3
+template<typename T>
+void conv3d_s3(const int numTeams,
+               const int numThreads,
+               const T * __restrict__ X,
+               const T * __restrict__ W,
+                     T * __restrict__ Y,
+               const int C,
+               const int N,
+               const int M,
+               const int K,
+               const int Hin,
+               const int Win,
+               const int Hout,
+               const int Wout,
+               const int H_grid,
+               const int W_grid)
+{
+  #pragma omp target teams num_teams(numTeams) 
+  {
+    #pragma omp parallel num_threads(numThreads)
+    {
+      int blockIdx_x = omp_get_team_num() % (H_grid * W_grid);
+      int blockIdx_y = omp_get_team_num() / (H_grid * W_grid) % N;
+      int blockIdx_z = omp_get_team_num() / (H_grid * W_grid) / N;
+      int threadIdx_x = omp_get_thread_num() % TILE_WIDTH;
+      int threadIdx_y = omp_get_thread_num() / TILE_WIDTH;
+      int h = blockIdx_x / W_grid * TILE_WIDTH + threadIdx_y;
+      int w = blockIdx_x % W_grid * TILE_WIDTH + threadIdx_x;
+      int n = blockIdx_y;
+      int m = blockIdx_z;
+      if (h < Hout && w < Wout) {
+        T s = 0;
+        for (int c = 0; c < C; c++) {
+          for (int p = 0; p < K; p++) {
+            for (int q = 0; q < K; q++) {
+              s += X[II(n, c, h+p, w+q)] * W[WI(m, c, p, q)];
+            }
+          }
+        }
+        Y[OI(n, m, h, w)] = s;
+      }
+    }
+  }
+}
+// end of conv3d_s3
+
+
 template <typename T>
 void conv3D(const int N, const int C, const int M, const int Win, const int Hin, const int K, const int repeat)
 {
@@ -81,25 +195,39 @@ void conv3D(const int N, const int C, const int M, const int Win, const int Hin,
   {
     auto start = std::chrono::steady_clock::now();
     for (int i = 0; i < repeat; i++) {
-      #pragma omp target teams distribute parallel for collapse(4) thread_limit(TILE_WIDTH*TILE_WIDTH)
-      for(int n = 0; n < N; n++)
-        for(int m = 0; m < M; m++)
-          for(int h = 0; h < Hout; h++)
-            for(int w = 0; w < Wout; w++) {
-              T s = 0;
-              for(int c = 0; c < C; c++)
-                for(int p = 0; p < K; p++)
-                  for(int q = 0; q < K; q++)
-                    s += X[II(n, c, h+p, w+q)] * W[WI(m, c, p, q)];
-              Y[OI(n, m, h, w)] = s;
-            }
+      conv3d_s1(X, W, Y, C, N, M, K, Hin, Win, Hout, Wout);
     }
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time of conv3d kernel: %f (us)\n",
+    printf("Average kernel execution time of conv3d_s1 kernel: %f (us)\n",
            (time * 1e-3f) / repeat);
 
+    int W_grid = (Wout + TILE_WIDTH - 1) / TILE_WIDTH;
+    int H_grid = (Hout + TILE_WIDTH - 1) / TILE_WIDTH;
+
+    start = std::chrono::steady_clock::now();
+    for (int i = 0; i < repeat; i++) {
+      conv3d_s2(X, W, Y, C, N, M, K, Hin, Win, Hout, Wout, H_grid, W_grid);
+    }
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time of conv3d_s2 kernel: %f (us)\n",
+           (time * 1e-3f) / repeat);
+
+    const int numTeams = N * M * H_grid * W_grid;   
+    const int numThreads = TILE_WIDTH * TILE_WIDTH;
+
+    start = std::chrono::steady_clock::now();
+    for (int i = 0; i < repeat; i++) {
+      conv3d_s3(numTeams, numThreads, X, W, Y, C, N, M, K, Hin, Win, Hout, Wout, H_grid, W_grid);
+    }
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time of conv3d_s3 kernel: %f (us)\n",
+           (time * 1e-3f) / repeat);
   }
   reference(X, W, Y_ref, N, M, C, K, Hin, Win, Hout, Wout);
 

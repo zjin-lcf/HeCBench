@@ -13,9 +13,12 @@
 #include <omp.h>
 #include "utils.h"
 
-void gate(double* __restrict m_gate, const long nCells, const double* __restrict Vm) 
+// begin of gate
+void gate(const int numTeams, const int numThreads,
+          double* __restrict m_gate, const long nCells, const double* __restrict Vm) 
 {
-  #pragma omp target teams distribute parallel for thread_limit(256)
+  #pragma omp target teams distribute parallel for \
+   num_teams(numTeams) num_threads(numThreads)
   for (long i = 0; i < nCells; i++) {
 
     double sum1,sum2;
@@ -43,6 +46,7 @@ void gate(double* __restrict m_gate, const long nCells, const double* __restrict
     m_gate[i] += (mhu - m_gate[i]) * (1.0 - exp(-tauR));
   }
 }
+// end of gate
 
 int main(int argc, char* argv[]) 
 {
@@ -72,6 +76,8 @@ int main(int argc, char* argv[])
 
   #pragma omp target data map (to: m_gate[0:nCells], Vm[0:nCells])
   {
+    const int numTeams = (nCells + 255)/256;
+    const int numThreads = 256;
     double kernel_starttime, kernel_endtime, kernel_runtime;
     for (long itime=0; itime<=iterations; itime++) {
       /* Start timer after warm-up iteration 0 */
@@ -79,7 +85,7 @@ int main(int argc, char* argv[])
         #pragma omp target update from (m_gate[0:nCells])
         kernel_starttime = secs_elapsed();
       }
-      gate(m_gate, nCells, Vm);
+      gate(numTeams, numThreads, m_gate, nCells, Vm);
     }
   
     kernel_endtime = secs_elapsed();

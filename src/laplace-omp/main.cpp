@@ -14,21 +14,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <omp.h>
 #include "timer.h"
+#include "kernels.h"
 
-/** Problem size along one side; total number of cells is this squared */
-#define NUM 1024
-
-// block size
-#define BLOCK_SIZE 256
-
-#define Real float
-#define ZERO 0.0f
-#define ONE 1.0f
-#define TWO 2.0f
-
-/** SOR relaxation parameter */
-const Real omega = 1.85f;
 
 /** Function to evaluate coefficient matrix and right-hand side vector.
  * 
@@ -171,6 +160,9 @@ int main (void) {
   // print problem info
   printf("Problem size: %d x %d \n", NUM, NUM);
 
+  const int numThreads = BLOCK_SIZE * 2;
+  const int numTeams = NUM / (2 * BLOCK_SIZE) * NUM/2;  
+
   // iteration loop
   #pragma omp target data map(to: aP[0:size], aW[0:size], aE[0:size], aS[0:size], aN[0:size], \
                                   b[0:size], bl_norm_L2[0:size_norm]) \
@@ -182,54 +174,16 @@ int main (void) {
   
       Real norm_L2 = ZERO;
   
-      #pragma omp target teams distribute parallel for collapse(2) num_threads(BLOCK_SIZE)
-      for (int row = 1; row <= NUM/2; row++) {
-        for (int col = 1; col <= NUM; col++) {
-          int ind_red = col * ((NUM >> 1) + 2) + row;  					// local (red) index
-          int ind = 2 * row - (col & 1) - 1 + NUM * (col - 1);	// global index
-  
-          Real temp_old = temp_red[ind_red];
-  
-          Real res = b[ind] + (aW[ind] * temp_black[row + (col - 1) * ((NUM >> 1) + 2)]
-                + aE[ind] * temp_black[row + (col + 1) * ((NUM >> 1) + 2)]
-                + aS[ind] * temp_black[row - (col & 1) + col * ((NUM >> 1) + 2)]
-                + aN[ind] * temp_black[row + ((col + 1) & 1) + col * ((NUM >> 1) + 2)]);
-  
-          Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
-  
-          temp_red[ind_red] = temp_new;
-          res = temp_new - temp_old;
-  
-          bl_norm_L2[ind_red] = res * res;
-        }
-      }
+      red_kernel(numTeams, numThreads, aP, aW, aE, aS, aN, b, temp_black, temp_red, bl_norm_L2);
+
       // add red cell contributions to residual
       #pragma omp target teams distribute parallel for reduction(+:norm_L2)
       for (int i = 0; i < size_norm; ++i) {
         norm_L2 += bl_norm_L2[i];
       }
   
-      #pragma omp target teams distribute parallel for collapse(2) num_threads(BLOCK_SIZE)
-      for (int row = 1; row <= NUM/2; row++) {
-        for (int col = 1; col <= NUM; col++) {
-          int ind_black = col * ((NUM >> 1) + 2) + row; // local (black) index
-          int ind = 2 * row - ((col + 1) & 1) - 1 + NUM * (col - 1); // global index
-  
-          Real temp_old = temp_black[ind_black];
-  
-          Real res = b[ind] + (aW[ind] * temp_red[row + (col - 1) * ((NUM >> 1) + 2)]
-                + aE[ind] * temp_red[row + (col + 1) * ((NUM >> 1) + 2)]
-                + aS[ind] * temp_red[row - ((col + 1) & 1) + col * ((NUM >> 1) + 2)]
-                + aN[ind] * temp_red[row + (col & 1) + col * ((NUM >> 1) + 2)]);
-  
-          Real temp_new = temp_old * (ONE - omega) + omega * (res / aP[ind]);
-  
-          temp_black[ind_black] = temp_new;
-          res = temp_new - temp_old;
-  
-          bl_norm_L2[ind_black] = res * res;
-        }
-      }
+      black_kernel(numTeams, numThreads, aP, aW, aE, aS, aN, b, temp_red, temp_black, bl_norm_L2);
+
       // add black cell contributions to residual
       #pragma omp target teams distribute parallel for reduction(+:norm_L2)
       for (int i = 0; i < size_norm; ++i)
