@@ -111,7 +111,7 @@ void tsne::ComputeAttractiveForcesV3(
     const int WG_SIZE1 = 256; // 1024;
     const int NUM_WGS1 = iDivUp(num_points * num_neighbors, WG_SIZE1);
 
-    auto e1 = myQueue.parallel_for(
+    myQueue.parallel_for(
         sycl::nd_range<1>(NUM_WGS1 * WG_SIZE1, WG_SIZE1),
         [=](sycl::nd_item<1> item) {
 
@@ -131,7 +131,7 @@ void tsne::ComputeAttractiveForcesV3(
     const int NUM_WGS2 = iDivUp(num_points, WG_SIZE2);
 
     myQueue.parallel_for(
-        sycl::nd_range<1>(NUM_WGS2 * WG_SIZE2, WG_SIZE2), std::move(e1),
+        sycl::nd_range<1>(NUM_WGS2 * WG_SIZE2, WG_SIZE2),
         [=](sycl::nd_item<1> item) {
 
             reduce_sum_kernel(

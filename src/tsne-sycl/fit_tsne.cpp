@@ -160,7 +160,7 @@ double tsne::RunTsne(tsne::Options& opt)
 
     sycl::device dts = sycl::device(sycl::default_selector_v);
 
-    sycl::queue q(dts);
+    sycl::queue q(dts, sycl::property::queue::in_order());
 
 #ifdef DEBUG_TIME
     END_IL_TIMER(_time_initialization);
