@@ -34,8 +34,6 @@
 #include "nbodyfft.h"
 
 const float PI = 3.14159265358979f;
-// const float twoPI = 3.14159265358979f * 2;
-
 
 #define BS1 16
 #define BS2 16
