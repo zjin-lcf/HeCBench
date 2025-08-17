@@ -372,7 +372,7 @@ double tsne::RunTsne(tsne::Options& opt)
     double duration_fft1 = 0.0, duration_fft2 = 0.0;
 
     // Support for infinite iteration
-    for (size_t step = 0; step != opt.iterations; step++) {
+    for (int step = 0; step != opt.iterations; step++) {
 
 #ifdef DEBUG_TIME
         START_IL_TIMER();

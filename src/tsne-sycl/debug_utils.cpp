@@ -49,8 +49,8 @@ void tsne::debug::PrintArray(
     
     T* h_matrix = new T[N * M];
     myQueue.memcpy(h_matrix, d_matrix, N * M * sizeof(T)).wait();
-    for (size_t i = 0; i < N; i++) {
-        for (size_t j = 0; j < M; j++) {
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < M; j++) {
             std::cout << h_matrix[i + j * N] << " ";
         }
         std::cout << std::endl;

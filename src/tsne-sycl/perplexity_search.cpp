@@ -185,7 +185,7 @@ void tsne::SearchPerplexity(
 
     do {
         // compute Gaussian Kernel row
-        auto e1 =myQueue.parallel_for(
+        myQueue.parallel_for(
             sycl::nd_range<1>{NUM_WGS1 * WG_SIZE1, WG_SIZE1},
             [=](sycl::nd_item<1> item) {
 
@@ -200,8 +200,8 @@ void tsne::SearchPerplexity(
         );
 
         // compute entropy of current row
-        auto e2 = myQueue.parallel_for(
-            sycl::nd_range<1>{NUM_WGS2 * WG_SIZE2, WG_SIZE2}, e1,
+        myQueue.parallel_for(
+            sycl::nd_range<1>{NUM_WGS2 * WG_SIZE2, WG_SIZE2},
             [=](sycl::nd_item<1> item) {
                 
                 RowSumKernel(
@@ -214,8 +214,8 @@ void tsne::SearchPerplexity(
         );
 
         // compute negative entropy
-        auto e3 = myQueue.parallel_for(
-            sycl::nd_range<1>{NUM_WGS2 * WG_SIZE2, WG_SIZE2}, e1,
+        myQueue.parallel_for(
+            sycl::nd_range<1>{NUM_WGS2 * WG_SIZE2, WG_SIZE2},
             [=](sycl::nd_item<1> item) {
                 
                 NegEntropyKernel(
@@ -228,8 +228,8 @@ void tsne::SearchPerplexity(
         );
 
         // binary search for beta
-        auto e4 = myQueue.parallel_for(
-            sycl::nd_range<1>{NUM_WGS2 * WG_SIZE2, WG_SIZE2}, {std::move(e2), std::move(e3)},
+        myQueue.parallel_for(
+            sycl::nd_range<1>{NUM_WGS2 * WG_SIZE2, WG_SIZE2},
             [=](sycl::nd_item<1> item) {
                 
                 PerplexitySearchKernel(
@@ -248,7 +248,7 @@ void tsne::SearchPerplexity(
 
         // Check if searching is done
         myQueue.parallel_for(
-            sycl::nd_range<1>{NUM_WGS2 * WG_SIZE2, WG_SIZE2}, std::move(e4),
+            sycl::nd_range<1>{NUM_WGS2 * WG_SIZE2, WG_SIZE2},
             sycl::reduction(all_found, sycl::plus<int>(), sycl::property::reduction::initialize_to_identity{}),
             [=](sycl::nd_item<1> item, auto& sum) {
                 int i = item.get_global_id(0);

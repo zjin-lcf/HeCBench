@@ -29,10 +29,11 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall \
 	-DNX=400 \
        	-DNZ=200 \
 	-DSIM_TIME=600 \
-	-DDATA_SPEC=DATA_SPEC_THERMAL
+	-DDATA_SPEC=DATA_SPEC_THERMAL \
+        -I../miniWeather-cuda/
 
 # Linker Flags
-LDFLAGS = 
+LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -52,16 +53,16 @@ ifeq ($(DEVICE),gpu)
           -Xopenmp-target=amdgcn-amd-amdhsa \
           -march=$(ARCH)
 else
-  CFLAGS += 
+  CFLAGS +=
 endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile
+%.o: %.cpp ../miniWeather-cuda/check_output.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
