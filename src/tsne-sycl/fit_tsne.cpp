@@ -160,7 +160,7 @@ double tsne::RunTsne(tsne::Options& opt)
 
     sycl::device dts = sycl::device(sycl::default_selector_v);
 
-    sycl::queue q(dts);
+    sycl::queue q(dts, sycl::property::queue::in_order());
 
 #ifdef DEBUG_TIME
     END_IL_TIMER(_time_initialization);
@@ -413,7 +413,7 @@ double tsne::RunTsne(tsne::Options& opt)
     double duration_fft1 = 0.0, duration_fft2 = 0.0;
 
     // Support for infinite iteration
-    for (size_t step = 0; step != opt.iterations; step++) {
+    for (int step = 0; step != opt.iterations; step++) {
 
 #ifdef DEBUG_TIME
         START_IL_TIMER();

@@ -5,19 +5,12 @@
 // =============================================================
 
 #include <chrono>
-#include <vector>
 #include <cstdlib>
+#include <vector>
 #include "Projectile.hpp"
+#include "reference.h"
 
-using namespace std;
-
-#ifdef DEBUG
-static const int num_elements = 100;
-#else
 static const int num_elements = 10000000;
-#endif
-const float kPIValue = 3.1415;
-const float kGValue = 9.81;
 const int BLOCK_SIZE = 256;
 
 // in_vect and out_vect are the vectors with N Projectile numbers and are inputs to the
@@ -63,26 +56,31 @@ int main(int argc, char* argv[]) {
 
   float init_angle = 0.0f;
   float init_vel = 0.0f;
-  vector<Projectile> input_vect1, out_parallel_vect2, out_scalar_vect3;
+  vector<Projectile> input_vect, out_parallel_vect, out_scalar_vect;
 
   // Initialize the Input and Output vectors
   srand(2);
   for (int i = 0; i < num_elements; i++) {
     init_angle = rand() % 90 + 10;
     init_vel = rand() % 400 + 10;
-    input_vect1.push_back(Projectile(init_angle, init_vel, 1.0f, 1.0f, 1.0f));
-    out_parallel_vect2.push_back(Projectile());
-    out_scalar_vect3.push_back(Projectile());
+    input_vect.push_back(Projectile(init_angle, init_vel, 1.0f, 1.0f, 1.0f));
+    out_parallel_vect.push_back(Projectile());
+    out_scalar_vect.push_back(Projectile());
   }
 
-  GpuParallel(input_vect1, out_parallel_vect2, repeat);
-      
-#ifdef DEBUG
-  for (int i = 0; i < num_elements; i++)
-  {
-    // Displaying the Parallel computation results.
-    cout << "Parallel " << out_parallel_vect2[i];
+  GpuParallel(input_vect, out_parallel_vect, repeat);
+
+  reference(input_vect.data(), out_scalar_vect.data(), num_elements);
+
+  bool ok = true;
+  for (int i = 0; i < num_elements; i++) {
+    if (out_parallel_vect[i] != out_scalar_vect[i]) {
+       ok = false;
+       std::cout << out_parallel_vect[i] << std::endl;
+       std::cout << out_scalar_vect[i] << std::endl;
+       break;
+    }
   }
-#endif
+  printf("%s\n", ok ? "PASS" : "FAIL");
   return 0;
 }

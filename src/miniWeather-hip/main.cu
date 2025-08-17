@@ -10,6 +10,7 @@
 #include <chrono>
 #include <mpi.h>
 #include <hip/hip_runtime.h>
+#include "check_output.h"
 
 const double pi        = 3.14159265358979323846264338327;   //Pi
 const double grav      = 9.8;                               //Gravitational acceleration (m / s^2)
@@ -82,8 +83,8 @@ double *recvbuf_l;            //Buffer to receive data from the left MPI rank
 double *recvbuf_r;            //Buffer to receive data from the right MPI rank
 int    num_out = 0;           //The number of outputs performed so far
 int    direction_switch = 1;
-double mass0, te0;            //Initial domain totals for mass and total energy  
-double mass , te ;            //Domain totals for mass and total energy  
+double mass0, te0;            //Initial domain totals for mass and total energy
+double mass , te ;            //Domain totals for mass and total energy
 
 #include "kernels.h"
 
@@ -215,14 +216,14 @@ void collision( double x , double z , double &r , double &u , double &w , double
 //First, compute the flux vector at each cell interface in the x-direction (including hyperviscosity)
 //Then, compute the tendencies using those fluxes
 void compute_tendencies_x(
-    const int hs, 
-    const int nx, 
-    const int nz, 
+    const int hs,
+    const int nx,
+    const int nz,
     const double dx,
-    double *d_state, 
-    double *d_flux, 
-    double *d_tend, 
-    double *d_hy_dens_cell, 
+    double *d_state,
+    double *d_flux,
+    double *d_tend,
+    double *d_hy_dens_cell,
     double *d_hy_dens_theta_cell)
 {
   dim3 flux_gws ((nx+16)/16, (nz+15)/16, 1);
@@ -248,15 +249,15 @@ void compute_tendencies_x(
 //First, compute the flux vector at each cell interface in the z-direction (including hyperviscosity)
 //Then, compute the tendencies using those fluxes
 void compute_tendencies_z(
-    const int hs, 
-    const int nx, 
-    const int nz,  
+    const int hs,
+    const int nx,
+    const int nz,
     const double dz,
-    double *d_state, 
-    double *d_flux, 
-    double *d_tend, 
-    double *d_hy_dens_int, 
-    double *d_hy_dens_theta_int, 
+    double *d_state,
+    double *d_flux,
+    double *d_tend,
+    double *d_hy_dens_int,
+    double *d_hy_dens_theta_int,
     double *d_hy_pressure_int)
 {
   //Compute the hyperviscosity coeficient
@@ -279,14 +280,14 @@ void compute_tendencies_z(
 
 //Set this MPI task's halo values in the x-direction. This routine will require MPI
 void set_halo_values_x(
-    const int hs, 
+    const int hs,
     const int nx,
     const int nz,
     const int k_beg,
     const double dz,
-    double *d_state, 
-    double *d_hy_dens_cell, 
-    double *d_hy_dens_theta_cell, 
+    double *d_state,
+    double *d_hy_dens_cell,
+    double *d_hy_dens_theta_cell,
     double *d_sendbuf_l,
     double *d_sendbuf_r,
     double *d_recvbuf_l,
@@ -340,7 +341,7 @@ void set_halo_values_x(
 //Set this MPI task's halo values in the z-direction. This does not require MPI because there is no MPI
 //decomposition in the vertical direction
 void set_halo_values_z(
-    const int hs, const int nx, const int nz, 
+    const int hs, const int nx, const int nz,
     const int i_beg,
     const double dx,
     const int data_spec_int,
@@ -509,16 +510,16 @@ void finalize() {
 
 //Compute reduced quantities for error checking without resorting to the "ncdiff" tool
 //#pragma omp target teams distribute parallel for collapse(2) reduction(+:mass,te)
-void reductions( 
-    double &mass, 
-    double &te, 
+void reductions(
+    double &mass,
+    double &te,
     const int hs,
     const int nx,
     const int nz,
     const double dx,
     const double dz,
-    const double *d_state, 
-    const double *d_hy_dens_cell, 
+    const double *d_state,
+    const double *d_hy_dens_cell,
     const double *d_hy_dens_theta_cell)
 {
   double* d_mass, *d_te;
@@ -551,43 +552,43 @@ void reductions(
 //Perform a single semi-discretized step in time with the form:
 //state_out = state_init + dt * rhs(state_forcing)
 //Meaning the step starts from state_init, computes the rhs using state_forcing, and stores the result in state_out
-void semi_discrete_step( 
-    const int hs, 
-    const int nx, 
-    const int nz, 
-    const int k_beg, 
-    const int i_beg, 
-    const double dx, 
-    const double dz, 
-    const double dt, 
-    int dir, 
+void semi_discrete_step(
+    const int hs,
+    const int nx,
+    const int nz,
+    const int k_beg,
+    const int i_beg,
+    const double dx,
+    const double dz,
+    const double dt,
+    int dir,
     const int data_spec_int,
-    double *d_state_init , 
-    double *d_state_forcing , 
-    double *d_state_out, 
-    double *d_flux , 
+    double *d_state_init ,
+    double *d_state_forcing ,
+    double *d_state_out,
+    double *d_flux ,
     double *d_tend,
-    double *d_hy_dens_cell , 
-    double *d_hy_dens_theta_cell , 
-    double *d_hy_dens_int , 
-    double *d_hy_dens_theta_int , 
-    double *d_hy_pressure_int , 
-    double *d_sendbuf_l , 
-    double *d_sendbuf_r , 
-    double *d_recvbuf_l , 
+    double *d_hy_dens_cell ,
+    double *d_hy_dens_theta_cell ,
+    double *d_hy_dens_int ,
+    double *d_hy_dens_theta_int ,
+    double *d_hy_pressure_int ,
+    double *d_sendbuf_l ,
+    double *d_sendbuf_r ,
+    double *d_recvbuf_l ,
     double *d_recvbuf_r)
 {
   if (dir == DIR_X) {
     //Set the halo values for this MPI task's fluid state in the x-direction
     set_halo_values_x(
-        hs, 
-        nx, 
-        nz, 
-        k_beg, 
-        dz, 
-        d_state_forcing, 
-        d_hy_dens_cell , 
-        d_hy_dens_theta_cell , 
+        hs,
+        nx,
+        nz,
+        k_beg,
+        dz,
+        d_state_forcing,
+        d_hy_dens_cell ,
+        d_hy_dens_theta_cell ,
         d_sendbuf_l,
         d_sendbuf_r,
         d_recvbuf_l,
@@ -621,20 +622,20 @@ void semi_discrete_step(
 // q*     = q[n] + dt/3 * rhs(q[n])
 // q**    = q[n] + dt/2 * rhs(q*  )
 // q[n+1] = q[n] + dt/1 * rhs(q** )
-void perform_timestep( 
-    double *d_state , 
-    double *d_state_tmp , 
-    double *d_flux , 
+void perform_timestep(
+    double *d_state ,
+    double *d_state_tmp ,
+    double *d_flux ,
     double *d_tend ,
-    double *d_hy_dens_cell , 
-    double *d_hy_dens_theta_cell , 
-    double *d_hy_dens_int , 
-    double *d_hy_dens_theta_int , 
-    double *d_hy_pressure_int , 
-    double *d_sendbuf_l , 
-    double *d_sendbuf_r , 
-    double *d_recvbuf_l , 
-    double *d_recvbuf_r , 
+    double *d_hy_dens_cell ,
+    double *d_hy_dens_theta_cell ,
+    double *d_hy_dens_int ,
+    double *d_hy_dens_theta_int ,
+    double *d_hy_pressure_int ,
+    double *d_sendbuf_l ,
+    double *d_sendbuf_r ,
+    double *d_recvbuf_l ,
+    double *d_recvbuf_r ,
     const double dt)
 {
 // semi discrete step
@@ -702,7 +703,7 @@ int main(int argc, char **argv) {
   double *d_hy_dens_int;
   hipMalloc((void**)&d_hy_dens_int, (nz+1)*sizeof(double));
   hipMemcpy(d_hy_dens_int, hy_dens_int, (nz+1)*sizeof(double), hipMemcpyHostToDevice);
-  
+
   double *d_hy_dens_theta_int;
   hipMalloc((void**)&d_hy_dens_theta_int, (nz+1)*sizeof(double));
   hipMemcpy(d_hy_dens_theta_int, hy_dens_theta_int, (nz+1)*sizeof(double), hipMemcpyHostToDevice);
@@ -744,15 +745,15 @@ int main(int argc, char **argv) {
         d_state_tmp,
         d_flux,
         d_tend,
-        d_hy_dens_cell, 
-        d_hy_dens_theta_cell, 
-        d_hy_dens_int, 
-        d_hy_dens_theta_int, 
-        d_hy_pressure_int, 
-        d_sendbuf_l, 
-        d_sendbuf_r, 
-        d_recvbuf_l, 
-        d_recvbuf_r, 
+        d_hy_dens_cell,
+        d_hy_dens_theta_cell,
+        d_hy_dens_int,
+        d_hy_dens_theta_int,
+        d_hy_pressure_int,
+        d_sendbuf_l,
+        d_sendbuf_r,
+        d_recvbuf_l,
+        d_recvbuf_r,
         dt);
 
     //Update the elapsed time and output counter
@@ -767,8 +768,12 @@ int main(int argc, char **argv) {
   //Final reductions for mass, kinetic energy, and total energy
   reductions(mass, te, hs, nx, nz, dx, dz, d_state, d_hy_dens_cell, d_hy_dens_theta_cell);
 
-  printf( "d_mass: %le\n" , (mass - mass0) / mass0 );
-  printf( "d_te:   %le\n" , (te   - te0  ) / te0   );
+  double d_mass = (mass - mass0) / mass0;
+  double d_te = (te - te0) / te0;
+  printf("d_mass: %le\n" , d_mass);
+  printf("d_te:   %le\n" , d_te);
+  bool ok = check_output(d_mass, d_te);
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   finalize();
 
@@ -776,15 +781,15 @@ int main(int argc, char **argv) {
   hipFree(d_state_tmp);
   hipFree(d_flux);
   hipFree(d_tend);
-  hipFree(d_hy_dens_cell); 
-  hipFree(d_hy_dens_theta_cell); 
-  hipFree(d_hy_dens_int); 
-  hipFree(d_hy_dens_theta_int); 
-  hipFree(d_hy_pressure_int); 
-  hipFree(d_sendbuf_l); 
-  hipFree(d_sendbuf_r); 
-  hipFree(d_recvbuf_l); 
-  hipFree(d_recvbuf_r); 
-  
+  hipFree(d_hy_dens_cell);
+  hipFree(d_hy_dens_theta_cell);
+  hipFree(d_hy_dens_int);
+  hipFree(d_hy_dens_theta_int);
+  hipFree(d_hy_pressure_int);
+  hipFree(d_sendbuf_l);
+  hipFree(d_sendbuf_r);
+  hipFree(d_recvbuf_l);
+  hipFree(d_recvbuf_r);
+
   return 0;
 }

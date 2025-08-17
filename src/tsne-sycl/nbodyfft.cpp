@@ -34,8 +34,6 @@
 #include "nbodyfft.h"
 
 const float PI = 3.14159265358979f;
-// const float twoPI = 3.14159265358979f * 2;
-
 
 #define BS1 16
 #define BS2 16
@@ -421,7 +419,7 @@ void tsne::PrecomputeFFT2D(
      * matrix
      */
     num_blocks = (n_interpolation_points_1d * n_interpolation_points_1d + num_threads - 1) / num_threads;
-    auto e1 = myQueue.parallel_for<class compute_kernel_tilde1>(
+    myQueue.parallel_for<class compute_kernel_tilde1>(
         sycl::nd_range<1>(num_blocks * num_threads, num_threads),
         [=](sycl::nd_item<1> item) {
 
@@ -444,8 +442,8 @@ void tsne::PrecomputeFFT2D(
     sycl::range<2> grid_size1((num_rows       + block_size[0] - 1) / block_size[0], (num_cols + block_size[1] - 1) / block_size[1]);
     sycl::range<2> grid_size2(((num_cols/2+1) + block_size[0] - 1) / block_size[0], (num_rows + block_size[1] - 1) / block_size[1]);
 
-    auto e2 = myQueue.parallel_for<class DFT2D1gpu1>(
-        sycl::nd_range<2>(grid_size1 * block_size, block_size), std::move(e1),
+    myQueue.parallel_for<class DFT2D1gpu1>(
+        sycl::nd_range<2>(grid_size1 * block_size, block_size),
         [=](sycl::nd_item<2> item) {
 
             DFT2D1gpu(
@@ -459,7 +457,7 @@ void tsne::PrecomputeFFT2D(
     );
 
     myQueue.parallel_for<class DFT2D2gpu1>(
-        sycl::nd_range<2>(grid_size2 * block_size, block_size), std::move(e2),
+        sycl::nd_range<2>(grid_size2 * block_size, block_size),
         [=](sycl::nd_item<2> item) {
 
             DFT2D2gpu(
@@ -514,7 +512,7 @@ void tsne::NbodyFFT2D(
     int num_blocks = (N + num_threads - 1) / num_threads;
 
     // Compute box indices and the relative position of each point in its box in the interval [0, 1]
-    auto e1 = myQueue.parallel_for<class compute_point_box_idx2>(
+    myQueue.parallel_for<class compute_point_box_idx2>(
         sycl::nd_range<1>(num_blocks * num_threads, num_threads),
         [=](sycl::nd_item<1> item) {
 
@@ -540,8 +538,8 @@ void tsne::NbodyFFT2D(
     // TODO: We can stream-parallelize these two interpolation functions
     // Compute the interpolated values at each real point with each Lagrange polynomial in the `x` direction
     num_blocks = (N * n_interpolation_points + num_threads - 1) / num_threads;
-    auto e2 = myQueue.parallel_for<class unterpolate_device2>(
-        sycl::nd_range<1>(num_blocks * num_threads, num_threads), e1,
+    myQueue.parallel_for<class unterpolate_device2>(
+        sycl::nd_range<1>(num_blocks * num_threads, num_threads),
         [=](sycl::nd_item<1> item) {
 
             interpolate_device(
@@ -556,8 +554,8 @@ void tsne::NbodyFFT2D(
     );
 
     // Compute the interpolated values at each real point with each Lagrange polynomial in the `y` direction
-    auto e3 = myQueue.parallel_for<class interpolate_device2>(
-        sycl::nd_range<1>(num_blocks * num_threads, num_threads), e1,
+    myQueue.parallel_for<class interpolate_device2>(
+        sycl::nd_range<1>(num_blocks * num_threads, num_threads),
         [=](sycl::nd_item<1> item) {
 
             interpolate_device(
@@ -575,8 +573,8 @@ void tsne::NbodyFFT2D(
 
     // TODO: This section has an atomic-add, can we remove it?
     num_blocks = (n_terms * n_interpolation_points * n_interpolation_points * N + num_threads - 1) / num_threads;
-    auto e4 = myQueue.parallel_for<class compute_interpolated_indices2>(
-        sycl::nd_range<1>(num_blocks * num_threads, num_threads), {std::move(e2), std::move(e3)},
+    myQueue.parallel_for<class compute_interpolated_indices2>(
+        sycl::nd_range<1>(num_blocks * num_threads, num_threads),
         [=](sycl::nd_item<1> item) {
 
             compute_interpolated_indices(
@@ -597,8 +595,8 @@ void tsne::NbodyFFT2D(
      * Step 2: Compute the values v_{m, n} at the equispaced nodes, multiply the kernel matrix with the coefficients w
      */
     num_blocks = ((n_terms * n_fft_coeffs_half * n_fft_coeffs_half) + num_threads - 1) / num_threads;
-    auto e5 = myQueue.parallel_for<class copy_to_fft_input2>(
-        sycl::nd_range<1>(num_blocks * num_threads, num_threads), std::move(e4),
+    myQueue.parallel_for<class copy_to_fft_input2>(
+        sycl::nd_range<1>(num_blocks * num_threads, num_threads),
         [=](sycl::nd_item<1> item) {
 
             copy_to_fft_input(
@@ -618,10 +616,9 @@ void tsne::NbodyFFT2D(
     sycl::range<2> grid_size1((num_rows       + block_size[0] - 1) / block_size[0], (num_cols + block_size[1] - 1) / block_size[1]);
     sycl::range<2> grid_size2(((num_cols/2+1) + block_size[0] - 1) / block_size[0], (num_rows + block_size[1] - 1) / block_size[1]);
 
-    std::vector<sycl::event> events = {sycl::event(), sycl::event(), sycl::event(), sycl::event()};
     for (int f = 0; f < n_terms; ++f) {
-        events[f] = myQueue.parallel_for<class DFT2D1gpu2>(
-            sycl::nd_range<2>(grid_size1 * block_size, block_size), e5,
+        myQueue.parallel_for<class DFT2D1gpu2>(
+            sycl::nd_range<2>(grid_size1 * block_size, block_size),
             [=](sycl::nd_item<2> item) {
 
                 DFT2D1gpu(
@@ -635,7 +632,7 @@ void tsne::NbodyFFT2D(
         );
 
         myQueue.parallel_for<class DFT2D2gpu2>(
-            sycl::nd_range<2>(grid_size2 * block_size, block_size), events[f],
+            sycl::nd_range<2>(grid_size2 * block_size, block_size),
             [=](sycl::nd_item<2> item) {
 
                 DFT2D2gpu(
@@ -664,9 +661,8 @@ void tsne::NbodyFFT2D(
 
     // Invert the computed values at the interpolated nodes
 
-    std::vector<sycl::event> events2 = {sycl::event(), sycl::event(), sycl::event(), sycl::event()};
     for (int f = 0; f < n_terms; ++f) {
-        events[f] = myQueue.parallel_for<class iDFT2D1gpu2>(
+        myQueue.parallel_for<class iDFT2D1gpu2>(
             sycl::nd_range<2>(grid_size1 * block_size, block_size),
             [=](sycl::nd_item<2> item) {
 
@@ -680,8 +676,8 @@ void tsne::NbodyFFT2D(
             }
         );
 
-        events2[f] = myQueue.parallel_for<class iDFT2D2gpu2>(
-            sycl::nd_range<2>(grid_size1 * block_size, block_size), events[f],
+        myQueue.parallel_for<class iDFT2D2gpu2>(
+            sycl::nd_range<2>(grid_size1 * block_size, block_size),
             [=](sycl::nd_item<2> item) {
 
                 iDFT2D2gpu(
@@ -695,8 +691,8 @@ void tsne::NbodyFFT2D(
         );
     }
 
-    auto e6 = myQueue.parallel_for<class copy_from_fft_output2>(
-        sycl::nd_range<1>(num_blocks * num_threads, num_threads), events2,
+    myQueue.parallel_for<class copy_from_fft_output2>(
+        sycl::nd_range<1>(num_blocks * num_threads, num_threads),
         [=](sycl::nd_item<1> item) {
 
             copy_from_fft_output(
@@ -715,7 +711,7 @@ void tsne::NbodyFFT2D(
     // TODO: Depending on the profiling here, we should check to see if we can split this code
     num_blocks = (n_terms * n_interpolation_points * n_interpolation_points * N + num_threads - 1) / num_threads;
     myQueue.parallel_for<class compute_potential_indices2>(
-        sycl::nd_range<1>(num_blocks * num_threads, num_threads), std::move(e6),
+        sycl::nd_range<1>(num_blocks * num_threads, num_threads),
         [=](sycl::nd_item<1> item) {
 
             compute_potential_indices(

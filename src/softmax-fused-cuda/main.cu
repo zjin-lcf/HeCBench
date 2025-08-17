@@ -4,9 +4,11 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <limits>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
-#include <limits>
+#include "reference.h"
 
 #define C10_WARP_SIZE 32
 typedef __nv_bfloat16 BFloat16;
@@ -106,16 +108,11 @@ __global__ void scaled_masked_softmax_warp_forward(
 
   // blockDim/threadIdx = (WARP_SIZE, WARPS_PER_BLOCK, 1)
   // gridDim/blockIdx = (seq_len, attn_heads, batches)
-  int first_batch =
-      (blockDim.y *
-           (blockIdx.x + gridDim.x * (blockIdx.y + gridDim.y * blockIdx.z)) +
-       threadIdx.y) *
-      WARP_BATCH;
+  int first_batch = (blockDim.y * (blockIdx.x + gridDim.x * (blockIdx.y + gridDim.y * blockIdx.z)) + threadIdx.y) * WARP_BATCH;
+
   int pad_first_batch;
   if (pad_batches != 1) { // bert style
-    pad_first_batch =
-        (blockDim.y * (blockIdx.x + gridDim.x * blockIdx.z) + threadIdx.y) *
-        WARP_BATCH;
+    pad_first_batch = (blockDim.y * (blockIdx.x + gridDim.x * blockIdx.z) + threadIdx.y) * WARP_BATCH;
   } else { // gpt2 style
     pad_first_batch = (blockDim.y * blockIdx.x + threadIdx.y) * WARP_BATCH;
   }
@@ -186,6 +183,7 @@ __global__ void scaled_masked_softmax_warp_forward(
     mask_value[i] = (max_value[i] == (acc_t)-10000.0) ? (acc_t)0.0 : (acc_t)1.0;
   }
 
+
   acc_t sum[WARP_BATCH]{0.0f};
 #pragma unroll
   for (int i = 0; i < WARP_BATCH; ++i) {
@@ -228,7 +226,7 @@ __global__ void scaled_masked_softmax_warp_forward(
 
 template <typename input_t, typename output_t, typename acc_t>
 void scaled_masked_softmax_forward(output_t *dst, const input_t *src,
-                                   const uint8_t *mask, const input_t scale,
+                                   const uint8_t *mask, const acc_t scale,
                                    int query_seq_len, int key_seq_len,
                                    int batches, int attn_heads,
                                    int pad_batches) {
@@ -273,21 +271,57 @@ void scaled_masked_softmax_forward(output_t *dst, const input_t *src,
 
 template <typename scalar_t>
 void fused_softmax(int batches, int attn_heads, int query_seq_len,
-                   int key_seq_len, int repeat) {
+                   int key_seq_len, int pad_batches, int repeat) {
   uint64_t num_data_elems =
       (uint64_t)batches * attn_heads * query_seq_len * key_seq_len;
-  scalar_t scale_factor = rsqrtf(key_seq_len);
-  int pad_batches = 0;
-  scalar_t *output =
-      (scalar_t *)aligned_alloc(1024, sizeof(scalar_t) * num_data_elems);
+  float scale_factor = rsqrtf(key_seq_len);
+  uint8_t *mask = (uint8_t*) malloc (sizeof(uint8_t) * num_data_elems);
+
+  srand(123);
+  for (size_t i = 0; i < (uint64_t)batches * attn_heads * query_seq_len; i++) {
+    uint8_t* mask_row = mask + i * key_seq_len;
+    int len = rand() % (key_seq_len / 2);
+    memset(mask_row, 1, sizeof(uint8_t) * len); // mask
+    memset(mask_row + len, 0, sizeof(uint8_t) * (key_seq_len - len));
+  }
+
+  scalar_t *input = make_random<scalar_t>(num_data_elems);
+
+  const int* outliers = make_random_int((uint64_t)batches * attn_heads * query_seq_len, key_seq_len);
+  for(int k = 0; k < query_seq_len; ++k) {
+    for(int j = 0; j < batches * attn_heads; ++j) {
+      input[j * key_seq_len + outliers[j* query_seq_len + k]] *= scalar_t(20);
+    }
+  }
+
+  scalar_t *output = (scalar_t *)aligned_alloc(1024, sizeof(scalar_t) * num_data_elems);
+  scalar_t *output_ref = (scalar_t *)aligned_alloc(1024, sizeof(scalar_t) * num_data_elems);
 
   scalar_t *d_input, *d_output;
   uint8_t *d_mask;
   cudaMalloc((void **)&d_input, sizeof(scalar_t) * num_data_elems);
   cudaMalloc((void **)&d_output, sizeof(scalar_t) * num_data_elems);
   cudaMalloc((void **)&d_mask, sizeof(uint8_t) * num_data_elems);
-  cudaMemset(d_mask, 0, sizeof(uint8_t) * num_data_elems);
-  cudaMemset(d_input, 0x3bff, sizeof(scalar_t) * num_data_elems);
+  cudaMemcpy(d_mask, mask, sizeof(uint8_t) * num_data_elems, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_input, input, sizeof(scalar_t) * num_data_elems, cudaMemcpyHostToDevice);
+
+  scaled_masked_softmax_forward<scalar_t, scalar_t, float>(
+      d_output, d_input, d_mask, scale_factor, query_seq_len, key_seq_len,
+      batches, attn_heads, pad_batches);
+
+  cudaMemcpy(output, d_output, sizeof(scalar_t) * num_data_elems, cudaMemcpyDeviceToHost);
+
+  reference<scalar_t, scalar_t, float>(output_ref, input, mask, scale_factor,
+                                       pad_batches, batches, attn_heads, query_seq_len, key_seq_len);
+  bool ok = true;
+  for (size_t i = 0; i < num_data_elems; i++) {
+    if (fabsf((float)output[i] - (float)output_ref[i]) > 1e-3f) {
+      printf("Mismatch at index %zu: %f %f\n", i, (float)output[i], (float)output_ref[i]);
+      ok = false;
+      break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
@@ -300,13 +334,13 @@ void fused_softmax(int batches, int attn_heads, int query_seq_len,
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
-  auto time =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
-  cudaMemcpy(output, d_output, sizeof(scalar_t) * num_data_elems,
-             cudaMemcpyDeviceToHost);
 
   free(output);
+  free(output_ref);
+  free(input);
+  free(mask);
   cudaFree(d_input);
   cudaFree(d_output);
   cudaFree(d_mask);
@@ -325,7 +359,12 @@ int main(int argc, char *argv[]) {
   int key_seq_len = atoi(argv[4]);
   int repeat = atoi(argv[5]);
 
-  fused_softmax<Half>(batches, attn_heads, query_seq_len, key_seq_len, repeat);
+  // bert mask
+  fused_softmax<Half>(batches, attn_heads, query_seq_len, key_seq_len, 0, repeat);
+  // gpt2 mask
+  fused_softmax<Half>(batches, attn_heads, query_seq_len, key_seq_len, 1, repeat);
+  fused_softmax<BFloat16>(batches, attn_heads, query_seq_len, key_seq_len, 0, repeat);
+  fused_softmax<BFloat16>(batches, attn_heads, query_seq_len, key_seq_len, 1, repeat);
 
   return 0;
 }

@@ -31,14 +31,6 @@
 #include "nbodyfft.h"
 
 const float PI = 3.14159265358979f;
-// const float twoPI = 3.14159265358979f * 2;
-
-// #define CUDA_CHECK_LAST_ERROR() {                                           \
-//     if( cudaSuccess != cudaGetLastError()) {                                \
-//         fprintf(stderr, "Cuda error in file '%s' in line %i : %s.\n",       \
-//             __FILE__, __LINE__, cudaGetErrorString( cudaGetLastError() ) ); \
-//         exit(EXIT_FAILURE);                                                 \
-//     } }
 
 #define BS1 16
 #define BS2 16

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <list>
+#include <omp.h>
 #include "bwt.hpp"
 
 const int blockSize = 256;

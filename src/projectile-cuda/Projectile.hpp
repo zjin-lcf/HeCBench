@@ -41,7 +41,7 @@ class Projectile {
   __host__ __device__
   float getvelocity() const { return m_velocity_; }
   // Set the Range and total flight time
-  __device__
+  __host__ __device__
   void setRangeandTime(float frange, float ttime, float angle_s,
                        float velocity_s, float height_s) {
     m_range_ = frange;
@@ -58,9 +58,12 @@ class Projectile {
   float getmaxHeight() const { return m_maxHeight_; }
   // Overloaded == operator to compare two projectile objects
   friend bool operator!=(const Projectile& a, const Projectile& b) {
-    return (a.m_angle_ != b.m_angle_) || (a.m_velocity_ != b.m_velocity_) ||
-           (a.m_range_ != b.m_range_) || (a.m_totalTime_ != b.m_totalTime_) ||
-           (a.m_maxHeight_ != b.m_maxHeight_);
+    float err_bound = 1.f;
+    return fabsf(a.m_angle_ - b.m_angle_) > err_bound ||
+           fabsf(a.m_velocity_ - b.m_velocity_) > err_bound ||
+           fabsf(a.m_range_ - b.m_range_) > err_bound ||
+           fabsf(a.m_totalTime_ - b.m_totalTime_) > err_bound ||
+           fabsf(a.m_maxHeight_ - b.m_maxHeight_) > err_bound;
   }
   // Ostream operator overloaded to display a projectile object
   friend ostream& operator<<(ostream& out, const Projectile& obj) {

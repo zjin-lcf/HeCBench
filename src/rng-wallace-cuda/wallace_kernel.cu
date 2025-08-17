@@ -18,10 +18,9 @@
 // of threads.
 // ************************************************
 
-
 __device__ void Hadamard4x4a(float &p, float &q, float &r, float &s)
 {
-	float t = (p + q + r + s) / 2;
+	float t = (p + q + r + s) / 2.f;
 	p = p - t;
 	q = q - t;
 	r = t - r;
@@ -30,7 +29,7 @@ __device__ void Hadamard4x4a(float &p, float &q, float &r, float &s)
 
 __device__ void Hadamard4x4b(float &p, float &q, float &r, float &s)
 {
-	float t = (p + q + r + s) / 2;
+	float t = (p + q + r + s) / 2.f;
 	p = t - p;
 	q = t - q;
 	r = r - t;

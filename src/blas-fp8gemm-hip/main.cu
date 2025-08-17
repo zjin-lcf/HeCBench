@@ -21,11 +21,12 @@ void LtFp8Matmul(const int repeat,
                  const hipblaslt_f8_fnuz *B,
                  int ldb,
                  const float *c_scale, /* device pointer */
-                 //const hip_bfloat16 *C,
                  const hipblaslt_f8_fnuz *C,
+                 //const hipblasLtBfloat16 *C,
                  int ldc,
                  const float *d_scale, /* device pointer */
                  hipblaslt_f8_fnuz *D,
+                 //hipblasLtBfloat16 *D,
                  float *amax_d, /* device pointer */
                  void *workspace,
                  size_t workspaceSize) {
@@ -52,11 +53,17 @@ void LtFp8Matmul(const int repeat,
     checkHipblasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_D_SCALE_POINTER, &d_scale, sizeof(d_scale)));
     checkHipblasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_AMAX_D_POINTER, &amax_d, sizeof(amax_d)));
 
+    // set fast accumulation
+    //int8_t fast_accum = 1;
+    //checkHipblasStatus(hipblasLtMatmulDescSetAttribute(operationDesc, HIPBLASLT_MATMUL_DESC_FAST_ACCUM, &fast_accum, sizeof(fast_accum)));
+
     // create matrix descriptors, we are good with the details here so no need to set any extra attributes
     // table of supported type combinations can be found in the documentation: https://docs.nvidia.com/cuda/hipblas/index.html#hipblasltmatmul
     checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Adesc, HIP_R_8F_E4M3_FNUZ, transa == HIPBLAS_OP_N ? m : k, transa == HIPBLAS_OP_N ? k : m, lda));
     checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Bdesc, HIP_R_8F_E4M3_FNUZ, transb == HIPBLAS_OP_N ? k : n, transb == HIPBLAS_OP_N ? n : k, ldb));
+    // no heuristic function available for current configuration
     //checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Cdesc, HIP_R_16BF, m, n, ldc));
+    //checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Ddesc, HIP_R_16BF, m, n, ldc));
     checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Cdesc, HIP_R_8F_E4M3_FNUZ, m, n, ldc));
     checkHipblasStatus(hipblasLtMatrixLayoutCreate(&Ddesc, HIP_R_8F_E4M3_FNUZ, m, n, ldc));
 
@@ -93,7 +100,9 @@ void LtFp8Matmul(const int repeat,
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average hipblasLtMatmul execution time %f (us)\n", (time * 1e-3f) / repeat);
+    auto ns_fp8 = (time / repeat);
+    printf("Average hipblasLtMatmul execution time %10.3f (us) | ", ns_fp8 * 1e-3f);
+    printf("Average hipblasLtMatmul performance %.1f (TFLOPS)\n", 2.f * m * k * n / ns_fp8 * 1e-3f);
 
     // descriptors are no longer needed as all GPU work was already enqueued
     if (preference) checkHipblasStatus(hipblasLtMatmulPreferenceDestroy(preference));
@@ -114,27 +123,41 @@ int main(int argc, char *argv[])
    const int repeat = atoi(argv[1]);
 
 
-   TestBench<hipblaslt_f8_fnuz, 
-             hipblaslt_f8_fnuz, //hip_bfloat16 ( hipblasLtMatrixLayoutCreate)
-             hipblaslt_f8_fnuz,
-             float> props(64, 128, 256, 2.0f, 1.0f, 32ULL * 1024 * 1024);
+   const int shapes[5][3] = {{16384, 8192, 1280},
+                             {16384, 1024, 8192},
+                             {16384, 8192, 7168},
+                             {16384, 3584, 8192},
+                             {8192, 8192, 8192}};
 
-   props.run([&props, repeat] {
-        LtFp8Matmul(repeat,
-                    props.ltHandle,
-                    props.m,
-                    props.n,
-                    props.k,
-                    &props.alpha,
-                    &props.beta,
-                    props.AscaleDev, props.Adev, props.k,
-                    props.BscaleDev, props.Bdev, props.k,
-                    props.CscaleDev, props.Cdev, props.m,
-                    props.DscaleDev, props.Ddev,
-                    props.DamaxDev,
-                    props.workspace,
-                    props.workspaceSize);
-    });
+   for (int i = 0; i < 5; i++) {
+
+     int m = shapes[i][0], n = shapes[i][1], k = shapes[i][2];
+     printf("Matrix dimension (M, N, K) = (%d, %d, %d)\n", m, n, k);
+
+     TestBench<hipblaslt_f8_fnuz,
+               hipblaslt_f8_fnuz,
+               //hipblasLtBfloat16,
+               hipblaslt_f8_fnuz,
+               //hipblasLtBfloat16,
+               float> props(m, n, k, 1.0f, 0.0f, 32ULL * 1024 * 1024);
+
+     props.run([&props, repeat] {
+          LtFp8Matmul(repeat,
+                      props.ltHandle,
+                      props.m,
+                      props.n,
+                      props.k,
+                      &props.alpha,
+                      &props.beta,
+                      props.AscaleDev, props.Adev, props.k,
+                      props.BscaleDev, props.Bdev, props.k,
+                      props.CscaleDev, props.Cdev, props.m,
+                      props.DscaleDev, props.Ddev,
+                      props.DamaxDev,
+                      props.workspace,
+                      props.workspaceSize);
+      });
+    }
 
     return 0;
 }

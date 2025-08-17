@@ -9,7 +9,7 @@
 
 void Hadamard4x4a(float &p, float &q, float &r, float &s)
 {
-  float t = (p + q + r + s) / 2;
+  float t = (p + q + r + s) / 2.f;
   p = p - t;
   q = q - t;
   r = t - r;
@@ -18,7 +18,7 @@ void Hadamard4x4a(float &p, float &q, float &r, float &s)
 
 void Hadamard4x4b(float &p, float &q, float &r, float &s)
 {
-  float t = (p + q + r + s) / 2;
+  float t = (p + q + r + s) / 2.f;
   p = t - p;
   q = t - q;
   r = r - t;
@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
   q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time: %f (s)\n", time * 1e-9f / repeat);
+  printf("Average kernel execution time: %f (us)\n", time * 1e-3f / repeat);
 
   q.memcpy(randomNumbers, d_randomNumbers, sizeof(float) * WALLACE_OUTPUT_SIZE).wait();
 
