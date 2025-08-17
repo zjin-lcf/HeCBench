@@ -30,7 +30,8 @@ CFLAGS := -DNX=400 \
 	  -DSIM_TIME=600 \
 	  -DDATA_SPEC=DATA_SPEC_THERMAL \
           -I$(MPI_INCLUDE) \
-          -std=c++14 -Wall
+          -std=c++14 -Wall \
+          -I../miniWeather-cuda
 
 # Linker Flags
 LDFLAGS = -L$(MPI_LIB_DIR) -lmpi
@@ -53,7 +54,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+%.o: %.cu ../miniWeather-cuda/check_output.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
