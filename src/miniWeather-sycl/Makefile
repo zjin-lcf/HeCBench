@@ -45,7 +45,8 @@ CFLAGS := $(EXTRA_CFLAGS) \
 	  -DDATA_SPEC=DATA_SPEC_THERMAL \
           -I$(MPI_INCLUDE) \
           -std=c++17 -Wall -fsycl \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+          --gcc-toolchain=$(GCC_TOOLCHAIN) \
+          -I../miniWeather-cuda
 
 # Linker Flags
 LDFLAGS = -L$(MPI_LIB_DIR) -lmpi
@@ -57,7 +58,7 @@ endif
 
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH)
 endif
 
 # Debug Flags
@@ -81,7 +82,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp ../miniWeather-cuda/check_output.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

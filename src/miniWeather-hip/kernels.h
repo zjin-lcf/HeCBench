@@ -6,6 +6,7 @@
 
   Double-precision floating point atomic add
  */
+
 __device__ __forceinline__
 double atomic_add(double *address, double val)
 {
@@ -33,7 +34,7 @@ void compute_flux_x (const double *__restrict__ state,
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   double stencil[4], d3_vals[NUM_VARS], vals[NUM_VARS];
 
-  if (i < nx+1 && k < nz) { 
+  if (i < nx+1 && k < nz) {
     //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
     for (int ll=0; ll<NUM_VARS; ll++) {
       for (int s=0; s < sten_size; s++) {
@@ -71,7 +72,7 @@ void compute_tend_x (const double *__restrict__ flux,
   int ll = blockIdx.z * blockDim.z + threadIdx.z;
   int k = blockIdx.y * blockDim.y + threadIdx.y;
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < nx && k < nz) { 
+  if (i < nx && k < nz) {
     int indt  = ll* nz   * nx    + k* nx    + i  ;
     int indf1 = ll*(nz+1)*(nx+1) + k*(nx+1) + i  ;
     int indf2 = ll*(nz+1)*(nx+1) + k*(nx+1) + i+1;
@@ -94,7 +95,7 @@ void compute_flux_z (const double *__restrict__ state,
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   double stencil[4], d3_vals[NUM_VARS], vals[NUM_VARS];
 
-  if (i < nx && k < nz+1) { 
+  if (i < nx && k < nz+1) {
     //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
     for (int ll=0; ll<NUM_VARS; ll++) {
       for (int s=0; s<sten_size; s++) {
@@ -138,7 +139,7 @@ void compute_tend_z (const double *__restrict__ state,
   int ll = blockIdx.z * blockDim.z + threadIdx.z;
   int k = blockIdx.y * blockDim.y + threadIdx.y;
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < nx && k < nz) { 
+  if (i < nx && k < nz) {
     int indt  = ll* nz   * nx    + k* nx    + i  ;
     int indf1 = ll*(nz+1)*(nx+1) + (k  )*(nx+1) + i;
     int indf2 = ll*(nz+1)*(nx+1) + (k+1)*(nx+1) + i;
@@ -161,7 +162,7 @@ void pack_send_buf (const double *__restrict__ state,
   int ll = blockIdx.z * blockDim.z + threadIdx.z;
   int k = blockIdx.y * blockDim.y + threadIdx.y;
   int s = blockIdx.x * blockDim.x + threadIdx.x;
-  if (s < hs && k < nz) { 
+  if (s < hs && k < nz) {
     sendbuf_l[ll*nz*hs + k*hs + s] = state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + hs+s];
     sendbuf_r[ll*nz*hs + k*hs + s] = state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+s];
   }
@@ -178,7 +179,7 @@ void unpack_recv_buf (double *__restrict__ state,
   int ll = blockIdx.z * blockDim.z + threadIdx.z;
   int k = blockIdx.y * blockDim.y + threadIdx.y;
   int s = blockIdx.x * blockDim.x + threadIdx.x;
-  if (s < hs && k < nz) { 
+  if (s < hs && k < nz) {
     state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + s      ] = recvbuf_l[ll*nz*hs + k*hs + s];
     state[ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + nx+hs+s] = recvbuf_r[ll*nz*hs + k*hs + s];
   }
@@ -196,7 +197,7 @@ void update_state_x (double *__restrict__ state,
 {
   int k = blockIdx.y * blockDim.y + threadIdx.y;
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < hs && k < nz) { 
+  if (i < hs && k < nz) {
     double z = (k_beg + k+0.5)*dz;
     if (fabs(z-3*zlen/4) <= zlen/16) {
       int ind_r = ID_DENS*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i;
@@ -220,7 +221,7 @@ void update_state_z (double *__restrict__ state,
 {
   int ll = blockIdx.y * blockDim.y + threadIdx.y;
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < nx+2*hs && ll < NUM_VARS) { 
+  if (i < nx+2*hs && ll < NUM_VARS) {
     if (ll == ID_WMOM) {
       state[ll*(nz+2*hs)*(nx+2*hs) + (0      )*(nx+2*hs) + i] = 0.;
       state[ll*(nz+2*hs)*(nx+2*hs) + (1      )*(nx+2*hs) + i] = 0.;
@@ -293,7 +294,7 @@ void update_fluid_state (const double *__restrict__ state_init,
   int ll = blockIdx.z * blockDim.z + threadIdx.z;
   int k = blockIdx.y * blockDim.y + threadIdx.y;
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < nx && k < nz) { 
+  if (i < nx && k < nz) {
     int inds = ll*(nz+2*hs)*(nx+2*hs) + (k+hs)*(nx+2*hs) + i+hs;
     int indt = ll*nz*nx + k*nx + i;
     state_out[inds] = state_init[inds] + dt * tend[indt];

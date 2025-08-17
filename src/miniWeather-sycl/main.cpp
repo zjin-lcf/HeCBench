@@ -13,6 +13,7 @@
 #include <mpi.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
+#include "check_output.h"
 
 const double pi        = 3.14159265358979323846264338327;   //Pi
 const double grav      = 9.8;                               //Gravitational acceleration (m / s^2)
@@ -1000,8 +1001,12 @@ int main(int argc, char **argv) {
   //Final reductions for mass, kinetic energy, and total energy
   reductions(mass, te, hs, nx, nz, dx, dz, d_state, d_hy_dens_cell, d_hy_dens_theta_cell, q);
 
-  printf( "d_mass: %le\n" , (mass - mass0) / mass0 );
-  printf( "d_te:   %le\n" , (te   - te0  ) / te0   );
+  double d_mass = (mass - mass0) / mass0;
+  double d_te = (te - te0) / te0;
+  printf("d_mass: %le\n" , d_mass);
+  printf("d_te:   %le\n" , d_te);
+  bool ok = check_output(d_mass, d_te);
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   finalize();
 
