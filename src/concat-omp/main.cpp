@@ -18,10 +18,10 @@ void concat (const int numTeams,
    num_teams(numTeams) num_threads(numThreads) 
   for (int idx = 0; idx < sz0 * sz2 * (sz1_1 + sz1_2); idx++) {
     float *dst_ptr = (float *)output + idx;
-    int idx2 = idx % sz2;
-    idx = idx / sz2;
-    int idx1 = idx % (sz1_1 + sz1_2);
-    int idx0 = idx / (sz1_1 + sz1_2);
+    int idx_x = idx % sz2;
+    int idx_y = idx / sz2;
+    int idx1 = idx_y % (sz1_1 + sz1_2);
+    int idx0 = idx_y / (sz1_1 + sz1_2);
     float *src_ptr;
     int sz1;
     if (idx1 < sz1_1) {
@@ -32,7 +32,7 @@ void concat (const int numTeams,
       sz1 = sz1_2;
       src_ptr = (float *)inp2;
     }
-    src_ptr += flat_3dim(idx0, idx1, idx2, sz1, sz2);
+    src_ptr += flat_3dim(idx0, idx1, idx_x, sz1, sz2);
     *dst_ptr = *src_ptr;
   }
 }
