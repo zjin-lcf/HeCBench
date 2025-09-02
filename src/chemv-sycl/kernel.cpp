@@ -1,9 +1,9 @@
 #define ppcg_min(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x < _y ? _x : _y; })
 #define ppcg_max(x,y)    ({ __typeof__(x) _x = (x); __typeof__(y) _y = (y); _x > _y ? _x : _y; })
 
-void kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
-             float alpha_im, float alpha_re, float beta_im, float beta_re,
-             sycl::nd_item<1> &item)
+void chemv_kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y,
+                   float alpha_im, float alpha_re, float beta_im, float beta_re,
+                   sycl::nd_item<1> &item)
 {
     int b0 = item.get_group(0);
     int t0 = item.get_local_id(0);
@@ -52,8 +52,8 @@ void kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloa
     }
 }
 
-void kernel1(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, 
-             float alpha_im, float alpha_re, sycl::nd_item<1> &item)
+void chemv_kernel1(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y,
+                   float alpha_im, float alpha_re, sycl::nd_item<1> &item)
 {
     int b0 = item.get_group(0);
     int t0 = item.get_local_id(0);
