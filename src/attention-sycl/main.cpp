@@ -61,14 +61,14 @@ float* attention_device(const float* key, const float* value, const float* query
       q.parallel_for(sycl::nd_range<1>(sycl::range<1>(grids(n, 256, warpSize) * 256),
                                        sycl::range<1>(256)),
                          [=](sycl::nd_item<1> item) {
-                           kernel1_warpReduce(d_key, d_query, d_dot_product,
+                           attention_kernel1_warpReduce(d_key, d_query, d_dot_product,
                                               d_exp_sum, n, d, item);
                          });
       q.submit([&](sycl::handler &cgh) {
         cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(d * 256),
                                            sycl::range<1>(256)),
                          [=](sycl::nd_item<1> item) {
-                           kernel2_blockReduce(d_exp_sum, d_dot_product,
+                           attention_kernel2_blockReduce(d_exp_sum, d_dot_product,
                                                d_value, d_output, n, d,
                                                item);
                          });
@@ -90,14 +90,14 @@ float* attention_device(const float* key, const float* value, const float* query
       q.parallel_for(sycl::nd_range<1>(sycl::range<1>(grids(n, 256, warpSize) * 256),
                                        sycl::range<1>(256)),
                          [=](sycl::nd_item<1> item) {
-                           kernel1_warpReduce(d_key, d_query, d_dot_product,
+                           attention_kernel1_warpReduce(d_key, d_query, d_dot_product,
                                               d_exp_sum, n, d, item);
                          });
       q.submit([&](sycl::handler &cgh) {
         cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(grids(d, 256, warpSize) * 256),
                                            sycl::range<1>(256)),
                          [=](sycl::nd_item<1> item) {
-                           kernel2_warpReduce(d_exp_sum, d_dot_product,
+                           attention_kernel2_warpReduce(d_exp_sum, d_dot_product,
                                                d_value, d_output, n, d,
                                                item);
                          });
@@ -120,7 +120,7 @@ float* attention_device(const float* key, const float* value, const float* query
         cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(n * 256),
                                            sycl::range<1>(256)),
                          [=](sycl::nd_item<1> item) {
-                           kernel1_blockReduce(d_key, d_query, d_dot_product,
+                           attention_kernel1_blockReduce(d_key, d_query, d_dot_product,
                                                d_exp_sum, n, d, item);
                          });
       });
@@ -128,7 +128,7 @@ float* attention_device(const float* key, const float* value, const float* query
         cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(d * 256),
                                            sycl::range<1>(256)),
                          [=](sycl::nd_item<1> item) {
-                           kernel2_blockReduce(d_exp_sum, d_dot_product,
+                           attention_kernel2_blockReduce(d_exp_sum, d_dot_product,
                                                d_value, d_output, n, d,
                                                item);
                          });
@@ -154,21 +154,21 @@ float* attention_device(const float* key, const float* value, const float* query
                             sycl::range<1>(256),
                             sycl::range<1>(256)),
           [=](sycl::nd_item<1> item) {
-            kernel1(d_key, d_query, d_dot_product, d_exp_sum, n, d, item);
+            attention_kernel1(d_key, d_query, d_dot_product, d_exp_sum, n, d, item);
           });
       q.parallel_for(
           sycl::nd_range<1>(sycl::range<1>((n + 255) / 256) *
                             sycl::range<1>(256),
                             sycl::range<1>(256)),
           [=](sycl::nd_item<1> item) {
-            kernel2(d_exp_sum, d_dot_product, d_score, n, item);
+            attention_kernel2(d_exp_sum, d_dot_product, d_score, n, item);
           });
       q.parallel_for(
           sycl::nd_range<1>(sycl::range<1>((d + 255) / 256) *
                             sycl::range<1>(256),
                             sycl::range<1>(256)),
           [=](sycl::nd_item<1> item) {
-            kernel3(d_score, d_value, d_output, n, d, item);
+            attention_kernel3(d_score, d_value, d_output, n, d, item);
           });
     }
 

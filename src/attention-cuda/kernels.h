@@ -3,7 +3,7 @@
 #include <cooperative_groups/reduce.h>
 
 __global__
-void kernel1 (
+void attention_kernel1 (
     const float*__restrict__ key,
     const float*__restrict__ query,
     float*__restrict__ dot_product,
@@ -22,7 +22,7 @@ void kernel1 (
 }
 
 __global__
-void kernel2 (
+void attention_kernel2 (
     const float*__restrict__ exp_sum,
     const float*__restrict__ dot_product,
     float*__restrict__ score,
@@ -34,7 +34,7 @@ void kernel2 (
 }
 
 __global__
-void kernel3 (
+void attention_kernel3 (
     const float*__restrict__ score,
     const float*__restrict__ value,
     float*__restrict__ output,
@@ -51,7 +51,7 @@ void kernel3 (
 }
 
 __global__
-void kernel1_blockReduce (
+void attention_kernel1_blockReduce (
     const float*__restrict__ key,
     const float*__restrict__ query,
     float*__restrict__ dot_product,
@@ -75,7 +75,7 @@ void kernel1_blockReduce (
 }
 
 __global__
-void kernel1_warpReduce (
+void attention_kernel1_warpReduce (
     const float*__restrict__ key,
     const float*__restrict__ query,
     float*__restrict__ dot_product,
@@ -103,7 +103,7 @@ void kernel1_warpReduce (
 }
 
 __global__
-void kernel2_blockReduce (
+void attention_kernel2_blockReduce (
     const float*__restrict__ exp_sum,
     const float*__restrict__ dot_product,
     const float*__restrict__ value,
@@ -125,7 +125,7 @@ void kernel2_blockReduce (
 }
 
 __global__
-void kernel2_warpReduce (
+void attention_kernel2_warpReduce (
     const float*__restrict__ exp_sum,
     const float*__restrict__ dot_product,
     const float*__restrict__ value,

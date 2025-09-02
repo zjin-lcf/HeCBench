@@ -49,8 +49,8 @@ float* attention_device(const float* key, const float* value, const float* query
 
     for (int k = 0; k < repeat; k++) {
       hipMemset(d_exp_sum, 0, 4);
-      kernel1_warpReduce<<<grids(n, 256), 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
-      kernel2_blockReduce<<<d, 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
+      attention_kernel1_warpReduce<<<grids(n, 256), 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      attention_kernel2_blockReduce<<<d, 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
     hipDeviceSynchronize();
@@ -65,8 +65,8 @@ float* attention_device(const float* key, const float* value, const float* query
 
     for (int k = 0; k < repeat; k++) {
       hipMemset(d_exp_sum, 0, 4);
-      kernel1_warpReduce<<<grids(n, 256), 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
-      kernel2_warpReduce<<<grids(d, 256), 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
+      attention_kernel1_warpReduce<<<grids(n, 256), 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      attention_kernel2_warpReduce<<<grids(d, 256), 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
     hipDeviceSynchronize();
@@ -81,8 +81,8 @@ float* attention_device(const float* key, const float* value, const float* query
 
     for (int k = 0; k < repeat; k++) {
       hipMemset(d_exp_sum, 0, 4);
-      kernel1_blockReduce<<<n, 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
-      kernel2_blockReduce<<<d, 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
+      attention_kernel1_blockReduce<<<n, 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      attention_kernel2_blockReduce<<<d, 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
     hipDeviceSynchronize();
@@ -99,9 +99,9 @@ float* attention_device(const float* key, const float* value, const float* query
 
     for (int k = 0; k < repeat; k++) {
       hipMemset(d_exp_sum, 0, 4);
-      kernel1<<<(n+255)/256, 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
-      kernel2<<<(n+255)/256, 256>>>(d_exp_sum, d_dot_product, d_score, n);
-      kernel3<<<(d+255)/256, 256>>>(d_score, d_value, d_output, n, d);
+      attention_kernel1<<<(n+255)/256, 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      attention_kernel2<<<(n+255)/256, 256>>>(d_exp_sum, d_dot_product, d_score, n);
+      attention_kernel3<<<(d+255)/256, 256>>>(d_score, d_value, d_output, n, d);
     }
 
     hipDeviceSynchronize();
