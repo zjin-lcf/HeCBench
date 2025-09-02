@@ -136,14 +136,14 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
     q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class k0>(
         sycl::nd_range<1>(k0_gws, k0_lws), [=] (sycl::nd_item<1> item) {
-        kernel0(d_AT, d_X, d_Y, alpha_im, alpha_re, beta_im, beta_re, item);
+        chemv_kernel0(d_AT, d_X, d_Y, alpha_im, alpha_re, beta_im, beta_re, item);
       });
     });
 
     q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class k1>(
         sycl::nd_range<1>(k1_gws, k1_lws), [=] (sycl::nd_item<1> item) {
-        kernel1(d_AT, d_X, d_Y, alpha_im, alpha_re, item);
+        chemv_kernel1(d_AT, d_X, d_Y, alpha_im, alpha_re, item);
       });
     });
   }

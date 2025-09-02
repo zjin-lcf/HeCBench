@@ -127,14 +127,14 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < REPEAT; n++) {
-    kernel0 <<< k0_dimGrid, k0_dimBlock >>> (dev_AT, dev_X, dev_Y, alpha_im, alpha_re, beta_im, beta_re);
-    kernel1 <<< k1_dimGrid, k1_dimBlock >>> (dev_AT, dev_X, dev_Y, alpha_im, alpha_re);
+    chemv_kernel0 <<< k0_dimGrid, k0_dimBlock >>> (dev_AT, dev_X, dev_Y, alpha_im, alpha_re, beta_im, beta_re);
+    chemv_kernel1 <<< k1_dimGrid, k1_dimBlock >>> (dev_AT, dev_X, dev_Y, alpha_im, alpha_re);
   }
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average execution time of chemv kernels: %f (us)\n", (time * 1e-3f) / REPEAT);
+  printf("Average execution time of chemv chemv_kernels: %f (us)\n", (time * 1e-3f) / REPEAT);
 
   cudaMemcpy(Y, dev_Y, Y_SIZE * sizeof(struct ComplexFloat), cudaMemcpyDeviceToHost);
   cudaFree(dev_AT);
