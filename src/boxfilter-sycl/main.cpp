@@ -16,8 +16,8 @@
 #include "shrUtils.h"
 
 extern
-void BoxFilterHost( unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage, 
-                    unsigned int uiWidth, unsigned int uiHeight, int r, float fScale );
+void BoxFilterHost( unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage,
+                    int uiWidth, int uiHeight, int r, float fScale );
 
 
 const unsigned int RADIUS = 10;                    // initial radius of 2D box filter mask
@@ -49,12 +49,12 @@ unsigned int rgbaFloat4ToUint(const sycl::float4 rgba, const float fScale)
     return uiPackedPix;
 }
 
-void BoxFilterGPU ( sycl::queue &q, 
+void BoxFilterGPU ( sycl::queue &q,
                     sycl::uchar4 *cmBufIn,
                     unsigned int *cmBufTmp,
                     unsigned int *cmBufOut,
-                    const unsigned int uiWidth, 
-                    const unsigned int uiHeight, 
+                    const int uiWidth,
+                    const int uiHeight,
                     const int iRadius,
                     const float fScale,
                     const int iCycles)
@@ -66,12 +66,12 @@ void BoxFilterGPU ( sycl::queue &q,
       uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - iRadius;
 
     // Set global and local work sizes for row kernel // Workgroup padded left and right
-    sycl::range<2> row_gws(uiHeight, (size_t)(iRadiusAligned + uiNumOutputPix + iRadius) * 
-                                      DivUp((size_t)uiWidth, (size_t)uiNumOutputPix));
-    sycl::range<2> row_lws(1, (size_t)(iRadiusAligned + uiNumOutputPix + iRadius));
+    sycl::range<2> row_gws(uiHeight, (iRadiusAligned + uiNumOutputPix + iRadius) *
+                                      DivUp(uiWidth, uiNumOutputPix));
+    sycl::range<2> row_lws(1, iRadiusAligned + uiNumOutputPix + iRadius);
 
     // Set global and local work sizes for column kernel
-    sycl::range<1> col_gws(64 * DivUp((size_t)uiWidth, 64));
+    sycl::range<1> col_gws(64 * DivUp(uiWidth, 64));
     sycl::range<1> col_lws(64);
 
     q.wait();
@@ -98,11 +98,11 @@ void BoxFilterGPU ( sycl::queue &q,
               uc4LocalData[lid] = cmBufIn[iGlobalOffset];
           }
           else
-              uc4LocalData[lid] = {0, 0, 0, 0}; 
+              uc4LocalData[lid] = {0, 0, 0, 0};
 
           item.barrier(sycl::access::fence_space::local_space);
 
-          if((globalPosX >= 0) && (globalPosX < uiWidth) && (lid >= iRadiusAligned) && 
+          if((globalPosX >= 0) && (globalPosX < uiWidth) && (lid >= iRadiusAligned) &&
              (lid < (iRadiusAligned + (int)uiNumOutputPix)))
           {
               // Init summation registers to zero
@@ -116,10 +116,10 @@ void BoxFilterGPU ( sycl::queue &q,
                   f4Sum.x() += uc4LocalData[iOffsetX].x();
                   f4Sum.y() += uc4LocalData[iOffsetX].y();
                   f4Sum.z() += uc4LocalData[iOffsetX].z();
-                  f4Sum.w() += uc4LocalData[iOffsetX].w(); 
+                  f4Sum.w() += uc4LocalData[iOffsetX].w();
               }
 
-              // Use inline function to scale and convert registers to packed RGBA values in a sycl::uchar4, 
+              // Use inline function to scale and convert registers to packed RGBA values in a sycl::uchar4,
               // and write back out to GMEM
               cmBufTmp[iGlobalOffset] = rgbaFloat4ToUint(f4Sum, fScale);
           }
@@ -130,7 +130,8 @@ void BoxFilterGPU ( sycl::queue &q,
       q.submit([&] (sycl::handler &cgh) {
         cgh.parallel_for<class col_kernel>(
           sycl::nd_range<1>(col_gws, col_lws), [=] (sycl::nd_item<1> item) {
-          size_t globalPosX = item.get_global_id(0);
+          int globalPosX = item.get_global_id(0);
+          if (globalPosX >= uiWidth) return;
           auto uiInputImage = cmBufTmp + globalPosX;
           auto uiOutputImage = cmBufOut + globalPosX;
 
@@ -139,26 +140,26 @@ void BoxFilterGPU ( sycl::queue &q,
 
           sycl::float4 radius = {iRadius, iRadius, iRadius, iRadius};
           sycl::float4 f4Sum = top_color * radius ;
-          for (int y = 0; y < iRadius + 1; y++) 
+          for (int y = 0; y < iRadius + 1; y++)
           {
               f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
           }
           uiOutputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
-          for(int y = 1; y < iRadius + 1; y++) 
+          for(int y = 1; y < iRadius + 1; y++)
           {
               f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
               f4Sum -= top_color;
               uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
           }
-          
-          for(int y = iRadius + 1; y < uiHeight - iRadius; y++) 
+
+          for(int y = iRadius + 1; y < uiHeight - iRadius; y++)
           {
               f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
               f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
               uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
           }
 
-          for (int y = uiHeight - iRadius; y < uiHeight; y++) 
+          for (int y = uiHeight - iRadius; y < uiHeight; y++)
           {
               f4Sum += bot_color;
               f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
@@ -184,11 +185,11 @@ int main(int argc, char** argv)
   unsigned int uiImageHeight = 0;    // Image height
   unsigned int* uiInput = NULL;      // Host buffer to hold input image data
   unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
-  unsigned int* uiDevOutput = NULL;      
-  unsigned int* uiHostOutput = NULL;      
+  unsigned int* uiDevOutput = NULL;
+  unsigned int* uiHostOutput = NULL;
 
   shrLoadPPM4ub(argv[1], (sycl::uchar **)&uiInput, &uiImageWidth, &uiImageHeight);
-  printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n", 
+  printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n",
          uiImageWidth, uiImageHeight, unsigned(sizeof(unsigned int) * 8), RADIUS);
   printf("Using Local Memory for Row Processing\n\n");
 
@@ -210,7 +211,7 @@ int main(int argc, char** argv)
   unsigned int *cmDevBufTmp = sycl::malloc_device<unsigned int>(szBuff, q);
   unsigned int *cmDevBufOut = sycl::malloc_device<unsigned int>(szBuff, q);
 
-  // Copy input data from host to device 
+  // Copy input data from host to device
   q.memcpy(cmDevBufIn, (sycl::uchar4*)uiInput, sizeof(sycl::uchar4) * szBuff);
 
   const int iCycles = atoi(argv[2]);
@@ -221,7 +222,7 @@ int main(int argc, char** argv)
 
   printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
 
-  BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
+  BoxFilterGPU (q, cmDevBufIn, cmDevBufTmp, cmDevBufOut,
                 uiImageWidth, uiImageHeight, RADIUS, SCALE, iCycles);
 
   // Copy output from device to host
@@ -234,7 +235,7 @@ int main(int argc, char** argv)
   sycl::free(cmDevBufTmp, q);
   sycl::free(cmDevBufOut, q);
 
-  // Verification 
+  // Verification
   // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
   int error = 0;
   for (unsigned i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
