@@ -24,8 +24,14 @@ int main(int argc, const char * argv[]) {
     exit(0);
   }
 
-  int bufSize = atoi(argv[1]) * 1024 * 1024; // workSize per data parity block
+  int workSize = atoi(argv[1]);
+  size_t bufSize = (size_t)workSize * 1024 * 1024; // workSize per data parity block
+
   int taskNum = atoi(argv[2]);
+  if (taskNum <= 0) {
+    printf("Error: Number of tasks must be a positive number\n");
+    return 1;
+  }
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -56,13 +62,13 @@ int main(int argc, const char * argv[]) {
     //printMatrix(bitmatrix, k*w, m*w);
 
     //  adjust the bufSize
-    int bufSizePerTask = align_value(bufSize / taskNum, sizeof(long) * w);
+    size_t bufSizePerTask = align_value(bufSize / taskNum, sizeof(long) * w);
     bufSize = bufSizePerTask * taskNum;
 
     //  compute the bufSize for the last task
-    int bufSizeForLastTask = bufSize - (bufSizePerTask * (taskNum - 1));
+    size_t bufSizeForLastTask = bufSize - (bufSizePerTask * (taskNum - 1));
 #ifdef DUMP
-    printf("Total Size:%d Size per task:%d Size for last task:%d\n", 
+    printf("Total Size:%zu Size per task:%zu Size for last task:%zu\n",
            bufSize, bufSizePerTask, bufSizeForLastTask);
 #endif
 
