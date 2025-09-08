@@ -199,9 +199,9 @@ int main(int argc, char** argv)
   size_t szBuffBytes = szBuff * sizeof (unsigned int);
 
   // Allocate intermediate and output host image buffers
-  uiTmp = (unsigned int*)malloc(szBuffBytes);
+  uiTmp = (unsigned int*)calloc(szBuff, sizeof(unsigned int));
+  uiHostOutput = (unsigned int*)calloc(szBuff, sizeof(unsigned int));
   uiDevOutput = (unsigned int*)malloc(szBuffBytes);
-  uiHostOutput = (unsigned int*)malloc(szBuffBytes);
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -215,6 +215,9 @@ int main(int argc, char** argv)
 
   // Copy input data from host to device
   q.memcpy(cmDevBufIn, (sycl::uchar4*)uiInput, sizeof(sycl::uchar4) * szBuff);
+  // Initialize buffer data
+  q.memset(cmDevBufTmp, 0, szBuffBytes);
+  q.memset(cmDevBufOut, 0, szBuffBytes);
 
   const int iCycles = atoi(argv[2]);
 
@@ -238,12 +241,12 @@ int main(int argc, char** argv)
   sycl::free(cmDevBufOut, q);
 
   // Verification
-  // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
   int error = 0;
-  for (unsigned i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
-  {
+  const int64_t start = RADIUS * uiImageWidth;
+  const int64_t end  = (int64_t)szBuff - (int64_t)start;
+  for (int64_t i = start; i < end; i++) {
     if (uiDevOutput[i] != uiHostOutput[i]) {
-      printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
+      printf("%ld %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
       error = 1;
       break;
     }
