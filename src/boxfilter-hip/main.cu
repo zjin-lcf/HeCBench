@@ -207,12 +207,14 @@ int main(int argc, char** argv)
   unsigned int* uiDevOutput = NULL;
   unsigned int* uiHostOutput = NULL;
 
-  shrLoadPPM4ub(argv[1], (unsigned char**)&uiInput, &uiImageWidth, &uiImageHeight);
+  bool status = shrLoadPPM4ub(argv[1], (unsigned char**)&uiInput, &uiImageWidth, &uiImageHeight);
+  if (!status) return 1;
+
   printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n",
       uiImageWidth, uiImageHeight, unsigned(sizeof(unsigned int) * 8), RADIUS);
   printf("Using Local Memory for Row Processing\n\n");
 
-  size_t szBuff= uiImageWidth * uiImageHeight;
+  size_t szBuff = uiImageWidth * uiImageHeight;
   size_t szBuffBytes = szBuff * sizeof (unsigned int);
 
   // Allocate intermediate and output host image buffers
