@@ -126,29 +126,34 @@ __global__ void col_kernel (
           make_float4((float)iRadius, (float)iRadius, (float)iRadius, (float)iRadius);
   for (int y = 0; y < iRadius + 1; y++)
   {
-    f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
+    if (y < uiHeight)
+      f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
   }
-  uiOutputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
-
   for(int y = 1; y < iRadius + 1; y++)
   {
-    f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
-    f4Sum -= top_color;
-    uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    if (y + iRadius < uiHeight) {
+      f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
+      f4Sum -= top_color;
+      uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    }
   }
 
   for(int y = iRadius + 1; y < uiHeight - iRadius; y++)
   {
-    f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
-    f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
-    uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    if (y + iRadius < uiHeight && y - iRadius >= 0) {
+      f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
+      f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
+      uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    }
   }
 
   for (int y = uiHeight - iRadius; y < uiHeight; y++)
   {
-    f4Sum += bot_color;
-    f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
-    uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    if (y < uiHeight && y - iRadius >= 0) {
+      f4Sum += bot_color;
+      f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
+      uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    }
   }
 }
 
@@ -207,7 +212,8 @@ int main(int argc, char** argv)
   unsigned int* uiDevOutput = NULL;
   unsigned int* uiHostOutput = NULL;
 
-  bool status = shrLoadPPM4ub(argv[1], (unsigned char**)&uiInput, &uiImageWidth, &uiImageHeight);
+  bool status = shrLoadPPM4ub(argv[1], (unsigned char**)&uiInput,
+                              &uiImageWidth, &uiImageHeight);
   if (!status) return 1;
 
   printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n",
@@ -218,9 +224,9 @@ int main(int argc, char** argv)
   size_t szBuffBytes = szBuff * sizeof (unsigned int);
 
   // Allocate intermediate and output host image buffers
-  uiTmp = (unsigned int*)malloc(szBuffBytes);
+  uiTmp = (unsigned int*)calloc(szBuff, sizeof(unsigned int));
+  uiHostOutput = (unsigned int*)calloc(szBuff, sizeof(unsigned int));
   uiDevOutput = (unsigned int*)malloc(szBuffBytes);
-  uiHostOutput = (unsigned int*)malloc(szBuffBytes);
 
   uchar4* cmDevBufIn;
   unsigned int* cmDevBufTmp;
@@ -232,6 +238,9 @@ int main(int argc, char** argv)
 
   // Copy input data from host to device
   hipMemcpy(cmDevBufIn, uiInput, szBuffBytes, hipMemcpyHostToDevice);
+  // Initialize buffer data
+  hipMemset(cmDevBufTmp, 0, szBuffBytes);
+  hipMemset(cmDevBufOut, 0, szBuffBytes);
 
   const int iCycles = atoi(argv[2]);
 
@@ -254,12 +263,12 @@ int main(int argc, char** argv)
   BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
 
   // Verification
-  // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
   int error = 0;
-  for (unsigned i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
-  {
+  const int64_t start = RADIUS * uiImageWidth;
+  const int64_t end  = (int64_t)szBuff - (int64_t)start;
+  for (int64_t i = start; i < end; i++) {
     if (uiDevOutput[i] != uiHostOutput[i]) {
-      printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
+      printf("%ld %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
       error = 1;
       break;
     }

@@ -163,28 +163,35 @@ void BoxFilterHost( unsigned int *uiInput,
     f4Sum = top_color * f4iRadius;
     for (int y = 0; y < iRadius + 1; y++)
     {
+      if (y < uiHeight)
         f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
     }
     uiOutputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
     for(int y = 1; y < iRadius + 1; y++)
     {
+      if (y + iRadius < uiHeight) {
         f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
         f4Sum -= top_color;
         uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+      }
     }
 
     for(int y = iRadius + 1; y < uiHeight - iRadius; y++)
     {
+      if (y + iRadius < uiHeight && y - iRadius >= 0) {
         f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
         f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
         uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+      }
     }
 
     for (int y = uiHeight - iRadius; y < uiHeight; y++)
     {
+      if (y < uiHeight && y - iRadius >= 0) {
         f4Sum += bot_color;
         f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
         uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+      }
     }
   }
 }
