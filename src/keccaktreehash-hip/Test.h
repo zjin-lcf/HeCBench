@@ -58,4 +58,7 @@ void Device_Info(void);
 //print Tree hash mode params set in KeccakTree.h
 void Print_Param(void);
 
+//verify 
+void Verify_results(void);
+
 #endif // TEST_H_INCLUDED
