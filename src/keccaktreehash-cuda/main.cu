@@ -21,5 +21,6 @@ int main()
    Print_Param();
    TestCPU(1);
    TestGPU();
+   Verify_results();
    return 0;
 }
