@@ -49,8 +49,9 @@ create_matrix_from_file(float **mp, const char* filename, int *size_p){
   }
 
   fscanf(fp, "%d\n", &size);
-
-  m = (float*) malloc(sizeof(float)*size*size);
+  
+  size_t s = (size_t)size;
+  m = (float*) malloc(s * s * sizeof(float));
   if ( m == NULL) {
       fclose(fp);
       return RET_FAILURE;
@@ -58,7 +59,7 @@ create_matrix_from_file(float **mp, const char* filename, int *size_p){
 
   for (i=0; i < size; i++) {
       for (j=0; j < size; j++) {
-          fscanf(fp, "%f ", m+i*size+j);
+          fscanf(fp, "%f ", m+i*s+j);
       }
   }
 
@@ -74,18 +75,19 @@ create_matrix_from_file(float **mp, const char* filename, int *size_p){
 void
 matrix_multiply(float *inputa, float *inputb, float *output, int size){
   int i, j, k;
-
+  size_t s = (size_t)size;
   for (i=0; i < size; i++)
     for (k=0; k < size; k++)
       for (j=0; j < size; j++)
-        output[i*size+j] = inputa[i*size+k] * inputb[k*size+j];
+        output[i*s+j] = inputa[i*s+k] * inputb[k*s+j];
 
 }
 
 void
 lud_verify(float *m, float *lu, int matrix_dim){
   int i,j,k;
-  float *tmp = (float*)malloc(matrix_dim*matrix_dim*sizeof(float));
+  size_t s = (size_t)matrix_dim;
+  float *tmp = (float*)malloc(s * s * sizeof(float));
 
   for (i=0; i < matrix_dim; i ++)
     for (j=0; j< matrix_dim; j++) {
@@ -95,11 +97,11 @@ lud_verify(float *m, float *lu, int matrix_dim){
             if ( i==k)
               l=1;
             else
-              l=lu[i*matrix_dim+k];
-            u=lu[k*matrix_dim+j];
+              l=lu[i*s+k];
+            u=lu[k*s+j];
             sum+=l*u;
         }
-        tmp[i*matrix_dim+j] = sum;
+        tmp[i*s+j] = sum;
     }
   /* printf(">>>>>LU<<<<<<<\n"); */
   /* for (i=0; i<matrix_dim; i++){ */
@@ -125,8 +127,8 @@ lud_verify(float *m, float *lu, int matrix_dim){
 
   for (i=0; i<matrix_dim; i++){
       for (j=0; j<matrix_dim; j++){
-          if ( fabs(m[i*matrix_dim+j]-tmp[i*matrix_dim+j]) > 0.0001)
-            printf("dismatch at (%d, %d): (o)%f (n)%f\n", i, j, m[i*matrix_dim+j], tmp[i*matrix_dim+j]);
+          if ( fabs(m[i*s+j]-tmp[i*s+j]) > 0.0001)
+            printf("mismatch at (%d, %d): (o)%f (n)%f\n", i, j, m[i*s+j], tmp[i*s+j]);
       }
   }
   free(tmp);
@@ -134,7 +136,7 @@ lud_verify(float *m, float *lu, int matrix_dim){
 
 void
 matrix_duplicate(float *src, float **dst, int matrix_dim) {
-    int s = matrix_dim*matrix_dim*sizeof(float);
+   size_t s = (size_t)matrix_dim * matrix_dim * sizeof(float); 
    float *p = (float *) malloc (s);
    memcpy(p, src, s);
    *dst = p;
@@ -143,9 +145,10 @@ matrix_duplicate(float *src, float **dst, int matrix_dim) {
 void
 print_matrix(float *m, int matrix_dim) {
     int i, j;
+    size_t s = (size_t)matrix_dim;
     for (i=0; i<matrix_dim;i++) {
       for (j=0; j<matrix_dim;j++)
-        printf("%f ", m[i*matrix_dim+j]);
+        printf("%f ", m[i*s+j]);
       printf("\n");
     }
 }
@@ -170,14 +173,15 @@ create_matrix(float **mp, int size){
       coe[j]=coe_i;
     }
 
-  m = (float*) malloc(sizeof(float)*size*size);
-  if ( m == NULL) {
+  size_t s = (size_t)size;
+  m = (float*) malloc(s * s * sizeof(float));
+  if (m == NULL) {
       return RET_FAILURE;
   }
 
   for (i=0; i < size; i++) {
       for (j=0; j < size; j++) {
-	m[i*size+j]=coe[size-1-i+j];
+	m[i*s+j]=coe[size-1-i+j];
       }
   }
 

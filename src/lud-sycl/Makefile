@@ -22,7 +22,7 @@ HIP_ARCH  = gfx908
 
 program = main
 
-source = lud.cpp utils.cpp
+source = lud.cpp common.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -32,6 +32,7 @@ obj = $(source:.cpp=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) $(KERNEL_DIM) -std=c++17 -Wall -fsycl \
+          -I../lud-cuda/common
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
@@ -73,10 +74,13 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp lud.h \
+lud.o: lud.cpp ../lud-cuda/common/common.h \
 	kernel_lud_diagonal.sycl \
 	kernel_lud_internal.sycl \
        	kernel_lud_perimeter.sycl
+	$(CC) $(CFLAGS) -c $< -o $@
+
+common.o: ../lud-cuda/common/common.cpp ../lud-cuda/common/common.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

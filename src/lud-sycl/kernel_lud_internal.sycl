@@ -9,8 +9,8 @@
   int global_row_id = offset + (by+1)*BLOCK_SIZE;
   int global_col_id = offset + (bx+1)*BLOCK_SIZE;
 
-  peri_row[ty * BLOCK_SIZE + tx] = d_m[(offset+ty)*matrix_dim+global_col_id+tx];
-  peri_col[ty * BLOCK_SIZE + tx] = d_m[(global_row_id+ty)*matrix_dim+offset+tx];
+  peri_row[ty * BLOCK_SIZE + tx] = d_m[(offset+ty)*(size_t)matrix_dim+global_col_id+tx];
+  peri_col[ty * BLOCK_SIZE + tx] = d_m[(global_row_id+ty)*(size_t)matrix_dim+offset+tx];
 
   item.barrier(sycl::access::fence_space::local_space);
 
@@ -18,5 +18,5 @@
   for (i=0; i < BLOCK_SIZE; i++)
     sum += peri_col[ty * BLOCK_SIZE + i] * peri_row[i * BLOCK_SIZE + tx];
 
-  d_m[(global_row_id+ty)*matrix_dim+global_col_id+tx] -= sum; 
+  d_m[(global_row_id+ty)*(size_t)matrix_dim+global_col_id+tx] -= sum; 
 

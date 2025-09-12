@@ -18,7 +18,6 @@ double gettime() {
 }
 
 static int do_verify = 0;
-void lud_cuda(float *d_m, int matrix_dim);
 
 static struct option long_options[] = {
   /* name, has_arg, flag, val */
@@ -30,7 +29,6 @@ static struct option long_options[] = {
 
 int main ( int argc, char *argv[] )
 {
-  printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
   int matrix_dim = 32; /* default matrix_dim */
   int opt, option_index=0;
   func_ret_t ret;
@@ -49,6 +47,14 @@ int main ( int argc, char *argv[] )
         break;
       case 's':
         matrix_dim = atoi(optarg);
+        if (matrix_dim <= 0) {
+          printf("Matrix dimension must be positive!\n");
+          exit(EXIT_FAILURE);
+        }
+        if (matrix_dim % 16 != 0) {
+          printf("Matrix dimension of %d not supported by the benchmark\n", matrix_dim);
+          exit(EXIT_FAILURE);
+        }
         printf("Generate input matrix internally, size =%d\n", matrix_dim);
         break;
       case '?':
@@ -99,10 +105,12 @@ int main ( int argc, char *argv[] )
     matrix_duplicate(m, &mm, matrix_dim);
   }
 
+  printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
+
   /* beginning of timing point */
   stopwatch_start(&sw);
 
-  #pragma omp target data map(tofrom: m[0:matrix_dim*matrix_dim])
+  #pragma omp target data map(tofrom: m[0:(size_t)matrix_dim*matrix_dim])
   {
   int offset;
   int i=0;
@@ -119,7 +127,7 @@ int main ( int argc, char *argv[] )
         int i,j;
         int tx = omp_get_thread_num() ;
       
-        int array_offset = offset*matrix_dim+offset;
+        size_t array_offset = offset*(size_t)matrix_dim+offset;
         for(i=0; i < BLOCK_SIZE; i++){
           shadow[i * BLOCK_SIZE + tx]=m[array_offset + tx];
           array_offset += matrix_dim;
@@ -145,7 +153,7 @@ int main ( int argc, char *argv[] )
           #pragma omp barrier
         }
       
-        array_offset = (offset+1)*matrix_dim+offset;
+        array_offset = (offset+1)*(size_t)matrix_dim+offset;
         for(i=1; i < BLOCK_SIZE; i++){
           m[array_offset+tx]=shadow[i * BLOCK_SIZE + tx];
           array_offset += matrix_dim;
@@ -160,7 +168,8 @@ int main ( int argc, char *argv[] )
       float peri_col[BLOCK_SIZE * BLOCK_SIZE];
       #pragma omp parallel
       {
-         int i,j, array_offset;
+         size_t array_offset;
+         int i,j;
          int idx;
 
          int  bx = omp_get_team_num();  
@@ -168,13 +177,13 @@ int main ( int argc, char *argv[] )
 
          if (tx < BLOCK_SIZE) {
            idx = tx;
-           array_offset = offset*matrix_dim+offset;
+           array_offset = offset*(size_t)matrix_dim+offset;
            for (i=0; i < BLOCK_SIZE/2; i++){
            dia[i * BLOCK_SIZE + idx]=m[array_offset+idx];
            array_offset += matrix_dim;
            }
          
-         array_offset = offset*matrix_dim+offset;
+         array_offset = offset*(size_t)matrix_dim+offset;
          for (i=0; i < BLOCK_SIZE; i++) {
            peri_row[i * BLOCK_SIZE+ idx]=m[array_offset+(bx+1)*BLOCK_SIZE+idx];
            array_offset += matrix_dim;
@@ -183,13 +192,13 @@ int main ( int argc, char *argv[] )
          } else {
          idx = tx-BLOCK_SIZE;
          
-         array_offset = (offset+BLOCK_SIZE/2)*matrix_dim+offset;
+         array_offset = (offset+BLOCK_SIZE/2)*(size_t)matrix_dim+offset;
          for (i=BLOCK_SIZE/2; i < BLOCK_SIZE; i++){
            dia[i * BLOCK_SIZE + idx]=m[array_offset+idx];
            array_offset += matrix_dim;
          }
          
-         array_offset = (offset+(bx+1)*BLOCK_SIZE)*matrix_dim+offset;
+         array_offset = (offset+(bx+1)*BLOCK_SIZE)*(size_t)matrix_dim+offset;
          for (i=0; i < BLOCK_SIZE; i++) {
            peri_col[i * BLOCK_SIZE + idx] = m[array_offset+idx];
            array_offset += matrix_dim;
@@ -215,14 +224,14 @@ int main ( int argc, char *argv[] )
        #pragma omp barrier
        if (tx < BLOCK_SIZE) { //peri-row
          idx=tx;
-         array_offset = (offset+1)*matrix_dim+offset;
+         array_offset = (offset+1)*(size_t)matrix_dim+offset;
          for(i=1; i < BLOCK_SIZE; i++){
            m[array_offset+(bx+1)*BLOCK_SIZE+idx] = peri_row[i*BLOCK_SIZE+idx];
            array_offset += matrix_dim;
          }
        } else { //peri-col
          idx=tx - BLOCK_SIZE;
-         array_offset = (offset+(bx+1)*BLOCK_SIZE)*matrix_dim+offset;
+         array_offset = (offset+(bx+1)*BLOCK_SIZE)*(size_t)matrix_dim+offset;
          for(i=0; i < BLOCK_SIZE; i++){
            m[array_offset+idx] =  peri_col[i*BLOCK_SIZE+idx];
            array_offset += matrix_dim;
@@ -250,15 +259,15 @@ int main ( int argc, char *argv[] )
         int global_row_id = offset + (by+1)*BLOCK_SIZE;
         int global_col_id = offset + (bx+1)*BLOCK_SIZE;
 
-        peri_row[ty * BLOCK_SIZE + tx] = m[(offset+ty)*matrix_dim+global_col_id+tx];
-        peri_col[ty * BLOCK_SIZE + tx] = m[(global_row_id+ty)*matrix_dim+offset+tx];
+        peri_row[ty * BLOCK_SIZE + tx] = m[(offset+ty)*(size_t)matrix_dim+global_col_id+tx];
+        peri_col[ty * BLOCK_SIZE + tx] = m[(global_row_id+ty)*(size_t)matrix_dim+offset+tx];
 
         #pragma omp barrier
 
         sum = 0;
         for (i=0; i < BLOCK_SIZE; i++)
           sum += peri_col[ty * BLOCK_SIZE + i] * peri_row[i * BLOCK_SIZE + tx];
-        m[(global_row_id+ty)*matrix_dim+global_col_id+tx] -= sum;
+        m[(global_row_id+ty)*(size_t)matrix_dim+global_col_id+tx] -= sum;
       }
     }
   } // for
@@ -272,7 +281,7 @@ int main ( int argc, char *argv[] )
       int i,j;
       int tx = omp_get_thread_num() ;
     
-      int array_offset = offset*matrix_dim+offset;
+      size_t array_offset = offset*(size_t)matrix_dim+offset;
       for(i=0; i < BLOCK_SIZE; i++){
         shadow[i * BLOCK_SIZE + tx]=m[array_offset + tx];
         array_offset += matrix_dim;
@@ -296,7 +305,7 @@ int main ( int argc, char *argv[] )
         #pragma omp barrier
       }
     
-      array_offset = (offset+1)*matrix_dim+offset;
+      array_offset = (offset+1)*(size_t)matrix_dim+offset;
       for(i=1; i < BLOCK_SIZE; i++){
         m[array_offset+tx]=shadow[i * BLOCK_SIZE + tx];
         array_offset += matrix_dim;

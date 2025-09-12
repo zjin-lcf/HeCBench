@@ -7,7 +7,7 @@
 #include <string.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
-#include "lud.h"
+#include "common.h"
 
 #define BLOCK_SIZE 16
 
@@ -29,7 +29,6 @@ static struct option long_options[] = {
 
 int main ( int argc, char *argv[] )
 {
-  printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
   int matrix_dim = 32; /* default matrix_dim */
   int opt, option_index=0;
   func_ret_t ret;
@@ -48,6 +47,14 @@ int main ( int argc, char *argv[] )
         break;
       case 's':
         matrix_dim = atoi(optarg);
+        if (matrix_dim <= 0) {
+          printf("Matrix dimension must be positive!\n");
+          exit(EXIT_FAILURE);
+        }
+        if (matrix_dim % 16 != 0) {
+          printf("Matrix dimension of %d not supported by the benchmark\n", matrix_dim);
+          exit(EXIT_FAILURE);
+        }
         printf("Generate input matrix internally, size =%d\n", matrix_dim);
         break;
       case '?':
@@ -108,9 +115,11 @@ int main ( int argc, char *argv[] )
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  float *d_m = sycl::malloc_device<float>(matrix_dim * matrix_dim, q);
-  q.memcpy(d_m, m, sizeof(float) * matrix_dim * matrix_dim);
+  size_t matrix_size_bytes = (size_t)matrix_dim * matrix_dim * sizeof(float);
+  float *d_m = (float*) sycl::malloc_device(matrix_size_bytes, q);
+  q.memcpy(d_m, m, matrix_size_bytes);
 
+  printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
   sycl::range<1> global_work1(BLOCK_SIZE);
   sycl::range<1> local_work1(BLOCK_SIZE);
   int offset;
@@ -172,7 +181,7 @@ int main ( int argc, char *argv[] )
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time : %f (s)\n", time * 1e-9f);
 
-  q.memcpy(m, d_m, sizeof(float) * matrix_dim * matrix_dim).wait();
+  q.memcpy(m, d_m, matrix_size_bytes).wait();
 
   /* end of timing point */
   stopwatch_stop(&sw);
