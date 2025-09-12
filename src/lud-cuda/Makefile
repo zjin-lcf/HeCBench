@@ -13,9 +13,9 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = lud
+program = main
 
-source = lud.cu ./common/common.cu 
+source = lud.cu ./common/common.cpp 
 
 #===============================================================================
 # Sets Flags
@@ -29,7 +29,7 @@ LDFLAGS =
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -G
   LDFLAGS  += -g
 endif
 

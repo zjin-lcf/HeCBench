@@ -1,7 +1,7 @@
 	int i,j;
 	int tx = item.get_local_id(0);
 
-	int array_offset = offset*matrix_dim+offset;
+	size_t array_offset = offset*(size_t)matrix_dim+offset;
 	for(i=0; i < BLOCK_SIZE; i++){
 		shadow[i * BLOCK_SIZE + tx]=d_m[array_offset + tx];
 		array_offset += matrix_dim;
@@ -27,7 +27,7 @@
 	item.barrier(sycl::access::fence_space::local_space);
     }
 
-    array_offset = (offset+1)*matrix_dim+offset;
+    array_offset = (offset+1)*(size_t)matrix_dim+offset;
     for(i=1; i < BLOCK_SIZE; i++){
       d_m[array_offset+tx]=shadow[i * BLOCK_SIZE + tx];
       array_offset += matrix_dim;
