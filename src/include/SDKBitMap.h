@@ -257,6 +257,9 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
         {
           // Read header
           val = fread((BitMapHeader *)this, sizeof(BitMapHeader), 1, fd);
+#ifdef DEBUG
+          printf("%d %d\n", size, offset);
+#endif
           // Failed to read header
           if (val != 1) 
           {
@@ -271,6 +274,20 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
           }
           // Read map info header
           val = fread((BitMapInfoHeader *)this, sizeof(BitMapInfoHeader), 1, fd);
+#ifdef DEBUG
+          printf("%d, %d, %d %d %d, %u %u %d %d %d %d\n",
+                  sizeInfo,
+                  width,
+                  height,
+                  planes,
+                  bitsPerPixel,
+                  compression,
+                  imageSize,
+                  xPelsPerMeter,
+                  yPelsPerMeter,
+                  clrUsed,
+                  clrImportant);
+#endif
           // Failed to read map info header
           if (val != 1) 
           {
@@ -285,8 +302,14 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
             return;
           }
           // Support only 8 or 24 bits images
-          if (bitsPerPixel < 8)
+          if (bitsPerPixel != 8 && bitsPerPixel != 24)
           {
+            fclose(fd);
+            return;
+          }
+          int sizeBuffer = size - offset;
+          if (width * height * (bitsPerPixel / 8) != sizeBuffer) {
+            printf("This is not a valid bitmap file.\n");
             fclose(fd);
             return;
           }
@@ -313,10 +336,8 @@ class SDKBitMap : public BitMapHeader, public BitMapInfoHeader
               fclose(fd);
               return;
             }
-
           }
           // Allocate buffer to hold all pixels
-          unsigned int sizeBuffer = size - offset;
           unsigned char * tmpPixels = new unsigned char[sizeBuffer];
           if (tmpPixels == NULL)
           {
