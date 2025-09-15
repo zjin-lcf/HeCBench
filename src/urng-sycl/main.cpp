@@ -24,14 +24,12 @@
 
 int main(int argc, char** argv)
 {
-  if (argc != 5) {
-    printf("Usage: %s <path to file> <blockSizeX> <blockSizeY> <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <path to file> <repeat>\n", argv[0]);
     return 1;
   }
   const char* filePath = argv[1];
-  const int blockSizeX = atoi(argv[2]);
-  const int blockSizeY = atoi(argv[3]);
-  const int iterations = atoi(argv[4]);
+  const int iterations = atoi(argv[2]);
 
   // load input bitmap image
   SDKBitMap inputBitmap;
@@ -45,7 +43,8 @@ int main(int argc, char** argv)
   // get width and height of input image
   int height = inputBitmap.getHeight();
   int width = inputBitmap.getWidth();
-  size_t imageSize = height * width * sizeof(uchar4);
+  int size = height * width;
+  size_t imageSize = size * sizeof(uchar4);
 
   std::cout << "Image " << filePath;
   std::cout << " height: " << height;
@@ -87,13 +86,13 @@ int main(int argc, char** argv)
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  uchar4 *d_input = sycl::malloc_device<uchar4>(width * height, q);
-  q.memcpy(d_input, inputImageData, width * height * sizeof(uchar4));
+  uchar4 *d_input = sycl::malloc_device<uchar4>(size, q);
+  q.memcpy(d_input, inputImageData, imageSize);
 
-  uchar4 *d_output = sycl::malloc_device<uchar4>(width * height, q);
+  uchar4 *d_output = sycl::malloc_device<uchar4>(size, q);
 
-  sycl::range<1> gws (height * width);
-  sycl::range<1> lws (blockSizeY * blockSizeX);  // maximum work-group size is 256
+  sycl::range<1> gws ((size + 255) / 256 * 256);
+  sycl::range<1> lws (256);
 
   std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
@@ -109,8 +108,9 @@ int main(int argc, char** argv)
         kernel_noise_uniform(
           d_input,
           d_output,
+          size,
           factor,
-          iv.get_pointer(),
+          iv.get_multi_ptr<sycl::access::decorated::no>().get(),
           item);
       });
     });
@@ -121,13 +121,13 @@ int main(int argc, char** argv)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "Average kernel execution time: " <<  (time * 1e-3f) / iterations << " (us)\n";
 
-  q.memcpy(outputImageData, d_output, width * height * sizeof(uchar4)).wait();
+  q.memcpy(outputImageData, d_output, imageSize).wait();
   sycl::free(d_input, q);
   sycl::free(d_output, q);
 
   // verify
   float mean = 0;
-  for(int i = 0; i < (int)(width * height); i++)
+  for(int i = 0; i < size; i++)
   {
     mean += outputImageData[i].x() - inputImageData[i].x();
     mean += outputImageData[i].y() - inputImageData[i].y();

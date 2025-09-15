@@ -79,4 +79,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) URNG_Input.bmp 16 16 1000
+	$(LAUNCHER) ./$(program) URNG_Input.bmp 1000

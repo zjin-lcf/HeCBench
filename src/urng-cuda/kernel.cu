@@ -80,9 +80,11 @@ __global__
 void noise_uniform(
   const uchar4*__restrict__ inputImage, 
         uchar4*__restrict__ outputImage, 
+  const int size,
   const int factor)
 {
   int pos = blockIdx.x * blockDim.x + threadIdx.x;
+  if (pos >= size) return;
 
   float4 temp = convert_float4(inputImage[pos]);
 
