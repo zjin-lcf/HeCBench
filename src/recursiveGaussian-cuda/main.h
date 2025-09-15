@@ -41,4 +41,4 @@ void PreProcessGaussParms (float fSigma, int iOrder, GaussParms* pGP);
 
 // forward interface declaration for host Gaussian processing function
 void HostRecursiveGaussianRGBA(unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage, 
-                                          int iWidth, int iHeight, GaussParms* pGP);
+                               int iWidth, int iHeight, GaussParms* pGP);
