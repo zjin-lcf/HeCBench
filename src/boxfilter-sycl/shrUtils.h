@@ -484,7 +484,7 @@ extern "C" shrBOOL shrGetCmdLineArgumentListstr( const int argc, const char** ar
 //! @param len        number of elements in reference and data
 ////////////////////////////////////////////////////////////////////////////
 extern "C" shrBOOL shrComparef( const float* reference, const float* data,
-             const unsigned int len);
+             const size_t len);
 
 ////////////////////////////////////////////////////////////////////////////
 //! Compare two integer arrays
@@ -494,7 +494,7 @@ extern "C" shrBOOL shrComparef( const float* reference, const float* data,
 //! @param len        number of elements in reference and data
 ////////////////////////////////////////////////////////////////////////////
 extern "C" shrBOOL shrComparei( const int* reference, const int* data, 
-             const unsigned int len ); 
+             const size_t len ); 
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Compare two unsigned integer arrays, with epsilon and threshold
@@ -505,7 +505,7 @@ extern "C" shrBOOL shrComparei( const int* reference, const int* data,
 //! @param threshold  tolerance % # of comparison errors (0.15f = 15%)
 ////////////////////////////////////////////////////////////////////////////////
 extern "C" shrBOOL shrCompareuit( const unsigned int* reference, const unsigned int* data,
-            const unsigned int len, const float epsilon, const float threshold );
+            const size_t len, const float epsilon, const float threshold );
 
 ////////////////////////////////////////////////////////////////////////////
 //! Compare two unsigned char arrays
@@ -515,7 +515,7 @@ extern "C" shrBOOL shrCompareuit( const unsigned int* reference, const unsigned 
 //! @param len        number of elements in reference and data
 ////////////////////////////////////////////////////////////////////////////
 extern "C" shrBOOL shrCompareub( const unsigned char* reference, const unsigned char* data,
-              const unsigned int len ); 
+              const size_t len ); 
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Compare two integers with a tolernance for # of byte errors
@@ -527,7 +527,7 @@ extern "C" shrBOOL shrCompareub( const unsigned char* reference, const unsigned 
 //! @param threshold  tolerance % # of comparison errors (0.15f = 15%)
 ////////////////////////////////////////////////////////////////////////////////
 extern "C" shrBOOL shrCompareubt( const unsigned char* reference, const unsigned char* data,
-             const unsigned int len, const float epsilon, const float threshold );
+             const size_t len, const float epsilon, const float threshold );
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Compare two integer arrays witha n epsilon tolerance for equality
@@ -538,7 +538,7 @@ extern "C" shrBOOL shrCompareubt( const unsigned char* reference, const unsigned
 //! @param epsilon    epsilon to use for the comparison
 ////////////////////////////////////////////////////////////////////////////////
 extern "C" shrBOOL shrCompareube( const unsigned char* reference, const unsigned char* data,
-             const unsigned int len, const float epsilon );
+             const size_t len, const float epsilon );
 
 ////////////////////////////////////////////////////////////////////////////
 //! Compare two float arrays with an epsilon tolerance for equality
@@ -549,7 +549,7 @@ extern "C" shrBOOL shrCompareube( const unsigned char* reference, const unsigned
 //! @param epsilon    epsilon to use for the comparison
 ////////////////////////////////////////////////////////////////////////////
 extern "C" shrBOOL shrComparefe( const float* reference, const float* data,
-              const unsigned int len, const float epsilon );
+              const size_t len, const float epsilon );
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Compare two float arrays with an epsilon tolerance for equality and a 
@@ -561,7 +561,7 @@ extern "C" shrBOOL shrComparefe( const float* reference, const float* data,
 //! @param epsilon    epsilon to use for the comparison
 ////////////////////////////////////////////////////////////////////////////////
 extern "C" shrBOOL shrComparefet( const float* reference, const float* data,
-             const unsigned int len, const float epsilon, const float threshold );
+             const size_t len, const float epsilon, const float threshold );
 
 ////////////////////////////////////////////////////////////////////////////
 //! Compare two float arrays using L2-norm with an epsilon tolerance for 
@@ -573,7 +573,7 @@ extern "C" shrBOOL shrComparefet( const float* reference, const float* data,
 //! @param epsilon    epsilon to use for the comparison
 ////////////////////////////////////////////////////////////////////////////
 extern "C" shrBOOL shrCompareL2fe( const float* reference, const float* data,
-                const unsigned int len, const float epsilon );
+                const size_t len, const float epsilon );
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Compare two PPM image files with an epsilon tolerance for equality
