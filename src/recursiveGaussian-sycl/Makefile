@@ -18,19 +18,18 @@ HIP_ARCH  = gfx908
 #===============================================================================
 # Program name & source code list
 #===============================================================================
-
 program = main
 
-source = main.cpp RecursiveGaussianHost.cpp shrUtils.cpp    
-
-obj = $(source:.cpp=.o)
+obj = main.o RecursiveGaussianHost.o shrUtils.o    
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl \
+          -I../boxfilter-sycl -I../recursiveGaussian-cuda
+          --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS_TMP := $(CFLAGS)
@@ -71,7 +70,15 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp main.h shrUtils.h
+main.o: main.cpp ../boxfilter-sycl/shrUtils.h ../recursiveGaussian-cuda/main.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+RecursiveGaussianHost.o: ../recursiveGaussian-cuda/RecursiveGaussianHost.cpp \
+                         ../recursiveGaussian-cuda/main.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+
+shrUtils.o : ../boxfilter-sycl/shrUtils.cpp ../boxfilter-sycl/shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

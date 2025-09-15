@@ -24,7 +24,8 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall \
+          -I../boxfilter-sycl -I../recursiveGaussian-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -52,7 +53,14 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp main.h shrUtils.h
+main.o: main.cpp ../boxfilter-sycl/shrUtils.h ../recursiveGaussian-cuda/main.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+RecursiveGaussianHost.o: ../recursiveGaussian-cuda/RecursiveGaussianHost.cpp \
+                         ../recursiveGaussian-cuda/main.h 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+shrUtils.o : ../boxfilter-sycl/shrUtils.cpp ../boxfilter-sycl/shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

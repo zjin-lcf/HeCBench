@@ -47,10 +47,10 @@ void TransposeHost(const unsigned int* uiDataIn, unsigned int* uiDataOut, int iW
     // transpose matrix
     for(int Y = 0; Y < iHeight; Y++) 
     {
-        int iBaseIn = Y * iWidth;
+        size_t iBaseIn = (size_t)Y * iWidth;
         for(int X = 0; X < iWidth; X++) 
         {
-            uiDataOut[X * iHeight + Y] = uiDataIn[iBaseIn + X];
+            uiDataOut[(size_t)X * iHeight + Y] = uiDataIn[iBaseIn + X];
         }
     }  
 }
@@ -79,7 +79,7 @@ void SimpleRecursiveGaussianRGBAHost(const unsigned int* uiDataIn, unsigned int*
         rgbaUintToFloat4(uiDataIn[X], yp);  // previous output
         for (int Y = 0; Y < iHeight; Y++) 
         {
-            int iOffSet = Y * iWidth + X;
+            size_t iOffSet = (size_t)Y * iWidth + X;
             rgbaUintToFloat4(uiDataIn[iOffSet], xc);
             yc[0] = xc[0] + (yp[0] - xc[0]) * a;   
             yc[1] = xc[1] + (yp[1] - xc[1]) * a;   
@@ -93,12 +93,12 @@ void SimpleRecursiveGaussianRGBAHost(const unsigned int* uiDataIn, unsigned int*
         }
 
         // reset to last element of column at this x position
-        rgbaUintToFloat4(uiDataIn[(iHeight - 1) * iWidth + X], yp);  
+        rgbaUintToFloat4(uiDataIn[(size_t)(iHeight - 1) * iWidth + X], yp);  
 
         // reverse pass: ensures response is symmetrical
         for (int Y = iHeight - 1; Y > -1; Y--) 
         {
-            int iOffSet = Y * iWidth + X;
+            size_t iOffSet = (size_t)Y * iWidth + X;
             rgbaUintToFloat4(uiDataIn[iOffSet], xc);
             yc[0] = xc[0] + (yp[0] - xc[0]) * a;   
             yc[1] = xc[1] + (yp[1] - xc[1]) * a;   
@@ -154,7 +154,7 @@ void RecursiveGaussianRGBAHost(const unsigned int* uiDataIn, unsigned int* uiDat
         float yc[4] = {0.0f, 0.0f, 0.0f, 0.0f}; 
         for (int Y = 0; Y < iHeight; Y++) 
         {
-            int iOffSet = Y * iWidth + X;
+            size_t iOffSet = (size_t)Y * iWidth + X;
             rgbaUintToFloat4(uiDataIn[iOffSet], xc);
             yc[0] = (a0 * xc[0]) + (a1 * xp[0]) - (b1 * yp[0]) - (b2 * yb[0]);
             yc[1] = (a0 * xc[1]) + (a1 * xp[1]) - (b1 * yp[1]) - (b2 * yb[1]);
@@ -177,7 +177,7 @@ void RecursiveGaussianRGBAHost(const unsigned int* uiDataIn, unsigned int* uiDat
 
 #ifdef CLAMP_TO_EDGE
         // reset to last element of column
-        rgbaUintToFloat4(uiDataIn[(iHeight - 1) * iWidth + X], xn);  
+        rgbaUintToFloat4(uiDataIn[(size_t)(iHeight - 1) * iWidth + X], xn);  
         for (int i = 0; i< 4; i++)
         {
             xa[i] = xn[i]; 
@@ -189,7 +189,7 @@ void RecursiveGaussianRGBAHost(const unsigned int* uiDataIn, unsigned int* uiDat
         float fTemp[4] = {0.0f, 0.0f, 0.0f, 0.0f};
         for (int Y = iHeight - 1; Y > -1; Y--) 
         {
-            int iOffSet = Y * iWidth + X;
+            size_t iOffSet = (size_t)Y * iWidth + X;
             rgbaUintToFloat4(uiDataIn[iOffSet], xc);  
             yc[0] = (a2 * xn[0]) + (a3 * xa[0]) - (b1 * yn[0]) - (b2 * ya[0]);
             yc[1] = (a2 * xn[1]) + (a3 * xa[1]) - (b1 * yn[1]) - (b2 * ya[1]);
