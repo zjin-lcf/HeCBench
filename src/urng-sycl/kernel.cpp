@@ -71,11 +71,13 @@ float ran1(int idum, int *iv, sycl::nd_item<1> &item)
 void kernel_noise_uniform(
   const uchar4* inputImage,
   uchar4* outputImage,
+  const int size,
   const int factor,
   int* iv,
   sycl::nd_item<1> &item)
 {
   int pos = item.get_global_id(0);
+  if (pos >= size) return;
 
   float4 temp = convert_float4(inputImage[pos]);
 
