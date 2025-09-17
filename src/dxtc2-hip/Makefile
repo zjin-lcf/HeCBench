@@ -11,19 +11,18 @@ LAUNCHER  =
 #===============================================================================
 # Program name & source code list
 #===============================================================================
+SPATH = ../boxfilter-sycl
 
 program = main
 
-source = main.cu shrUtils.cu
-
-obj = $(source:.cu=.o)
+obj = main.o shrUtils.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I$(SPATH)
 
 # Linker Flags
 LDFLAGS = 
@@ -46,10 +45,10 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o : main.cu permutations.h dds.h shrUtils.h
+main.o : main.cu permutations.h dds.h $(SPATH)/shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-shrUtils.o : shrUtils.cu shrUtils.h 
+shrUtils.o : $(SPATH)/shrUtils.cpp $(SPATH)/shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
