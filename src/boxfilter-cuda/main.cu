@@ -206,6 +206,8 @@ int main(int argc, char** argv)
     printf("Usage %s <PPM image> <repeat>\n", argv[0]);
     return 1;
   }
+  const unsigned int uiMaxImageWidth = 1920;   // Image width
+  const unsigned int uiMaxImageHeight = 1080;  // Image height
   unsigned int uiImageWidth = 0;     // Image width
   unsigned int uiImageHeight = 0;    // Image height
   unsigned int* uiInput = NULL;      // Host buffer to hold input image data
@@ -215,10 +217,17 @@ int main(int argc, char** argv)
 
   bool status = shrLoadPPM4ub(argv[1], (unsigned char**)&uiInput,
                               &uiImageWidth, &uiImageHeight);
-  if (!status) return 1;
-
   printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n",
       uiImageWidth, uiImageHeight, unsigned(sizeof(unsigned int) * 8), RADIUS);
+  if (uiImageWidth > uiMaxImageWidth || uiImageHeight > uiMaxImageHeight) {
+    printf("Error: Image Dimensions exceed the maximum values");
+    status = 0;
+  }
+  if (!status) {
+     free(uiInput);
+     return 1;
+  }
+
   printf("Using Local Memory for Row Processing\n\n");
 
   size_t szBuff = uiImageWidth * uiImageHeight;
