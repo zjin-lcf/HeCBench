@@ -14,19 +14,19 @@ LAUNCHER  =
 #===============================================================================
 # Program name & source code list
 #===============================================================================
+UPATH = ../boxfilter-sycl
+SPATH = ../medianfilter-cuda
 
 program = main
 
-source = main.cpp shrUtils.cpp MedianFilterHost.cpp
-
-obj = $(source:.cpp=.o)
+obj = main.o shrUtils.o MedianFilterHost.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I$(UPATH) -I$(SPATH)
 
 # Linker Flags
 LDFLAGS = 
@@ -55,13 +55,13 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cpp shrUtils.h
+main.o: main.cpp $(UPATH)/shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-MedianFilterHost.o : MedianFilterHost.cpp 
+MedianFilterHost.o : $(SPATH)/MedianFilterHost.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-shrUtils.o : shrUtils.cpp shrUtils.h 
+shrUtils.o : $(UPATH)/shrUtils.cpp $(UPATH)/shrUtils.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

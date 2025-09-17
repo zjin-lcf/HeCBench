@@ -37,8 +37,11 @@ int main(int argc, char** argv)
 
   const int iCycles = atoi(argv[2]);
 
-  unsigned int uiImageWidth = 1920;   // Image width
-  unsigned int uiImageHeight = 1080;  // Image height
+  const unsigned int uiMaxImageWidth = 1920;   // Image width
+  const unsigned int uiMaxImageHeight = 1080;  // Image height
+
+  unsigned int uiImageWidth;
+  unsigned int uiImageHeight;
 
   size_t szBuffBytes;                 // Size of main image buffers
   size_t szBuffWords;                 
@@ -47,16 +50,26 @@ int main(int argc, char** argv)
   unsigned int* uiOutput;             // Host output buffer
 
   // One device processes the whole image
-  szBuffWords = uiImageHeight * uiImageWidth;
+  szBuffWords = uiMaxImageHeight * uiMaxImageWidth;
   szBuffBytes = szBuffWords * sizeof (unsigned int);
 
   uiInput = (unsigned int*) malloc (szBuffBytes);
-  uiOutput = (unsigned int*) malloc (szBuffBytes);
 
-  shrLoadPPM4ub(cPathAndName, (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
+  bool status = shrLoadPPM4ub(cPathAndName, (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
 
   printf("Image File\t = %s\nImage Dimensions = %u w x %u h x %lu bpp\n\n", 
          cPathAndName, uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+
+  if (uiImageWidth > uiMaxImageWidth || uiImageHeight > uiMaxImageHeight) {
+    printf("Error: Image Dimensions exceed the maximum values");
+    status = 0;
+  }
+  if (!status) {
+     free(uiInput);
+     return 1;
+  }
+
+  uiOutput = (unsigned int*) malloc (szBuffBytes);
 
   uchar4* cmDevBufIn;
   cudaMalloc((void**)&cmDevBufIn, szBuffBytes);
@@ -85,7 +98,7 @@ int main(int argc, char** argv)
 
   // Compare GPU and Host results:  Allow variance of 1 GV in up to 0.01% of pixels 
   printf("Comparing GPU Result to CPU Result...\n"); 
-  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.0001f);
+  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, szBuffWords, 1.0f, 0.0001f);
   printf("\nGPU Result %s CPU Result within tolerance...\n", 
          (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
 
