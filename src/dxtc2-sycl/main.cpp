@@ -55,6 +55,18 @@ int main(int argc, char** argv)
     exit(EXIT_FAILURE);
   }
 
+  if (width % 4 != 0 || height % 4 != 0) {
+    printf("Error: the image dimensions must be a multiple of 4.\n");
+    free(h_img);
+    exit(EXIT_FAILURE);
+  }
+
+  if (width > 16384 || height > 16384) {
+    printf("Error: the image dimensions exceed the maximum values.\n");
+    free(h_img);
+    exit(EXIT_FAILURE);
+  }
+
   printf("Image Loaded '%s', %d x %d pixels\n\n", image_path, width, height);
 
   // Convert linear image to block linear. 
@@ -112,7 +124,7 @@ int main(int argc, char** argv)
   sycl::uint2 *d_result = sycl::malloc_device<sycl::uint2>(compressedSize/8, q); 
 
   // Determine launch configuration and run timed computation numIterations times
-  int blocks = ((width + 3) / 4) * ((height + 3) / 4); // rounds up by 1 block in each dim if %4 != 0
+  int blocks = width / 4 * height / 4;
 
   // Restrict the numbers of blocks to launch on low end GPUs to avoid kernel timeout
   int blocksPerLaunch = MIN(blocks, 768 * 24);

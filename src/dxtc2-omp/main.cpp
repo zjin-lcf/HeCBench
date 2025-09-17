@@ -56,8 +56,24 @@ int main(int argc, char** argv)
   const int prods3[4] = {0x040000, 0x000400, 0x040101, 0x010401};
 
   // load image 
-  shrLoadPPM4ub(image_path, (unsigned char **)&h_img, &width, &height);
-  assert(h_img != NULL);
+  if (!shrLoadPPM4ub(image_path, (unsigned char **)&h_img, &width, &height)) {
+    printf("Error, unable to open source image file <%s>\n", image_path);
+
+    exit(EXIT_FAILURE);
+  }
+
+  if (width % 4 != 0 || height % 4 != 0) {
+    printf("Error: the image dimensions must be a multiple of 4.\n");
+    free(h_img);
+    exit(EXIT_FAILURE);
+  }
+
+  if (width > 16384 || height > 16384) {
+    printf("Error: the image dimensions exceed the maximum values.\n");
+    free(h_img);
+    exit(EXIT_FAILURE);
+  }
+
   printf("Loaded '%s', %d x %d pixels\n\n", image_path, width, height);
 
   // Convert linear image to block linear. 
@@ -93,7 +109,7 @@ int main(int argc, char** argv)
                           map(from: h_result[0:compressedSize/4])
 {
   // Determine launch configuration and run timed computation numIterations times
-  int blocks = ((width + 3) / 4) * ((height + 3) / 4); // rounds up by 1 block in each dim if %4 != 0
+  int blocks = width / 4 * height * 4;
 
   // Restrict the numbers of blocks to launch on low end GPUs to avoid kernel timeout
   unsigned int compute_units = 24;

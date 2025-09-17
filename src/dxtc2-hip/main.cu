@@ -607,7 +607,7 @@ int main(int argc, char **argv) {
 
   // Load input image.
   unsigned char *data = NULL;
-  uint W, H;
+  uint w, h;
 
   const char *image_path = argv[1];
 
@@ -615,14 +615,22 @@ int main(int argc, char **argv) {
 
   const int numIterations = atoi(argv[3]);
 
-  if (!shrLoadPPM4ub(image_path, (unsigned char **)&data, &W, &H)) {
-
-    printf("Error, unable to open source image file <%s>\n", image_path);
-
+  if (!shrLoadPPM4ub(image_path, (unsigned char **)&data, &w, &h)) {
+    printf("Error: unable to open source image file <%s>\n", image_path);
     exit(EXIT_FAILURE);
   }
 
-  uint w = W, h = H;
+  if (w % 4 != 0 || h % 4 != 0) {
+    printf("Error: the image dimensions must be a multiple of 4.\n");
+    free(data);
+    exit(EXIT_FAILURE);
+  }
+
+  if (w > 16384 || h > 16384) {
+    printf("Error: the image dimensions exceed the maximum values.\n");
+    free(data);
+    exit(EXIT_FAILURE);
+  }
 
   printf("Image Loaded '%s', %d x %d pixels\n\n", image_path, w, h);
 
@@ -638,7 +646,7 @@ int main(int argc, char **argv) {
         const int x = i & 3;
         const int y = i / 4;
         block_image[(by * w / 4 + bx) * 16 + i] =
-            ((uint *)data)[(by * 4 + y) * 4 * (W / 4) + bx * 4 + x];
+            ((uint *)data)[(by * 4 + y) * 4 * (w / 4) + bx * 4 + x];
       }
     }
   }
@@ -668,8 +676,7 @@ int main(int argc, char **argv) {
 
   // Determine launch configuration and run timed computation numIterations
   // times
-  uint blocks = ((w + 3) / 4) *
-                ((h + 3) / 4);  // rounds up by 1 block in each dim if %4 != 0
+  uint blocks = w / 4 * h / 4;
 
   // Restrict the numbers of blocks to launch on low end GPUs to avoid kernel
   // timeout
@@ -748,7 +755,7 @@ int main(int argc, char **argv) {
   }
 
   fseek(fp, sizeof(DDSHeader), SEEK_SET);
-  uint referenceSize = (W / 4) * (H / 4) * 8;
+  uint referenceSize = (w / 4) * (h / 4) * 8;
   uint *reference = (uint *)malloc(referenceSize);
   fread(reference, referenceSize, 1, fp);
   fclose(fp);
@@ -758,7 +765,7 @@ int main(int argc, char **argv) {
 
   for (uint y = 0; y < h; y += 4) {
     for (uint x = 0; x < w; x += 4) {
-      uint referenceBlockIdx = ((y / 4) * (W / 4) + (x / 4));
+      uint referenceBlockIdx = ((y / 4) * (w / 4) + (x / 4));
       uint resultBlockIdx = ((y / 4) * (w / 4) + (x / 4));
 
       int cmp = compareBlock(((BlockDXT1 *)h_result) + resultBlockIdx,
@@ -785,7 +792,7 @@ int main(int argc, char **argv) {
   free(reference);
 
   printf("RMS(reference, result) = %f\n\n", rms);
-  printf(rms <= ERROR_THRESHOLD ? "Test passed\n" : "Test failed!\n");
+  printf(rms <= ERROR_THRESHOLD ? "PASS\n" : "FAIL\n");
   /* Return zero if test passed, one otherwise */
   return rms > ERROR_THRESHOLD;
 }
