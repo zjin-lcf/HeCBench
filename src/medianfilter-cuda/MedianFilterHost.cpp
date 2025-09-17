@@ -22,12 +22,12 @@
 //! @param uiHeight         height of image
 //*****************************************************************
 extern "C" void MedianFilterHost(unsigned int* uiInputImage, unsigned int* uiOutputImage, 
-    unsigned int uiWidth, unsigned int uiHeight)
+                                 int uiWidth, int uiHeight)
 {
   // do the Median 
-  for(unsigned int y = 0; y < uiHeight; y++)      // all the rows
+  for(int y = 0; y < uiHeight; y++)      // all the rows
   {
-    for(unsigned int x = 0; x < uiWidth; x++)    // all the columns
+    for(int x = 0; x < uiWidth; x++)    // all the columns
     {
       // local registers for working with RGB subpixels and managing border
       unsigned char* ucRGBA; 
@@ -45,7 +45,7 @@ extern "C" void MedianFilterHost(unsigned int* uiInputImage, unsigned int* uiOut
 
         for (int iRow = -1; iRow <= 1 ; iRow++)
         {
-          int iLocalOffset = (int)((iRow + y) * uiWidth) + x - 1;
+          int iLocalOffset = (iRow + y) * uiWidth + x - 1;
 
           // Left Pix (RGB)
           // Read in pixel value to local register:  if boundary pixel, use zero

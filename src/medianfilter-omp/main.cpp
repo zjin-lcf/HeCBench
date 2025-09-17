@@ -47,46 +47,57 @@ int main(int argc, char** argv)
 
   const int iCycles = atoi(argv[2]);
 
-  unsigned int uiImageWidth = 1920;   // Image width
-  unsigned int uiImageHeight = 1080;  // Image height
+  const unsigned int uiMaxImageWidth = 1920;   // Image width
+  const unsigned int uiMaxImageHeight = 1080;  // Image height
+
+  unsigned int uiImageWidth;
+  unsigned int uiImageHeight;
 
   size_t szBuffBytes;                 // Size of main image buffers
   size_t szBuffWords;                 
 
-  //char* cPathAndName = NULL;          // var for full paths to data, src, etc.
   unsigned int* uiInput;              // Host input buffer 
   unsigned int* uiOutput;             // Host output buffer
 
   // One device processes the whole image
-  szBuffWords = uiImageHeight * uiImageWidth;
+  szBuffWords = uiMaxImageHeight * uiMaxImageWidth;
   szBuffBytes = szBuffWords * sizeof (unsigned int);
 
   uiInput = (unsigned int*) malloc (szBuffBytes);
-  uiOutput = (unsigned int*) malloc (szBuffBytes);
+  uchar4* uc4Source = (uchar4*) uiInput;
 
-  shrLoadPPM4ub(cPathAndName, (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
+  bool status = shrLoadPPM4ub(cPathAndName, (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
 
   printf("Image File\t = %s\nImage Dimensions = %u w x %u h x %lu bpp\n\n", 
          cPathAndName, uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
- 
-  uchar4* uc4Source = (uchar4*) uiInput;
 
-#pragma omp target data map(to: uc4Source[0:szBuffWords])\
-                        map(from: uiOutput[0:szBuffWords])
-{
-  // Warmup call 
-  MedianFilterGPU (uc4Source, uiOutput, uiImageWidth, uiImageHeight);
-
-  double time = 0.0;
-
-  // Process n loops on the GPU
-  printf("\nRunning MedianFilterGPU for %d cycles...\n\n", iCycles);
-  for (int i = 0; i < iCycles; i++)
-  {
-    time += MedianFilterGPU (uc4Source, uiOutput, uiImageWidth, uiImageHeight);
+  if (uiImageWidth > uiMaxImageWidth || uiImageHeight > uiMaxImageHeight) {
+    printf("Error: Image Dimensions exceed the maximum values");
+    status = 0;
   }
-  printf("Average kernel execution time: %f (s)\n\n", (time * 1e-9f) / iCycles);
-}
+  if (!status) {
+     free(uiInput);
+     return 1;
+  }
+
+  uiOutput = (unsigned int*) malloc (szBuffBytes);
+
+  #pragma omp target data map(to: uc4Source[0:szBuffWords])\
+                          map(from: uiOutput[0:szBuffWords])
+  {
+    // Warmup call 
+    MedianFilterGPU (uc4Source, uiOutput, uiImageWidth, uiImageHeight);
+  
+    double time = 0.0;
+  
+    // Process n loops on the GPU
+    printf("\nRunning MedianFilterGPU for %d cycles...\n\n", iCycles);
+    for (int i = 0; i < iCycles; i++)
+    {
+      time += MedianFilterGPU (uc4Source, uiOutput, uiImageWidth, uiImageHeight);
+    }
+    printf("Average kernel execution time: %f (s)\n\n", (time * 1e-9f) / iCycles);
+  }
 
   // Compute on host 
   unsigned int* uiGolden = (unsigned int*)malloc(szBuffBytes);
@@ -94,7 +105,7 @@ int main(int argc, char** argv)
 
   // Compare GPU and Host results:  Allow variance of 1 GV in up to 0.01% of pixels 
   printf("Comparing GPU Result to CPU Result...\n"); 
-  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.0001f);
+  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, szBuffWords, 1.0f, 0.0001f);
   printf("\nGPU Result %s CPU Result within tolerance...\n", 
          (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
 
