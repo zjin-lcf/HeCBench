@@ -1192,10 +1192,17 @@ shrBOOL shrLoadPPM4ub( const char* file, unsigned char** OutData,
 	unsigned char* cLocalData = 0;
 	unsigned int channels;
 	shrBOOL bLoadOK = loadPPM(file, &cLocalData, w, h, &channels);   // this allocates cLocalData, which must be freed later
-
 	// If the data loaded OK from file to temporary buffer, then go ahead with padding and transfer 
 	if (shrTRUE == bLoadOK)
 	{
+		if (channels != 3)
+		{
+			std::cerr << "shrLoadPPM4ub() : Expect 3 channels, but got "
+				  << channels << " channel(s)." << std::endl;
+			free(cLocalData);
+			return shrFALSE;
+		}
+
 		// if the receiving buffer is null, allocate it... caller must free this 
 		int size = *w * *h;
 		if (*OutData == NULL)
