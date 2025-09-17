@@ -328,16 +328,28 @@ int main(int argc, char** argv)
 
   const float fSigma = 10.0f;         // filter sigma (blur factor)
   const int iOrder = 0;               // filter order
-  unsigned int uiImageWidth = 1920;   // Image width
-  unsigned int uiImageHeight = 1080;  // Image height
+  unsigned int uiMaxImageWidth = 1920;   // Image width
+  unsigned int uiMaxImageHeight = 1080;  // Image height
+  unsigned int uiImageWidth;
+  unsigned int uiImageHeight;
   unsigned int* uiInput = NULL;       // Host buffer to hold input image data
   unsigned int* uiTemp = NULL;        // Host buffer to hold intermediate image data
   unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
 
   bool status = shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
-  if (!status) return 1;
 
-  printf("Image Width = %i, Height = %i, bpp = %lu\n\n", uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+  printf("Image Width = %i, Height = %i, bpp = %lu\n\n",
+         uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+
+  if (uiImageWidth > uiMaxImageWidth || uiImageHeight > uiMaxImageHeight) {
+    printf("Error: Image Dimensions exceed the maximum values");
+    status = 0;
+  }
+  if (!status) {
+     free(uiInput);
+     return 1;
+  }
+
   const int iCycles = atoi(argv[2]);
 
   // Allocate intermediate and output host image buffers
