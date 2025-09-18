@@ -432,12 +432,13 @@ void Keccak_top_GPU(tKeccakLane * Kstate, tKeccakLane *inBuffer , int block_numb
 //data to be hashed is in h_inBuffer
 //output chaining values hashes are copied to h_outBuffer
 //************************
-#pragma omp declare target 
-void KeccakTreeGPU(tKeccakLane * h_inBuffer, tKeccakLane * h_outBuffer, const tKeccakLane *h_KeccakF_RoundConstants)
+void KeccakTreeGPU(tKeccakLane * h_inBuffer, tKeccakLane * h_outBuffer,
+                   const tKeccakLane *h_KeccakF_RoundConstants)
 {
   #pragma omp target update to (h_inBuffer[0:INPUT_BLOCK_SIZE_B/4 * NB_THREADS * NB_INPUT_BLOCK*NB_THREADS_BLOCKS])
 
-  #pragma omp target teams distribute parallel for collapse(2) num_teams(NB_THREADS_BLOCKS) thread_limit(NB_THREADS) 
+  #pragma omp target teams distribute parallel for collapse(2) \
+  num_teams(NB_THREADS_BLOCKS) thread_limit(NB_THREADS) 
   for(int blkIdx=0;blkIdx<NB_THREADS_BLOCKS;blkIdx++) 
     for (int thrIdx=0; thrIdx< NB_THREADS;thrIdx++)
     {
@@ -474,4 +475,3 @@ void KeccakTreeGPU(tKeccakLane * h_inBuffer, tKeccakLane * h_outBuffer, const tK
    }
   #pragma omp target update from (h_outBuffer[0:OUTPUT_BLOCK_SIZE_B/4 * NB_THREADS*NB_THREADS_BLOCKS])
 }
-#pragma omp end declare target 
