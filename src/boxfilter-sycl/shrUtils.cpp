@@ -1114,7 +1114,8 @@ shrBOOL loadPPM(const char* file, unsigned char** data,
 	}
 
 	// read and close file
-	if (fread(*data, sizeof(unsigned char), width * height * *channels, fp) != width * height * *channels)
+	if (fread(*data, sizeof(unsigned char), (size_t)width * height * *channels, fp) 
+            != (size_t)width * height * *channels)
 	{
 		fclose(fp);
 		std::cerr << "loadPPM() : Invalid image." << std::endl;
@@ -1161,7 +1162,7 @@ shrBOOL savePPM( const char* file, unsigned char *data,
 
 	fh << w << "\n" << h << "\n" << 0xff << std::endl;
 
-	for( unsigned int i = 0; (i < (w*h*channels)) && fh.good(); ++i) 
+	for( size_t i = 0; (i < ((size_t)w*h*channels)) && fh.good(); ++i) 
 	{
 		fh << data[i];
 	}
@@ -1204,7 +1205,7 @@ shrBOOL shrLoadPPM4ub( const char* file, unsigned char** OutData,
 		}
 
 		// if the receiving buffer is null, allocate it... caller must free this 
-		int size = *w * *h;
+		size_t size = (size_t)*w * *h;
 		if (*OutData == NULL)
 		{
 			*OutData = (unsigned char*)malloc(sizeof(unsigned char) * size * 4);
@@ -1215,7 +1216,7 @@ shrBOOL shrLoadPPM4ub( const char* file, unsigned char** OutData,
 		unsigned char* cOutPtr = *OutData;
 
 		// transfer data, padding 4th element
-		for(int i=0; i<size; i++) 
+		for(size_t i=0; i<size; i++) 
 		{
 			*cOutPtr++ = *cTemp++;
 			*cOutPtr++ = *cTemp++;
@@ -1247,10 +1248,10 @@ shrBOOL shrSavePPM4ub( const char* file, unsigned char *data,
 		unsigned int w, unsigned int h) 
 {
 	// strip 4th component
-	int size = w * h;
-	unsigned char *ndata = (unsigned char*) malloc( sizeof(unsigned char) * size*3);
+	size_t size = (size_t)w * h;
+	unsigned char *ndata = (unsigned char*) malloc( sizeof(unsigned char) * size * 3);
 	unsigned char *ptr = ndata;
-	for(int i=0; i<size; i++) {
+	for(size_t i=0; i<size; i++) {
 		*ptr++ = *data++;
 		*ptr++ = *data++;
 		*ptr++ = *data++;
