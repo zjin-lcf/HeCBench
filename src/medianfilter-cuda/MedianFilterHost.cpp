@@ -14,32 +14,32 @@
 //*****************************************************************
 //! Exported Host/C++ RGB 3x3 Median function
 //! Gradient intensity is from RSS combination of H and V gradient components
-//! R, G and B medians are treated separately 
+//! R, G and B medians are treated separately
 //!
 //! @param uiInputImage     pointer to input data
 //! @param uiOutputImage    pointer to output dataa
 //! @param uiWidth          width of image
 //! @param uiHeight         height of image
 //*****************************************************************
-extern "C" void MedianFilterHost(unsigned int* uiInputImage, unsigned int* uiOutputImage, 
+extern "C" void MedianFilterHost(unsigned int* uiInputImage, unsigned int* uiOutputImage,
                                  int uiWidth, int uiHeight)
 {
-  // do the Median 
+  // do the Median
   for(int y = 0; y < uiHeight; y++)      // all the rows
   {
     for(int x = 0; x < uiWidth; x++)    // all the columns
     {
       // local registers for working with RGB subpixels and managing border
-      unsigned char* ucRGBA; 
+      unsigned char* ucRGBA;
       const unsigned int uiZero = 0U;
 
-      // reset accumulators  
+      // reset accumulators
       float fMedianEstimate [3] = {128.0f, 128.0f, 128.0f};
       float fMinBound [3]= {0.0f, 0.0f, 0.0f};
       float fMaxBound[3] = {255.0f, 255.0f, 255.0f};
 
       // now find the median using a binary search - Divide and Conquer 256 gv levels for 8 bit plane
-      for(int iSearch = 0; iSearch < 8; iSearch++)  
+      for(int iSearch = 0; iSearch < 8; iSearch++)
       {
         unsigned int uiHighCount[3] = {0,0,0};
 
@@ -53,28 +53,28 @@ extern "C" void MedianFilterHost(unsigned int* uiInputImage, unsigned int* uiOut
           {
             ucRGBA = (unsigned char*)&uiInputImage [iLocalOffset];
           }
-          else 
+          else
           {
             ucRGBA = (unsigned char*)&uiZero;
           }
-          uiHighCount[0] += (fMedianEstimate[0] < ucRGBA[0]);          
-          uiHighCount[1] += (fMedianEstimate[1] < ucRGBA[1]);          
-          uiHighCount[2] += (fMedianEstimate[2] < ucRGBA[2]);  
+          uiHighCount[0] += (fMedianEstimate[0] < ucRGBA[0]);
+          uiHighCount[1] += (fMedianEstimate[1] < ucRGBA[1]);
+          uiHighCount[2] += (fMedianEstimate[2] < ucRGBA[2]);
 
           // Middle Pix (RGB)
           // Increment offset and read in next pixel value to a local register:  if boundary pixel, use zero
           iLocalOffset++;
-          if (((y + iRow) >= 0) && ((y + iRow) < uiHeight)) 
+          if (((y + iRow) >= 0) && ((y + iRow) < uiHeight))
           {
             ucRGBA = (unsigned char*)&uiInputImage [iLocalOffset];
           }
-          else 
+          else
           {
             ucRGBA = (unsigned char*)&uiZero;
           }
-          uiHighCount[0] += (fMedianEstimate[0] < ucRGBA[0]);          
-          uiHighCount[1] += (fMedianEstimate[1] < ucRGBA[1]);          
-          uiHighCount[2] += (fMedianEstimate[2] < ucRGBA[2]);  
+          uiHighCount[0] += (fMedianEstimate[0] < ucRGBA[0]);
+          uiHighCount[1] += (fMedianEstimate[1] < ucRGBA[1]);
+          uiHighCount[2] += (fMedianEstimate[2] < ucRGBA[2]);
 
           // Right Pix (RGB)
           // Increment offset and read in next pixel value to a local register:  if boundary pixel, use zero
@@ -83,42 +83,42 @@ extern "C" void MedianFilterHost(unsigned int* uiInputImage, unsigned int* uiOut
           {
             ucRGBA = (unsigned char*)&uiInputImage [iLocalOffset];
           }
-          else 
+          else
           {
             ucRGBA = (unsigned char*)&uiZero;
           }
-          uiHighCount[0] += (fMedianEstimate[0] < ucRGBA[0]);          
-          uiHighCount[1] += (fMedianEstimate[1] < ucRGBA[1]);          
-          uiHighCount[2] += (fMedianEstimate[2] < ucRGBA[2]);  
+          uiHighCount[0] += (fMedianEstimate[0] < ucRGBA[0]);
+          uiHighCount[1] += (fMedianEstimate[1] < ucRGBA[1]);
+          uiHighCount[2] += (fMedianEstimate[2] < ucRGBA[2]);
         }
 
         //********************************
         // reset the appropriate bound, depending upon counter
         if(uiHighCount[0] > 4)
         {
-          fMinBound[0] = fMedianEstimate[0];        
+          fMinBound[0] = fMedianEstimate[0];
         }
         else
         {
-          fMaxBound[0] = fMedianEstimate[0];        
+          fMaxBound[0] = fMedianEstimate[0];
         }
 
         if(uiHighCount[1] > 4)
         {
-          fMinBound[1] = fMedianEstimate[1];        
+          fMinBound[1] = fMedianEstimate[1];
         }
         else
         {
-          fMaxBound[1] = fMedianEstimate[1];        
+          fMaxBound[1] = fMedianEstimate[1];
         }
 
         if(uiHighCount[2] > 4)
         {
-          fMinBound[2] = fMedianEstimate[2];        
+          fMinBound[2] = fMedianEstimate[2];
         }
         else
         {
-          fMaxBound[2] = fMedianEstimate[2];        
+          fMaxBound[2] = fMedianEstimate[2];
         }
 
         // refine the estimate
@@ -127,13 +127,13 @@ extern "C" void MedianFilterHost(unsigned int* uiInputImage, unsigned int* uiOut
         fMedianEstimate[2] = 0.5f * (fMaxBound[2] + fMinBound[2]);
       }
 
-      // pack into a monochrome uint 
+      // pack into a monochrome uint
       unsigned int uiPackedPix = 0x000000FF & (unsigned int)(fMedianEstimate[0] + 0.5f);
       uiPackedPix |= 0x0000FF00 & (((unsigned int)(fMedianEstimate[1] + 0.5f)) << 8);
       uiPackedPix |= 0x00FF0000 & (((unsigned int)(fMedianEstimate[2] + 0.5f)) << 16);
 
       // copy to output
-      uiOutputImage[y * uiWidth + x] = uiPackedPix;  
+      uiOutputImage[y * uiWidth + x] = uiPackedPix;
     }
   }
 }

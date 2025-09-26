@@ -47,7 +47,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cu MedianFilter.cu $(UPATH)/shrUtils.h
+main.o: main.cu $(SPATH)/MedianFilter.cu $(UPATH)/shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 MedianFilterHost.o : $(SPATH)/MedianFilterHost.cpp 
