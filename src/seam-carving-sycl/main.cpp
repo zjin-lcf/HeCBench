@@ -69,8 +69,8 @@ int main(int argc, char **argv) {
 
   int current_w = w;
   uchar4 *h_pixels = build_pixels(imgv, w, h);
-  const int img_size = w * h;
-  const int img_bytes = img_size * sizeof(uchar4);
+  const size_t img_size = (size_t)w * h;
+  const size_t img_bytes = img_size * sizeof(uchar4);
   const int w_bytes = w * sizeof(int);
 
   int* indices = (int*)malloc(w_bytes);
@@ -214,5 +214,6 @@ int main(int argc, char **argv) {
   }
   free(h_pixels);
   free(indices);
+  free(imgv);
   return 0;
 }

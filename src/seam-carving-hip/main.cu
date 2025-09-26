@@ -211,5 +211,6 @@ int main(int argc, char **argv) {
   free(h_pixels);
   free(output);
   free(indices);
+  free(imgv);
   return 0;
 }
