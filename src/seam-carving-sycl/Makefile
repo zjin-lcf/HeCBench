@@ -80,4 +80,4 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) ../seam-carving-cuda/Broadway_tower.jpg 100 -u 
-	#./$(program) ../seam-carving-cuda/Broadway_tower.jpg 100 -a
+	#$(LAUNCHER) ./$(program) ../seam-carving-cuda/Broadway_tower.jpg 100 -a
