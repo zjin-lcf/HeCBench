@@ -19,8 +19,8 @@
 int main(int argc, char **argv) {
   if(argc < 3){
     printf("Usage: %s <file> <number of seams to remove> [options]\n"
-        "valid options:\n-u\tupdate costs instead of recomputing them\n"
-        "-a\tapproximate computation\n", argv[0]);
+           "valid options:\n-u\tupdate costs instead of recomputing them\n"
+           "-a\tapproximate computation\n", argv[0]);
     return 1;
   }
 
@@ -34,7 +34,8 @@ int main(int argc, char **argv) {
   int w, h, ncomp;
   unsigned char* imgv = stbi_load(argv[1], &w, &h, &ncomp, 0);
   if(imgv == NULL){
-    printf("ERROR: can't load image \"%s\" (maybe the file does not exist?), exiting.\n", argv[1]);
+    printf("ERROR: can't load image \"%s\", exiting.\n", argv[1]);
+    printf("Reason: %s\n", stbi_failure_reason());
     return 1;
   }
 
