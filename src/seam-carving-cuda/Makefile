@@ -54,4 +54,4 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) Broadway_tower.jpg 100 -u 
-	#./$(program) Broadway_tower.jpg 100 -a
+	#$(LAUNCHER) ./$(program) Broadway_tower.jpg 100 -a
