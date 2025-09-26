@@ -14,7 +14,7 @@ int next_pow2(int n){
 }
 
 uchar4 *build_pixels(const unsigned char *imgv, int w, int h){
-  uchar4 *pixels = (uchar4*)malloc(w*h*sizeof(uchar4));
+  uchar4 *pixels = (uchar4*)malloc((size_t)w*h*sizeof(uchar4));
   uchar4 pix;
   for(int i = 0; i < h; i++){
     for(int j = 0; j < w; j++){
