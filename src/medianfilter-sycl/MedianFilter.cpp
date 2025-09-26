@@ -30,12 +30,12 @@ void ckMedian(
   int iGroupIdX = item.get_group(1);
   int iBlockX = item.get_local_range(1);
   int iBlockY = item.get_local_range(0);
-  int iImageX = item.get_global_range(1);
+  int iImageX = iImageWidth;
 
-  int iDevGMEMOffset = sycl::mul24(iDevYPrime, iImageX) + iImagePosX;
+  int iDevGMEMOffset = iDevYPrime * iImageX + iImagePosX;
 
   // Compute initial offset of current pixel within work group LMEM block
-  int iLocalPixOffset = sycl::mul24(iLocalIdY, iLocalPixPitch) + iLocalIdX + 1;
+  int iLocalPixOffset = iLocalIdY * iLocalPixPitch + iLocalIdX + 1;
 
   // Main read of GMEM data into LMEM
   if((iDevYPrime > -1) && (iDevYPrime < iDevImageHeight) && (iImagePosX < iImageWidth))
@@ -52,14 +52,13 @@ void ckMedian(
   {
     // Increase local offset by 1 workgroup LMEM block height
     // to read in top rows from the next block region down
-    iLocalPixOffset += sycl::mul24(iBlockY, iLocalPixPitch);
+    iLocalPixOffset += iBlockY * iLocalPixPitch;
 
     // If source offset is within the image boundaries
     if (((iDevYPrime + iBlockY) < iDevImageHeight) && (iImagePosX < iImageWidth))
     {
       // Read in top rows from the next block region down
-      uc4LocalData[iLocalPixOffset] = uc4Source[iDevGMEMOffset +
-                                      sycl::mul24(iBlockY, iImageX)];
+      uc4LocalData[iLocalPixOffset] = uc4Source[iDevGMEMOffset + iBlockY * iImageX];
     }
     else
     {
@@ -71,14 +70,13 @@ void ckMedian(
   if (iLocalIdX == (iBlockX - 1))
   {
     // set local offset to read data from the next region over
-    iLocalPixOffset = sycl::mul24(iLocalIdY, iLocalPixPitch);
+    iLocalPixOffset = iLocalIdY * iLocalPixPitch;
 
     // If source offset is within the image boundaries and not at the leftmost workgroup
     if ((iDevYPrime > -1) && (iDevYPrime < iDevImageHeight) && (iGroupIdX > 0))
     {
       // Read data into the LMEM apron from the GMEM at the left edge of the next block region over
-      uc4LocalData[iLocalPixOffset] = uc4Source[sycl::mul24(iDevYPrime,
-      iImageX) + sycl::mul24(iGroupIdX, iBlockX) - 1];
+      uc4LocalData[iLocalPixOffset] = uc4Source[iDevYPrime * iImageX + iGroupIdX * iBlockX - 1];
     }
     else
     {
@@ -90,14 +88,13 @@ void ckMedian(
     {
       // Increase local offset by 1 workgroup LMEM block height
       // to read in top rows from the next block region down
-      iLocalPixOffset += sycl::mul24(iBlockY, iLocalPixPitch);
+      iLocalPixOffset += iBlockY * iLocalPixPitch;
 
       // If source offset in the next block down isn't off the image and not at the leftmost workgroup
       if (((iDevYPrime + iBlockY) < iDevImageHeight) && (iGroupIdX > 0))
       {
         // read in from GMEM (reaching down 1 workgroup LMEM block height and left 1 pixel)
-        uc4LocalData[iLocalPixOffset] = uc4Source[sycl::mul24((iDevYPrime +
-        iBlockY), iImageX) + sycl::mul24(iGroupIdX, iBlockX) - 1];
+        uc4LocalData[iLocalPixOffset] = uc4Source[(iDevYPrime + iBlockY) * iImageX + (iGroupIdX * iBlockX) - 1];
       }
       else
       {
@@ -108,14 +105,13 @@ void ckMedian(
   else if (iLocalIdX == 0) // Work items with x ID at left workgroup edge will read right apron pixel
   {
     // set local offset
-    iLocalPixOffset = sycl::mul24((iLocalIdY + 1), iLocalPixPitch) - 1;
+    iLocalPixOffset = (iLocalIdY + 1) * iLocalPixPitch - 1;
 
     if ((iDevYPrime > -1) && (iDevYPrime < iDevImageHeight) &&
-        (sycl::mul24((iGroupIdX + 1), iBlockX) < iImageWidth))
+        (((iGroupIdX + 1) * iBlockX) < iImageWidth))
     {
       // read in from GMEM (reaching left 1 pixel) if source offset is within image boundaries
-      uc4LocalData[iLocalPixOffset] = uc4Source[sycl::mul24(iDevYPrime,
-      iImageX) + sycl::mul24((iGroupIdX + 1), iBlockX)];
+      uc4LocalData[iLocalPixOffset] = uc4Source[iDevYPrime * iImageX + (iGroupIdX + 1) * iBlockX];
     }
     else
     {
@@ -126,16 +122,13 @@ void ckMedian(
     if (iLocalIdY < 2)
     {
       // increase local offset by 1 workgroup LMEM block height
-      iLocalPixOffset += (sycl::mul24(iBlockY, iLocalPixPitch));
+      iLocalPixOffset += iBlockY * iLocalPixPitch;
 
       if (((iDevYPrime + iBlockY) < iDevImageHeight) &&
-          (sycl::mul24((iGroupIdX + 1), iBlockX)
-          < iImageWidth) )
+          ((iGroupIdX + 1) * iBlockX < iImageWidth))
       {
         // read in from GMEM (reaching down 1 workgroup LMEM block height and left 1 pixel) if source offset is within image boundaries
-        uc4LocalData[iLocalPixOffset] = uc4Source[sycl::mul24((iDevYPrime +
-        iBlockY), iImageX) +
-        sycl::mul24((iGroupIdX + 1), iBlockX)];
+        uc4LocalData[iLocalPixOffset] = uc4Source[(iDevYPrime + iBlockY) * iImageX + (iGroupIdX + 1) * iBlockX];
       }
       else
       {
@@ -159,7 +152,7 @@ void ckMedian(
     unsigned int uiHighCount [3] = {0, 0, 0};
 
     // set local offset and kernel offset
-    iLocalPixOffset = sycl::mul24(iLocalIdY, iLocalPixPitch) + iLocalIdX;
+    iLocalPixOffset = iLocalIdY * iLocalPixPitch + iLocalIdX;
 
     // Row1 Left Pix (RGB)
     uiHighCount[0] += (fMedianEstimate[0] < uc4LocalData[iLocalPixOffset].x());
