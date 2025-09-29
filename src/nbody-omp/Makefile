@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../nbody-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -52,7 +52,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp *.hpp
+%.o: %.cpp *.hpp ../nbody-cuda/GSimulationReference.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

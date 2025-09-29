@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include "GSimulation.hpp"
+#include "GSimulationReference.hpp"
 
 int main(int argc, char** argv) {
   int n;      // number of particles
@@ -23,6 +24,7 @@ int main(int argc, char** argv) {
   }
 
   sim.Start();
+  sim.Verify();
 
   return 0;
 }

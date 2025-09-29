@@ -27,6 +27,7 @@ class GSimulation {
   void SetNumberOfParticles(int N);
   void SetNumberOfSteps(int N);
   void Start();
+  void Verify();
 
  private:
   //  Particle *particles_;
@@ -38,6 +39,7 @@ class GSimulation {
   int sfreq_;  // sample frequency
 
   RealType kenergy_;  // kinetic energy
+  RealType ref_kenergy_;  // kinetic energy
 
   double total_time_;   // total time of the simulation
   double total_flops_;  // total number of FLOPS
