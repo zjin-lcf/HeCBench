@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <chrono>
 #include <cmath>
 #include <ctime>
@@ -34,6 +35,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <iostream>
 #include <chrono>
 #include <hip/hip_runtime.h>
+#include "reference.h"
 
 // Helper functions
 
@@ -107,12 +109,12 @@ void Simulation(float*__restrict__ a_particleX,
     pY += displacementY;
 
     // Compute distances from particle position to grid point
-    float dX = pX - trunc(pX);
-    float dY = pY - trunc(pY);
+    float dX = pX - truncf(pX);
+    float dY = pY - truncf(pY);
 
     // Compute grid point indices
-    int iX = floor(pX);
-    int iY = floor(pY);
+    int iX = floorf(pX);
+    int iY = floorf(pY);
 
     // Check if particle is still in computation grid
     if ((pX < grid_size) && (pY < grid_size) && (pX >= 0) && (pY >= 0)) {
@@ -145,20 +147,7 @@ void motion_device(float* particleX, float* particleY,
   std::cout << " The number of iterations is " << nIterations << std::endl;
   std::cout << " The number of kernel execution is " << nRepeat << std::endl;
   std::cout << " The number of particles is " << n_particles << std::endl;
-
-  // Set the seed for rand() function.
-  // Use a fixed seed for reproducibility/debugging
-  srand(17);
   
-  // Scale of random numbers
-  const size_t scale = 100;
-
-  // Compute vectors of random values for X and Y directions
-  for (size_t i = 0; i < n_particles * nIterations; i++) {
-    randomX[i] = rand() % scale;
-    randomY[i] = rand() % scale;
-  }
-
   float *d_randomX;
   float *d_randomY;
   float *d_particleX;
@@ -259,6 +248,7 @@ int main(int argc, char* argv[]) {
   // 'map' array replicates grid to be used by each particle
   size_t MAP_SIZE = n_particles * grid_size * grid_size;
   size_t* map = new size_t[MAP_SIZE];
+  size_t* map_ref = new size_t[MAP_SIZE];
 
   // Initialize arrays
   for (size_t i = 0; i < n_particles; i++) {
@@ -269,6 +259,7 @@ int main(int argc, char* argv[]) {
     for (size_t y = 0; y < grid_size; y++) {
       for (size_t x = 0; x < grid_size; x++) {
         map[i * grid_size * grid_size + y * grid_size + x] = 0;
+        map_ref[i * grid_size * grid_size + y * grid_size + x] = 0;
       }
     }
   }
@@ -277,6 +268,16 @@ int main(int argc, char* argv[]) {
     for (size_t x = 0; x < grid_size; x++) {
       grid[y][x] = 0;
     }
+  }
+
+  // Compute vectors of random values for X and Y directions
+  // Set the seed for rand() function.
+  // Use a fixed seed for reproducibility/debugging
+  srand(17);
+  const size_t scale = 100; // Scale of random numbers
+  for (size_t i = 0; i < n_particles * nIterations; i++) {
+    randomX[i] = rand() % scale;
+    randomY[i] = rand() % scale;
   }
 
   // Start timers
@@ -292,11 +293,22 @@ int main(int argc, char* argv[]) {
   std::cout << "Simulation time: " << time * 1e-9 << " (s) ";
   std::cout << std::endl;
 
+  motion_host(particleX, particleY, randomX, randomY, grid, grid_size,
+              n_particles, nIterations, radius, map_ref, nRepeat);
+
+  size_t count = 0;
+  for (size_t i = 0; i < MAP_SIZE; i++) {
+    if (map[i] != map_ref[i]) count++; 
+  }
+  std::cout << (count <= 2 ? "PASS" : "FAIL") << std::endl;
+
+#ifdef DEBUG
   // Displays final grid only if grid small.
   if (grid_size <= 64) {
     std::cout << "\n ********************** OUTPUT GRID: " << std::endl;
     print_matrix<int>(grid, grid_size, grid_size);
   }
+#endif
 
   // Cleanup
   for (size_t i = 0; i < grid_size; i++) delete grid[i];
@@ -307,6 +319,7 @@ int main(int argc, char* argv[]) {
   delete[] randomX;
   delete[] randomY;
   delete[] map;
+  delete[] map_ref;
 
   return 0;
 }
