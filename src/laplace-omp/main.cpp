@@ -30,6 +30,8 @@
 /** SOR relaxation parameter */
 const Real omega = 1.85f;
 
+#include "reference.h"
+
 /** Function to evaluate coefficient matrix and right-hand side vector.
  * 
  * \param[in]   rowmax   number of rows
@@ -134,6 +136,7 @@ int main (void) {
   // allocate memory
   Real *aP, *aW, *aE, *aS, *aN, *b;
   Real *temp_red, *temp_black;
+  Real *temp_red_ref, *temp_black_ref;
 
   // arrays of coefficients
   aP = (Real *) calloc (size, sizeof(Real));
@@ -148,6 +151,8 @@ int main (void) {
   // temperature arrays
   temp_red = (Real *) calloc (size_temp, sizeof(Real));
   temp_black = (Real *) calloc (size_temp, sizeof(Real));
+  temp_red_ref = (Real *) calloc (size_temp, sizeof(Real));
+  temp_black_ref = (Real *) calloc (size_temp, sizeof(Real));
 
   // set coefficients
   fill_coeffs (NUM, NUM, th_cond, dx, dy, width, TN, aP, aW, aE, aS, aN, b);
@@ -248,6 +253,17 @@ int main (void) {
     printf("Total time for %i iterations: %f s\n", iter, runtime / 1000.0);
   }
 
+  // Reference
+  int count = 0;
+
+  for (iter = 1; iter <= it_max; ++iter) {
+    Real norm_L2;
+    norm_L2 = red_ref(aP, aW, aE, aS, aN, b, temp_black_ref, temp_red_ref);
+    norm_L2 += black_ref (aP, aW, aE, aS, aN, b, temp_red_ref, temp_black_ref);
+    norm_L2 = sqrt(norm_L2 / ((Real)size));
+    if (norm_L2 < tol) break;
+  }
+
   // print temperature data to file
   FILE * pfile;
   pfile = fopen("temperature.dat", "w");
@@ -264,17 +280,21 @@ int main (void) {
         if ((row + col) % 2 == 0) {
           // even, so red cell
           int ind = col * num_rows + (row + (col % 2)) / 2;
+          if ((temp_red[ind] - temp_red_ref[ind]) >= 1e-3f) count++;
           fprintf(pfile, "%f\t%f\t%f\n", x_pos, y_pos, temp_red[ind]);
         } else {
           // odd, so black cell
           int ind = col * num_rows + (row + ((col + 1) % 2)) / 2;
+          if ((temp_black[ind] - temp_black_ref[ind]) >= 1e-3f) count++;
           fprintf(pfile, "%f\t%f\t%f\n", x_pos, y_pos, temp_black[ind]);
         }	
       }
       fprintf(pfile, "\n");
     }
   }
+
   fclose(pfile);
+  printf("%s\n", count == 0 ? "PASS" : "FAIL");
 
   free(aP);
   free(aW);
@@ -284,6 +304,8 @@ int main (void) {
   free(b);
   free(temp_red);
   free(temp_black);
+  free(temp_red_ref);
+  free(temp_black_ref);
   free(bl_norm_L2);
 
   return 0;
