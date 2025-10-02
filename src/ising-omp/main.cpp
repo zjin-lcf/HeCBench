@@ -24,9 +24,9 @@
 #include <fstream>
 #include <getopt.h>
 #include <iostream>
-#include <cmath>
 #include <cstring>
 #include <omp.h>
+#include "reference.h"
 
 #define TCRIT 2.26918531421f
 #define THREADS  128
@@ -190,6 +190,11 @@ int main(int argc, char **argv) {
   float* randvals = (float*) malloc(nx * ny/2 * sizeof(float));
   signed char* lattice_b = (signed char*) malloc(nx * ny/2 * sizeof(*lattice_b));
   signed char* lattice_w = (signed char*) malloc(nx * ny/2 * sizeof(*lattice_w));
+
+  signed char *lattice_b_r, *lattice_w_r;
+  lattice_b_r = (signed char*) malloc(nx * ny/2 * sizeof(signed char));
+  lattice_w_r = (signed char*) malloc(nx * ny/2 * sizeof(signed char));
+
   for (int i = 0; i < nx * ny/2; i++)
     randvals[i] = (float)rand() / (float)RAND_MAX;
 
@@ -230,14 +235,24 @@ int main(int argc, char **argv) {
   printf("\telapsed time: %f sec\n", duration * 1e-6);
   printf("\tupdates per ns: %f\n", (double) (nx * ny) * niters / duration * 1e-3);
 
-  double naivesum = 0.0;
-  for (int i = 0; i < nx*ny/2; i++) {
-    naivesum += lattice_b[i];
-    naivesum += lattice_w[i];
+  printf("Starting verification iterations ...\n");
+  init_spins_ref(lattice_b_r, randvals, nx, ny/2);
+  init_spins_ref(lattice_w_r, randvals, nx, ny/2);
+  for (int i = 0; i < nwarmup + niters; i++) {
+    update_ref(lattice_b_r, lattice_w_r, randvals, inv_temp, nx, ny);
   }
-  printf("checksum = %lf\n", naivesum);
+
+  bool ok = true;
+  for (int i = 0; i < nx*ny/2; i++) {
+    ok  = (lattice_b[i] == lattice_b_r[i]) && 
+          (lattice_w[i] == lattice_w_r[i]);
+    if (!ok) break;
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
   free(randvals);
   free(lattice_b);
   free(lattice_w);
+  free(lattice_b_r);
+  free(lattice_w_r);
   return 0;
 }

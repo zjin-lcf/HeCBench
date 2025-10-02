@@ -27,6 +27,7 @@
 #include <string>
 #include <cstring>
 #include <cuda.h>
+#include "reference.h"
 
 #ifdef CURAND
 #include <curand.h>
@@ -152,7 +153,6 @@ int main(int argc, char **argv) {
   float alpha = 0.1f;
   int nwarmup = 100;
   int niters = 1000;
-  bool write = false;
   unsigned long long seed = 1234ULL;
 
   while (1) {
@@ -218,6 +218,10 @@ int main(int argc, char **argv) {
     randvals_host[i] = (float)rand() / (float)RAND_MAX;
 #endif
 
+  signed char *lattice_b_r, *lattice_w_r;
+  lattice_b_r = (signed char*) malloc(nx * ny/2 * sizeof(signed char));
+  lattice_w_r = (signed char*) malloc(nx * ny/2 * sizeof(signed char));
+
   float *randvals;
   CHECK_CUDA(cudaMalloc(&randvals, nx * ny/2 * sizeof(*randvals)));
 
@@ -282,17 +286,29 @@ int main(int argc, char **argv) {
   signed char* lattice_w_h = (signed char*) malloc(nx * ny/2 * sizeof(*lattice_w_h));
   CHECK_CUDA(cudaMemcpy(lattice_b_h, lattice_b, nx * ny/2 * sizeof(*lattice_b), cudaMemcpyDeviceToHost));
   CHECK_CUDA(cudaMemcpy(lattice_w_h, lattice_w, nx * ny/2 * sizeof(*lattice_w), cudaMemcpyDeviceToHost));
-  double naivesum = 0.0;
-  for (int i = 0; i < nx*ny/2; i++) {
-    naivesum += lattice_b_h[i];
-    naivesum += lattice_w_h[i];
+  
+  printf("Starting verification iterations ...\n");
+  init_spins_ref(lattice_b_r, randvals_host, nx, ny/2);
+  init_spins_ref(lattice_w_r, randvals_host, nx, ny/2);
+  for (int i = 0; i < nwarmup + niters; i++) {
+    update_ref(lattice_b_r, lattice_w_r, randvals_host, inv_temp, nx, ny);
   }
-  printf("checksum = %lf\n", naivesum);
+
+  bool ok = true;
+  for (int i = 0; i < nx*ny/2; i++) {
+    ok  = (lattice_b_h[i] == lattice_b_r[i]) && 
+          (lattice_w_h[i] == lattice_w_r[i]);
+    if (!ok) break;
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
 #ifndef CURAND
   free(randvals_host);
 #endif
   free(lattice_b_h);
   free(lattice_w_h);
+  free(lattice_b_r);
+  free(lattice_w_r);
 
   cudaFree(lattice_b);
   cudaFree(lattice_w);

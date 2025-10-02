@@ -32,6 +32,8 @@
 #endif
 #include <sycl/sycl.hpp>
 
+#include "reference.h"
+
 #define TCRIT    2.26918531421f
 #define THREADS  128
 
@@ -240,6 +242,10 @@ int main(int argc, char **argv) {
     randvals_host[i] = (float)rand() / (float)RAND_MAX;
 #endif
 
+  signed char *lattice_b_r, *lattice_w_r;
+  lattice_b_r = (signed char*) malloc(nx * ny/2 * sizeof(signed char));
+  lattice_w_r = (signed char*) malloc(nx * ny/2 * sizeof(signed char));
+
   float *d_randvals = sycl::malloc_device<float>(nx * ny / 2, q);
 
 #ifndef MKLRAND
@@ -320,17 +326,29 @@ int main(int argc, char **argv) {
   q.memcpy(lattice_w_h, d_lattice_w, nx * ny/2 * sizeof(signed char));
 
   q.wait();
-  double naivesum = 0.0;
-  for (int i = 0; i < nx*ny/2; i++) {
-    naivesum += lattice_b_h[i];
-    naivesum += lattice_w_h[i];
+
+  printf("Starting verification iterations ...\n");
+  init_spins_ref(lattice_b_r, randvals_host, nx, ny/2);
+  init_spins_ref(lattice_w_r, randvals_host, nx, ny/2);
+  for (int i = 0; i < nwarmup + niters; i++) {
+    update_ref(lattice_b_r, lattice_w_r, randvals_host, inv_temp, nx, ny);
   }
-  printf("checksum = %lf\n", naivesum);
+
+  bool ok = true;
+  for (int i = 0; i < nx*ny/2; i++) {
+    ok  = (lattice_b_h[i] == lattice_b_r[i]) && 
+          (lattice_w_h[i] == lattice_w_r[i]);
+    if (!ok) break;
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
 #ifndef MKLRAND
   free(randvals_host);
 #endif
   free(lattice_b_h);
   free(lattice_w_h);
+  free(lattice_b_r);
+  free(lattice_w_r);
 
   sycl::free(d_lattice_b, q);
   sycl::free(d_lattice_w, q);
