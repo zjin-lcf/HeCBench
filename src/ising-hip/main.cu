@@ -26,6 +26,8 @@
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <hip/hip_runtime.h>
+#include "reference.h"
 
 #ifdef HIPRAND
 #include <hiprand.h>
@@ -97,20 +99,20 @@ void update(signed char *lattice_b,
     long long nx, 
     long long ny) {
 
-  // Setup HIP launch configuration
+  // Setup CUDA launch configuration
   int blocks = (nx * ny/2 + THREADS - 1) / THREADS;
 
   // Update black
 #ifdef HIPRAND
   CHECK_HIPRAND(hiprandGenerateUniform(rng, randvals, nx*ny/2));
 #endif
-  hipLaunchKernelGGL(HIP_KERNEL_NAME(update_lattice<true>), dim3(blocks), dim3(THREADS), 0, 0, lattice_b, lattice_w, randvals, inv_temp, nx, ny/2);
+  update_lattice<true><<<blocks, THREADS>>>(lattice_b, lattice_w, randvals, inv_temp, nx, ny/2);
 
   // Update white
 #ifdef HIPRAND
   CHECK_HIPRAND(hiprandGenerateUniform(rng, randvals, nx*ny/2));
 #endif
-  hipLaunchKernelGGL(HIP_KERNEL_NAME(update_lattice<false>), dim3(blocks), dim3(THREADS), 0, 0, lattice_w, lattice_b, randvals, inv_temp, nx, ny/2);
+  update_lattice<false><<<blocks, THREADS>>>(lattice_w, lattice_b, randvals, inv_temp, nx, ny/2);
 }
 
 static void usage(const char *pname) {
@@ -151,7 +153,6 @@ int main(int argc, char **argv) {
   float alpha = 0.1f;
   int nwarmup = 100;
   int niters = 1000;
-  bool write = false;
   unsigned long long seed = 1234ULL;
 
   while (1) {
@@ -204,7 +205,6 @@ int main(int argc, char **argv) {
 
   float inv_temp = 1.0f / (alpha*TCRIT);
 
-
 #ifdef HIPRAND
   // Setup cuRAND generator
   hiprandGenerator_t rng;
@@ -217,6 +217,10 @@ int main(int argc, char **argv) {
   for (int i = 0; i < nx * ny/2; i++)
     randvals_host[i] = (float)rand() / (float)RAND_MAX;
 #endif
+
+  signed char *lattice_b_r, *lattice_w_r;
+  lattice_b_r = (signed char*) malloc(nx * ny/2 * sizeof(signed char));
+  lattice_w_r = (signed char*) malloc(nx * ny/2 * sizeof(signed char));
 
   float *randvals;
   CHECK_HIP(hipMalloc(&randvals, nx * ny/2 * sizeof(*randvals)));
@@ -235,12 +239,12 @@ int main(int argc, char **argv) {
 #ifdef HIPRAND
   CHECK_HIPRAND(hiprandGenerateUniform(rng, randvals, nx*ny/2));
 #endif
-  hipLaunchKernelGGL(init_spins, dim3(blocks), dim3(THREADS), 0, 0, lattice_b, randvals, nx, ny/2);
+  init_spins<<<blocks, THREADS>>>(lattice_b, randvals, nx, ny/2);
 
 #ifdef HIPRAND
   CHECK_HIPRAND(hiprandGenerateUniform(rng, randvals, nx*ny/2));
 #endif
-  hipLaunchKernelGGL(init_spins, dim3(blocks), dim3(THREADS), 0, 0, lattice_w, randvals, nx, ny/2);
+  init_spins<<<blocks, THREADS>>>(lattice_w, randvals, nx, ny/2);
 
   // Warmup iterations
   printf("Starting warmup...\n");
@@ -282,17 +286,29 @@ int main(int argc, char **argv) {
   signed char* lattice_w_h = (signed char*) malloc(nx * ny/2 * sizeof(*lattice_w_h));
   CHECK_HIP(hipMemcpy(lattice_b_h, lattice_b, nx * ny/2 * sizeof(*lattice_b), hipMemcpyDeviceToHost));
   CHECK_HIP(hipMemcpy(lattice_w_h, lattice_w, nx * ny/2 * sizeof(*lattice_w), hipMemcpyDeviceToHost));
-  double naivesum = 0.0;
-  for (int i = 0; i < nx*ny/2; i++) {
-    naivesum += lattice_b_h[i];
-    naivesum += lattice_w_h[i];
+  
+  printf("Starting verification iterations ...\n");
+  init_spins_ref(lattice_b_r, randvals_host, nx, ny/2);
+  init_spins_ref(lattice_w_r, randvals_host, nx, ny/2);
+  for (int i = 0; i < nwarmup + niters; i++) {
+    update_ref(lattice_b_r, lattice_w_r, randvals_host, inv_temp, nx, ny);
   }
-  printf("checksum = %lf\n", naivesum);
+
+  bool ok = true;
+  for (int i = 0; i < nx*ny/2; i++) {
+    ok  = (lattice_b_h[i] == lattice_b_r[i]) && 
+          (lattice_w_h[i] == lattice_w_r[i]);
+    if (!ok) break;
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
 #ifndef HIPRAND
   free(randvals_host);
 #endif
   free(lattice_b_h);
   free(lattice_w_h);
+  free(lattice_b_r);
+  free(lattice_w_r);
 
   hipFree(lattice_b);
   hipFree(lattice_w);
