@@ -292,18 +292,10 @@ int main(int argc, char* argv[]) {
   std::cout << "Host time: " << time << " ms" << std::endl;
   std::cout << std::endl;
 
-  // Compute error (difference between final wavefields computed in device and
-  // CPU)
+  std::cout << "Check difference between final wavefields computed in device and host"
+            << std::endl;
   error = within_epsilon(next_base, next_cpu, nRows, nCols, HALF_LENGTH, 0.1f);
-
-  // If error greater than threshold (last parameter in error function call),
-  // report
-  if (error)
-    std::cout << "Final wavefields from device and CPU are different: Error "
-              << std::endl;
-  else
-    std::cout << "Final wavefields from device and CPU are equivalent: Success"
-              << std::endl;
+  std::cout << (error ? "FAIL" : "PASS") << std::endl;
 
   // Output final wavefield (computed by CPU) to binary file
   outFile.open("wavefield_snapshot_cpu.bin", std::ios::out | std::ios::binary);
