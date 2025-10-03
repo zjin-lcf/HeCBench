@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <hip/hip_runtime.h>
 #include "params.h"
+#include "reference.h"
 
 __global__
 void postprocess (
@@ -30,6 +31,7 @@ void postprocess (
   const float *__restrict__ anchors,
   const float *__restrict__ anchor_bottom_heights,
         float *__restrict__ bndbox_output,
+        float *__restrict__ score_output,
         int *__restrict__ object_counter,
   const float min_x_range,
   const float max_x_range,
@@ -100,7 +102,7 @@ void postprocess (
 
     int resCount = atomicAdd(object_counter, 1);
     bndbox_output[0] = resCount+1;
-    float *data = bndbox_output + 1 + resCount * 9;
+    float *data = bndbox_output + resCount * 9;
     data[0] = box_input[box_offset];
     data[1] = box_input[box_offset + 1];
     data[2] = box_input[box_offset + 2];
@@ -109,7 +111,8 @@ void postprocess (
     data[5] = box_input[box_offset + 5];
     data[6] = yaw;
     data[7] = dev_cls[0];
-    data[8] = dev_cls[1];
+    data[8] = box_offset;
+    score_output[resCount] = max_score;
   }
 }
 
@@ -141,12 +144,13 @@ int main(int argc, char* argv[])
   const int cls_size = feature_anchor_size * num_classes;
   const int box_size = feature_anchor_size * num_box_values;
   const int dir_cls_size = feature_anchor_size * num_dir_bins;
-  const int bndbox_size = feature_anchor_size * 9 + 1;
+  const int bndbox_size = feature_anchor_size * 9;
 
   const int cls_size_byte = cls_size * sizeof(float);
   const int box_size_byte = box_size * sizeof(float);
   const int dir_cls_size_byte = dir_cls_size * sizeof(float);
   const int bndbox_size_byte = bndbox_size * sizeof(float);
+  const int score_size_byte = feature_anchor_size * sizeof(float);
 
   // input of the post-process kernel
   float *h_cls_input = (float*) malloc (cls_size_byte);
@@ -155,6 +159,7 @@ int main(int argc, char* argv[])
 
   // output of the post-process kernel
   float *h_bndbox_output = (float*) malloc (bndbox_size_byte);
+  float *h_score_output = (float*) malloc (score_size_byte);
 
   // random values
   srand(123);
@@ -162,7 +167,7 @@ int main(int argc, char* argv[])
   for (int i = 0; i < box_size; i++)  h_box_input[i] = rand() / (float)RAND_MAX;
   for (int i = 0; i < dir_cls_size; i++)  h_dir_cls_input[i] = rand() / (float)RAND_MAX;
   
-  float *d_cls_input, *d_box_input, *d_dir_cls_input, *d_bndbox_output;
+  float *d_cls_input, *d_box_input, *d_dir_cls_input, *d_bndbox_output, *d_score_output;
   float *d_anchors, *d_anchor_bottom_heights;
   int *d_object_counter;
 
@@ -170,6 +175,7 @@ int main(int argc, char* argv[])
   hipMalloc((void **)&d_box_input, box_size_byte);
   hipMalloc((void **)&d_dir_cls_input, dir_cls_size_byte);
   hipMalloc((void **)&d_bndbox_output, bndbox_size_byte);
+  hipMalloc((void **)&d_score_output, score_size_byte);
 
   hipMemcpy(d_cls_input, h_cls_input, cls_size_byte, hipMemcpyHostToDevice);
   hipMemcpy(d_dir_cls_input, h_dir_cls_input, dir_cls_size_byte, hipMemcpyHostToDevice);
@@ -196,13 +202,14 @@ int main(int argc, char* argv[])
     hipDeviceSynchronize();
     auto start = std::chrono::steady_clock::now();
 
-    hipLaunchKernelGGL(postprocess, blocks, threads, 0, 0, 
+    postprocess<<<blocks, threads>>> (
       d_cls_input,
       d_box_input,
       d_dir_cls_input,
       d_anchors,
       d_anchor_bottom_heights,
       d_bndbox_output,
+      d_score_output,
       d_object_counter,
       min_x_range,
       max_x_range,
@@ -223,11 +230,31 @@ int main(int argc, char* argv[])
 
   printf("Average execution time of postprocess kernel: %f (us)\n", (time * 1e-3f) / repeat);
 
+  int bndbox_num;
+  hipMemcpy(&bndbox_num, d_object_counter, sizeof(int), hipMemcpyDeviceToHost);
   hipMemcpy(h_bndbox_output, d_bndbox_output, bndbox_size_byte, hipMemcpyDeviceToHost);
-  
-  double checksum = 0.0;
-  for (int i = 0; i < bndbox_size; i++) checksum += h_bndbox_output[i];
-  printf("checksum = %lf\n", checksum / bndbox_size);
+  hipMemcpy(h_score_output, d_score_output, score_size_byte, hipMemcpyDeviceToHost);
+
+  verify (bndbox_num,
+          h_cls_input,
+          h_box_input,
+          h_dir_cls_input,
+          p.anchors,
+          p.anchor_bottom_heights,
+          h_bndbox_output,
+          h_score_output,
+          min_x_range,
+          max_x_range,
+          min_y_range,
+          max_y_range,
+          feature_size,
+          feature_x_size,
+          feature_y_size,
+          num_anchors,
+          num_classes,
+          num_box_values,
+          score_thresh,
+          dir_offset);
 
   hipFree(d_anchors);
   hipFree(d_anchor_bottom_heights);
@@ -236,10 +263,12 @@ int main(int argc, char* argv[])
   hipFree(d_box_input);
   hipFree(d_dir_cls_input);
   hipFree(d_bndbox_output);
+  hipFree(d_score_output);
 
   free(h_cls_input);
   free(h_box_input);
   free(h_dir_cls_input);
+  free(h_score_output);
   free(h_bndbox_output);
 
   return 0;
