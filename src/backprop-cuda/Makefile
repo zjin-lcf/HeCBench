@@ -52,7 +52,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu backprop.h bpnn_adjust_weights.h bpnn_layerforward.h Makefile
+%.o: %.cu reference.h backprop.h bpnn_adjust_weights.h bpnn_layerforward.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
