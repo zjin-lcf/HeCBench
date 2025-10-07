@@ -31,7 +31,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, bitcracker, bitpermute, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fpc, histogram, lzss, minmax, mpc, mtf, quantAQLM, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, scatter, scatterAdd, scatterThrust, segment-reduce
+    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fma, fpc, histogram, lzss, minmax, mpc, mtf, quantAQLM, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, scatter, scatterAdd, scatterThrust, segment-reduce
 
 ### Data encoding, decoding, or verification
     ans, crc64, crs, entropy, jenkins-hash, kiss, ldpc, md5hash, murmurhash3
@@ -657,6 +657,9 @@ Early results are shown [here](results/README.md)
 
 ### fluidSim (opencl)
   2D Fluid Simulation using the Lattice-Boltzman method (https://github.com/OpenCL/AMD_APP_samples)
+
+### fma (cuda)
+  Fused multiply and add operations with gather-scatter indices (https://github.com/NVlabs/WarpConvNet)
 
 ### fpc (opencl)
   Frequent pattern compression ( Base-delta-immediate compression: practical data compression for on-chip caches. In Proceedings of the 21st international conference on Parallel architectures and compilation techniques (pp. 377- 388). ACM.)
