@@ -155,14 +155,16 @@ int main(int argc, char* argv[]) {
   }
 
   float* hout = attention_host(key, value, query, n, d);
-
   float* dout = attention_device(key, value, query, n, d, k, r);
 
-  float rmse = 0;
+  bool ok = true;
   for (int i = 0; i < d; i++) {
-    rmse += (hout[i] - dout[i]) * (hout[i] - dout[i]);
+    if (fabsf(hout[i] - dout[i]) > 1e-3f) {
+      ok = false;
+      break;
+    }
   }
-  printf("RMSE = %f\n", sqrtf(rmse / d));
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(key);
   free(value);
