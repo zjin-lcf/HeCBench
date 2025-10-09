@@ -15,6 +15,8 @@
 #define WGS 256
 #define SAMPLE_TEST_LEN 20000
 
+#include "reference.h"
+
 #ifdef DEBUG
 void dump (const char* work_path, const char* result_filename, const float* result) 
 {
@@ -247,6 +249,9 @@ int main(int argc, char* argv[])
       std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
     std::cout << "Device offload time: " <<  elapsedTime << " ms\n";
 
+    if (n == 0)
+      reference(sample_input, inW, intW, intB, outW, &outB, infer1_out);
+
 #ifdef DEBUG
     dump(work_path, result1_filename, infer1_out);
 #endif
@@ -258,6 +263,9 @@ int main(int argc, char* argv[])
     elapsedTime =
       std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
     std::cout << "Device offload time: " <<  elapsedTime << " ms\n";
+
+    if (n == 0)
+      reference(sample_input, inW, intW, intB, outW, &outB, infer2_out);
 
 #ifdef DEBUG
     dump(work_path, result2_filename, infer2_out);
