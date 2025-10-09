@@ -29,8 +29,8 @@ obj = main.o meshBasis.o
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -Ddfloat=float -Ddlong=int \
-          -std=c++17 -Wall -I../include -fsycl \
-          --gcc-toolchain=$(GCC_TOOLCHAIN)
+          -std=c++17 -Wall -I../include -I../axhelm-cuda \
+          -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS_TMP := $(CFLAGS)
@@ -71,7 +71,7 @@ endif
 $(program): $(obj) BlasLapack/libBlasLapack.a
 	$(CC) $(CFLAGS) $+ -o $@ $(LDFLAGS)
 
-main.o : main.cpp axhelmReference.cpp
+main.o : main.cpp ../axhelm-cuda/axhelmReference.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 	
 meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h

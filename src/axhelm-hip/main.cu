@@ -1,9 +1,10 @@
-#include <iostream>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <chrono>
+#include <iostream>
 #include <hip/hip_runtime.h>
 
 #define POLYNOMIAL_DEGREE  7
