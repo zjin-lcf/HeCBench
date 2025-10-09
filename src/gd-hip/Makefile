@@ -14,8 +14,6 @@ LAUNCHER  =
 
 program = main
 
-source = main.cu ../gd-cuda/utils.cu
-
 obj = main.o utils.o
 
 #===============================================================================
@@ -47,10 +45,10 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cu ../gd-cuda/utils.h
+main.o: main.cu ../gd-cuda/utils.h ../gd-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-utils.o: ../gd-cuda/utils.cu ../gd-cuda/utils.h
+utils.o: ../gd-cuda/utils.cpp ../gd-cuda/utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

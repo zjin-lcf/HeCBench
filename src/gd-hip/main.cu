@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <hip/hip_runtime.h>
 #include "utils.h"
+#include "reference.h"
 
 __global__ void 
 L2_norm(const float *x, float* l2_norm, int n)
@@ -180,8 +181,9 @@ int main(int argc, const char *argv[]) {
   printf("Training time takes %lf (s) for %d iterations\n\n",
          (train_end - train_start) * 1e-6, iters);
 
-  // After 100 iterations, the expected obj_val and train_error are 0.3358405828 and 0.07433331013
   printf("object value = %f train_error = %f\n", obj_val, train_error);
+
+  reference(A, x, grad, m, n, iters, alpha, lambda, obj_val, train_error);
 
   hipFree(d_row_ptr);
   hipFree(d_col_index);
