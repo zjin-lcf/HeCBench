@@ -89,14 +89,17 @@ void run_gpu_kernel(
       #pragma omp target teams distribute thread_limit(wgsize)
       for(int igrid=0;igrid<ngrid;igrid++){
         float sum = 0.0f;
+        float l_gx = gx[igrid];
+        float l_gy = gy[igrid];
+        float l_gz = gz[igrid];
         #pragma omp parallel for reduction(+:sum)
         for(int iatom=0; iatom<natom; iatom++) {
-          float dist = sqrtf((gx[igrid]-ax[iatom])*(gx[igrid]-ax[iatom]) + 
-              (gy[igrid]-ay[iatom])*(gy[igrid]-ay[iatom]) + 
-              (gz[igrid]-az[iatom])*(gz[igrid]-az[iatom]));
+          float dist = sqrtf((l_gx-ax[iatom])*(l_gx-ax[iatom]) + 
+                             (l_gy-ay[iatom])*(l_gy-ay[iatom]) + 
+                             (l_gz-az[iatom])*(l_gz-az[iatom]));
 
           sum += pre1*(charge[iatom]/dist)*expf(-xkappa*(dist-size[iatom]))
-            / (1+xkappa*size[iatom]);
+                 / (1.f + xkappa*size[iatom]);
         }
         val[igrid] = sum;
       }
@@ -138,14 +141,16 @@ void run_cpu_kernel(
     #pragma omp parallel for
     for(int igrid=0;igrid<ngrid;igrid++){
       float sum = 0.0f;
+      float l_gx = gx[igrid];
+      float l_gy = gy[igrid];
+      float l_gz = gz[igrid];
       #pragma omp parallel for simd reduction(+:sum)
       for(int iatom=0; iatom<natom; iatom++) {
-        float dist = sqrtf((gx[igrid]-ax[iatom])*(gx[igrid]-ax[iatom]) + 
-            (gy[igrid]-ay[iatom])*(gy[igrid]-ay[iatom]) + 
-            (gz[igrid]-az[iatom])*(gz[igrid]-az[iatom]));
-
+        float dist = sqrtf((l_gx-ax[iatom])*(l_gx-ax[iatom]) + 
+                           (l_gy-ay[iatom])*(l_gy-ay[iatom]) + 
+                           (l_gz-az[iatom])*(l_gz-az[iatom]));
         sum += pre1*(charge[iatom]/dist)*expf(-xkappa*(dist-size[iatom]))
-          / (1+xkappa*size[iatom]);
+               / (1.f + xkappa*size[iatom]);
       }
       val[igrid] = sum;
     }
