@@ -19,45 +19,13 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 #include "reference.h"
+#include "kernel.h"
 
-#define ATOMIC_REF(v) \
-  sycl::atomic_ref<T, sycl::memory_order::relaxed, \
-                   sycl::memory_scope::device,\
-                   sycl::access::address_space::generic_space>(v)
-
-template <class T>
-void testKernel(sycl::nd_item<1> &item, T *g_odata)
-{
-  const int i = item.get_global_id(0);
-
-  auto ao0 = ATOMIC_REF(g_odata[0]);
-  ao0.fetch_add((T)10);
-
-  auto ao1 = ATOMIC_REF(g_odata[1]);
-  ao1.fetch_sub((T)10);
-
-  auto ao2 = ATOMIC_REF(g_odata[2]);
-  ao2.fetch_max((T)i);
-
-  auto ao3 = ATOMIC_REF(g_odata[3]);
-  ao3.fetch_min((T)i);
-
-  auto ao4 = ATOMIC_REF(g_odata[4]);
-  ao4.fetch_and((T)(2*i+7));
-
-  auto ao5 = ATOMIC_REF(g_odata[5]);
-  ao5.fetch_or((T)(1<<i));
-
-  auto ao6 = ATOMIC_REF(g_odata[6]);
-  ao6.fetch_xor((T)(i));
-
-  // atomicInc and atomicDec are not implemented yet
-}
 
 template <typename T>
-void testcase(sycl::queue &q, const int repeat)
+void testcase(sycl::queue &q, const int num, const int repeat)
 {
-  unsigned int len = 1 << 27;
+  size_t len = 1UL << num;
   unsigned int localWorkSize = 256;
   unsigned int globalWorkSize = (len + localWorkSize - 1) /
                                 localWorkSize * localWorkSize;
@@ -76,7 +44,7 @@ void testcase(sycl::queue &q, const int repeat)
 
     q.submit([&](sycl::handler &h) {
       h.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        testKernel(item, dOData);
+        testKernel(item, dOData, len);
       });
     });
   }
@@ -89,7 +57,7 @@ void testcase(sycl::queue &q, const int repeat)
   for (int i = 0; i < repeat; i++) {
     q.submit([&](sycl::handler &h) {
       h.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        testKernel(item, dOData);
+        testKernel(item, dOData, len);
       });
     });
   }
@@ -104,8 +72,8 @@ void testcase(sycl::queue &q, const int repeat)
 
 int main(int argc, char **argv)
 {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of atomic operations> <repeat>\n", argv[0]);
     return 1;
   }
 
@@ -115,8 +83,9 @@ int main(int argc, char **argv)
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  const int repeat = atoi(argv[1]);
-  testcase<int>(q, repeat);
-  testcase<unsigned int>(q, repeat);
+  const int num = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+  testcase<int>(q, num, repeat);
+  testcase<unsigned int>(q, num, repeat);
   return 0;
 }

@@ -17,14 +17,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <chrono>
 #include <hip/hip_runtime.h>
 #include "kernel.h"
 #include "reference.h"
 
 template <class T>
-void testcase(const int repeat)
+void testcase(const int num, const int repeat)
 {
-  unsigned int len = 1 << 27;
+  const size_t len = 1UL << num;
   unsigned int numThreads = 256;
   unsigned int numBlocks = (len + numThreads - 1) / numThreads;
   T gpuData[] = {0, 0, (T)-256, 256, 255, 0, 255, 0, 0};
@@ -39,7 +40,7 @@ void testcase(const int repeat)
     hipMemcpy(dOData, gpuData, memSize, hipMemcpyHostToDevice);
 
     // execute the kernel
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(testKernel<T>), numBlocks, numThreads, 0, 0, dOData);
+    testKernel<T><<<numBlocks, numThreads>>>(dOData, len);
   }
 
   //Copy result from device to host
@@ -51,7 +52,7 @@ void testcase(const int repeat)
 
   for (int i = 0; i < repeat; i++) {
     // ignore result verification
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(testKernel<T>), numBlocks, numThreads, 0, 0, dOData);
+    testKernel<T><<<numBlocks, numThreads>>>(dOData, len);
   }
   hipDeviceSynchronize();
 
@@ -64,13 +65,14 @@ void testcase(const int repeat)
 
 int main(int argc, char **argv)
 {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of atomic operations> <repeat>\n", argv[0]);
     return 1;
   }
 
-  const int repeat = atoi(argv[1]);
-  testcase<int>(repeat);
-  testcase<unsigned int>(repeat);
+  const int num = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+  testcase<int>(num, repeat);
+  testcase<unsigned int>(num, repeat);
   return 0;
 }
