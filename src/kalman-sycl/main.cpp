@@ -19,6 +19,7 @@
 #include <math.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
+#include "reference.h"
 
 //! Thread-local Matrix-Vector multiplication.
 template <int n>
@@ -109,14 +110,14 @@ void kalman(
   double* d_F_fc = nullptr)
 {
   constexpr int rd2 = rd * rd;
-  double l_RQR[rd2];
-  double l_T[rd2];
-  double l_Z[rd];
-  double l_P[rd2];
-  double l_alpha[rd];
-  double l_K[rd];
-  double l_tmp[rd2];
-  double l_TP[rd2];
+  double l_RQR[rd2] = {0.0};
+  double l_T[rd2] = {0.0};
+  double l_Z[rd] = {0.0};
+  double l_P[rd2] = {0.0};
+  double l_alpha[rd] = {0.0};
+  double l_K[rd] = {0.0};
+  double l_tmp[rd2] = {0.0};
+  double l_TP[rd2] = {0.0};
 
   int bid = item.get_global_id(0);
   if (bid < batch_size) {
@@ -309,7 +310,7 @@ int main(int argc, char* argv[]) {
 
   double *T = (double*) malloc (rd2_size);
   for (i = 0; i < rd2 * nseries; i++)
-    T[i] = (double)rand() / (double)RAND_MAX;
+    T[i] = 1.0;
 
   double *d_T = sycl::malloc_device<double>(rd2_word, q);
   q.memcpy(d_T, T, rd2_size);
@@ -398,14 +399,23 @@ int main(int argc, char* argv[]) {
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     printf("Average kernel execution time (n_diff = %d): %f (s)\n", n_diff, (time * 1e-9f) / repeat);
+    q.memcpy(F_fc, d_F_fc, fc_size).wait();
+    reference<rd>(
+          nseries,
+          nobs,
+          ys,
+          T,
+          Z,
+          RQR,
+          P,
+          alpha,
+          mu,
+          F_fc, // device
+          true, // intercept,
+          n_diff,
+          fc_steps,
+          true); // forcast
   }
-
-  q.memcpy(F_fc, d_F_fc, fc_size).wait();
-
-  double sum = 0.0;
-  for (i = 0; i < fc_steps * nseries - 1; i++)
-    sum += (fabs(F_fc[i+1]) - fabs(F_fc[i])) / (fabs(F_fc[i+1]) + fabs(F_fc[i]));
-  printf("Checksum: %lf\n", sum);
 
   free(F_fc);
   free(mu);
