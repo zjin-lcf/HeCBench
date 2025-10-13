@@ -31,7 +31,7 @@ int main(int argc, char** argv)
 {
   int arrayLength = 52428800;
   int block_sizes[] = {128, 256, 512, 1024};
-  int N = 32;
+  int N = 100;
 
   if (argc == 3) {
     arrayLength=atoi(argv[1]);
