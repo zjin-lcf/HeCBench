@@ -23,9 +23,9 @@
 #include "reference.h"
 
 template <class T>
-void testcase(const int repeat)
+void testcase(const int num, const int repeat)
 {
-  unsigned int len = 1 << 27;
+  size_t len = 1UL << num;
   unsigned int numThreads = 256;
   unsigned int numBlocks = (len + numThreads - 1) / numThreads;
   T gpuData[] = {0, 0, (T)-256, 256, 255, 0, 255, 0, 0};
@@ -40,7 +40,7 @@ void testcase(const int repeat)
     hipMemcpy(dOData, gpuData, memSize, hipMemcpyHostToDevice);
 
     // execute the kernel
-    testKernel<T><<<numBlocks, numThreads>>>(dOData);
+    testKernel<T><<<numBlocks, numThreads>>>(dOData, len);
   }
   hipDeviceSynchronize();
 
@@ -50,10 +50,10 @@ void testcase(const int repeat)
 
   for (int i = 0; i < repeat; i++) {
     // ignore result verification
-    testKernel<T><<<numBlocks, numThreads>>>(dOData);
+    testKernel<T><<<numBlocks, numThreads>>>(dOData, len);
   }
-
   hipDeviceSynchronize();
+
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
@@ -63,13 +63,14 @@ void testcase(const int repeat)
 
 int main(int argc, char **argv)
 {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of atomic operations> <repeat>\n", argv[0]);
     return 1;
   }
 
-  const int repeat = atoi(argv[1]);
-  testcase<int>(repeat);
-  testcase<unsigned int>(repeat);
+  const int num = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+  testcase<int>(num, repeat);
+  testcase<unsigned int>(num, repeat);
   return 0;
 }

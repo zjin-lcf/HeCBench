@@ -9,12 +9,12 @@
 //! @param len        number of elements in reference / idata
 ////////////////////////////////////////////////////////////////////////////////
 template <class T>
-void computeGold(T *gpuData, const int len)
+void computeGold(T *gpuData, const size_t len)
 {
   T val = 0;
   bool ok = true;
 
-  for (int i = 0; i < len; ++i)
+  for (size_t i = 0; i < len; ++i)
   {
     val += (T)10;
   }
@@ -27,7 +27,7 @@ void computeGold(T *gpuData, const int len)
 
   val = 0;
 
-  for (int i = 0; i < len; ++i)
+  for (size_t i = 0; i < len; ++i)
   {
     val -= (T)10;
   }
@@ -40,7 +40,7 @@ void computeGold(T *gpuData, const int len)
 
   val = (T)(-256);
 
-  for (int i = 0; i < len; ++i)
+  for (size_t i = 0; i < len; ++i)
   {
     val = max(val, (T)i);
   }
@@ -53,7 +53,7 @@ void computeGold(T *gpuData, const int len)
 
   val = (T)256;
 
-  for (int i = 0; i < len; ++i)
+  for (size_t i = 0; i < len; ++i)
   {
     val = min(val, (T)i);
   }
@@ -66,7 +66,7 @@ void computeGold(T *gpuData, const int len)
 
   val = 0xff;
 
-  for (int i = 0; i < len; ++i)
+  for (size_t i = 0; i < len; ++i)
   {
     val &= (T)(2 * i + 7);
   }
@@ -79,7 +79,7 @@ void computeGold(T *gpuData, const int len)
 
   val = 0;
 
-  for (int i = 0; i < len; ++i)
+  for (size_t i = 0; i < len; ++i)
   {
     val |= (T)(1 << i);
   }
@@ -92,7 +92,7 @@ void computeGold(T *gpuData, const int len)
 
   val = 0xff;
 
-  for (int i = 0; i < len; ++i)
+  for (size_t i = 0; i < len; ++i)
   {
     val ^= (T)i;
   }
@@ -106,7 +106,7 @@ void computeGold(T *gpuData, const int len)
   T limit = 17;
   val = 0;
 
-  for (int i = 0; i < len; ++i) {
+  for (size_t i = 0; i < len; ++i) {
     val = (val >= limit) ? 0 : val + 1;
   }
 
@@ -118,7 +118,7 @@ void computeGold(T *gpuData, const int len)
   limit = 137;
   val = 0;
 
-  for (int i = 0; i < len; ++i) {
+  for (size_t i = 0; i < len; ++i) {
     val = ((val == 0) || (val > limit)) ? limit : val - 1;
   }
 
