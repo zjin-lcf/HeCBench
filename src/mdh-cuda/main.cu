@@ -34,7 +34,7 @@ void gendata(float *ax,float *ay,float *az,
     ay[i] = ((float) rand() / (float) RAND_MAX);
     az[i] = ((float) rand() / (float) RAND_MAX);
     charge[i] = ((float) rand() / (float) RAND_MAX);
-    size[i] = ((float) rand() / (float) RAND_MAX);
+    size[i] = (float)natom;
   }
 
   for (i=0; i<ngrid; i++) {
@@ -45,13 +45,16 @@ void gendata(float *ax,float *ay,float *az,
   printf("Done generating inputs.\n\n");
 }
 
-void print_total(float * arr, int ngrid){
+void compare(const float *arr, const float *arr2, int ngrid) {
   int i;
-  double accum = 0.0;
-  for (i=0; i<ngrid; i++){
-    accum += arr[i];
+  bool ok = true;
+  for (i=0; i<ngrid; i++) {
+    if (fabsf(arr[i] - arr2[i]) > 1e-3f) {
+      ok = false;
+      break;
+    }
   }
-  printf("Accumulated value: %1.7g\n",accum);
+  printf("%s\n", ok ? "PASS" : "FAIL");
 }
 
 __global__ void mdh (
@@ -436,27 +439,27 @@ int main(int argc, const char **argv) {
   float *gz = (float*)calloc(ngadj, sizeof(float));
 
   // result
-  float *val = (float*)calloc(ngadj, sizeof(float));
+  float *val_cpu = (float*)calloc(ngadj, sizeof(float));
+  float *val_gpu = (float*)calloc(ngadj, sizeof(float));
 
   gendata(ax, ay, az, gx, gy, gz, charge, size, natom, ngrid);
 
   wkf_timer_start(timer);
-  run_cpu_kernel(itmax, ngadj, natom, ax, ay, az, gx, gy, gz, charge, size, xkappa, pre1, val);
+  run_cpu_kernel(itmax, ngadj, natom, ax, ay, az, gx, gy, gz, charge, size, xkappa, pre1, val_cpu);
   wkf_timer_stop(timer);
 
-  print_total(val, ngrid);
   printf("CPU Time: %1.12g (Number of tests = %d)\n", wkf_timer_time(timer), itmax);
   SEP;
 
   for (int choice = 0; choice < 3; choice++) {
     wkf_timer_start(timer);
     run_gpu_kernel(choice, wgsize, itmax, ngrid, natom, ngadj, ax, ay, az, gx, gy, gz, 
-                   charge, size, xkappa, pre1, val);
+                   charge, size, xkappa, pre1, val_gpu);
     wkf_timer_stop(timer);
 
-    print_total(val, ngrid);
     printf("GPU Time: %1.12g (Number of tests = %d)\n", wkf_timer_time(timer), itmax);
     SEP;
+    compare(val_cpu, val_gpu, ngrid);
   }
 
   free(ax);
@@ -467,7 +470,8 @@ int main(int argc, const char **argv) {
   free(gx);
   free(gy);
   free(gz);
-  free(val);
+  free(val_cpu);
+  free(val_gpu);
 
   wkf_timer_destroy(timer);
 
