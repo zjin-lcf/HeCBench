@@ -1,8 +1,7 @@
-
-void reference(int NX, int NY, int NZ, float* u1, float* u2) 
+void reference(int NX, int NY, int NZ, const float* u1, float* u2)
 {
   int   i, j, k, ind;
-  float sixth=1.0f/6.0f;  // predefining this improves performance
+  float sixth=1.0f/6.0f;
 
   for (k=0; k<NZ; k++) {
     for (j=0; j<NY; j++) {
@@ -21,4 +20,3 @@ void reference(int NX, int NY, int NZ, float* u1, float* u2)
     }
   }
 }
-
