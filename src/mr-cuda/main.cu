@@ -7,7 +7,7 @@
 #include "benchmark.h"
 #include "kernels.h"
 
-void run_benchmark()
+void run_benchmark(const int repeat)
 {
   int i, j, cnt, val_ref, val_eff;
   uint64_t time_vals[SIZES_CNT_MAX][BASES_CNT_MAX][2];
@@ -35,7 +35,6 @@ void run_benchmark()
   for (i = 0; i < SIZES_CNT32; i++) {
     val_ref = val_eff = 0;
     cudaMemcpy(d_n32, n32[i], n32_size, cudaMemcpyHostToDevice);
-    cudaMemset(d_val, 0, sizeof(int));
 
     for (cnt = 1; cnt <= BASES_CNT32; cnt++) {
       time_point start = get_time();
@@ -58,16 +57,17 @@ void run_benchmark()
       break;
     }
 
-    cudaDeviceSynchronize();
-    auto start = std::chrono::steady_clock::now();
-
-    // the efficient version is faster than the simple version on a device
-    mr32_sf <<< grids, blocks >>> (d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
-
-    cudaDeviceSynchronize();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    mr32_sf_time += time;
+    double time = 0.0;
+    for (int n = 0; n < repeat; n++) {
+      cudaMemset(d_val, 0, sizeof(int));
+      cudaDeviceSynchronize();
+      auto start = std::chrono::steady_clock::now();
+      mr32_sf <<< grids, blocks >>> (d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
+      cudaDeviceSynchronize();
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    }
+    mr32_sf_time += time / repeat;
 
     cudaMemcpy(&val_dev, d_val, sizeof(int), cudaMemcpyDeviceToHost);
     if (val_ref != val_dev) {
@@ -76,17 +76,17 @@ void run_benchmark()
       break;
     }
 
-    cudaMemset(d_val, 0, sizeof(int));
-
-    cudaDeviceSynchronize();
-    start = std::chrono::steady_clock::now();
-
-    mr32_eff <<< grids, blocks >>> (d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
-
-    cudaDeviceSynchronize();
-    end = std::chrono::steady_clock::now();
-    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    mr32_eff_time += time;
+    time = 0.0;
+    for (int n = 0; n < repeat; n++) {
+      cudaMemset(d_val, 0, sizeof(int));
+      cudaDeviceSynchronize();
+      auto start = std::chrono::steady_clock::now();
+      mr32_eff <<< grids, blocks >>> (d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
+      cudaDeviceSynchronize();
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    }
+    mr32_eff_time += time / repeat;
 
     cudaMemcpy(&val_dev, d_val, sizeof(int), cudaMemcpyDeviceToHost);
     if (val_ref != val_dev) {
@@ -108,19 +108,27 @@ void run_benchmark()
   cudaFree(d_val);
 }
 
-int main()
+int main(int argc, char *argv[]) 
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+
+  const int repeat = atoi(argv[1]);
+  if (repeat <= 0) return 1;
+
 #ifdef _WIN32
   system("mode CON: COLS=98");
 #endif
 
   printf("Setting random primes...\n");
   set_nprimes();
-  run_benchmark();
+  run_benchmark(repeat);
 
   printf("Setting random odd integers...\n");
   set_nintegers();
-  run_benchmark();
+  run_benchmark(repeat);
 
   return 0;
 }

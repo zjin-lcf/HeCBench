@@ -7,7 +7,7 @@
 #include "benchmark.h"
 #include "kernels.h"
 
-void run_benchmark(sycl::queue &q)
+void run_benchmark(sycl::queue &q, const int repeat)
 {
   int i, j, cnt, val_ref, val_eff;
   uint64_t time_vals[SIZES_CNT_MAX][BASES_CNT_MAX][2];
@@ -34,7 +34,6 @@ void run_benchmark(sycl::queue &q)
     val_ref = val_eff = 0;
 
     q.memcpy(d_n32, n32[i], n32_size);
-    q.memset(d_val, 0, sizeof(int));
 
     for (cnt = 1; cnt <= BASES_CNT32; cnt++) {
       time_point start = get_time();
@@ -57,21 +56,21 @@ void run_benchmark(sycl::queue &q)
       break;
     }
 
-    q.wait();
-    auto start = std::chrono::steady_clock::now();
-
-    // the efficient version is faster than the simple version on a device
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class simple>(
-       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-       mr32_sf(item, d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
-      });
-    });
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    mr32_sf_time += time;
+    double time = 0.0;
+    for (int n = 0; n < repeat; n++) { 
+      q.memset(d_val, 0, sizeof(int)).wait();
+      auto start = std::chrono::steady_clock::now();
+      // the efficient version is faster than the simple version on a device
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class simple>(
+         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+         mr32_sf(item, d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
+        });
+      }).wait();
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    }
+    mr32_sf_time += time / repeat;
 
     q.memcpy(&val_dev, d_val, sizeof(int)).wait();
 
@@ -81,22 +80,20 @@ void run_benchmark(sycl::queue &q)
       break;
     }
 
-    q.memset(d_val, 0, sizeof(int));
-
-    q.wait();
-    start = std::chrono::steady_clock::now();
-
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class efficient>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        mr32_eff(item, d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
-      });
-    });
-
-    q.wait();
-    end = std::chrono::steady_clock::now();
-    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    mr32_eff_time += time;
+    time = 0.0;
+    for (int n = 0; n < repeat; n++) { 
+      q.memset(d_val, 0, sizeof(int)).wait();
+      auto start = std::chrono::steady_clock::now();
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class efficient>(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          mr32_eff(item, d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
+        });
+      }).wait();
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    }
+    mr32_eff_time += time / repeat;
 
     q.memcpy(&val_dev, d_val, sizeof(int)).wait();
 
@@ -119,8 +116,16 @@ void run_benchmark(sycl::queue &q)
   sycl::free(d_val, q);
 }
 
-int main()
+int main(int argc, char *argv[]) 
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+
+  const int repeat = atoi(argv[1]);
+  if (repeat <= 0) return 1;
+
 #ifdef _WIN32
   system("mode CON: COLS=98");
 #endif
@@ -133,11 +138,11 @@ int main()
 
   printf("Setting random primes...\n");
   set_nprimes();
-  run_benchmark(q);
+  run_benchmark(q, repeat);
 
   printf("Setting random odd integers...\n");
   set_nintegers();
-  run_benchmark(q);
+  run_benchmark(q, repeat);
 
   return 0;
 }
