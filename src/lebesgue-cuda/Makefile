@@ -48,7 +48,7 @@ $(program): $(obj) Makefile
 %.o: %.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.cpp lebesgue.h Makefile
+%.o: %.cpp reference.h lebesgue.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
