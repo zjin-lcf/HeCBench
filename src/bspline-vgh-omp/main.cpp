@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <omp.h>
+#include "reference.h"
 
 #define max(a,b) ((a<b)?b:a)
 #define min(a,b) ((a<b)?a:b)
@@ -133,14 +134,18 @@ int main(int argc, char ** argv) {
   float* walkers_vals = (float*) malloc(sizeof(float)*WSIZE*NSIZE);
   float* walkers_grads = (float*) malloc(sizeof(float)*WSIZE*MSIZE);
   float* walkers_hess = (float*) malloc(sizeof(float)*WSIZE*OSIZE);
+  float* walkers_vals_ref = (float*) malloc(sizeof(float)*WSIZE*NSIZE);
+  float* walkers_grads_ref = (float*) malloc(sizeof(float)*WSIZE*MSIZE);
+  float* walkers_hess_ref = (float*) malloc(sizeof(float)*WSIZE*OSIZE);
+
   float* walkers_x = (float*) malloc(sizeof(float)*WSIZE);
   float* walkers_y = (float*) malloc(sizeof(float)*WSIZE);
   float* walkers_z = (float*) malloc(sizeof(float)*WSIZE);
 
   for (int i=0; i<WSIZE; i++) {
-    walkers_x[i] = x + i*1.0/WSIZE;
-    walkers_y[i] = y + i*1.0/WSIZE;
-    walkers_z[i] = z + i*1.0/WSIZE;
+    walkers_x[i] = x / WSIZE;
+    walkers_y[i] = y / WSIZE;
+    walkers_z[i] = z / WSIZE;
   }
 
   float* spline_coefs = (float*) malloc (sizeof(float)*SSIZE);
@@ -204,6 +209,27 @@ int main(int argc, char ** argv) {
       eval_abc(d2Af,ty,&d2b[0]);
       eval_abc(d2Af,tz,&d2c[0]);              
 
+      bspline_ref(
+        spline_coefs,
+        xs, ys, zs, 
+        walkers_vals_ref,
+        walkers_grads_ref,
+        walkers_hess_ref,
+        a,
+        b,
+        c,
+        da,
+        db,
+        dc,
+        d2a,
+        d2b,
+        d2c,
+        spline_x_grid_delta_inv,
+        spline_y_grid_delta_inv,
+        spline_z_grid_delta_inv,
+        spline_num_splines,
+        i, ix, iy, iz	);
+
       #pragma omp target update to(a[0:4])
       #pragma omp target update to(b[0:4])
       #pragma omp target update to(c[0:4])
@@ -234,16 +260,30 @@ int main(int argc, char ** argv) {
     printf("Total kernel execution time %lf (s)\n", total_time * 1e-9);
   }
 
-  // collect results for the first walker
-  float resVal = 0.0;
-  float resGrad = 0.0;
-  float resHess = 0.0;
-
-  for( int i = 0; i < NSIZE; i++ ) resVal = resVal + walkers_vals[i];
-  for( int i = 0; i < MSIZE; i++ ) resGrad = resGrad + walkers_grads[i];
-  for( int i = 0; i < OSIZE; i++ ) resHess = resHess + walkers_hess[i];
-  printf("walkers[0]->collect([resVal resGrad resHess]) = [%e %e %e]\n",
-         resVal,resGrad, resHess);  
+  bool ok = true;
+  const float atol = 2.f;
+  for( int i = 0; i < WSIZE * NSIZE; i++ ) {
+    if (fabsf(walkers_vals[i] - walkers_vals_ref[i]) > atol) {
+      //printf("%f %f\n", walkers_vals[i] , walkers_vals_ref[i]);
+      ok = false;
+      break;
+    }
+  }
+  for( int i = 0; i < WSIZE * MSIZE; i++ ) {
+    if (fabsf(walkers_grads[i] - walkers_grads_ref[i]) > atol) {
+      //printf("%f %f\n", walkers_grads[i] , walkers_grads_ref[i]);
+      ok = false;
+      break;
+    }
+  }
+  for( int i = 0; i < WSIZE * OSIZE; i++ ) {
+    if (fabsf(walkers_hess[i] - walkers_hess_ref[i]) > atol) {
+      //printf("%f %f\n", walkers_hess[i] , walkers_hess_ref[i]);
+      ok = false;
+      break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(Af);
   free(dAf);
@@ -251,6 +291,9 @@ int main(int argc, char ** argv) {
   free(walkers_vals);
   free(walkers_grads);
   free(walkers_hess);
+  free(walkers_vals_ref);
+  free(walkers_grads_ref);
+  free(walkers_hess_ref);
   free(walkers_x);
   free(walkers_y);
   free(walkers_z);
