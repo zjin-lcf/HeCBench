@@ -8,7 +8,7 @@
 #include "benchmark.h"
 #include "kernels.h"
 
-void run_benchmark()
+void run_benchmark(const int repeat)
 {
   int i, j, cnt, val_ref, val_eff;
   uint64_t time_vals[SIZES_CNT_MAX][BASES_CNT_MAX][2];
@@ -34,9 +34,6 @@ void run_benchmark()
       memcpy(d_n32, n32[i], sizeof(uint32_t) * BENCHMARK_ITERATIONS);
       #pragma omp target update to (d_n32[0:BENCHMARK_ITERATIONS])
       
-      #pragma omp target 
-      d_val[0] = 0;
-
       for (cnt = 1; cnt <= BASES_CNT32; cnt++) {
         time_point start = get_time();
         for (j = 0; j < BENCHMARK_ITERATIONS; j++)
@@ -58,14 +55,20 @@ void run_benchmark()
         break;
       }
 
-      auto start = std::chrono::steady_clock::now();
+      double time = 0.0;
+      for (int n = 0; n < repeat; n++) {
+        #pragma omp target 
+        d_val[0] = 0;
 
-      // the efficient version is faster than the simple version on a device
-      mr32_sf(d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
+        auto start = std::chrono::steady_clock::now();
 
-      auto end = std::chrono::steady_clock::now();
-      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-      mr32_sf_time += time;
+        // the efficient version is faster than the simple version on a device
+        mr32_sf(d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
+
+        auto end = std::chrono::steady_clock::now();
+        time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      }
+      mr32_sf_time += time / repeat;
 
       #pragma omp target update from (d_val[0:1])
 
@@ -75,16 +78,19 @@ void run_benchmark()
         break;
       }
 
-      #pragma omp target 
-      d_val[0] = 0;
+      time = 0.0;
+      for (int n = 0; n < repeat; n++) {
+        #pragma omp target 
+        d_val[0] = 0;
 
-      start = std::chrono::steady_clock::now();
+        auto start = std::chrono::steady_clock::now();
 
-      mr32_eff(d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
+        mr32_eff(d_bases32, d_n32, d_val, BENCHMARK_ITERATIONS);
 
-      end = std::chrono::steady_clock::now();
-      time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-      mr32_eff_time += time;
+        auto end = std::chrono::steady_clock::now();
+        time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      }
+      mr32_eff_time += time / repeat;
 
       #pragma omp target update from (d_val[0:1])
 
@@ -105,19 +111,27 @@ void run_benchmark()
   free(d_n32);
 }
 
-int main()
+int main(int argc, char *argv[]) 
 {
+  if (argc != 2) {
+    printf("Usage: %s <repeat>\n", argv[0]);
+    return 1;
+  }
+
+  const int repeat = atoi(argv[1]);
+  if (repeat <= 0) return 1;
+
 #ifdef _WIN32
   system("mode CON: COLS=98");
 #endif
 
   printf("Setting random primes...\n");
   set_nprimes();
-  run_benchmark();
+  run_benchmark(repeat);
 
   printf("Setting random odd integers...\n");
   set_nintegers();
-  run_benchmark();
+  run_benchmark(repeat);
 
   return 0;
 }
