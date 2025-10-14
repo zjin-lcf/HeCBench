@@ -54,7 +54,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: $(inc)/main.cpp $(inc)/lebesgue.h
+main.o: $(inc)/main.cpp $(inc)/lebesgue.h $(inc)/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 utils.o: $(inc)/utils.cpp $(inc)/lebesgue.h
