@@ -47,7 +47,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../bspline-vgh-cuda/kernel.h Makefile
+%.o: %.cu ../bspline-vgh-cuda/*.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
