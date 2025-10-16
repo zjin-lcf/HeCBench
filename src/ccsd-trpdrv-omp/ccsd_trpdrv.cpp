@@ -1,4 +1,4 @@
-void ccsd_tengy_gpu(
+long ccsd_tengy_gpu(
     const double * __restrict f1n,    const double * __restrict f1t,
     const double * __restrict f2n,    const double * __restrict f2t,
     const double * __restrict f3n,    const double * __restrict f3t,
@@ -10,7 +10,7 @@ void ccsd_tengy_gpu(
     double * __restrict emp4k, double * __restrict emp5k,
     const int ncor, const int nocc, const int nvir);
 
-void ccsd_trpdrv(
+long ccsd_trpdrv(
     double * __restrict f1n, double * __restrict f1t,
     double * __restrict f2n, double * __restrict f2t,
     double * __restrict f3n, double * __restrict f3t,
@@ -49,10 +49,10 @@ void ccsd_trpdrv(
 
   const double eaijk = eorb[a] - (eorb[ncor+i] + eorb[ncor+j] + eorb[ncor+k]);
 
-  ccsd_tengy_gpu(f1n, f1t, f2n, f2t, f3n, f3t, f4n, f4t,
-      dintc1, dintx1, t1v1, dintc2, dintx2, t1v2,
-      eorb, eaijk, &emp4i, &emp5i, &emp4k, &emp5k,
-      ncor, nocc, nvir);
+  long time = ccsd_tengy_gpu(f1n, f1t, f2n, f2t, f3n, f3t, f4n, f4t,
+                             dintc1, dintx1, t1v1, dintc2, dintx2, t1v2,
+                             eorb, eaijk, &emp4i, &emp5i, &emp4k, &emp5k,
+                             ncor, nocc, nvir);
 
   emp4 += emp4i;
   emp5 += emp5i;
@@ -65,6 +65,5 @@ void ccsd_trpdrv(
   *emp4_ = emp4;
   *emp5_ = emp5;
 
-  return;
+  return time;
 }
-
