@@ -1,6 +1,7 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <chrono>
+#include "reference.h"
 
 /* Do not allow the test to allocate more than MAX_MEM gigabytes. */
 #ifndef MAX_MEM
@@ -10,7 +11,7 @@
 #define MIN(x,y) (x<y ? x : y)
 #define MAX(x,y) (x>y ? x : y)
 
-void ccsd_trpdrv(
+long ccsd_trpdrv(
     double * __restrict__ f1n, double * __restrict__ f1t,
     double * __restrict__ f2n, double * __restrict__ f2t,
     double * __restrict__ f3n, double * __restrict__ f3t,
@@ -42,7 +43,7 @@ int main(int argc, char* argv[])
   int nkpass = 1;
 
   if (argc<3) {
-    printf("Usage: ./test_cbody nocc nvir [maxiter] [nkpass]\n");
+    printf("Usage: ./%s nocc nvir [maxiter] [nkpass]\n", argv[0]);
     return argc;
   } else {
     ncor = 0;
@@ -121,6 +122,7 @@ int main(int argc, char* argv[])
   double * timers = (double*) calloc(ntimers,sizeof(double));
 
   double emp4=0.0, emp5=0.0;
+  double emp4_r=0.0, emp5_r=0.0;
 
   int iter = 0;
 
@@ -130,14 +132,16 @@ int main(int argc, char* argv[])
     for (int j=1; j<=nocc; j++) {
       for (int i=1; i<=nocc; i++) {
         for (int k=klo; k<=MIN(khi,i); k++) {
-          auto t0 = std::chrono::steady_clock::now();
-          ccsd_trpdrv(f1n, f1t, f2n, f2t, f3n, f3t, f4n, f4t, eorb,
+          long time = ccsd_trpdrv(f1n, f1t, f2n, f2t, f3n, f3t, f4n, f4t, eorb,
               &ncor, &nocc, &nvir, &emp4, &emp5, &a, &i, &j, &k, &klo,
               Tij, Tkj, Tia, Tka, Xia, Xka, Jia, Jka, Kia, Kka, Jij, Jkj, Kij, Kkj,
               dintc1, dintx1, t1v1, dintc2, dintx2, t1v2);
-          auto t1 = std::chrono::steady_clock::now();
-          auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
           timers[iter] = time * 1e-9f;
+
+          ccsd_trpdrv_ref(f1n, f1t, f2n, f2t, f3n, f3t, f4n, f4t, eorb,
+              &ncor, &nocc, &nvir, &emp4_r, &emp5_r, &a, &i, &j, &k, &klo,
+              Tij, Tkj, Tia, Tka, Xia, Xka, Jia, Jka, Kia, Kka, Jij, Jkj, Kij, Kkj,
+              dintc1, dintx1, t1v1, dintc2, dintx2, t1v2);
 
           iter++;
           if (iter==maxiter) {
@@ -150,6 +154,10 @@ int main(int argc, char* argv[])
           if (emp4 < -1000.0) emp4 += 1000.0;
           if (emp5 >  1000.0) emp5 -= 1000.0;
           if (emp5 < -1000.0) emp5 += 1000.0;
+          if (emp4_r >  1000.0) emp4_r -= 1000.0;
+          if (emp4_r < -1000.0) emp4_r += 1000.0;
+          if (emp5_r >  1000.0) emp5_r -= 1000.0;
+          if (emp5_r < -1000.0) emp5_r += 1000.0;
         }
       }
     }
@@ -165,7 +173,7 @@ maxed_out:
     tmin  = MIN(tmin,timers[i]);
   }
   double tavg = tsum / iter;
-  printf("TIMING: min=%lf, max=%lf, avg=%lf\n", tmin, tmax, tavg);
+  printf("Kernel timing: min=%lf, max=%lf, avg=%lf\n", tmin, tmax, tavg);
 
   double dgemm_flops = ((8.0*nvir)*nvir)*(nvir+nocc);
   double dgemm_mops  = 8.0*(4.0*nvir*nvir + 2.0*nvir*nocc);
@@ -182,7 +190,9 @@ maxed_out:
 
   printf("These are meaningless but should not vary for a particular input:\n");
   printf("emp4=%f emp5=%f\n", emp4, emp5);
-  printf("Finished\n");
+
+  bool ok = fabs(emp4_r - emp4) < 1e-6 && fabs(emp5_r - emp5) < 1e-6;
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(eorb);
   free(f1n );
