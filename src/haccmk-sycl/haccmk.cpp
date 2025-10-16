@@ -90,7 +90,8 @@ void haccmk (
 
           r2 = dxc * dxc + dyc * dyc + dzc * dzc;
 
-          if ( r2 < fsrrmax ) m = d_mass[j]; else m = 0.f;
+          //if ( r2 < fsrrmax ) m = d_mass[j]; else m = 0.f;
+          m = d_mass[j] * (r2 < fsrrmax);
 
           f = r2 + mp_rsm;
           f = m * ( 1.f / ( f * sycl::sqrt( f ) ) - 
