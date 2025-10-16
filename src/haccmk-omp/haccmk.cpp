@@ -59,7 +59,8 @@ void haccmk (
 
           r2 = dxc * dxc + dyc * dyc + dzc * dzc;
 
-          if ( r2 < fsrrmax ) m = mass[j]; else m = 0.f;
+          //if ( r2 < fsrrmax ) m = mass[j]; else m = 0.f;
+          m = mass[j] * (r2 < fsrrmax);
 
           f = r2 + mp_rsm;
           f = m * ( 1.f / (f * sqrtf(f)) - 
