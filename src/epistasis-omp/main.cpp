@@ -30,18 +30,9 @@ float gammafunction(unsigned int n)
   return x;
 }
 
-
-// naive 
 inline unsigned int popcount (unsigned int x)
 {
-  // return __builtin_popcount(v);
-  unsigned count = 0;
-  for (char i = 0; i < 32; i++)
-  {
-    count += (x & 0x1);
-    x = x >> 1;
-  }
-  return count;
+  return __builtin_popcount(x);
 }
 #pragma omp end declare target
 
