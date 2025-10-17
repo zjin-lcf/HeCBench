@@ -25,10 +25,10 @@ inline float4 convert_float4(uchar4 v) {
 
 inline uchar4 convert_uchar4_sat(float4 v) {
   uchar4 res;
-  res.x() = (uchar) ((v.x() > 255.f) ? 255.f : (v.x() < 0.f ? 0.f : v.x()));
-  res.y() = (uchar) ((v.y() > 255.f) ? 255.f : (v.y() < 0.f ? 0.f : v.y()));
-  res.z() = (uchar) ((v.z() > 255.f) ? 255.f : (v.z() < 0.f ? 0.f : v.z()));
-  res.w() = (uchar) ((v.w() > 255.f) ? 255.f : (v.w() < 0.f ? 0.f : v.w()));
+  res.x() = (unsigned char) ((v.x() > 255.f) ? 255.f : (v.x() < 0.f ? 0.f : v.x()));
+  res.y() = (unsigned char) ((v.y() > 255.f) ? 255.f : (v.y() < 0.f ? 0.f : v.y()));
+  res.z() = (unsigned char) ((v.z() > 255.f) ? 255.f : (v.z() < 0.f ? 0.f : v.z()));
+  res.w() = (unsigned char) ((v.w() > 255.f) ? 255.f : (v.w() < 0.f ? 0.f : v.w()));
   return res;
 }
 
@@ -52,9 +52,11 @@ float ran1(int idum, int *iv, sycl::nd_item<1> &item)
       idum += IM;
 
     if(j < NTAB)
-      iv[NTAB* tid + j] = idum;
+      //iv[NTAB* tid + j] = idum;
+      iv[NTAB * j + tid] = idum;
   }
-  iy = iv[NTAB* tid];
+  //iy = iv[NTAB* tid];
+  iy = iv[tid];
 
   k = idum / IQ;
   idum = IA * (idum - k * IQ) - IR * k;
@@ -63,7 +65,8 @@ float ran1(int idum, int *iv, sycl::nd_item<1> &item)
     idum += IM;
 
   j = iy / NDIV;
-  iy = iv[NTAB * tid + j];
+  //iy = iv[NTAB * tid + j];
+  iy = iv[NTAB * j + tid];
   return (AM * iy);  //AM *iy will be between 0.0 and 1.0
 }
 
