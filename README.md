@@ -166,6 +166,7 @@ Some host programs contain platform-specific intrinsics, so they may cause compi
 When double-precision floating-point operations are not supported on certain Intel GPU devices, software emulation may be enabled. [FP64 emulation](https://github.com/intel/compute-runtime/blob/master/opencl/doc/FAQ.md#feature-double-precision-emulation-fp64)
 
 # Feedback from the papers
+Schäffeler, J., 2025. Comparing Application Performance across GPU Programming Models.
 
 Bolet, G., Georgakoudis, G., Menon, H., Parasyris, K., Hasabnis, N., Estes, H., Cameron, K.W. and Oren, G., 2025. Can Large Language Models Predict Parallel Code Performance?. arXiv preprint arXiv:2505.03988.
 
