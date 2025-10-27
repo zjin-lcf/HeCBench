@@ -115,7 +115,6 @@ int main(int argc, char *argv[]) {
   int iter = max_iter;
   float thresh = threshold;
   int divisor = 2;
-  int nb_links = 0;
 
   int opt, opt_index = 0;
   while((opt = getopt_long(argc, argv, "::n:i:t:q:", size_opts, &opt_index)) != -1){
@@ -140,7 +139,7 @@ int main(int argc, char *argv[]) {
 
   size_t rank_size = (size_t)n * sizeof(float);
   size_t map_size = (size_t)n * n * sizeof(float);
-  size_t page_size = (size_t)n * n * sizeof(int);
+  //size_t page_size = (size_t)n * n * sizeof(int);
   size_t link_size = (size_t)n * sizeof(unsigned int);
 
   page_ranks = (float*)malloc(rank_size);
@@ -154,13 +153,6 @@ int main(int argc, char *argv[]) {
   }
   pages = random_pages(n,noutlinks,divisor);
   init_array(page_ranks, n, 1.0f / (float) n);
-
-  nb_links = 0;
-  for (i=0; i<n; ++i) {
-    for (j=0; j<n; ++j) {
-      nb_links += pages[(size_t)i*n+j];
-    }
-  }
 
   float *diffs;
   diffs  = (float*) malloc(rank_size);
