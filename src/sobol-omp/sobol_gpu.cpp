@@ -49,7 +49,7 @@ int _ffs(const int x) {
 double sobolGPU(int repeat, int n_vectors, int n_dimensions, 
                 unsigned int *dir, float *out)
 {
-    const int threadsperblock = 64;
+    const int threadsperblock = 128;
 
     // This implementation of the generator outputs all the draws for
     // one dimension in a contiguous region of memory, followed by the
