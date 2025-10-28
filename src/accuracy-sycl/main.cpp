@@ -17,8 +17,8 @@ void accuracy_kernel(
     const int N,
     const int D,
     const int top_k,
-    const float* Xdata,
-    const int* labelData,
+    const float* __restrict Xdata,
+    const int* __restrict labelData,
     int* accuracy)
 {
   int count = 0;
