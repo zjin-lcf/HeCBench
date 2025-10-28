@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <type_traits>
 #include "common.h"
+#include "verify.h"
 
 #define CHECK_CUDA(func)                                                       \
 {                                                                              \
@@ -120,7 +121,7 @@ __global__ void qdq_mxfp4_kernel(const float_type* inp, float_type* out) {
     // Each thread handles a single value, thus applying `shfl_xor` 5 times.
     // (Max over 2**5 = 32 values).
     for (int i = 1; i < 32; i*=2) {
-        block_max = __hmax(block_max, __habs(shfl_xor_bf16_or_half(block_max, i)));
+        block_max = __hmax(block_max, shfl_xor_bf16_or_half(block_max, i));
     }
 
     // Apply rounding strategy to block_max.
@@ -176,7 +177,8 @@ void mxfp4(T* y, const T* a, int numel, int niters, int group_size=32) {
   double time = std::chrono::duration_cast<std::chrono::microseconds>
                 (end - start).count() / niters / 1.0e6;
   double size = 2.0 * sizeof(T) * numel / 1.0e9;
-  printf("size(GB):%.2f, average time(sec):%f, BW:%f\n", size, time, size / time);
+  printf("size(GB):%.2f, average time(sec):%f, Bandwidth (GB/sec):%f\n",
+         size, time, size / time);
 }
 
 
@@ -191,17 +193,24 @@ void mxfp4_sim(int numel, int niters)
     return;
   }
 
-  srand(123);
-  const float v[] = {0.0, 0.5, 1.0, 1.5, 2, 3, 4, 6,
-                     -0.5, -1.0, -1.5, -2, -3, -4, -6,
-                     0.25, 0.75, 1.25, 1.75, 2.5, 3.5, 5};
-
   size_t bytes = (size_t)numel * sizeof(T); 
   T *src, *dst;
   src = (T*) malloc (bytes);
   dst = (T*) malloc (bytes);
-  for (int i = 0; i < numel; i++) {
-    src[i] = v[rand() % (sizeof(v) / sizeof(v[0]))];
+
+  // basic functional test 
+  const float v[] = {0.0, 0.5, 1.0, 1.5, 2, 3, 4,
+                     -0.0, -0.5, -1.0, -1.5, -2, -3, -4,
+                     0.25, 0.75, 1.25, 1.75, 2.5, 3.5, 5,
+                     0.1, 0.3, 0.4, 0.6, 0.9,
+                     -0.1, -0.3, -0.4, -0.6, -0.9};
+
+  srand(123);
+  for (int i = 0; i < numel / 32; i++) {
+    for (int j = i*32; j < (i+1)*32; j++)
+      src[j] = v[rand() % (sizeof(v) / sizeof(v[0]))];
+    int r = rand() % 32;
+    src[i*32 + r] = r < 16 ? 6 : -6;
   }
 
   T *d_src, *d_dst;
@@ -214,42 +223,7 @@ void mxfp4_sim(int numel, int niters)
 
   CHECK_CUDA(cudaMemcpy(dst, d_dst, bytes, cudaMemcpyDeviceToHost)); 
 
-  bool ok = true;
-  for (int i = 0; i < numel; i++) {
-    float s = src[i], d = dst[i]; 
-    if (s == 0.25) {
-      if (d != 0.f) {
-        printf("%f %f\n", s, d);
-        ok = false;
-      }
-    }
-    else if (s == 0.75f || s == 1.25f) {
-      if (d != 1.f) {
-        printf("%f %f\n", s, d);
-        ok = false;
-      }
-    }
-    else if (s == 1.75f || s == 2.5f) {
-      if (d != 2.f) {
-        printf("%f %f\n", s, d);
-        ok = false;
-      }
-    }
-    else if (s == 3.5f || s == 5.0f) {
-      if (d != 4.f) {
-        printf("%f %f\n", s, d);
-        ok = false;
-      }
-    }
-    else {
-      if (fabsf(s - d) > 1e-3f) {
-        printf("%f %f\n", s, d);
-        ok = false;
-      }
-    }
-    if (!ok) break;
-  }
-  printf("%s\n", ok ? "PASS" : "FAIL");
+  verify(src, dst, numel);
 
   free(src);
   free(dst);
