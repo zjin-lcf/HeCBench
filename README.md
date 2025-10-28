@@ -64,7 +64,7 @@ Each benchmark falls into a single category. While such classification is not ac
     extrema, fft, lombscargle, sosfil, zmddft
 
 ### Simulation
-    ace, adv, amgmk, axhelm, bh, bspline-vgh, burger, cooling, ccsd-trpdrv, che, chemv, chi2, clenergy, cmp, cobahh, d2q9_bgk, d3q19_bgk, damage, ddbp, dslash, easyWave, eikonal, fdtd3d, feynman-kac, fhd, fluidSim, gibbs, goulash, gpp, grrt, haccmk, halo-finder, heartwall, heat, heat2d, henry, hexicton, hotspot, hotspot3D, hpl, hwt1d, hypterm, ising, iso2dfd, laplace, laplace3d, lavaMD, lid-driven-cavity, logic-resim, logic-rewrite, loopback, lsqt, lulesh, mcmd, md, mdh, metropolis, miniFE, minimod, minisweep, miniWeather, multimaterial, myocte, nbody, particle-diffusion, particlefilter, particles, pathfinder, pns, projectile, pso, qem, rainflow, rayleighBenardConvection, reaction, rsbench, rtm8, rushlarsen, s3d, su3, sheath, simplemoc, slit, sparkler, sph, sw4ck, tensorT, testSNAP, tissue, tpacf, tqs, tridiagonal, tsa, vanGenuchten, vmc, wlcpow, wsm5, xlqc, xsbench
+    ace, adv, amgmk, axhelm, bh, bspline-vgh, burger, cooling, ccsd-trpdrv, che, chemv, chi2, clenergy, cmp, cobahh, d2q9_bgk, d3q19_bgk, damage, ddbp, dslash, easyWave, eikonal, fdtd3d, feynman-kac, fhd, fluidSim, gibbs, goulash, gpp, grrt, haccmk, halo-finder, heartwall, heat, heat2d, henry, hexicton, hotspot, hotspot3D, hpl, hwt1d, hypterm, ising, iso2dfd, laplace, laplace3d, lavaMD, lid-driven-cavity, logic-resim, logic-rewrite, loopback, lsqt, lulesh, mcmd, md, mdh, metropolis, miniFE, minimod, minisweep, miniWeather, multimaterial, mxfp4, myocte, nbody, particle-diffusion, particlefilter, particles, pathfinder, pns, projectile, pso, qem, rainflow, rayleighBenardConvection, reaction, rsbench, rtm8, rushlarsen, s3d, su3, sheath, simplemoc, slit, sparkler, sph, sw4ck, tensorT, testSNAP, tissue, tpacf, tqs, tridiagonal, tsa, vanGenuchten, vmc, wlcpow, wsm5, xlqc, xsbench
 
 ### Sorting
     bitonic-sort, hybridsort, is, merge, quicksort, radixsort, segsort, sort, sortKV, split, warpsort
@@ -1105,6 +1105,9 @@ Early results are shown [here](results/README.md)
 
 ### murmurhash3 (c)
   MurmurHash3 yields a 128-bit hash value (https://github.com/aappleby/smhasher/wiki/MurmurHash3)
+
+### mxfp4 (cuda)
+  Simulation of 4-bit floating-point numbers using 16-bit floating-point numbers (https://github.com/amd/Quark/)
 
 ### myocte (opencl)
   Myocte in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
