@@ -28,8 +28,8 @@ HIP_OBJECTS = $(HIP_SOURCES:$(HIP_PATH)/%.$(HIP_EXT)=$(BUILD_HIP_PATH)/%.o)
 DEPS = $(OBJECTS:.o=.d)
 
 # flags #
-COMPILE_FLAGS = -std=c++11 -Wall -Wextra -g
-HIPCC_COMPILE_FLAGS = -std=c++11 -g -O3 
+COMPILE_FLAGS = -std=c++17 -Wall -Wextra -g
+HIPCC_COMPILE_FLAGS = -std=c++17 -g -O3 
 INCLUDES = -I include/ -I /usr/local/include
 # Space-separated pkg-config libraries used by this project
 LIBS =
