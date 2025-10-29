@@ -24,7 +24,7 @@ obj = main.o device_sc.o host_sc.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../sc-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../sc-cuda
 
 # Linker Flags
 LDFLAGS = -lpthread

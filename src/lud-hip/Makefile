@@ -21,7 +21,7 @@ source = lud.cu ../lud-cuda/common/common.cpp
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../lud-cuda/common -I../lud-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../lud-cuda/common -I../lud-cuda
 
 # Linker Flags
 LDFLAGS = 

@@ -21,7 +21,7 @@ obj = main.o io.o process.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../cm-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../cm-cuda
 
 # Linker Flags
 LDFLAGS = 

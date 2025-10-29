@@ -26,7 +26,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -I$(MPI_ROOT)/include -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I$(MPI_ROOT)/include -Wall
 
 # Linker Flags
 LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lrccl

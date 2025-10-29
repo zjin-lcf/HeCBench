@@ -28,7 +28,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../xsbench-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../xsbench-cuda
 
 # Linker Flags
 LDFLAGS = -lm

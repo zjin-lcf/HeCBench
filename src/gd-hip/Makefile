@@ -21,7 +21,7 @@ obj = main.o utils.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../gd-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../gd-cuda
 
 # Linker Flags
 LDFLAGS = 

@@ -25,7 +25,7 @@ obj = kernel.o fim.o StructuredEikonal.o \
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../eikonal-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../eikonal-cuda
 
 # Linker Flags
 LDFLAGS = 

@@ -23,7 +23,7 @@ obj = main.o reference.o su_cdp.o su_gather.o su_trace.o log.o parser.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I$(inc)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I$(inc)
 
 # Linker Flags
 LDFLAGS = 

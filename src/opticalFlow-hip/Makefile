@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -I../opticalFlow-cuda/Common \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I../opticalFlow-cuda/Common \
           -Wall
 
 # Linker Flags

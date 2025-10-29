@@ -23,7 +23,7 @@ obj = main.o kernels.o utils.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../spmv-cuda \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../spmv-cuda \
           -I/opt/rocm/include/hipsparse
 
 # Linker Flags

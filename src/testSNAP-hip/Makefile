@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I. -I../testSNAP-omp \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I. -I../testSNAP-omp \
           -DREFDATA_TWOJ=14
 
 # Linker Flags

@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../softmax-online-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../softmax-online-cuda
 
 # Linker Flags
 LDFLAGS = 

@@ -27,7 +27,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -I$(MPI_ROOT)/include -DOMPI_SKIP_MPICXX= \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I$(MPI_ROOT)/include -DOMPI_SKIP_MPICXX= \
           -Wall
 
 # Linker Flags

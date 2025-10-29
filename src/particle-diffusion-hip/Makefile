@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../particle-diffusion-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../particle-diffusion-cuda
 
 # Linker Flags
 LDFLAGS = 

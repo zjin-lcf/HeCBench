@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -fopenmp -Wall -I../openmp-omp
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -fopenmp -Wall -I../openmp-omp
 
 # Linker Flags
 LDFLAGS = 
