@@ -7,8 +7,8 @@ void moeSoftmax(
     sycl::range<3> &gws,
     sycl::range<3> &lws,
     const int slm_size,
-    const float* input,
-    const bool* finished,
+    const float* __restrict__ input,
+    const bool* __restrict__ finished,
     float* output,
     const int num_cols)
 {
@@ -85,9 +85,9 @@ void moeTopK(
     sycl::range<3> &gws,
     sycl::range<3> &lws,
     const int slm_size,
-    const float* inputs_after_softmax,
-    const bool* finished,
-    float* output,
+    const float* __restrict__ inputs_after_softmax,
+    const bool* __restrict__ finished,
+    float* __restrict__ output,
     int* __restrict__ indices,
     int* __restrict__ source_rows,
     const int num_experts,
