@@ -25,7 +25,7 @@ header = src/gate/*.h src/parser/*.h \
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall \
           -Isrc/gate -Isrc/parser -Isrc/sim -Isrc/util -Isrc/wave
 
 # Linker Flags

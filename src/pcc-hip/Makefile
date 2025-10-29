@@ -23,7 +23,7 @@ obj = main.o device.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../pcc-cuda -I /opt/rocm/include/hipblas
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../pcc-cuda -I /opt/rocm/include/hipblas
 
 # Linker Flags
 LDFLAGS = -lhipblas

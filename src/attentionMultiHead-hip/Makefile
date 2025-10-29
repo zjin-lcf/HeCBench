@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -fopenmp -I../attentionMultiHead-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fopenmp -I../attentionMultiHead-cuda
 
 # Linker Flags
 LDFLAGS = 

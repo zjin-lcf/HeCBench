@@ -28,7 +28,7 @@ obj = $(source:.cu=.o)
 # The Thrust include path (-I<thrust repo root>)
 # The CUB include path, if using the CUDA device system (-I<thrust repo root>/dependencies/cub/)
 
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
 
 # Linker Flags
 LDFLAGS = 

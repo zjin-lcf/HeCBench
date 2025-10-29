@@ -23,7 +23,7 @@ obj = main.o wc.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -DTHRUST_DEVICE_SYSTEM=4 # 4 is for CPP
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -DTHRUST_DEVICE_SYSTEM=4 # 4 is for CPP
 
 # Linker Flags
 LDFLAGS = 

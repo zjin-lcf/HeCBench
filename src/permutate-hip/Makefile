@@ -37,7 +37,7 @@ obj = main.o permutation_testing.o utils.o statistical_test.o \
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++14 -Wall -I../permutate-cuda
+CFLAGS := -std=c++17 -Wall -I../permutate-cuda
 
 # Linker Flags
 LDFLAGS = 

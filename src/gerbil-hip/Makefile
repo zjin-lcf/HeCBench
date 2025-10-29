@@ -42,7 +42,7 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++11 -Wall -fpermissive -DGPU \
           -DBOOST_REGEX_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -DBOOST_THREAD_DYN_LINK \
 	  -I/opt/rocm/include -D__HIP_PLATFORM_AMD__
 
-HIPCCFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -DGPU
+HIPCCFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -DGPU
 
 # Linker Flags
 LDFLAGS = -lboost_system -lboost_thread -lboost_regex -lboost_filesystem \

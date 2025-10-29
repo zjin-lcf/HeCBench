@@ -24,7 +24,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -fopenmp -I../logprob-cuda/
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fopenmp -I../logprob-cuda/
 
 # Linker Flags
 LDFLAGS =

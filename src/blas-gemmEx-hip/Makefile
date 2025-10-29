@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../blas-gemmEx-cuda \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../blas-gemmEx-cuda \
           -I/opt/rocm/include/hipblas
 
 # Linker Flags

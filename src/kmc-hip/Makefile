@@ -21,7 +21,7 @@ obj = main.o svm.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -Wno-unused-result -I../kmc-cuda \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -Wno-unused-result -I../kmc-cuda \
           -I/opt/rocm/include/hipblas
 
 # Linker Flags

@@ -21,7 +21,7 @@ obj = main.o bwt.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../include -I../bwt-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I../bwt-cuda
 
 # Linker Flags
 LDFLAGS = 

@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../slit-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../slit-cuda
 
 # Linker Flags
 LDFLAGS = -lhipfft

@@ -30,7 +30,7 @@ CFLAGS := -DNX=400 \
 	  -DSIM_TIME=600 \
 	  -DDATA_SPEC=DATA_SPEC_THERMAL \
           -I$(MPI_INCLUDE) \
-          -std=c++14 -Wall \
+          -std=c++17 -Wall \
           -I../miniWeather-cuda
 
 # Linker Flags

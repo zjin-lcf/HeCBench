@@ -21,7 +21,7 @@ obj = main.o meshBasis.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -Ddfloat=float -Ddlong=int \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -Ddfloat=float -Ddlong=int \
           -I../axhelm-cuda
 
 # Linker Flags
