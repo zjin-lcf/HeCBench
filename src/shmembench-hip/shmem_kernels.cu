@@ -26,17 +26,11 @@ __device__ float4 init_val(int i){
 }
 
 __device__ float4 reduce_vector(float4 v1, float4 v2, float4 v3, float4 v4, float4 v5, float4 v6){
-  return make_float4(v1.x + v2.x + v3.x + v4.x + v5.x + v6.x, 
-                     v1.y + v2.y + v3.y + v4.y + v5.y + v6.y,
-                     v1.z + v2.z + v3.z + v4.z + v5.z + v6.z,
-                     v1.w + v2.w + v3.w + v4.w + v5.w + v6.w);
+  return (v1 + v2 + v3 + v4 + v5 + v6);
 }
 
 __device__ void set_vector(float4 *target, int offset, float4 v){
-  target[offset].x = v.x;
-  target[offset].y = v.y;
-  target[offset].z = v.z;
-  target[offset].w = v.w;
+  target[offset] = v;
 }
 
 
@@ -87,8 +81,10 @@ void shmembenchGPU(double *c, const long size, const int n) {
   dim3 dimGrid_f4(TOTAL_BLOCKS/4, 1, 1);
 
   auto start = high_resolution_clock::now();
+
   for (int i = 0; i < n; i++)
-    hipLaunchKernelGGL(benchmark_shmem, dim3(dimGrid_f4), dim3(dimBlock), 0, 0, (float4*)cd);
+    benchmark_shmem<<< dimGrid_f4, dimBlock >>>((float4*)cd);
+
   hipDeviceSynchronize();
   auto end = high_resolution_clock::now();
   auto time_shmem_128b = duration_cast<nanoseconds>(end - start).count() / (double)n;
