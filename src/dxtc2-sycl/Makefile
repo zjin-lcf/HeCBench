@@ -18,19 +18,19 @@ HIP_ARCH  = gfx908
 #===============================================================================
 # Program name & source code list
 #===============================================================================
+SPATH = ../boxfilter-sycl
 
 program = main
 
-source = main.cpp shrUtils.cpp block.cpp 
-
-obj = $(source:.cpp=.o)
+obj = main.o shrUtils.o block.o 
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl \
+          -I$(SPATH) --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS_TMP := $(CFLAGS)
@@ -74,10 +74,10 @@ $(program): $(obj)
 block.o: block.cpp block.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o : main.cpp kernel.cpp shrUtils.h
+main.o : main.cpp kernel.cpp $(SPATH)/shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-shrUtils.o : shrUtils.cpp shrUtils.h 
+shrUtils.o : $(SPATH)/shrUtils.cpp $(SPATH)/shrUtils.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

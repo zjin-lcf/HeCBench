@@ -1,10 +1,10 @@
-#include <iostream>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <chrono>
-#include <math.h>
+#include <iostream>
 #include <omp.h>
 
 #define POLYNOMIAL_DEGREE  7

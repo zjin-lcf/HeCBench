@@ -64,116 +64,11 @@ inline __device__ __host__ float3 firstEigenVector(float matrix[6]) {
   return v;
 }
 
-inline __device__ void colorSums(const float3 *colors, float3 *sums) {
-  const int idx = threadIdx.x;
-
-  sums[idx] = colors[idx];
-  sums[idx] += sums[idx ^ 8];
-  sums[idx] += sums[idx ^ 4];
-  sums[idx] += sums[idx ^ 2];
-  sums[idx] += sums[idx ^ 1];
-}
-
-inline __device__ float3 bestFitLine(const float3 *colors, float3 color_sum)
-{
-  // Compute covariance matrix of the given colors.
-  const int idx = threadIdx.x;
-
-  float3 diff = colors[idx] - color_sum * (1.0f / 16.0f);
-
-  // @@ Eliminate two-way bank conflicts here.
-  // @@ It seems that doing that and unrolling the reduction doesn't help...
-  __shared__ float covariance[16 * 6];
-
-  covariance[6 * idx + 0] = diff.x * diff.x;  // 0, 6, 12, 2, 8, 14, 4, 10, 0
-  covariance[6 * idx + 1] = diff.x * diff.y;
-  covariance[6 * idx + 2] = diff.x * diff.z;
-  covariance[6 * idx + 3] = diff.y * diff.y;
-  covariance[6 * idx + 4] = diff.y * diff.z;
-  covariance[6 * idx + 5] = diff.z * diff.z;
-
-  for (int d = 8; d > 0; d >>= 1) {
-    if (idx < d) {
-      covariance[6 * idx + 0] += covariance[6 * (idx + d) + 0];
-      covariance[6 * idx + 1] += covariance[6 * (idx + d) + 1];
-      covariance[6 * idx + 2] += covariance[6 * (idx + d) + 2];
-      covariance[6 * idx + 3] += covariance[6 * (idx + d) + 3];
-      covariance[6 * idx + 4] += covariance[6 * (idx + d) + 4];
-      covariance[6 * idx + 5] += covariance[6 * (idx + d) + 5];
-    }
-  }
-
-  // Compute first eigen vector.
-  return firstEigenVector(covariance);
-}
-
 template <class T>
 __device__ inline void swap(T &a, T &b) {
   T tmp = a;
   a = b;
   b = tmp;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Sort colors
-////////////////////////////////////////////////////////////////////////////////
-__device__ void sortColors(const float *values, int *ranks) {
-  const int tid = threadIdx.x;
-
-  int rank = 0;
-
-#pragma unroll
-
-  for (int i = 0; i < 16; i++) {
-    rank += (values[i] < values[tid]);
-  }
-
-  ranks[tid] = rank;
-
-  // Resolve elements with the same index.
-  for (int i = 0; i < 15; i++) {
-    if (tid > i && ranks[tid] == ranks[i]) {
-      ++ranks[tid];
-    }
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Load color block to shared mem
-////////////////////////////////////////////////////////////////////////////////
-__device__ void loadColorBlock(const uint *image, float3 colors[16],
-                               float3 sums[16], int xrefs[16], int blockOffset)
-{
-  const int bid = blockIdx.x + blockOffset;
-  const int idx = threadIdx.x;
-
-  __shared__ float dps[16];
-
-  float3 tmp;
-
-  if (idx < 16) {
-    // Read color and copy to shared mem.
-    uint c = image[(bid)*16 + idx];
-
-    colors[idx].x = ((c >> 0) & 0xFF) * (1.0f / 255.0f);
-    colors[idx].y = ((c >> 8) & 0xFF) * (1.0f / 255.0f);
-    colors[idx].z = ((c >> 16) & 0xFF) * (1.0f / 255.0f);
-
-    // Sort colors along the best fit line.
-    colorSums(colors, sums);
-
-    float3 axis = bestFitLine(colors, sums[0]);
-
-    dps[idx] = colors[idx].x * axis.x + 
-               colors[idx].y * axis.y +
-               colors[idx].z * axis.z;
-
-    sortColors(dps, xrefs);
-
-    tmp = colors[idx];
-
-    colors[xrefs[idx]] = tmp;
-  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -468,13 +363,90 @@ __global__ void compress(const uint *permutations, const uint *image,
   cg::thread_block cta = cg::this_thread_block();
 
   const int idx = threadIdx.x;
+  const int bid = blockIdx.x + blockOffset;
 
+  __shared__ float3 sums;
   __shared__ float3 colors[16];
-  __shared__ float3 sums[16];
   __shared__ int xrefs[16];
+  __shared__ float dps[16];
+  __shared__ float covariance[16 * 6];
 
-  loadColorBlock(image, colors, sums, xrefs, blockOffset);
+  if (idx < 16) {
+    // Read color and copy to shared mem.
+    uint c = image[(bid)*16 + idx];
 
+    colors[idx].x = ((c >> 0) & 0xFF) * (1.0f / 255.0f);
+    colors[idx].y = ((c >> 8) & 0xFF) * (1.0f / 255.0f);
+    colors[idx].z = ((c >> 16) & 0xFF) * (1.0f / 255.0f);
+  }
+
+  cg::sync(cta);
+
+  if (idx == 0) {
+    sums = colors[0];
+    for (int i = 1; i < 16; i++)
+      sums += colors[i];
+  }
+
+  cg::sync(cta);
+
+  if (idx < 16) {
+    // Sort colors along the best fit line.
+    float3 diff = colors[idx] - sums * (1.0f / 16.0f);
+    covariance[6 * idx + 0] = diff.x * diff.x;  // 0, 6, 12, 2, 8, 14, 4, 10, 0
+    covariance[6 * idx + 1] = diff.x * diff.y;
+    covariance[6 * idx + 2] = diff.x * diff.z;
+    covariance[6 * idx + 3] = diff.y * diff.y;
+    covariance[6 * idx + 4] = diff.y * diff.z;
+    covariance[6 * idx + 5] = diff.z * diff.z;
+  }
+
+  cg::sync(cta);
+
+  for (int d = 8; d > 0; d >>= 1) {
+    if (idx < d) {
+      covariance[6 * idx + 0] += covariance[6 * (idx + d) + 0];
+      covariance[6 * idx + 1] += covariance[6 * (idx + d) + 1];
+      covariance[6 * idx + 2] += covariance[6 * (idx + d) + 2];
+      covariance[6 * idx + 3] += covariance[6 * (idx + d) + 3];
+      covariance[6 * idx + 4] += covariance[6 * (idx + d) + 4];
+      covariance[6 * idx + 5] += covariance[6 * (idx + d) + 5];
+    }
+    cg::sync(cta);
+  }
+   
+  if (idx < 16) {
+    // Compute first eigen vector.
+    float3 axis = firstEigenVector(covariance);
+
+    dps[idx] = colors[idx].x * axis.x + 
+               colors[idx].y * axis.y +
+               colors[idx].z * axis.z;
+  }
+  cg::sync(cta);
+
+  if (idx < 16) {
+    int rank = 0;
+    #pragma unroll
+    for (int i = 0; i < 16; i++) {
+      rank += (dps[i] < dps[idx]);
+    }
+  
+    xrefs[idx] = rank;
+  }
+  cg::sync(cta);
+  
+  // Resolve elements with the same index.
+  for (int i = 0; i < 15; i++) {
+    if (idx < 16 && idx > i && xrefs[idx] == xrefs[i]) {
+      ++xrefs[idx];
+    }
+    cg::sync(cta);
+  }
+  
+  if (idx < 16) {
+    colors[xrefs[idx]] = colors[idx];
+  }
   cg::sync(cta);
 
   ushort bestStart, bestEnd;
@@ -483,7 +455,7 @@ __global__ void compress(const uint *permutations, const uint *image,
   __shared__ float errors[NUM_THREADS];
 
   evalAllPermutations(colors, permutations, bestStart, bestEnd, bestPermutation,
-                      errors, sums[0], cta);
+                      errors, sums, cta);
 
   // Use a parallel reduction to find minimum error.
   const int minIdx = findMinError(errors, cta);
@@ -606,7 +578,7 @@ int main(int argc, char **argv) {
 
   // Load input image.
   unsigned char *data = NULL;
-  uint W, H;
+  uint w, h;
 
   const char *image_path = argv[1];
 
@@ -614,14 +586,22 @@ int main(int argc, char **argv) {
 
   const int numIterations = atoi(argv[3]);
 
-  if (!shrLoadPPM4ub(image_path, (unsigned char **)&data, &W, &H)) {
-
-    printf("Error, unable to open source image file <%s>\n", image_path);
-
+  if (!shrLoadPPM4ub(image_path, (unsigned char **)&data, &w, &h)) {
+    printf("Error: unable to open source image file <%s>\n", image_path);
     exit(EXIT_FAILURE);
   }
 
-  uint w = W, h = H;
+  if (w % 4 != 0 || h % 4 != 0) {
+    printf("Error: the image dimensions must be a multiple of 4.\n");
+    free(data);
+    exit(EXIT_FAILURE);
+  }
+
+  if (w > 16384 || h > 16384) {
+    printf("Error: the image dimensions exceed the maximum values.\n");
+    free(data);
+    exit(EXIT_FAILURE);
+  }
 
   printf("Image Loaded '%s', %d x %d pixels\n\n", image_path, w, h);
 
@@ -637,7 +617,7 @@ int main(int argc, char **argv) {
         const int x = i & 3;
         const int y = i / 4;
         block_image[(by * w / 4 + bx) * 16 + i] =
-            ((uint *)data)[(by * 4 + y) * 4 * (W / 4) + bx * 4 + x];
+            ((uint *)data)[(by * 4 + y) * 4 * (w / 4) + bx * 4 + x];
       }
     }
   }
@@ -667,8 +647,7 @@ int main(int argc, char **argv) {
 
   // Determine launch configuration and run timed computation numIterations
   // times
-  uint blocks = ((w + 3) / 4) *
-                ((h + 3) / 4);  // rounds up by 1 block in each dim if %4 != 0
+  uint blocks = w / 4 * h / 4;
 
   // Restrict the numbers of blocks to launch on low end GPUs to avoid kernel
   // timeout
@@ -747,7 +726,7 @@ int main(int argc, char **argv) {
   }
 
   fseek(fp, sizeof(DDSHeader), SEEK_SET);
-  uint referenceSize = (W / 4) * (H / 4) * 8;
+  uint referenceSize = (w / 4) * (h / 4) * 8;
   uint *reference = (uint *)malloc(referenceSize);
   fread(reference, referenceSize, 1, fp);
   fclose(fp);
@@ -757,7 +736,7 @@ int main(int argc, char **argv) {
 
   for (uint y = 0; y < h; y += 4) {
     for (uint x = 0; x < w; x += 4) {
-      uint referenceBlockIdx = ((y / 4) * (W / 4) + (x / 4));
+      uint referenceBlockIdx = ((y / 4) * (w / 4) + (x / 4));
       uint resultBlockIdx = ((y / 4) * (w / 4) + (x / 4));
 
       int cmp = compareBlock(((BlockDXT1 *)h_result) + resultBlockIdx,
@@ -784,7 +763,7 @@ int main(int argc, char **argv) {
   free(reference);
 
   printf("RMS(reference, result) = %f\n\n", rms);
-  printf(rms <= ERROR_THRESHOLD ? "Test passed\n" : "Test failed!\n");
+  printf(rms <= ERROR_THRESHOLD ? "PASS\n" : "FAIL\n");
   /* Return zero if test passed, one otherwise */
   return rms > ERROR_THRESHOLD;
 }

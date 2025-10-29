@@ -13,18 +13,14 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = lud
-
-source = lud.cpp common.cpp
-
-obj = $(source:.cpp=.o)
+program = main
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -I./common -std=c++14 -Wall 
+CFLAGS := $(EXTRA_CFLAGS) -I../lud-cuda/common -std=c++14 -Wall 
 
 # Linker Flags
 LDFLAGS = 
@@ -49,8 +45,8 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): lud.cpp ./common/common.c ./common/common.h Makefile
-	$(CC) $(CFLAGS) lud.cpp ./common/common.c -o $@ $(LDFLAGS)
+$(program): lud.cpp ../lud-cuda/common/common.cpp ../lud-cuda/common/common.h
+	$(CC) $(CFLAGS) lud.cpp ../lud-cuda/common/common.cpp -o $@ $(LDFLAGS)
 
 clean:
 	rm -rf $(program) 

@@ -15,9 +15,7 @@ LAUNCHER  =
 
 program = main
 
-source = main.cu utils.cu
-
-obj = $(source:.cu=.o)
+obj = main.o utils.o
 
 #===============================================================================
 # Sets Flags
@@ -48,7 +46,10 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu utils.h
+utils.o: utils.cpp utils.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+main.o: main.cu utils.h reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

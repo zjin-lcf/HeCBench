@@ -46,11 +46,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../atomicIntrinsics-cuda/reference.h kernel.h Makefile
+%.o: %.cu ../atomicIntrinsics-cuda/reference.h \
+          ../atomicIntrinsics-cuda/kernel.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 100
+	$(LAUNCHER) ./$(program) 27 100

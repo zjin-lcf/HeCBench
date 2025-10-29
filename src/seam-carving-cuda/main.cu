@@ -16,11 +16,22 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#define CUDA_CHECK(call)                                                    \
+do {                                                                        \
+    cudaError_t err_ = call;                                                \
+    if (err_ != cudaSuccess) {                                              \
+        fprintf(stderr, "CUDA error at %s:%d code=%d(%s) \"%s\" \n",        \
+                __FILE__, __LINE__, err_, cudaGetErrorString(err_), #call); \
+        exit(EXIT_FAILURE);                                                 \
+    }                                                                       \
+} while (0)
+
+
 int main(int argc, char **argv) {
   if(argc < 3){
     printf("Usage: %s <file> <number of seams to remove> [options]\n"
-        "valid options:\n-u\tupdate costs instead of recomputing them\n"
-        "-a\tapproximate computation\n", argv[0]);
+           "valid options:\n-u\tupdate costs instead of recomputing them\n"
+           "-a\tapproximate computation\n", argv[0]);
     return 1;
   }
 
@@ -34,7 +45,8 @@ int main(int argc, char **argv) {
   int w, h, ncomp;
   unsigned char* imgv = stbi_load(argv[1], &w, &h, &ncomp, 0);
   if(imgv == NULL){
-    printf("ERROR: can't load image \"%s\" (maybe the file does not exist?), exiting.\n", argv[1]);
+    printf("ERROR: can't load image \"%s\", exiting.\n", argv[1]);
+    printf("Reason: %s\n", stbi_failure_reason());
     return 1;
   }
 
@@ -59,7 +71,7 @@ int main(int argc, char **argv) {
       mode = SEAM_CARVER_APPROX_MODE;
       printf("approximation mode selected.\n");
     }
-    else{    
+    else{
       printf("an invalid option was specified and will be ignored. Valid options are: -u, -a.\n");
     }
   }
@@ -68,7 +80,7 @@ int main(int argc, char **argv) {
 
   int current_w = w;
   uchar4 *h_pixels = build_pixels(imgv, w, h);
-  const int img_bytes = w * h * sizeof(uchar4);
+  const size_t img_bytes = (size_t)w * h * sizeof(uchar4);
   const int cost_bytes = w * h * sizeof(short);
   const int h_bytes = h * sizeof(int);
   const int w_bytes = w * sizeof(int);
@@ -87,17 +99,17 @@ int main(int argc, char **argv) {
   int *d_M;
 
   if(mode != SEAM_CARVER_APPROX_MODE) {
-    cudaMalloc((void**)&d_costs_left, cost_bytes); 
-    cudaMalloc((void**)&d_costs_up, cost_bytes); 
-    cudaMalloc((void**)&d_costs_right, cost_bytes); 
+    CUDA_CHECK(cudaMalloc((void**)&d_costs_left, cost_bytes));
+    CUDA_CHECK(cudaMalloc((void**)&d_costs_up, cost_bytes));
+    CUDA_CHECK(cudaMalloc((void**)&d_costs_right, cost_bytes));
   }
   if(mode == SEAM_CARVER_UPDATE_MODE){
-    cudaMalloc((void**)&d_costs_swap_left, cost_bytes); 
-    cudaMalloc((void**)&d_costs_swap_up, cost_bytes); 
-    cudaMalloc((void**)&d_costs_swap_right, cost_bytes);
+    CUDA_CHECK(cudaMalloc((void**)&d_costs_swap_left, cost_bytes));
+    CUDA_CHECK(cudaMalloc((void**)&d_costs_swap_up, cost_bytes));
+    CUDA_CHECK(cudaMalloc((void**)&d_costs_swap_right, cost_bytes));
   }
   //sum map in approx mode
-  cudaMalloc((void**)&d_M, img_bytes); 
+  CUDA_CHECK(cudaMalloc((void**)&d_M, img_bytes));
 
   // rows to consider for reduce
   if(mode == SEAM_CARVER_APPROX_MODE)
@@ -106,22 +118,22 @@ int main(int argc, char **argv) {
     reduce_row = d_M + w*(h-1); //last row
 
   if(mode == SEAM_CARVER_APPROX_MODE){
-    cudaMalloc((void**)&d_index_map, img_bytes);
-    cudaMalloc((void**)&d_offset_map, img_bytes);
+    CUDA_CHECK(cudaMalloc((void**)&d_index_map, img_bytes));
+    CUDA_CHECK(cudaMalloc((void**)&d_offset_map, img_bytes));
   }
 
   int* indices = (int*)malloc(w_bytes);
   for(int i = 0; i < w; i++) indices[i] = i;
 
-  cudaMalloc((void**)&d_indices, w_bytes); 
+  CUDA_CHECK(cudaMalloc((void**)&d_indices, w_bytes));
 
-  cudaMalloc((void**)&d_indices_ref, w_bytes); 
-  cudaMemcpy(d_indices_ref, indices, w_bytes, cudaMemcpyHostToDevice);   
-  cudaMalloc((void**)&d_seam, h_bytes);    
+  CUDA_CHECK(cudaMalloc((void**)&d_indices_ref, w_bytes));
+  CUDA_CHECK(cudaMemcpy(d_indices_ref, indices, w_bytes, cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMalloc((void**)&d_seam, h_bytes));
 
-  cudaMalloc((void**)&d_pixels, img_bytes);
-  cudaMemcpy(d_pixels, h_pixels, img_bytes, cudaMemcpyHostToDevice);       
-  cudaMalloc((void**)&d_pixels_swap, img_bytes);
+  CUDA_CHECK(cudaMalloc((void**)&d_pixels, img_bytes));
+  CUDA_CHECK(cudaMemcpy(d_pixels, h_pixels, img_bytes, cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMalloc((void**)&d_pixels_swap, img_bytes));
 
   if(mode == SEAM_CARVER_UPDATE_MODE)
     compute_costs(current_w, w, h, d_pixels, d_costs_left, d_costs_up, d_costs_right);
@@ -151,7 +163,7 @@ int main(int argc, char **argv) {
     std::swap(d_pixels, d_pixels_swap);
 
     if(mode == SEAM_CARVER_UPDATE_MODE){
-      update_costs(current_w, w, h, d_M, d_pixels, 
+      update_costs(current_w, w, h, d_M, d_pixels,
                    d_costs_left, d_costs_up, d_costs_right,
                    d_costs_swap_left, d_costs_swap_up, d_costs_swap_right, d_seam );
       std::swap(d_costs_left, d_costs_swap_left);
@@ -163,41 +175,42 @@ int main(int argc, char **argv) {
     num_iterations++;
   }
 
-  cudaDeviceSynchronize();
+  CUDA_CHECK(cudaDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   float time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Execution time of seam carver kernels: %f (ms)\n", time * 1e-6f);
 
-  cudaMemcpy(h_pixels, d_pixels, img_bytes, cudaMemcpyDeviceToHost);
-  unsigned char* output = flatten_pixels(h_pixels, w, h, current_w); 
+  CUDA_CHECK(cudaMemcpy(h_pixels, d_pixels, img_bytes, cudaMemcpyDeviceToHost));
+  unsigned char* output = flatten_pixels(h_pixels, w, h, current_w);
   printf("Image resized\n");
 
   printf("Saving in resized.bmp...\n");
   int success = stbi_write_bmp("resized.bmp", current_w, h, 3, output);
   printf("%s\n", success ? "Success" : "Failed");
 
-  cudaFree(d_pixels);
-  cudaFree(d_pixels_swap);
+  CUDA_CHECK(cudaFree(d_pixels));
+  CUDA_CHECK(cudaFree(d_pixels_swap));
   if(mode != SEAM_CARVER_APPROX_MODE){
-    cudaFree(d_costs_left);
-    cudaFree(d_costs_up);
-    cudaFree(d_costs_right);
+    CUDA_CHECK(cudaFree(d_costs_left));
+    CUDA_CHECK(cudaFree(d_costs_up));
+    CUDA_CHECK(cudaFree(d_costs_right));
   }
   if(mode == SEAM_CARVER_UPDATE_MODE){
-    cudaFree(d_costs_swap_left);
-    cudaFree(d_costs_swap_up);
-    cudaFree(d_costs_swap_right);
+    CUDA_CHECK(cudaFree(d_costs_swap_left));
+    CUDA_CHECK(cudaFree(d_costs_swap_up));
+    CUDA_CHECK(cudaFree(d_costs_swap_right));
   }
-  cudaFree(d_M); 
-  cudaFree(d_indices); 
-  cudaFree(d_indices_ref); 
-  cudaFree(d_seam);
+  CUDA_CHECK(cudaFree(d_M));
+  CUDA_CHECK(cudaFree(d_indices));
+  CUDA_CHECK(cudaFree(d_indices_ref));
+  CUDA_CHECK(cudaFree(d_seam));
   if(mode == SEAM_CARVER_APPROX_MODE){
-    cudaFree(d_index_map);
-    cudaFree(d_offset_map);
+    CUDA_CHECK(cudaFree(d_index_map));
+    CUDA_CHECK(cudaFree(d_offset_map));
   }
   free(h_pixels);
-  free(output);   
+  free(output);
   free(indices);
+  free(imgv);
   return 0;
 }

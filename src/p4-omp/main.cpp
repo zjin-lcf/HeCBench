@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <omp.h>
 #include "params.h"
+#include "reference.h"
 
 #pragma omp declare target
 
@@ -31,6 +32,7 @@ void postprocess (
   const float *__restrict anchors,
   const float *__restrict anchor_bottom_heights,
         float *__restrict bndbox_output,
+        float *__restrict score_output,
         int *__restrict object_counter,
   const float min_x_range,
   const float max_x_range,
@@ -108,7 +110,7 @@ void postprocess (
     }
 
     bndbox_output[0] = resCount+1;
-    float *data = bndbox_output + 1 + resCount * 9;
+    float *data = bndbox_output + resCount * 9;
     data[0] = box_input[box_offset];
     data[1] = box_input[box_offset + 1];
     data[2] = box_input[box_offset + 2];
@@ -117,7 +119,8 @@ void postprocess (
     data[5] = box_input[box_offset + 5];
     data[6] = yaw;
     data[7] = dev_cls[0];
-    data[8] = dev_cls[1];
+    data[8] = box_offset;
+    score_output[resCount] = max_score;
   }
 }
 
@@ -151,12 +154,13 @@ int main(int argc, char* argv[])
   const int cls_size = feature_anchor_size * num_classes;
   const int box_size = feature_anchor_size * num_box_values;
   const int dir_cls_size = feature_anchor_size * num_dir_bins;
-  const int bndbox_size = feature_anchor_size * 9 + 1;
+  const int bndbox_size = feature_anchor_size * 9;
 
   const int cls_size_byte = cls_size * sizeof(float);
   const int box_size_byte = box_size * sizeof(float);
   const int dir_cls_size_byte = dir_cls_size * sizeof(float);
   const int bndbox_size_byte = bndbox_size * sizeof(float);
+  const int score_size_byte = feature_anchor_size * sizeof(float);
 
   // input of the post-process kernel
   float *cls_input = (float*) malloc (cls_size_byte);
@@ -165,6 +169,7 @@ int main(int argc, char* argv[])
 
   // output of the post-process kernel
   float *bndbox_output = (float*) malloc (bndbox_size_byte);
+  float *score_output = (float*) malloc (score_size_byte);
 
   const float *anchors = p.anchors;
   const float *anchor_bottom_heights = p.anchor_bottom_heights;
@@ -181,60 +186,81 @@ int main(int argc, char* argv[])
                                   anchors[0:num_anchors * len_per_anchor], \
                                   anchor_bottom_heights[0:num_classes]) \
                           map(alloc: box_input[0:box_size], object_counter[0:1]) \
-                          map(from: bndbox_output[0:bndbox_size])
+                          map(from: bndbox_output[0:bndbox_size], \
+                                    score_output[0:feature_anchor_size])
   {
      
-  double time = 0.0;
+    double time = 0.0;
 
-  for (int i = 0; i < repeat; i++) {
-    #pragma omp target update to (box_input[0:box_size])
+    for (int i = 0; i < repeat; i++) {
+      #pragma omp target update to (box_input[0:box_size])
 
-    object_counter[0] = 0;
-    #pragma omp target update to (object_counter[0:1])
+      object_counter[0] = 0;
+      #pragma omp target update to (object_counter[0:1])
 
-    auto start = std::chrono::steady_clock::now();
+      auto start = std::chrono::steady_clock::now();
 
-    #pragma omp target teams num_teams(feature_size) thread_limit(num_anchors)
-    {
-      #pragma omp parallel 
+      #pragma omp target teams num_teams(feature_size)
       {
-        postprocess(cls_input,
-                    box_input,
-                    dir_cls_input,
-                    anchors,
-                    anchor_bottom_heights,
-                    bndbox_output,
-                    object_counter,
-                    min_x_range,
-                    max_x_range,
-                    min_y_range,
-                    max_y_range,
-                    feature_x_size,
-                    feature_y_size,
-                    num_anchors,
-                    num_classes,
-                    num_box_values,
-                    score_thresh,
-                    dir_offset);
+        #pragma omp parallel num_threads(num_anchors)
+        {
+          postprocess(cls_input,
+                      box_input,
+                      dir_cls_input,
+                      anchors,
+                      anchor_bottom_heights,
+                      bndbox_output,
+                      score_output,
+                      object_counter,
+                      min_x_range,
+                      max_x_range,
+                      min_y_range,
+                      max_y_range,
+                      feature_x_size,
+                      feature_y_size,
+                      num_anchors,
+                      num_classes,
+                      num_box_values,
+                      score_thresh,
+                      dir_offset);
+        }
       }
+
+      auto end = std::chrono::steady_clock::now();
+      time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }
 
-    auto end = std::chrono::steady_clock::now();
-    time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average execution time of postprocess kernel: %f (us)\n", (time * 1e-3f) / repeat);
+
+    #pragma omp target update from (object_counter[0:1])
   }
 
-  printf("Average execution time of postprocess kernel: %f (us)\n", (time * 1e-3f) / repeat);
-
-  }
-
-  double checksum = 0.0;
-  for (int i = 0; i < bndbox_size; i++) checksum += bndbox_output[i];
-  printf("checksum = %lf\n", checksum / bndbox_size);
+  verify (object_counter[0],
+          cls_input,
+          box_input,
+          dir_cls_input,
+          p.anchors,
+          p.anchor_bottom_heights,
+          bndbox_output,
+          score_output,
+          min_x_range,
+          max_x_range,
+          min_y_range,
+          max_y_range,
+          feature_size,
+          feature_x_size,
+          feature_y_size,
+          num_anchors,
+          num_classes,
+          num_box_values,
+          score_thresh,
+          dir_offset);
 
   free(cls_input);
   free(box_input);
   free(dir_cls_input);
   free(bndbox_output);
+  free(score_output);
 
   return 0;
 }

@@ -15,10 +15,11 @@
 #define _SIMPLEATOMICS_KERNEL_H_
 
 template <class T>
-__global__ void testKernel(T *g_odata)
+__global__ void testKernel(T *g_odata, size_t len)
 {
     // access thread id
-    const int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    const size_t tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid >= len) return;
 
     // Atomic addition
     atomicAdd(&g_odata[0], (T)10);

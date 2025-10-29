@@ -5,6 +5,7 @@
 #include <sycl/sycl.hpp>
 #include "atomics.h"
 #include "utils.h"
+#include "reference.h"
 
 void L2_norm(sycl::queue &q,
              sycl::range<3> &gws,
@@ -204,8 +205,9 @@ int main(int argc, const char *argv[]) {
   printf("Training time takes %lf (s) for %d iterations\n\n",
          (train_end - train_start) * 1e-6, iters);
 
-  // After 100 iterations, the expected obj_val and train_error are 0.3358405828 and 0.07433331013
   printf("object value = %f train_error = %f\n", obj_val, train_error);
+
+  reference(A, x, grad, m, n, iters, alpha, lambda, obj_val, train_error);
 
   sycl::free(d_row_ptr, q);
   sycl::free(d_col_index, q);

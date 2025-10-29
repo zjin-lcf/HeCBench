@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <chrono>
 #include <cuda.h>
 
 #define BLOCK_SIZE 16
@@ -71,7 +71,7 @@ void ccsd_kernel(const double * __restrict__ f1n,    const double * __restrict__
   }
 }
 
-void ccsd_tengy_gpu(const double * __restrict__ f1n,    const double * __restrict__ f1t,
+long ccsd_tengy_gpu(const double * __restrict__ f1n,    const double * __restrict__ f1t,
                     const double * __restrict__ f2n,    const double * __restrict__ f2t,
                     const double * __restrict__ f3n,    const double * __restrict__ f3t,
                     const double * __restrict__ f4n,    const double * __restrict__ f4t,
@@ -129,6 +129,8 @@ void ccsd_tengy_gpu(const double * __restrict__ f1n,    const double * __restric
   cudaMemcpy(d_emp5k, &emp5k, sizeof(double), cudaMemcpyHostToDevice);
   cudaMemcpy(d_emp4k, &emp4k, sizeof(double), cudaMemcpyHostToDevice);
 
+  cudaDeviceSynchronize();
+  auto t0 = std::chrono::steady_clock::now();
 
   ccsd_kernel<<< dim3( (nvir+BLOCK_SIZE-1) / BLOCK_SIZE, (nvir+BLOCK_SIZE-1) / BLOCK_SIZE ), 
                  dim3( BLOCK_SIZE, BLOCK_SIZE ) >>> (
@@ -154,17 +156,9 @@ void ccsd_tengy_gpu(const double * __restrict__ f1n,    const double * __restric
         d_emp5k, 
         ncor, nocc, nvir);
 
-#ifdef DEBUG
-  // make the host block until the device is finished
   cudaDeviceSynchronize();
-
-  // check for error
-  cudaError_t error = cudaGetLastError();
-  if(error != cudaSuccess)
-  {
-    printf("CUDA error: %s\n", cudaGetErrorString(error));
-  }
-#endif
+  auto t1 = std::chrono::steady_clock::now();
+  long time = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
 
   cudaMemcpy(&emp5i, d_emp5i, sizeof(double), cudaMemcpyDeviceToHost);
   cudaMemcpy(&emp4i, d_emp4i, sizeof(double), cudaMemcpyDeviceToHost);
@@ -195,4 +189,5 @@ void ccsd_tengy_gpu(const double * __restrict__ f1n,    const double * __restric
   *emp4k_ = emp4k;
   *emp5i_ = emp5i;
   *emp5k_ = emp5k;
+  return time;
 }

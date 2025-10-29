@@ -79,6 +79,7 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cpp ../backprop-cuda/backprop.h \
+           ../backprop-cuda/reference.h \
 	   bpnn_adjust_weights.h bpnn_layerforward.h
 	$(CC) $(CFLAGS) -c $< -o $@
 

@@ -32,8 +32,8 @@ typedef struct __attribute__((__aligned__(16)))
 } float4;
 
 extern
-void BoxFilterHost( unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage, 
-                    unsigned int uiWidth, unsigned int uiHeight, int iRadius, float fScale );
+void BoxFilterHost( unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage,
+                    int uiWidth, int uiHeight, int iRadius, float fScale );
 
 
 const unsigned int RADIUS = 10;                    // initial radius of 2D box filter mask
@@ -102,8 +102,8 @@ inline void operator-=(float4 &a, float4 b)
 void BoxFilterGPU ( unsigned int *uiInput,
                     unsigned int *uiTmp,
                     unsigned int *uiDevOutput,
-                    const unsigned int uiWidth, 
-                    const unsigned int uiHeight, 
+                    const int uiWidth,
+                    const int uiHeight,
                     const int iRadius,
                     const float fScale,
                     const float iCycles )
@@ -116,7 +116,7 @@ void BoxFilterGPU ( unsigned int *uiInput,
     uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - iRadius;
 
   // Set team and thread sizes for row kernel // Workgroup padded left and right
-  const int uiBlockWidth = DivUp((size_t)uiWidth, (size_t)uiNumOutputPix);
+  const int uiBlockWidth = DivUp(uiWidth, uiNumOutputPix);
   const int numTeams = uiHeight * uiBlockWidth;
   const int blockSize = iRadiusAligned + uiNumOutputPix + iRadius;
 
@@ -127,9 +127,9 @@ void BoxFilterGPU ( unsigned int *uiInput,
     #pragma omp target teams num_teams(numTeams) thread_limit(blockSize)
     {
       uchar4 uc4LocalData[90]; //16+64+10;
-      #pragma omp parallel 
+      #pragma omp parallel
       {
-        int lid = omp_get_thread_num(); 
+        int lid = omp_get_thread_num();
         int gidx = omp_get_team_num() % uiBlockWidth;
         int gidy = omp_get_team_num() / uiBlockWidth;
 
@@ -139,14 +139,14 @@ void BoxFilterGPU ( unsigned int *uiInput,
 
         // Read global data into LMEM
         if (globalPosX >= 0 && globalPosX < uiWidth)
-            // IBM xlc: no known conversion from 'unsigned int *' to 'uchar4 *' 
+            // IBM xlc: no known conversion from 'unsigned int *' to 'uchar4 *'
             uc4LocalData[lid] = rgbaUintToUchar4(uiInput[iGlobalOffset]);
         else
-            uc4LocalData[lid] = {0, 0, 0, 0}; 
+            uc4LocalData[lid] = {0, 0, 0, 0};
 
         #pragma omp barrier
 
-        if((globalPosX >= 0) && (globalPosX < uiWidth) && (lid >= iRadiusAligned) && 
+        if((globalPosX >= 0) && (globalPosX < uiWidth) && (lid >= iRadiusAligned) &&
            (lid < (iRadiusAligned + (int)uiNumOutputPix)))
         {
             // Init summation registers to zero
@@ -160,10 +160,10 @@ void BoxFilterGPU ( unsigned int *uiInput,
                 f4Sum.x += uc4LocalData[iOffsetX].x;
                 f4Sum.y += uc4LocalData[iOffsetX].y;
                 f4Sum.z += uc4LocalData[iOffsetX].z;
-                f4Sum.w += uc4LocalData[iOffsetX].w; 
+                f4Sum.w += uc4LocalData[iOffsetX].w;
             }
 
-            // Use inline function to scale and convert registers to packed RGBA values in a uchar4, 
+            // Use inline function to scale and convert registers to packed RGBA values in a uchar4,
             // and write back out to GMEM
             uiTmp[iGlobalOffset] = rgbaFloat4ToUint(f4Sum, fScale);
         }
@@ -182,26 +182,26 @@ void BoxFilterGPU ( unsigned int *uiInput,
       float4 bot_color = rgbaUintToFloat4(uiInputImage[(uiHeight - 1) * uiWidth]);
 
       f4Sum = top_color * f4iRadius;
-      for (int y = 0; y < iRadius + 1; y++) 
+      for (int y = 0; y < iRadius + 1; y++)
       {
           f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
       }
       uiOutputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
-      for(int y = 1; y < iRadius + 1; y++) 
+      for(int y = 1; y < iRadius + 1; y++)
       {
           f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
           f4Sum -= top_color;
           uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
       }
-      
-      for(int y = iRadius + 1; y < uiHeight - iRadius; y++) 
+
+      for(int y = iRadius + 1; y < uiHeight - iRadius; y++)
       {
           f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
           f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
           uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
       }
 
-      for (int y = uiHeight - iRadius; y < uiHeight; y++) 
+      for (int y = uiHeight - iRadius; y < uiHeight; y++)
       {
           f4Sum += bot_color;
           f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
@@ -220,34 +220,45 @@ int main(int argc, char** argv)
     printf("Usage %s <PPM image> <repeat>\n", argv[0]);
     return 1;
   }
+  const unsigned int uiMaxImageWidth = 1920;   // Image width
+  const unsigned int uiMaxImageHeight = 1080;  // Image height
   unsigned int uiImageWidth = 0;     // Image width
   unsigned int uiImageHeight = 0;    // Image height
   unsigned int* uiInput = NULL;      // Host buffer to hold input image data
   unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
-  unsigned int* uiDevOutput = NULL;      
-  unsigned int* uiHostOutput = NULL;      
+  unsigned int* uiDevOutput = NULL;
+  unsigned int* uiHostOutput = NULL;
 
-  shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
-  printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n", 
+  bool status = shrLoadPPM4ub(argv[1], (unsigned char**)&uiInput,
+                              &uiImageWidth, &uiImageHeight);
+  printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n",
       uiImageWidth, uiImageHeight, unsigned(sizeof(unsigned int) * 8), RADIUS);
+  if (uiImageWidth > uiMaxImageWidth || uiImageHeight > uiMaxImageHeight) {
+    printf("Error: Image Dimensions exceed the maximum values");
+    status = 0;
+  }
+  if (!status) {
+     free(uiInput);
+     return 1;
+  }
+
   printf("Using Local Memory for Row Processing\n\n");
 
-  size_t szBuff= uiImageWidth * uiImageHeight;
-  size_t szBuffBytes = szBuff * sizeof (unsigned int);
+  size_t szBuff = uiImageWidth * uiImageHeight;
 
   // Allocate intermediate and output host image buffers
-  uiTmp = (unsigned int*)malloc(szBuffBytes);
-  uiDevOutput = (unsigned int*)malloc(szBuffBytes);
-  uiHostOutput = (unsigned int*)malloc(szBuffBytes);
+  uiTmp = (unsigned int*)calloc(szBuff, sizeof(unsigned int));
+  uiHostOutput = (unsigned int*)calloc(szBuff, sizeof(unsigned int));
+  uiDevOutput = (unsigned int*)calloc(szBuff, sizeof(unsigned int));
 
   #pragma omp target data map(to: uiInput[0:szBuff]) \
-                          map(alloc: uiTmp[0:szBuff]) \
-                          map(from: uiDevOutput[0:szBuff])
+                          map(to: uiTmp[0:szBuff]) \
+                          map(tofrom: uiDevOutput[0:szBuff])
   {
     const int iCycles = atoi(argv[2]);
 
     printf("Warmup..\n");
-    BoxFilterGPU (uiInput, uiTmp, uiDevOutput, 
+    BoxFilterGPU (uiInput, uiTmp, uiDevOutput,
                   uiImageWidth, uiImageHeight, RADIUS, SCALE, iCycles);
 
 
@@ -259,13 +270,13 @@ int main(int argc, char** argv)
   // Do filtering on the host
   BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
 
-  // Verification 
-  // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
+  // Verification
   int error = 0;
-  for (unsigned i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
-  {
+  const int64_t start = RADIUS * uiImageWidth;
+  const int64_t end  = (int64_t)szBuff - (int64_t)start;
+  for (int64_t i = start; i < end; i++) {
     if (uiDevOutput[i] != uiHostOutput[i]) {
-      printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
+      printf("%ld %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
       error = 1;
       break;
     }

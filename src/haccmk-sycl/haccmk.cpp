@@ -51,7 +51,8 @@ void haccmk_kernel (
 
         r2 = dxc * dxc + dyc * dyc + dzc * dzc;
 
-        if ( r2 < fsrmax ) m = mass[j]; else m = 0.f;
+        //if ( r2 < fsrmax ) m = mass[j]; else m = 0.f;
+        m = mass[j] * (r2 < fsrmax);
 
         f = r2 + mp_rsm;
         f = m * (1.f / (f * sycl::sqrt(f)) - (ma0 + r2*(ma1 + r2*(ma2 + r2*(ma3 + r2*(ma4 + r2*ma5))))));

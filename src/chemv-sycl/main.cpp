@@ -171,9 +171,9 @@ int main() {
         (fabs(Y_cpu[i * INCY + 0].Im - Y_gpu[i * INCY + 0].Im) > 1e-3))
     {
       printf("%d %f %f\n", i, Y_cpu[i * INCY + 0].Re,Y_gpu[i * INCY + 0].Re);
-      printf("FAILED\n");
+      printf("FAIL\n");
       return EXIT_FAILURE;
     }
-  printf("PASSED\n");
+  printf("PASS\n");
   return EXIT_SUCCESS;
 }

@@ -132,7 +132,7 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   auto end = std::chrono::high_resolution_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time = %f (s)\n", time * 1e-9f / repeat);
+  printf("Average chi_kernel execution time = %f (s)\n", time * 1e-9f / repeat);
 
   hipMemcpy(h_results, d_results, result_size, hipMemcpyDeviceToHost);
 
@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
 
   start = std::chrono::high_resolution_clock::now();
 
-  cpu_kernel(rows,cols,ncases,ncontrols,dataT,cpu_results);
+  cpu_chi_kernel(rows,cols,ncases,ncontrols,dataT,cpu_results);
 
   end = std::chrono::high_resolution_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

@@ -64,7 +64,7 @@ unsigned int rgbaFloat4ToUint(const float4 rgba)
 //*****************************************************************
 void Transpose(const unsigned int* uiDataIn, 
                unsigned int* uiDataOut, 
-               const int iWidth, const int iHeight)
+               const size_t iWidth, const size_t iHeight)
 {
   size_t szTransposeGlobalWork[2];
   size_t szTransposeLocalWork[2] = {16, 16};
@@ -85,8 +85,8 @@ void Transpose(const unsigned int* uiDataIn,
       unsigned int tidY = omp_get_team_num() / numTeamsX;
 
       // read the matrix tile into LMEM
-      unsigned int xIndex = tidX * 16 + lidX;
-      unsigned int yIndex = tidY * 16 + lidY;
+      size_t xIndex = tidX * 16 + lidX;
+      size_t yIndex = tidY * 16 + lidY;
 
       if((xIndex < iWidth) && (yIndex < iHeight))
       {
@@ -124,14 +124,14 @@ void Transpose(const unsigned int* uiDataIn,
 void SimpleRecursiveRGBA(
   const unsigned int* uiDataIn,
   unsigned int* uiDataOut,
-  const int iWidth, const int iHeight, const float a)
+  const size_t iWidth, const size_t iHeight, const float a)
 {
   size_t szGaussLocalWork = 256;
   size_t szGaussGlobalWork = shrRoundUp((int)szGaussLocalWork, iWidth); 
   size_t szTeams = szGaussGlobalWork / szGaussLocalWork; 
 
   #pragma omp target teams distribute parallel for num_teams(szTeams) thread_limit(szGaussLocalWork)
-  for (unsigned int X = 0; X < iWidth; X++) {
+  for (size_t X = 0; X < iWidth; X++) {
     // advance global pointers to correct column for this work item and x position
     uiDataIn += X;    
     uiDataOut += X;
@@ -179,7 +179,7 @@ void SimpleRecursiveRGBA(
 //*****************************************************************
 void RecursiveRGBA(const unsigned int* uiDataIn, 
                    unsigned int* uiDataOut, 
-                   const int iWidth, const int iHeight, 
+                   const size_t iWidth, const size_t iHeight, 
                    const float a0, const float a1, 
                    const float a2, const float a3, 
                    const float b1, const float b2, 
@@ -192,7 +192,7 @@ void RecursiveRGBA(const unsigned int* uiDataIn,
   size_t szTeams = szGaussGlobalWork / szGaussLocalWork; 
 
   #pragma omp target teams distribute parallel for num_teams(szTeams) thread_limit(szGaussLocalWork)
-  for (unsigned int X = 0; X < iWidth; X++) {
+  for (size_t X = 0; X < iWidth; X++) {
 
     // advance global pointers to correct column for this work item and x position
     uiDataIn += X;    
@@ -273,7 +273,7 @@ double GPUGaussianFilterRGBA(const unsigned int* uiInput,
   float coefn = pGP->coefn;
 #endif
 
-  unsigned int szBuff = uiImageWidth * uiImageHeight;
+  size_t szBuff = (size_t)uiImageWidth * uiImageHeight;
 
   #pragma omp target update to(uiInput[0:szBuff])
 
@@ -319,19 +319,33 @@ int main(int argc, char** argv)
 
   const float fSigma = 10.0f;         // filter sigma (blur factor)
   const int iOrder = 0;               // filter order
-  unsigned int uiImageWidth = 1920;   // Image width
-  unsigned int uiImageHeight = 1080;  // Image height
+  unsigned int uiMaxImageWidth = 1920;   // Image width
+  unsigned int uiMaxImageHeight = 1080;  // Image height
+  unsigned int uiImageWidth;
+  unsigned int uiImageHeight;
   unsigned int* uiInput = NULL;       // Host buffer to hold input image data
   unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
   unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
 
-  shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
+  bool status = shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
+
+  printf("Image Width = %i, Height = %i, bpp = %lu\n\n",
+         uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+
+  if (uiImageWidth > uiMaxImageWidth || uiImageHeight > uiMaxImageHeight) {
+    printf("Error: Image Dimensions exceed the maximum values");
+    status = 0;
+  }
+  if (!status) {
+     free(uiInput);
+     return 1;
+  }
+
   const int iCycles = atoi(argv[2]);
-  printf("Image Width = %i, Height = %i, bpp = %lu\n\n", uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
 
   // Allocate intermediate and output host image buffers
-  unsigned int szBuff = uiImageWidth * uiImageHeight;
-  unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
+  size_t szBuff = (size_t)uiImageWidth * uiImageHeight;
+  size_t szBuffBytes = szBuff * sizeof (unsigned int);
   uiTmp = (unsigned int*)malloc(szBuffBytes);
   uiOutput = (unsigned int*)malloc(szBuffBytes);
   printf("Allocate Host Image Buffers...\n"); 
@@ -364,7 +378,7 @@ int main(int argc, char** argv)
   HostRecursiveGaussianRGBA(uiInput, uiTmp, uiGolden, uiImageWidth, uiImageHeight, &GP);
 
   printf("Comparing GPU Result to CPU Result...\n"); 
-  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
+  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, szBuff, 1.0f, 0.01f);
   printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
 
   free(uiGolden);

@@ -33,7 +33,7 @@ void gendata(float *ax,float *ay,float *az,
     ay[i] = ((float) rand() / (float) RAND_MAX);
     az[i] = ((float) rand() / (float) RAND_MAX);
     charge[i] = ((float) rand() / (float) RAND_MAX);
-    size[i] = ((float) rand() / (float) RAND_MAX);
+    size[i] = (float)natom;
   }
 
   for (i=0; i<ngrid; i++) {
@@ -44,13 +44,16 @@ void gendata(float *ax,float *ay,float *az,
   printf("Done generating inputs.\n\n");
 }
 
-void print_total(float * arr, int ngrid){
+void compare(const float *arr, const float *arr2, int ngrid) {
   int i;
-  double accum = 0.0;
-  for (i=0; i<ngrid; i++){
-    accum += arr[i];
+  bool ok = true;
+  for (i=0; i<ngrid; i++) {
+    if (fabsf(arr[i] - arr2[i]) > 1e-3f) {
+      ok = false;
+      break;
+    }
   }
-  printf("Accumulated value: %1.7g\n",accum);
+  printf("%s\n", ok ? "PASS" : "FAIL");
 }
 
 void run_gpu_kernel(
@@ -89,14 +92,17 @@ void run_gpu_kernel(
       #pragma omp target teams distribute thread_limit(wgsize)
       for(int igrid=0;igrid<ngrid;igrid++){
         float sum = 0.0f;
+        float l_gx = gx[igrid];
+        float l_gy = gy[igrid];
+        float l_gz = gz[igrid];
         #pragma omp parallel for reduction(+:sum)
         for(int iatom=0; iatom<natom; iatom++) {
-          float dist = sqrtf((gx[igrid]-ax[iatom])*(gx[igrid]-ax[iatom]) + 
-              (gy[igrid]-ay[iatom])*(gy[igrid]-ay[iatom]) + 
-              (gz[igrid]-az[iatom])*(gz[igrid]-az[iatom]));
+          float dist = sqrtf((l_gx-ax[iatom])*(l_gx-ax[iatom]) + 
+                             (l_gy-ay[iatom])*(l_gy-ay[iatom]) + 
+                             (l_gz-az[iatom])*(l_gz-az[iatom]));
 
           sum += pre1*(charge[iatom]/dist)*expf(-xkappa*(dist-size[iatom]))
-            / (1+xkappa*size[iatom]);
+                 / (1.f + xkappa*size[iatom]);
         }
         val[igrid] = sum;
       }
@@ -138,14 +144,16 @@ void run_cpu_kernel(
     #pragma omp parallel for
     for(int igrid=0;igrid<ngrid;igrid++){
       float sum = 0.0f;
+      float l_gx = gx[igrid];
+      float l_gy = gy[igrid];
+      float l_gz = gz[igrid];
       #pragma omp parallel for simd reduction(+:sum)
       for(int iatom=0; iatom<natom; iatom++) {
-        float dist = sqrtf((gx[igrid]-ax[iatom])*(gx[igrid]-ax[iatom]) + 
-            (gy[igrid]-ay[iatom])*(gy[igrid]-ay[iatom]) + 
-            (gz[igrid]-az[iatom])*(gz[igrid]-az[iatom]));
-
+        float dist = sqrtf((l_gx-ax[iatom])*(l_gx-ax[iatom]) + 
+                           (l_gy-ay[iatom])*(l_gy-ay[iatom]) + 
+                           (l_gz-az[iatom])*(l_gz-az[iatom]));
         sum += pre1*(charge[iatom]/dist)*expf(-xkappa*(dist-size[iatom]))
-          / (1+xkappa*size[iatom]);
+               / (1.f + xkappa*size[iatom]);
       }
       val[igrid] = sum;
     }
@@ -212,27 +220,27 @@ int main(int argc, const char **argv) {
   float *gz = (float*)calloc(ngadj, sizeof(float));
 
   // result
-  float *val = (float*)calloc(ngadj, sizeof(float));
+  float *val_cpu = (float*)calloc(ngadj, sizeof(float));
+  float *val_gpu = (float*)calloc(ngadj, sizeof(float));
 
   gendata(ax, ay, az, gx, gy, gz, charge, size, natom, ngrid);
 
   wkf_timer_start(timer);
-  run_cpu_kernel(itmax, ngadj, natom, ax, ay, az, gx, gy, gz, charge, size, xkappa, pre1, val);
+  run_cpu_kernel(itmax, ngadj, natom, ax, ay, az, gx, gy, gz, charge, size, xkappa, pre1, val_cpu);
   wkf_timer_stop(timer);
 
-  print_total(val, ngrid);
   printf("CPU Time: %1.12g (Number of tests = %d)\n", wkf_timer_time(timer), itmax);
   SEP;
 
   wkf_timer_start(timer);
   run_gpu_kernel(wgsize, itmax, ngrid, natom, ngadj, ax, ay, az, gx, gy, gz, 
-                 charge, size, xkappa, pre1, val);
+                 charge, size, xkappa, pre1, val_gpu);
   wkf_timer_stop(timer);
 
-  print_total(val, ngrid);
   printf("GPU Time: %1.12g (Number of tests = %d)\n", wkf_timer_time(timer), itmax);
   SEP;
 
+  compare(val_cpu, val_gpu, ngrid);
 
   free(ax);
   free(ay);
@@ -242,7 +250,8 @@ int main(int argc, const char **argv) {
   free(gx);
   free(gy);
   free(gz);
-  free(val);
+  free(val_cpu);
+  free(val_gpu);
 
   wkf_timer_destroy(timer);
 

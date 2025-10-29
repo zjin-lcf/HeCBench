@@ -21,16 +21,14 @@ HIP_ARCH  = gfx908
 
 program = main
 
-source = main.cpp utils.cpp
-
-obj = $(source:.cpp=.o)
+obj = main.o utils.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../include \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../include -I../gd-cuda \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
@@ -72,7 +70,10 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp utils.h
+utils.o: ../gd-cuda/utils.cpp ../gd-cuda/utils.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+main.o: main.cpp  ../gd-cuda/utils.h ../gd-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

@@ -134,7 +134,7 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average execution time of chemv kernels: %f (us)\n", (time * 1e-3f) / REPEAT);
+  printf("Average execution time of chemv chemv_kernels: %f (us)\n", (time * 1e-3f) / REPEAT);
 
   cudaMemcpy(Y, dev_Y, Y_SIZE * sizeof(struct ComplexFloat), cudaMemcpyDeviceToHost);
   cudaFree(dev_AT);
@@ -170,10 +170,10 @@ int main() {
         (fabs(Y_cpu[i * INCY + 0].Im - Y_gpu[i * INCY + 0].Im) > 1e-3))
     {
       printf("%d %f %f\n", i, Y_cpu[i * INCY + 0].Re,Y_gpu[i * INCY + 0].Re);
-      printf("FAILED\n");
+      printf("FAIL\n");
       return EXIT_FAILURE;
     }
-  printf("PASSED\n");
+  printf("PASS\n");
   return EXIT_SUCCESS;
 }
 

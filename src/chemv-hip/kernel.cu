@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include "kernel.h"
 
 __global__ void chemv_kernel0(struct ComplexFloat *AT, struct ComplexFloat *X, struct ComplexFloat *Y, float alpha_im, float alpha_re, float beta_im, float beta_re)

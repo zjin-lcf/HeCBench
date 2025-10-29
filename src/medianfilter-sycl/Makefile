@@ -18,19 +18,20 @@ HIP_ARCH  = gfx908
 #===============================================================================
 # Program name & source code list
 #===============================================================================
+UPATH = ../boxfilter-sycl
+SPATH = ../medianfilter-cuda
 
 program = main
 
-source = main.cpp shrUtils.cpp MedianFilterHost.cpp
-
-obj = $(source:.cpp=.o)
+obj = main.o shrUtils.o MedianFilterHost.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl \
+          -I$(UPATH) -I$(SPATH) --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS_TMP := $(CFLAGS)
@@ -71,14 +72,14 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+main.o: main.cpp MedianFilter.cpp $(UPATH)/shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o: main.cpp MedianFilter.cpp shrUtils.h
+MedianFilterHost.o : $(SPATH)/MedianFilterHost.cpp 
+	$(CC) $(CFLAGS) -c $< -o $@
 
-MedianFilterHost.o : MedianFilterHost.cpp 
-
-shrUtils.o : shrUtils.cpp shrUtils.h 
+shrUtils.o : $(UPATH)/shrUtils.cpp $(UPATH)/shrUtils.h 
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

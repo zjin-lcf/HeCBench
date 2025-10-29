@@ -13,7 +13,7 @@ using namespace std;
 
 
 #ifdef SINGLE_PRECISION
-#define T float 
+#define T float
 #define EPISON 1e-4
 #else
 #define T double
@@ -25,7 +25,7 @@ typedef struct {
   T y;
 } T2;
 
-#pragma omp declare target 
+#pragma omp declare target
 
 #ifndef M_SQRT1_2
 # define M_SQRT1_2      0.70710678118654752440f
@@ -115,7 +115,169 @@ inline T2 cmplx_sub( T2 a, T2 b ) { return (T2){ a.x - b.x, a.y - b.y }; }
   IFFT4( &a[4], &a[5], &a[6], &a[7] );                        \
 }
 
-#pragma omp end declare target 
+#pragma omp end declare target
+
+#include "reference.h"
+
+void fft1D_512 (T2* source, const int n_ffts) {
+  #pragma omp target teams num_teams(n_ffts) thread_limit(64)
+  {
+    T smem[8*8*9];
+    #pragma omp parallel
+    {
+      int tid = omp_get_thread_num();
+      int blockIdx = omp_get_team_num() * 512 + tid;
+      int hi = tid>>3;
+      int lo = tid&7;
+      T2 data[8];
+      const int reversed[] = {0,4,2,6,1,5,3,7};
+
+      // starting index of data to/from global memory
+      // globalLoads8(data, source, 64)
+      for( int i = 0; i < 8; i++ ) data[i] = source[blockIdx+i*64];
+
+      FFT8( data );
+
+      //twiddle8( data, tid, 512 );
+      #ifdef UNROLL
+        data[1] = cmplx_mul( data[1],exp_i(((T)-2*(T)M_PI*reversed[1]/(T)512)*tid) );
+        data[2] = cmplx_mul( data[2],exp_i(((T)-2*(T)M_PI*reversed[2]/(T)512)*tid) );
+        data[3] = cmplx_mul( data[3],exp_i(((T)-2*(T)M_PI*reversed[3]/(T)512)*tid) );
+        data[4] = cmplx_mul( data[4],exp_i(((T)-2*(T)M_PI*reversed[4]/(T)512)*tid) );
+        data[5] = cmplx_mul( data[5],exp_i(((T)-2*(T)M_PI*reversed[5]/(T)512)*tid) );
+        data[6] = cmplx_mul( data[6],exp_i(((T)-2*(T)M_PI*reversed[6]/(T)512)*tid) );
+        data[7] = cmplx_mul( data[7],exp_i(((T)-2*(T)M_PI*reversed[7]/(T)512)*tid) );
+      #else
+        for( int j = 1; j < 8; j++ ){
+            data[j] = cmplx_mul( data[j],exp_i(((T)-2*(T)M_PI*reversed[j]/(T)512)*tid) );
+        }
+      #endif
+
+      //transpose(data, &smem[hi*8+lo], 66, &smem[lo*66+hi], 8, 0xf);
+      for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].x;
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) data[i].x = smem[lo*66+hi+i*8];
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].y;
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) data[i].y= smem[lo*66+hi+i*8];
+      #pragma omp barrier
+
+      FFT8( data );
+
+      //twiddle8( data, hi, 64 );
+      #ifdef UNROLL
+        data[1] = cmplx_mul( data[1],exp_i(((T)-2*(T)M_PI*reversed[1]/(T)64)*hi) );
+        data[2] = cmplx_mul( data[2],exp_i(((T)-2*(T)M_PI*reversed[2]/(T)64)*hi) );
+        data[3] = cmplx_mul( data[3],exp_i(((T)-2*(T)M_PI*reversed[3]/(T)64)*hi) );
+        data[4] = cmplx_mul( data[4],exp_i(((T)-2*(T)M_PI*reversed[4]/(T)64)*hi) );
+        data[5] = cmplx_mul( data[5],exp_i(((T)-2*(T)M_PI*reversed[5]/(T)64)*hi) );
+        data[6] = cmplx_mul( data[6],exp_i(((T)-2*(T)M_PI*reversed[6]/(T)64)*hi) );
+        data[7] = cmplx_mul( data[7],exp_i(((T)-2*(T)M_PI*reversed[7]/(T)64)*hi) );
+      #else
+        for( int j = 1; j < 8; j++ ){
+            data[j] = cmplx_mul( data[j],exp_i(((T)-2*(T)M_PI*reversed[j]/(T)64)*hi) );
+        }
+      #endif
+
+      //transpose(data, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE);
+      for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].x;
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) data[i].x = smem[hi*72+lo+i*8];
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].y;
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) data[i].y= smem[hi*72+lo+i*8];
+
+      FFT8( data );
+
+      //globalStores8(data, source, 64);
+      for( int i = 0; i < 8; i++ )
+        source[blockIdx+i*64] = data[reversed[i]];
+    }
+  }
+}
+
+void ifft1D_512 (T2* source, const int n_ffts) {
+  #pragma omp target teams num_teams(n_ffts) thread_limit(64)
+  {
+    T smem[8*8*9];
+    #pragma omp parallel
+    {
+      int tid = omp_get_thread_num();
+      int blockIdx = omp_get_team_num() * 512 + tid;
+      int hi = tid>>3;
+      int lo = tid&7;
+      T2 data[8];
+      const int reversed[] = {0,4,2,6,1,5,3,7};
+
+      // starting index of data to/from global memory
+      for( int i = 0; i < 8; i++ ) data[i] = source[blockIdx+i*64];
+
+      IFFT8( data );
+
+      //itwiddle8( data, tid, 512 );
+      #ifdef UNROLL
+        data[1] = cmplx_mul( data[1],exp_i(((T)2*(T)M_PI*reversed[1]/(T)512)*tid) );
+        data[2] = cmplx_mul( data[2],exp_i(((T)2*(T)M_PI*reversed[2]/(T)512)*tid) );
+        data[3] = cmplx_mul( data[3],exp_i(((T)2*(T)M_PI*reversed[3]/(T)512)*tid) );
+        data[4] = cmplx_mul( data[4],exp_i(((T)2*(T)M_PI*reversed[4]/(T)512)*tid) );
+        data[5] = cmplx_mul( data[5],exp_i(((T)2*(T)M_PI*reversed[5]/(T)512)*tid) );
+        data[6] = cmplx_mul( data[6],exp_i(((T)2*(T)M_PI*reversed[6]/(T)512)*tid) );
+        data[7] = cmplx_mul( data[7],exp_i(((T)2*(T)M_PI*reversed[7]/(T)512)*tid) );
+      #else
+        for( int j = 1; j < 8; j++ )
+            data[j] = cmplx_mul(data[j] , exp_i(((T)2*(T)M_PI*reversed[j]/(T)512)*(tid)) );
+      #endif
+
+      //transpose(data, &smem[hi*8+lo], 66, &smem[lo*66+hi], 8, 0xf);
+      for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].x;
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) data[i].x = smem[lo*66+hi+i*8];
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].y;
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) data[i].y= smem[lo*66+hi+i*8];
+      #pragma omp barrier
+
+      IFFT8( data );
+
+      //itwiddle8( data, hi, 64 );
+      #ifdef UNROLL
+        data[1] = cmplx_mul( data[1],exp_i(((T)2*(T)M_PI*reversed[1]/(T)64)*hi) );
+        data[2] = cmplx_mul( data[2],exp_i(((T)2*(T)M_PI*reversed[2]/(T)64)*hi) );
+        data[3] = cmplx_mul( data[3],exp_i(((T)2*(T)M_PI*reversed[3]/(T)64)*hi) );
+        data[4] = cmplx_mul( data[4],exp_i(((T)2*(T)M_PI*reversed[4]/(T)64)*hi) );
+        data[5] = cmplx_mul( data[5],exp_i(((T)2*(T)M_PI*reversed[5]/(T)64)*hi) );
+        data[6] = cmplx_mul( data[6],exp_i(((T)2*(T)M_PI*reversed[6]/(T)64)*hi) );
+        data[7] = cmplx_mul( data[7],exp_i(((T)2*(T)M_PI*reversed[7]/(T)64)*hi) );
+      #else
+        for( int j = 1; j < 8; j++ )
+            data[j] = cmplx_mul(data[j] , exp_i(((T)2*(T)M_PI*reversed[j]/(T)64)*hi) );
+      #endif
+
+      //transpose(data, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE);
+      for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].x;
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) data[i].x = smem[hi*72+lo+i*8];
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].y;
+      #pragma omp barrier
+      for( int i = 0; i < 8; i++ ) data[i].y= smem[hi*72+lo+i*8];
+
+      IFFT8( data );
+
+      for(int i=0; i<8; i++) {
+        data[i].x = data[i].x/(T)512;
+        data[i].y = data[i].y/(T)512;
+      }
+
+      //globalStores8(data, source, 64);
+      for( int i = 0; i < 8; i++ )
+        source[blockIdx+i*64] = data[reversed[i]];
+    }
+  }
+}
 
 int main(int argc, char** argv)
 {
@@ -153,8 +315,8 @@ int main(int argc, char** argv)
 
   // init host memory...
   for (i = 0; i < half_n_cmplx; i++) {
-    source[i].x = (rand()/(float)RAND_MAX)*2-1;
-    source[i].y = (rand()/(float)RAND_MAX)*2-1;
+    source[i].x = sinf(i / powf(10000, i % 768 / 384));
+    source[i].y = cosf(i / powf(10000, i % 768 / 384));
     source[i+half_n_cmplx].x = source[i].x;
     source[i+half_n_cmplx].y= source[i].y;
   }
@@ -163,166 +325,50 @@ int main(int argc, char** argv)
 
   #pragma omp target data map (tofrom: source[0:N])
   {
+    fft1D_512(source, n_ffts);
+
+    // verify FFT
+    fft1D_512_reference<64>(reference, n_ffts);
+    #pragma omp target update from (source[0:N])
+
+    bool error = false;
+    for (int i = 0; i < N; i++) {
+      if (fabs((T)source[i].x - (T)reference[i].x) > EPISON) {
+        //std::cout << i << " " << (T)source[i].x << " " << (T)reference[i].x << std::endl;
+        error = true;
+        break;
+      }
+      if (fabs((T)source[i].y - (T)reference[i].y) > EPISON) {
+        //std::cout << i << " " << (T)source[i].y << " " << (T)reference[i].y << std::endl;
+        error = true;
+        break;
+      }
+    }
+    std::cout << "FFT " << (error ? "FAIL" : "PASS")  << std::endl;
+
+    ifft1D_512(source, n_ffts);
+
+    // verify iFFT
+    #pragma omp target update from (source[0:N])
+    error = false;
+    for (int i = 0; i < N; i++) {
+      int j = i % half_n_cmplx;
+      if (fabs((T)source[i].x - (T)sinf(j / powf(10000, j%768/384))) > EPISON) {
+        error = true;
+        break;
+      }
+      if (fabs((T)source[i].y - (T)cosf(j / powf(10000, j%768/384))) > EPISON) {
+        error = true;
+        break;
+      }
+    }
+    std::cout << "iFFT " << (error ? "FAIL" : "PASS")  << std::endl;
+
     auto start = std::chrono::steady_clock::now();
 
     for (int k=0; k<passes; k++) {
-
-      #pragma omp target teams num_teams(n_ffts) thread_limit(64)
-      {
-        T smem[8*8*9];
-        #pragma omp parallel
-        {
-          int tid = omp_get_thread_num();
-          int blockIdx = omp_get_team_num() * 512 + tid;
-          int hi = tid>>3;
-          int lo = tid&7;
-          T2 data[8];
-          const int reversed[] = {0,4,2,6,1,5,3,7};
-
-          // starting index of data to/from global memory
-          // globalLoads8(data, source, 64)
-          for( int i = 0; i < 8; i++ ) data[i] = source[blockIdx+i*64];
-
-          FFT8( data );
-
-          //twiddle8( data, tid, 512 );
-          #ifdef UNROLL
-            data[1] = cmplx_mul( data[1],exp_i(((T)-2*(T)M_PI*reversed[1]/(T)512)*tid) ); 
-            data[2] = cmplx_mul( data[2],exp_i(((T)-2*(T)M_PI*reversed[2]/(T)512)*tid) ); 
-            data[3] = cmplx_mul( data[3],exp_i(((T)-2*(T)M_PI*reversed[3]/(T)512)*tid) ); 
-            data[4] = cmplx_mul( data[4],exp_i(((T)-2*(T)M_PI*reversed[4]/(T)512)*tid) ); 
-            data[5] = cmplx_mul( data[5],exp_i(((T)-2*(T)M_PI*reversed[5]/(T)512)*tid) ); 
-            data[6] = cmplx_mul( data[6],exp_i(((T)-2*(T)M_PI*reversed[6]/(T)512)*tid) ); 
-            data[7] = cmplx_mul( data[7],exp_i(((T)-2*(T)M_PI*reversed[7]/(T)512)*tid) ); 
-          #else
-            for( int j = 1; j < 8; j++ ){                                       
-                data[j] = cmplx_mul( data[j],exp_i(((T)-2*(T)M_PI*reversed[j]/(T)512)*tid) ); 
-            }                                                                   
-          #endif
-
-          //transpose(data, &smem[hi*8+lo], 66, &smem[lo*66+hi], 8, 0xf);
-          for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].x;
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) data[i].x = smem[lo*66+hi+i*8]; 
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].y;
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) data[i].y= smem[lo*66+hi+i*8]; 
-          #pragma omp barrier 
-
-          FFT8( data );
-
-          //twiddle8( data, hi, 64 );
-          #ifdef UNROLL
-            data[1] = cmplx_mul( data[1],exp_i(((T)-2*(T)M_PI*reversed[1]/(T)64)*hi) ); 
-            data[2] = cmplx_mul( data[2],exp_i(((T)-2*(T)M_PI*reversed[2]/(T)64)*hi) ); 
-            data[3] = cmplx_mul( data[3],exp_i(((T)-2*(T)M_PI*reversed[3]/(T)64)*hi) ); 
-            data[4] = cmplx_mul( data[4],exp_i(((T)-2*(T)M_PI*reversed[4]/(T)64)*hi) ); 
-            data[5] = cmplx_mul( data[5],exp_i(((T)-2*(T)M_PI*reversed[5]/(T)64)*hi) ); 
-            data[6] = cmplx_mul( data[6],exp_i(((T)-2*(T)M_PI*reversed[6]/(T)64)*hi) ); 
-            data[7] = cmplx_mul( data[7],exp_i(((T)-2*(T)M_PI*reversed[7]/(T)64)*hi) ); 
-          #else
-            for( int j = 1; j < 8; j++ ){                                       
-                data[j] = cmplx_mul( data[j],exp_i(((T)-2*(T)M_PI*reversed[j]/(T)64)*hi) ); 
-            }                                                                   
-          #endif
-
-          //transpose(data, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE);
-          for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].x;
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) data[i].x = smem[hi*72+lo+i*8]; 
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].y;
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) data[i].y= smem[hi*72+lo+i*8]; 
-
-          FFT8( data );
-
-          //globalStores8(data, source, 64);
-          for( int i = 0; i < 8; i++ )
-            source[blockIdx+i*64] = data[reversed[i]];
-        }
-      }
-
-      #pragma omp target teams num_teams(n_ffts) thread_limit(64)
-      {
-        T smem[8*8*9];
-        #pragma omp parallel
-        {
-          int tid = omp_get_thread_num();
-          int blockIdx = omp_get_team_num() * 512 + tid;
-          int hi = tid>>3;
-          int lo = tid&7;
-          T2 data[8];
-          const int reversed[] = {0,4,2,6,1,5,3,7};
-
-          // starting index of data to/from global memory
-          for( int i = 0; i < 8; i++ ) data[i] = source[blockIdx+i*64];
-
-          IFFT8( data );
-
-          //itwiddle8( data, tid, 512 );
-          #ifdef UNROLL
-            data[1] = cmplx_mul( data[1],exp_i(((T)2*(T)M_PI*reversed[1]/(T)512)*tid) ); 
-            data[2] = cmplx_mul( data[2],exp_i(((T)2*(T)M_PI*reversed[2]/(T)512)*tid) ); 
-            data[3] = cmplx_mul( data[3],exp_i(((T)2*(T)M_PI*reversed[3]/(T)512)*tid) ); 
-            data[4] = cmplx_mul( data[4],exp_i(((T)2*(T)M_PI*reversed[4]/(T)512)*tid) ); 
-            data[5] = cmplx_mul( data[5],exp_i(((T)2*(T)M_PI*reversed[5]/(T)512)*tid) ); 
-            data[6] = cmplx_mul( data[6],exp_i(((T)2*(T)M_PI*reversed[6]/(T)512)*tid) ); 
-            data[7] = cmplx_mul( data[7],exp_i(((T)2*(T)M_PI*reversed[7]/(T)512)*tid) ); 
-          #else
-            for( int j = 1; j < 8; j++ )
-                data[j] = cmplx_mul(data[j] , exp_i(((T)2*(T)M_PI*reversed[j]/(T)512)*(tid)) );
-          #endif
-
-          //transpose(data, &smem[hi*8+lo], 66, &smem[lo*66+hi], 8, 0xf);
-          for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].x;
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) data[i].x = smem[lo*66+hi+i*8]; 
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*66] = data[reversed[i]].y;
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) data[i].y= smem[lo*66+hi+i*8]; 
-          #pragma omp barrier 
-
-          IFFT8( data );
-
-          //itwiddle8( data, hi, 64 );
-          #ifdef UNROLL
-            data[1] = cmplx_mul( data[1],exp_i(((T)2*(T)M_PI*reversed[1]/(T)64)*hi) ); 
-            data[2] = cmplx_mul( data[2],exp_i(((T)2*(T)M_PI*reversed[2]/(T)64)*hi) ); 
-            data[3] = cmplx_mul( data[3],exp_i(((T)2*(T)M_PI*reversed[3]/(T)64)*hi) ); 
-            data[4] = cmplx_mul( data[4],exp_i(((T)2*(T)M_PI*reversed[4]/(T)64)*hi) ); 
-            data[5] = cmplx_mul( data[5],exp_i(((T)2*(T)M_PI*reversed[5]/(T)64)*hi) ); 
-            data[6] = cmplx_mul( data[6],exp_i(((T)2*(T)M_PI*reversed[6]/(T)64)*hi) ); 
-            data[7] = cmplx_mul( data[7],exp_i(((T)2*(T)M_PI*reversed[7]/(T)64)*hi) ); 
-          #else
-            for( int j = 1; j < 8; j++ )
-                data[j] = cmplx_mul(data[j] , exp_i(((T)2*(T)M_PI*reversed[j]/(T)64)*hi) );
-          #endif
-
-          //transpose(data, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE);
-          for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].x;
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) data[i].x = smem[hi*72+lo+i*8]; 
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) smem[hi*8+lo+i*72] = data[reversed[i]].y;
-          #pragma omp barrier 
-          for( int i = 0; i < 8; i++ ) data[i].y= smem[hi*72+lo+i*8]; 
-
-          IFFT8( data );
-
-          for(i=0; i<8; i++) {
-            data[i].x = data[i].x/(T)512;
-            data[i].y = data[i].y/(T)512;
-          }
-
-          //globalStores8(data, source, 64);
-          for( int i = 0; i < 8; i++ )
-            source[blockIdx+i*64] = data[reversed[i]];
-
-        }
-      }
+      fft1D_512(source, n_ffts);
+      ifft1D_512(source, n_ffts);
     }
 
     auto end = std::chrono::steady_clock::now();
@@ -330,21 +376,6 @@ int main(int argc, char** argv)
     std::cout << "Average kernel execution time " << (time * 1e-9f) / passes << " (s)\n";
   }
 
-  // Verification
-  bool error = false;
-  for (int i = 0; i < N; i++) {
-    if ( fabs((T)source[i].x - (T)reference[i].x) > EPISON) {
-      //std::cout << i << " " << (T)source[i].x << " " << (T)reference[i].x << std::endl;
-      error = true;
-      break;
-    }
-    if ( fabs((T)source[i].y - (T)reference[i].y) > EPISON) {
-      //std::cout << i << " " << (T)source[i].y << " " << (T)reference[i].y << std::endl;
-      error = true;
-      break;
-    }
-  }
-  std::cout << (error ? "FAIL" : "PASS")  << std::endl;
   free(reference);
   free(source);
 

@@ -121,7 +121,7 @@ int main(int argc, char **argv){
 
   dfloat maxDiff = 0;
   for(int n=0;n<Ndim*Np*Nelements;++n){
-    dfloat diff = std::fabs(q[n]-Aq[n]);
+    dfloat diff = fabs(q[n]-Aq[n]);
     maxDiff = (maxDiff<diff) ? diff:maxDiff;
   }
   std::cout << "Correctness check: maxError = " << maxDiff << "\n";

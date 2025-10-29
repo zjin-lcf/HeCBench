@@ -7,9 +7,9 @@
 #include "reference.h"
 
 template <class T>
-void testcase(const int repeat)
+void testcase(const int num, const int repeat)
 {
-  const int len = 1 << 10;
+  const size_t len = 1UL << num;
   unsigned int numThreads = 256;
   unsigned int numData = 7;
   unsigned int memSize = sizeof(T) * numData;
@@ -23,7 +23,7 @@ void testcase(const int repeat)
       #pragma omp target update to (gpuData[0:7])
 
       #pragma omp target teams distribute parallel for thread_limit(numThreads)
-      for (int i = 0; i < len; ++i)
+      for (size_t i = 0; i < len; ++i)
       {
          #pragma omp atomic update
           gpuData[0] += (T)10;
@@ -42,11 +42,11 @@ void testcase(const int repeat)
       }
 
       #pragma omp target teams distribute parallel for thread_limit(256) reduction(max: gpuData[2])
-      for (int i = 0; i < len; ++i)
+      for (size_t i = 0; i < len; ++i)
          gpuData[2] = max(gpuData[2], (T)i);
 
       #pragma omp target teams distribute parallel for thread_limit(256) reduction(min: gpuData[3])
-      for (int i = 0; i < len; ++i)
+      for (size_t i = 0; i < len; ++i)
          gpuData[3] = min(gpuData[3], (T)i);
     }
 
@@ -58,7 +58,7 @@ void testcase(const int repeat)
     for (int n = 0; n < repeat; n++) {
       // ignore result verification
       #pragma omp target teams distribute parallel for thread_limit(numThreads)
-      for (int i = 0; i < len; ++i)
+      for (size_t i = 0; i < len; ++i)
       {
          #pragma omp atomic update
           gpuData[0] += (T)10;
@@ -77,11 +77,11 @@ void testcase(const int repeat)
       }
 
       #pragma omp target teams distribute parallel for thread_limit(256) reduction(max: gpuData[2])
-      for (int i = 0; i < len; ++i)
+      for (size_t i = 0; i < len; ++i)
          gpuData[2] = max(gpuData[2], (T)i);
 
       #pragma omp target teams distribute parallel for thread_limit(256) reduction(min: gpuData[3])
-      for (int i = 0; i < len; ++i)
+      for (size_t i = 0; i < len; ++i)
          gpuData[3] = min(gpuData[3], (T)i);
     }
 
@@ -93,13 +93,14 @@ void testcase(const int repeat)
 
 int main(int argc, char **argv)
 {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <number of atomic operations> <repeat>\n", argv[0]);
     return 1;
   }
 
-  const int repeat = atoi(argv[1]);
-  testcase<int>(repeat);
-  testcase<unsigned int>(repeat);
+  const int num = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
+  testcase<int>(num, repeat);
+  testcase<unsigned int>(num, repeat);
   return 0;
 }

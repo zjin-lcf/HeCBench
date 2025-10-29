@@ -31,7 +31,6 @@ static struct option long_options[] = {
 
 int main ( int argc, char *argv[] )
 {
-  printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
   int matrix_dim = 32; /* default matrix_dim */
   int opt, option_index=0;
   func_ret_t ret;
@@ -39,7 +38,7 @@ int main ( int argc, char *argv[] )
   float *m, *mm;
   stopwatch sw;
 
-  while ((opt = getopt_long(argc, argv, "::vs:i:", 
+  while ((opt = getopt_long(argc, argv, "::vs:i:",
           long_options, &option_index)) != -1 ) {
     switch(opt){
       case 'i':
@@ -50,6 +49,14 @@ int main ( int argc, char *argv[] )
         break;
       case 's':
         matrix_dim = atoi(optarg);
+        if (matrix_dim <= 0) {
+          printf("Matrix dimension must be positive!\n");
+          exit(EXIT_FAILURE);
+        }
+        if (matrix_dim % 16 != 0) {
+          printf("Matrix dimension of %d not supported by the benchmark\n", matrix_dim);
+          exit(EXIT_FAILURE);
+        }
         printf("Generate input matrix internally, size=%d\n", matrix_dim);
         break;
       case '?':
@@ -67,7 +74,7 @@ int main ( int argc, char *argv[] )
   if ( (optind < argc) || (optind == 1)) {
     fprintf(stderr, "Usage: %s [-v] [-s matrix_size|-i input_file]\n", argv[0]);
     exit(EXIT_FAILURE);
-  }  
+  }
 
   if (input_file) {
     printf("Reading matrix from file %s\n", input_file);
@@ -77,7 +84,7 @@ int main ( int argc, char *argv[] )
       fprintf(stderr, "error create matrix from file %s\n", input_file);
       exit(EXIT_FAILURE);
     }
-  } 
+  }
 
   else if (matrix_dim) {
     printf("Creating matrix internally size=%d\n", matrix_dim);
@@ -104,32 +111,31 @@ int main ( int argc, char *argv[] )
   stopwatch_start(&sw);
 
   float *d_m;
-  cudaMalloc((void**)&d_m, matrix_dim*matrix_dim*sizeof(float));
-  cudaMemcpy(d_m, m, matrix_dim*matrix_dim*sizeof(float), cudaMemcpyHostToDevice);
+  size_t matrix_size_bytes = (size_t)matrix_dim * matrix_dim * sizeof(float); 
+  cudaMalloc((void**)&d_m, matrix_size_bytes);
+  cudaMemcpy(d_m, m, matrix_size_bytes, cudaMemcpyHostToDevice);
 
-  int offset;
   int i=0;
+  printf("WG size of kernel = %d X %d\n", BLOCK_SIZE, BLOCK_SIZE);
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
-  
+
   for (i=0; i < matrix_dim-BLOCK_SIZE; i += BLOCK_SIZE) {
-    offset = i;  // add the offset 
-    lud_diagonal<<<1, BLOCK_SIZE>>>(d_m, matrix_dim, offset);
-    lud_perimeter<<<(matrix_dim-i)/BLOCK_SIZE-1, 2*BLOCK_SIZE>>>(d_m, matrix_dim, offset);
+    lud_diagonal<<<1, BLOCK_SIZE>>>(d_m, matrix_dim, i);
+    lud_perimeter<<<(matrix_dim-i)/BLOCK_SIZE-1, 2*BLOCK_SIZE>>>(d_m, matrix_dim, i);
     lud_internal<<< dim3((matrix_dim-i)/BLOCK_SIZE-1, (matrix_dim-i)/BLOCK_SIZE-1),
-	    dim3(BLOCK_SIZE, BLOCK_SIZE)>>>(d_m, matrix_dim, offset);
+	    dim3(BLOCK_SIZE, BLOCK_SIZE)>>>(d_m, matrix_dim, i);
   } // for
 
-  offset = i;  // add the offset 
-  lud_diagonal<<<1, BLOCK_SIZE>>>(d_m, matrix_dim, offset);
+  lud_diagonal<<<1, BLOCK_SIZE>>>(d_m, matrix_dim, i);
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time : %f (s)\n", time * 1e-9f);
 
-  cudaMemcpy(m, d_m, matrix_dim*matrix_dim*sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(m, d_m, matrix_size_bytes, cudaMemcpyDeviceToHost);
 
   /* end of timing point */
   stopwatch_stop(&sw);
@@ -139,7 +145,7 @@ int main ( int argc, char *argv[] )
     printf("After LUD\n");
     // print_matrix(m, matrix_dim);
     printf(">>>Verify<<<<\n");
-    lud_verify(mm, m, matrix_dim); 
+    lud_verify(mm, m, matrix_dim);
     free(mm);
   }
 

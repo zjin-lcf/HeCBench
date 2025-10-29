@@ -6,6 +6,8 @@
 
 #define BLOCK_SIZE 256
 
+#include "reference.h"
+
 template <typename T>
 void BlockRangeAtomicOnGlobalMem(
     sycl::queue &q,
@@ -156,6 +158,9 @@ void atomicPerf (int n, int t, int repeat)
   size_t data_size = sizeof(T) * t;
 
   T* data = (T*) malloc (data_size);
+  T* h_data = (T*) malloc (data_size);
+  T* r_data = (T*) malloc (data_size);
+  int fail;
 
   for(int i=0; i<t; i++) {
     data[i] = i%1024+1;
@@ -178,6 +183,13 @@ void atomicPerf (int n, int t, int repeat)
   printf("Average execution time of BlockRangeAtomicOnGlobalMem: %f (us)\n",
           time * 1e-3f / repeat);
 
+  q.memcpy(h_data, d_data, data_size).wait();
+  memcpy(r_data, data, data_size);
+  for(int i=0; i<repeat; i++)
+    BlockRangeAtomicOnGlobalMem_ref<T>(r_data, n);
+  fail = memcmp(h_data, r_data, data_size);
+  printf("%s\n", fail ? "FAIL" : "PASS");
+  
   q.memcpy(d_data, data, data_size).wait();
   start = std::chrono::steady_clock::now();
   for(int i=0; i<repeat; i++)
@@ -189,6 +201,13 @@ void atomicPerf (int n, int t, int repeat)
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of WarpRangeAtomicOnGlobalMem: %f (us)\n",
           time * 1e-3f / repeat);
+
+  q.memcpy(h_data, d_data, data_size).wait();
+  memcpy(r_data, data, data_size);
+  for(int i=0; i<repeat; i++)
+    WarpRangeAtomicOnGlobalMem_ref<T>(r_data, n);
+  fail = memcmp(h_data, r_data, data_size);
+  printf("%s\n", fail ? "FAIL" : "PASS");
 
   q.memcpy(d_data, data, data_size).wait();
   start = std::chrono::steady_clock::now();
@@ -202,6 +221,13 @@ void atomicPerf (int n, int t, int repeat)
   printf("Average execution time of SingleRangeAtomicOnGlobalMem: %f (us)\n",
           time * 1e-3f / repeat);
 
+  q.memcpy(h_data, d_data, data_size).wait();
+  memcpy(r_data, data, data_size);
+  for(int i=0; i<repeat; i++)
+    SingleRangeAtomicOnGlobalMem_ref<T>(r_data, i % BLOCK_SIZE, n);
+  fail = memcmp(h_data, r_data, data_size);
+  printf("%s\n", fail ? "FAIL" : "PASS");
+
   q.memcpy(d_data, data, data_size).wait();
   start = std::chrono::steady_clock::now();
   for(int i=0; i<repeat; i++)
@@ -213,6 +239,10 @@ void atomicPerf (int n, int t, int repeat)
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of BlockRangeAtomicOnSharedMem: %f (us)\n",
           time * 1e-3f / repeat);
+
+  q.memcpy(h_data, d_data, data_size).wait();
+  fail = memcmp(h_data, data, data_size);
+  printf("%s\n", fail ? "FAIL" : "PASS");
 
   q.memcpy(d_data, data, data_size).wait();
   start = std::chrono::steady_clock::now();
@@ -226,6 +256,10 @@ void atomicPerf (int n, int t, int repeat)
   printf("Average execution time of WarpRangeAtomicOnSharedMem: %f (us)\n",
           time * 1e-3f / repeat);
 
+  q.memcpy(h_data, d_data, data_size).wait();
+  fail = memcmp(h_data, data, data_size);
+  printf("%s\n", fail ? "FAIL" : "PASS");
+
   q.memcpy(d_data, data, data_size).wait();
   start = std::chrono::steady_clock::now();
   for(int i=0; i<repeat; i++)
@@ -238,7 +272,13 @@ void atomicPerf (int n, int t, int repeat)
   printf("Average execution time of SingleRangeAtomicOnSharedMem: %f (us)\n",
           time * 1e-3f / repeat);
 
+  q.memcpy(h_data, d_data, data_size).wait();
+  fail = memcmp(h_data, data, data_size);
+  printf("%s\n", fail ? "FAIL" : "PASS");
+
   free(data);
+  free(h_data);
+  free(r_data);
   sycl::free(d_data, q);
 }
 

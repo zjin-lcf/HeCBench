@@ -22,6 +22,7 @@
 #include <sycl/sycl.hpp>
 #include "atomics.h"
 #include "params.h"
+#include "reference.h"
 
 void postprocess (
   sycl::queue &q,
@@ -34,6 +35,7 @@ void postprocess (
   const float *__restrict anchors,
   const float *__restrict anchor_bottom_heights,
         float *__restrict bndbox_output,
+        float *__restrict score_output,
         int *__restrict object_counter,
   const float min_x_range,
   const float max_x_range,
@@ -106,7 +108,7 @@ void postprocess (
 
         int resCount = atomicAdd(object_counter, 1);
         bndbox_output[0] = resCount+1;
-        float *data = bndbox_output + 1 + resCount * 9;
+        float *data = bndbox_output + resCount * 9;
         data[0] = box_input[box_offset];
         data[1] = box_input[box_offset + 1];
         data[2] = box_input[box_offset + 2];
@@ -115,7 +117,8 @@ void postprocess (
         data[5] = box_input[box_offset + 5];
         data[6] = yaw;
         data[7] = dev_cls[0];
-        data[8] = dev_cls[1];
+        data[8] = box_offset;
+        score_output[resCount] = max_score;
       }
     };
     cgh.parallel_for(sycl::nd_range<3>(gws, lws), kfn);
@@ -151,12 +154,13 @@ int main(int argc, char* argv[])
   const int cls_size = feature_anchor_size * num_classes;
   const int box_size = feature_anchor_size * num_box_values;
   const int dir_cls_size = feature_anchor_size * num_dir_bins;
-  const int bndbox_size = feature_anchor_size * 9 + 1;
+  const int bndbox_size = feature_anchor_size * 9;
 
   const int cls_size_byte = cls_size * sizeof(float);
   const int box_size_byte = box_size * sizeof(float);
   const int dir_cls_size_byte = dir_cls_size * sizeof(float);
   const int bndbox_size_byte = bndbox_size * sizeof(float);
+  const int score_size_byte = feature_anchor_size * sizeof(float);
 
   // input of the post-process kernel
   float *h_cls_input = (float*) malloc (cls_size_byte);
@@ -165,6 +169,7 @@ int main(int argc, char* argv[])
 
   // output of the post-process kernel
   float *h_bndbox_output = (float*) malloc (bndbox_size_byte);
+  float *h_score_output = (float*) malloc (score_size_byte);
 
   // random values
   srand(123);
@@ -182,6 +187,7 @@ int main(int argc, char* argv[])
   float *d_box_input = sycl::malloc_device<float>(box_size, q);
   float *d_dir_cls_input = sycl::malloc_device<float>(dir_cls_size, q);
   float *d_bndbox_output = sycl::malloc_device<float>(bndbox_size, q);
+  float *d_score_output = sycl::malloc_device<float>(feature_anchor_size, q);
   float *d_anchors = sycl::malloc_device<float>(num_anchors * len_per_anchor, q);
   float *d_anchor_bottom_heights = sycl::malloc_device<float>(num_classes, q);
     int *d_object_counter = sycl::malloc_device<int>(1, q);
@@ -211,6 +217,7 @@ int main(int argc, char* argv[])
                 d_anchors,
                 d_anchor_bottom_heights,
                 d_bndbox_output,
+                d_score_output,
                 d_object_counter,
                 min_x_range,
                 max_x_range,
@@ -231,11 +238,32 @@ int main(int argc, char* argv[])
 
   printf("Average execution time of postprocess kernel: %f (us)\n", (time * 1e-3f) / repeat);
 
-  q.memcpy(h_bndbox_output, d_bndbox_output, bndbox_size_byte).wait();
+  int bndbox_num;
+  q.memcpy(&bndbox_num, d_object_counter, sizeof(int));
+  q.memcpy(h_bndbox_output, d_bndbox_output, bndbox_size_byte);
+  q.memcpy(h_score_output, d_score_output, score_size_byte);
+  q.wait();
 
-  double checksum = 0.0;
-  for (int i = 0; i < bndbox_size; i++) checksum += h_bndbox_output[i];
-  printf("checksum = %lf\n", checksum / bndbox_size);
+  verify (bndbox_num,
+          h_cls_input,
+          h_box_input,
+          h_dir_cls_input,
+          p.anchors,
+          p.anchor_bottom_heights,
+          h_bndbox_output,
+          h_score_output,
+          min_x_range,
+          max_x_range,
+          min_y_range,
+          max_y_range,
+          feature_size,
+          feature_x_size,
+          feature_y_size,
+          num_anchors,
+          num_classes,
+          num_box_values,
+          score_thresh,
+          dir_offset);
 
   sycl::free(d_anchors, q);
   sycl::free(d_anchor_bottom_heights, q);
@@ -244,10 +272,12 @@ int main(int argc, char* argv[])
   sycl::free(d_box_input, q);
   sycl::free(d_dir_cls_input, q);
   sycl::free(d_bndbox_output, q);
+  sycl::free(d_score_output, q);
 
   free(h_cls_input);
   free(h_box_input);
   free(h_dir_cls_input);
+  free(h_score_output);
   free(h_bndbox_output);
 
   return 0;

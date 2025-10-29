@@ -25,18 +25,25 @@ float* attention_device(const float* key, const float* value, const float* query
   auto r = std::max_element(sg_sizes.begin(), sg_sizes.end());
   int warpSize = *r;
 
+  size_t q_size = (size_t)d;
+  size_t r_size = (size_t)n;
+  size_t kv_size = (size_t)d * n;
+  size_t r_size_bytes = r_size * sizeof(float);
+  size_t q_size_bytes = q_size * sizeof(float);
+  size_t kv_size_bytes = kv_size * sizeof(float);
+
   // input
   float *d_key;
-  d_key = sycl::malloc_device<float>(n * d, q);
-  q.memcpy(d_key, key, n * d * sizeof(float)).wait();
+  d_key = sycl::malloc_device<float>(kv_size, q);
+  q.memcpy(d_key, key, kv_size_bytes).wait();
 
   float *d_value;
-  d_value = sycl::malloc_device<float>(n * d, q);
-  q.memcpy(d_value, value, n * d * sizeof(float)).wait();
+  d_value = sycl::malloc_device<float>(kv_size, q);
+  q.memcpy(d_value, value, kv_size_bytes).wait();
 
   float *d_query;
   d_query = sycl::malloc_device<float>(d, q);
-  q.memcpy(d_query, query, d * sizeof(float)).wait();
+  q.memcpy(d_query, query, q_size_bytes).wait();
 
   // intermediate
   float *d_dot_product;
@@ -46,7 +53,7 @@ float* attention_device(const float* key, const float* value, const float* query
   d_exp_sum = sycl::malloc_device<float>(1, q);
 
   // result
-  float *output = (float*) malloc (d * sizeof(float));
+  float *output = (float*) malloc (q_size_bytes);
   float *d_output;
   d_output = sycl::malloc_device<float>(d, q);
 
@@ -144,7 +151,7 @@ float* attention_device(const float* key, const float* value, const float* query
     sycl::free(d_score, q);
   }
 
-  q.memcpy(output, d_output, d * sizeof(float)).wait();
+  q.memcpy(output, d_output, q_size_bytes).wait();
   sycl::free(d_value, q);
   sycl::free(d_output, q);
   sycl::free(d_key, q);
@@ -168,28 +175,35 @@ int main(int argc, char* argv[]) {
   const int r = atoi(argv[4]);
 
   // input
-  float* key = (float*) malloc (n * d * sizeof(float));
-  float* value = (float*) malloc (n * d * sizeof(float));
-  float* query = (float*) malloc (d * sizeof(float));
+  size_t q_size = (size_t)d;
+  size_t kv_size = (size_t)d * n;
+  size_t q_size_bytes = q_size * sizeof(float);
+  size_t kv_size_bytes = kv_size * sizeof(float);
+
+  float* key = (float*) malloc (kv_size_bytes);
+  float* value = (float*) malloc (kv_size_bytes);
+  float* query = (float*) malloc (q_size_bytes);
 
   std::mt19937 gen(19937);
   std::uniform_real_distribution<float> dist(-0.01f, 0.01f);
 
-  for (int i = 0; i < n * d; i++) {
+  for (size_t i = 0; i < kv_size; i++) {
     key[i] = dist(gen);
     value[i] = dist(gen);
     query[i % d] = dist(gen);
   }
 
   float* hout = attention_host(key, value, query, n, d);
-
   float* dout = attention_device(key, value, query, n, d, k, r);
 
-  float rmse = 0;
+  bool ok = true;
   for (int i = 0; i < d; i++) {
-    rmse += (hout[i] - dout[i]) * (hout[i] - dout[i]);
+    if (fabsf(hout[i] - dout[i]) > 1e-3f) {
+      ok = false;
+      break;
+    }
   }
-  printf("RMSE = %f\n", sqrtf(rmse / d));
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(key);
   free(value);

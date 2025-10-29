@@ -11,19 +11,20 @@ LAUNCHER  =
 #===============================================================================
 # Program name & source code list
 #===============================================================================
+UPATH = ../boxfilter-sycl
+SPATH = ../recursiveGaussian-cuda
 
 program = main
 
-source = main.cu RecursiveGaussianHost.cu shrUtils.cu    
-
-obj = $(source:.cu=.o)
+obj = main.o RecursiveGaussianHost.o shrUtils.o 
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../include
+CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../boxfilter-sycl \
+          -I../recursiveGaussian-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -46,7 +47,16 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu main.h shrUtils.h
+main.o: main.cu ../boxfilter-sycl/shrUtils.h \
+                ../recursiveGaussian-cuda/main.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+RecursiveGaussianHost.o: ../recursiveGaussian-cuda/RecursiveGaussianHost.cpp \
+                         ../recursiveGaussian-cuda/main.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+
+shrUtils.o : ../boxfilter-sycl/shrUtils.cpp ../boxfilter-sycl/shrUtils.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

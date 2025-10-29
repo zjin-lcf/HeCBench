@@ -30,7 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I../atomicPerf-cuda \
           -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
@@ -72,7 +72,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp
+%.o: %.cpp ../atomicPerf-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
