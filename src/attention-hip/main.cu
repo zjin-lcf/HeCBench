@@ -15,33 +15,39 @@ inline int grids(int p, int b) {
 float* attention_device(const float* key, const float* value, const float* query,
                         const int n, const int d, const int impl_num, const int repeat)
 {
+  size_t q_size = (size_t)d;
+  size_t r_size = (size_t)n;
+  size_t kv_size = (size_t)d * n;
+  size_t r_size_bytes = r_size * sizeof(float);
+  size_t q_size_bytes = q_size * sizeof(float);
+  size_t kv_size_bytes = kv_size * sizeof(float);
+
   // input
   float *d_key;
-  hipMalloc((void**)&d_key, n * d * sizeof(float));
-  hipMemcpy(d_key, key, n * d * sizeof(float), hipMemcpyHostToDevice);
+  hipMalloc((void**)&d_key, kv_size_bytes);
+  hipMemcpy(d_key, key, kv_size_bytes, hipMemcpyHostToDevice);
 
   float *d_value;
-  hipMalloc((void**)&d_value, n * d * sizeof(float));
-  hipMemcpy(d_value, value, n * d * sizeof(float), hipMemcpyHostToDevice);
+  hipMalloc((void**)&d_value, kv_size_bytes);
+  hipMemcpy(d_value, value, kv_size_bytes, hipMemcpyHostToDevice);
 
   float *d_query;
-  hipMalloc((void**)&d_query, d * sizeof(float));
-  hipMemcpy(d_query, query, d * sizeof(float), hipMemcpyHostToDevice);
+  hipMalloc((void**)&d_query, q_size_bytes);
+  hipMemcpy(d_query, query, q_size_bytes, hipMemcpyHostToDevice);
 
   // intermediate
   float *d_dot_product;
-  hipMalloc((void**)&d_dot_product, n * sizeof(float));
+  hipMalloc((void**)&d_dot_product, r_size_bytes);
 
   float *d_exp_sum;
   hipMalloc((void**)&d_exp_sum, sizeof(float));
 
   // result
-  float *output = (float*) malloc (d * sizeof(float));
+  float *output = (float*) malloc (q_size_bytes);
   float *d_output;
-  hipMalloc((void**)&d_output, d * sizeof(float));
+  hipMalloc((void**)&d_output, q_size_bytes);
 
   hipDeviceSynchronize();
-
 
   if (impl_num == 3) {
 
@@ -93,7 +99,7 @@ float* attention_device(const float* key, const float* value, const float* query
 
   else {
     float *d_score;
-    hipMalloc((void**)&d_score, n * sizeof(float));
+    hipMalloc((void**)&d_score, r_size_bytes);
 
     auto start = std::chrono::steady_clock::now();
 
@@ -111,7 +117,7 @@ float* attention_device(const float* key, const float* value, const float* query
     hipFree(d_score);
   }
 
-  hipMemcpy(output, d_output, d * sizeof(float), hipMemcpyDeviceToHost);
+  hipMemcpy(output, d_output, q_size_bytes, hipMemcpyDeviceToHost);
   hipFree(d_value);
   hipFree(d_output);
   hipFree(d_key);
@@ -135,28 +141,35 @@ int main(int argc, char* argv[]) {
   const int r = atoi(argv[4]);
 
   // input
-  float* key = (float*) malloc (n * d * sizeof(float));
-  float* value = (float*) malloc (n * d * sizeof(float));
-  float* query = (float*) malloc (d * sizeof(float));
+  size_t q_size = (size_t)d;
+  size_t kv_size = (size_t)d * n;
+  size_t q_size_bytes = q_size * sizeof(float);
+  size_t kv_size_bytes = kv_size * sizeof(float);
+
+  float* key = (float*) malloc (kv_size_bytes);
+  float* value = (float*) malloc (kv_size_bytes);
+  float* query = (float*) malloc (q_size_bytes);
 
   std::mt19937 gen(19937);
   std::uniform_real_distribution<float> dist(-0.01f, 0.01f);
 
-  for (int i = 0; i < n * d; i++) {
+  for (size_t i = 0; i < kv_size; i++) {
     key[i] = dist(gen);
     value[i] = dist(gen);
     query[i % d] = dist(gen);
   }
 
   float* hout = attention_host(key, value, query, n, d);
-
   float* dout = attention_device(key, value, query, n, d, k, r);
 
-  float rmse = 0;
+  bool ok = true;
   for (int i = 0; i < d; i++) {
-    rmse += (hout[i] - dout[i]) * (hout[i] - dout[i]);
+    if (fabsf(hout[i] - dout[i]) > 1e-3f) {
+      ok = false;
+      break;
+    }
   }
-  printf("RMSE = %f\n", sqrtf(rmse / d));
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(key);
   free(value);

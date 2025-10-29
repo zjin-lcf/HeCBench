@@ -31,6 +31,7 @@
 #include <getopt.h>
 #include <chrono>
 #include <sycl/sycl.hpp>
+#include "reference.h"
 
 #ifdef __NVPTX__
   #include <sycl/ext/oneapi/experimental/cuda/builtins.hpp>
@@ -51,7 +52,7 @@ const float threshold= 1e-16f;
 // generates an array of random pages and their links
 int *random_pages(int n, unsigned int *noutlinks, int divisor){
   int i, j, k;
-  int *pages = (int*) malloc(sizeof(int)*n*n); // matrix 1 means link from j->i
+  int *pages = (int*) malloc((size_t)n * n * sizeof(int)); // matrix 1 means link from j->i
 
   if (divisor <= 0) {
     fprintf(stderr, "ERROR: Invalid divisor '%d' for random initialization, divisor should be greater or equal to 1\n", divisor);
@@ -62,7 +63,7 @@ int *random_pages(int n, unsigned int *noutlinks, int divisor){
     noutlinks[i] = 0;
     for(j=0; j<n; ++j){
       if(i!=j && (abs(rand())%divisor == 0)){
-        pages[i*n+j] = 1;
+        pages[(size_t)i*n+j] = 1;
         noutlinks[i] += 1;
       }
     }
@@ -70,7 +71,7 @@ int *random_pages(int n, unsigned int *noutlinks, int divisor){
     // the case with no outlinks is avoided
     if(noutlinks[i] == 0){
       do { k = abs(rand()) % n; } while ( k == i);
-      pages[i*n + k] = 1;
+      pages[(size_t)i*n + k] = 1;
       noutlinks[i] = 1;
     }
   }
@@ -114,7 +115,7 @@ int main(int argc, char *argv[]) {
   float *page_ranks;
   unsigned int *noutlinks;
   int t;
-  float max_diff;
+  float max_diff, max_diff_ref;
 
   int i = 0;
   int j;
@@ -122,7 +123,6 @@ int main(int argc, char *argv[]) {
   int iter = max_iter;
   float thresh = threshold;
   int divisor = 2;
-  int nb_links = 0;
 
   int opt, opt_index = 0;
   while((opt = getopt_long(argc, argv, "::n:i:t:q:", size_opts, &opt_index)) != -1){
@@ -144,11 +144,17 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
   }
-  page_ranks = (float*)malloc(sizeof(float)*n);
-  maps = (float*)malloc(sizeof(float)*n*n);
-  noutlinks = (unsigned int*)malloc(sizeof(unsigned int)*n);
 
-  max_diff=99.0f;
+  size_t rank_size = (size_t)n * sizeof(float);
+  size_t map_size = (size_t)n * n * sizeof(float);
+  size_t page_size = (size_t)n * n * sizeof(int);
+  size_t link_size = (size_t)n * sizeof(unsigned int);
+
+  page_ranks = (float*)malloc(rank_size);
+  maps = (float*)malloc(map_size);
+  noutlinks = (unsigned int*)malloc(link_size);
+
+  max_diff=max_diff_ref=99.0f;
 
   for (i=0; i<n; ++i) {
     noutlinks[i] = 0;
@@ -156,15 +162,8 @@ int main(int argc, char *argv[]) {
   pages = random_pages(n,noutlinks,divisor);
   init_array(page_ranks, n, 1.0f / (float) n);
 
-  nb_links = 0;
-  for (i=0; i<n; ++i) {
-    for (j=0; j<n; ++j) {
-      nb_links += pages[i*n+j];
-    }
-  }
-
   float *diffs;
-  diffs  = (float*) malloc(sizeof(float)*n);
+  diffs  = (float*) malloc(rank_size);
   for(i = 0; i < n; ++i){
     diffs[i] = 0.0f;
   }
@@ -175,18 +174,19 @@ int main(int argc, char *argv[]) {
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  int *d_pages = sycl::malloc_device<int>(n*n, q);
-  q.memcpy(d_pages, pages, sizeof(int) * n * n);
+  int *d_pages = (int*)sycl::malloc_device(page_size, q);
+  q.memcpy(d_pages, pages, page_size);
 
-  float *d_page_ranks = sycl::malloc_device<float>(n, q);
-  q.memcpy(d_page_ranks, page_ranks, sizeof(float) * n);
+  float *d_page_ranks = (float*)sycl::malloc_device(rank_size, q);
+  q.memcpy(d_page_ranks, page_ranks, rank_size);
 
-  float *d_maps = sycl::malloc_device<float>(n*n, q);
+  float *d_maps = (float*)sycl::malloc_device(map_size, q);
 
-  unsigned int *d_noutlinks = sycl::malloc_device<unsigned int>(n, q);
-  q.memcpy(d_noutlinks, noutlinks, sizeof(unsigned int) * n);
+  unsigned int *d_noutlinks = (unsigned int*)sycl::malloc_device(link_size, q);
+  q.memcpy(d_noutlinks, noutlinks, link_size);
 
-  float *d_diffs = sycl::malloc_device<float>(n, q);
+  float *d_diffs = (float*)sycl::malloc_device(rank_size, q);
+  q.memset(d_diffs, 0, rank_size);
 
   size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
   size_t global_work_size = (n+block_size-1) / block_size * block_size;
@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
         if (i < n) {
           float outbound_rank = ldg(&d_page_ranks[i])/(float)ldg(&d_noutlinks[i]);
           for(int j=0; j<n; ++j)
-            d_maps[i*n+j] = ldg(&d_pages[i*n+j])*outbound_rank;
+            d_maps[(size_t)i*n+j] = ldg(&d_pages[(size_t)i*n+j])*outbound_rank;
         }
       });
     });
@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) {
         if (j < n) {
           old_rank = d_page_ranks[j];
           new_rank = 0.0f;
-          for(int i=0; i< n; ++i) new_rank += d_maps[i*n + j];
+          for(int i=0; i< n; ++i) new_rank += d_maps[(size_t)i*n + j];
           new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
           d_diffs[j] = sycl::max(sycl::fabs(new_rank - old_rank), d_diffs[j]);
           d_page_ranks[j] = new_rank;
@@ -235,9 +235,7 @@ int main(int argc, char *argv[]) {
     auto end = std::chrono::high_resolution_clock::now();
     ktime += std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
 
-    q.memcpy(diffs, d_diffs, sizeof(float)*n).wait();
-    q.memset(d_diffs, 0, sizeof(float)*n);
-
+    q.memcpy(diffs, d_diffs, rank_size).wait();
     max_diff = maximum_dif(diffs, n);
   }
 
@@ -250,6 +248,15 @@ int main(int argc, char *argv[]) {
   fprintf(stderr, "Max difference %f is reached at iteration %d\n", max_diff, t);
   printf("\"Options\": \"-n %d -i %d -t %f\". Total kernel execution time: %lf (s)\n",
          n, iter, thresh, ktime);
+
+  memset(diffs, 0, rank_size);
+  for (t=1; t<=iter && max_diff_ref>=thresh; ++t) {
+    map_ref(pages, page_ranks, maps, noutlinks, n);
+    reduce_ref(page_ranks, maps, n, diffs);
+    max_diff_ref = maximum_dif(diffs, n);
+  }
+  bool ok = fabsf(max_diff - max_diff_ref) < 1e-3f;
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(pages);
   free(maps);

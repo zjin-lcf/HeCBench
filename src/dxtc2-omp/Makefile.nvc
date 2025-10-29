@@ -13,19 +13,18 @@ LAUNCHER  =
 #===============================================================================
 # Program name & source code list
 #===============================================================================
+SPATH = ../boxfilter-sycl
 
 program = main
 
-source = main.cpp shrUtils.cpp block.cpp 
-
-obj = $(source:.cpp=.o)
+obj = main.o shrUtils.o block.o 
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -DUSE_GPU -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -DUSE_GPU -std=c++14 -Wall -I$(SPATH)
 
 # Linker Flags
 LDFLAGS = 
@@ -57,10 +56,10 @@ $(program): $(obj)
 block.o: block.cpp block.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o : main.cpp kernel.cpp shrUtils.h
+main.o : main.cpp kernel.cpp $(SPATH)/shrUtils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-shrUtils.o : shrUtils.cpp shrUtils.h 
+shrUtils.o : $(SPATH)/shrUtils.cpp $(SPATH)/shrUtils.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

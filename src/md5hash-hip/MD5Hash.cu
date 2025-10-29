@@ -425,7 +425,7 @@ void FindKeyWithDigest_GPU(
   unsigned int searchDigest2 = searchDigest[2];
   unsigned int searchDigest3 = searchDigest[3];
 
-  hipLaunchKernelGGL(md5hash_kernel, dim3(nblocks), dim3(nthreads), 0, 0, 
+  md5hash_kernel<<< dim3(nblocks), dim3(nthreads) >>>(
       d_foundIndex, d_foundKey, d_foundDigest, 
       keyspace, byteLength, valsPerByte,
       searchDigest0, searchDigest1, searchDigest2, searchDigest3);
@@ -528,7 +528,7 @@ int main(int argc, char** argv)
       if (verbose)
       {
         cout << endl;
-        cout << "--- pass " << pass << " ---" << endl;
+        cout << "--- iteration " << pass << " ---" << endl;
         cout << "Looking for random key:" << endl;
         cout << " randomIndex = " << randomIndex << endl;
         cout << " randomKey   = 0x" << AsHex(randomKey, 8/*byteLength*/) << endl;
@@ -612,6 +612,7 @@ int main(int argc, char** argv)
         cout << " foundDigest = " << AsHex((unsigned char*)foundDigest, 16) << endl;
         cout << endl;
       }
+      cout << ((rate == FLT_MAX) ? "FAIL" : "PASS") << endl;
     }
   }
 

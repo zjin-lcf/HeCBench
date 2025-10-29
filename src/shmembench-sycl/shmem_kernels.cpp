@@ -27,17 +27,11 @@ float4 init_val(int i){
 }
 
 float4 reduce_vector(float4 v1, float4 v2, float4 v3, float4 v4, float4 v5, float4 v6){
-  return float4(v1.x() + v2.x() + v3.x() + v4.x() + v5.x() + v6.x(),
-                v1.y() + v2.y() + v3.y() + v4.y() + v5.y() + v6.y(),
-                v1.z() + v2.z() + v3.z() + v4.z() + v5.z() + v6.z(),
-                v1.w() + v2.w() + v3.w() + v4.w() + v5.w() + v6.w());
+  return (v1 + v2 + v3 + v4 + v5 + v6);
 }
 
 void set_vector(float4 *target, int offset, float4 v){
-  target[offset].x() = v.x();
-  target[offset].y() = v.y();
-  target[offset].z() = v.z();
-  target[offset].w() = v.w();
+  target[offset] = v;
 }
 
 
@@ -98,7 +92,8 @@ void shmembenchGPU(double *c, const long size, const int n) {
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<float4, 1> shm_buffer(sycl::range<1>(BLOCK_SIZE*6), cgh);
       cgh.parallel_for<class kernel>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        benchmark_shmem((float4*)cd, shm_buffer.get_pointer(), item);
+        benchmark_shmem((float4*)cd,
+                         shm_buffer.get_multi_ptr<sycl::access::decorated::no>().get(), item);
       });
     });
   }

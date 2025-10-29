@@ -43,12 +43,12 @@ unsigned int rgbaFloat4ToUint(const float4 rgba)
 void Transpose(sycl::nd_item<2> &item,
                const unsigned int *uiDataIn,
                unsigned int *uiDataOut,
-               const int iWidth, const int iHeight,
+               const size_t iWidth, const size_t iHeight,
                unsigned int *uiLocalBuff)
 {
     // read the matrix tile into LMEM
-    unsigned int xIndex = item.get_global_id(1);
-    unsigned int yIndex = item.get_global_id(0);
+    size_t xIndex = item.get_global_id(1);
+    size_t yIndex = item.get_global_id(0);
 
     if((xIndex < iWidth) && (yIndex < iHeight))
     {
@@ -61,10 +61,8 @@ void Transpose(sycl::nd_item<2> &item,
     item.barrier(sycl::access::fence_space::local_space);
 
     // write the transposed matrix tile to global memory
-    // mul24(get_group_id(1), get_local_size(1)) + get_local_id(0);
-    xIndex = sycl::mul24((unsigned)item.get_group(0), (unsigned)item.get_local_range(0)) + item.get_local_id(1);
-    //mul24(get_group_id(0), get_local_size(0)) + get_local_id(1);
-    yIndex = sycl::mul24((unsigned)item.get_group(1), (unsigned)item.get_local_range(1)) + item.get_local_id(0);
+    xIndex = item.get_group(0) * item.get_local_range(0) + item.get_local_id(1);
+    yIndex = item.get_group(1) * item.get_local_range(1) + item.get_local_id(0);
     if((xIndex < iHeight) && (yIndex < iWidth))
     {
         uiDataOut[(yIndex * iHeight) + xIndex] =
@@ -87,10 +85,10 @@ void SimpleRecursiveRGBA(
   sycl::nd_item<1> &item,
   const unsigned int *uiDataIn,
   unsigned int *uiDataOut,
-  const int iWidth, const int iHeight, const float a)
+  const size_t iWidth, const size_t iHeight, const float a)
 {
     // compute X pixel location and check in-bounds
-  unsigned int X = item.get_global_id(0);
+  size_t X = item.get_global_id(0);
   if (X >= iWidth) return;
 
   // advance global pointers to correct column for this work item and x position
@@ -140,7 +138,7 @@ void SimpleRecursiveRGBA(
 void RecursiveRGBA(sycl::nd_item<1> &item,
                    const unsigned int *uiDataIn,
                    unsigned int *uiDataOut,
-                   const int iWidth, const int iHeight,
+                   const size_t iWidth, const size_t iHeight,
                    const float a0, const float a1,
                    const float a2, const float a3,
                    const float b1, const float b2,
@@ -148,8 +146,8 @@ void RecursiveRGBA(sycl::nd_item<1> &item,
 {
     // compute X pixel location and check in-bounds
     //unsigned int X = mul24(get_group_id(0), get_local_size(0)) + get_local_id(0);
-    unsigned int X = item.get_global_id(0);
-	if (X >= iWidth) return;
+    size_t X = item.get_global_id(0);
+    if (X >= iWidth) return;
 
     // advance global pointers to correct column for this work item and x position
     uiDataIn += X;
@@ -232,7 +230,7 @@ double GPUGaussianFilterRGBA(sycl::queue &q,
   float coefn = pGP->coefn;
 #endif
 
-  unsigned int szBuffBytes = uiImageWidth * uiImageHeight * sizeof (unsigned int);
+  size_t szBuffBytes = (size_t)uiImageWidth * uiImageHeight * sizeof (unsigned int);
   q.memcpy(d_BufIn, uiInput, szBuffBytes).wait();
 
   auto start = std::chrono::steady_clock::now();
@@ -270,7 +268,8 @@ double GPUGaussianFilterRGBA(sycl::queue &q,
     sycl::local_accessor<unsigned int, 1>
       uiLocalBuff (sycl::range<1>(iTransposeBlockDim * (iTransposeBlockDim + 1)), cgh);
     cgh.parallel_for<class transpose1>(sycl::nd_range<2>(t1_gws, t1_lws), [=] (sycl::nd_item<2> item) {
-      Transpose(item, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight, uiLocalBuff.get_pointer());
+      Transpose(item, d_BufTmp, d_BufOut, uiImageWidth, uiImageHeight,
+                uiLocalBuff.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 
@@ -307,7 +306,8 @@ double GPUGaussianFilterRGBA(sycl::queue &q,
     sycl::local_accessor<unsigned int, 1>
       uiLocalBuff (sycl::range<1>(iTransposeBlockDim * (iTransposeBlockDim + 1)), cgh);
     cgh.parallel_for<class transpose2>(sycl::nd_range<2>(t2_gws, t1_lws), [=] (sycl::nd_item<2> item) {
-      Transpose(item, d_BufTmp, d_BufOut, uiImageHeight, uiImageWidth, uiLocalBuff.get_pointer());
+      Transpose(item, d_BufTmp, d_BufOut, uiImageHeight, uiImageWidth,
+                uiLocalBuff.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 
@@ -328,19 +328,33 @@ int main(int argc, char** argv)
 
   const float fSigma = 10.0f;         // filter sigma (blur factor)
   const int iOrder = 0;               // filter order
-  unsigned int uiImageWidth = 1920;   // Image width
-  unsigned int uiImageHeight = 1080;  // Image height
+  unsigned int uiMaxImageWidth = 1920;   // Image width
+  unsigned int uiMaxImageHeight = 1080;  // Image height
+  unsigned int uiImageWidth;
+  unsigned int uiImageHeight;
   unsigned int* uiInput = NULL;       // Host buffer to hold input image data
   unsigned int* uiTemp = NULL;        // Host buffer to hold intermediate image data
   unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
 
-  shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
-  printf("Image Width = %i, Height = %i, bpp = %lu\n\n", uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+  bool status = shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
+
+  printf("Image Width = %i, Height = %i, bpp = %lu\n\n",
+         uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
+
+  if (uiImageWidth > uiMaxImageWidth || uiImageHeight > uiMaxImageHeight) {
+    printf("Error: Image Dimensions exceed the maximum values");
+    status = 0;
+  }
+  if (!status) {
+     free(uiInput);
+     return 1;
+  }
+
   const int iCycles = atoi(argv[2]);
 
   // Allocate intermediate and output host image buffers
-  unsigned int szBuff = uiImageWidth * uiImageHeight;
-  unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
+  size_t szBuff = (size_t)uiImageWidth * uiImageHeight;
+  size_t szBuffBytes = szBuff * sizeof (unsigned int);
   uiTemp = (unsigned int*)malloc(szBuffBytes);
   uiOutput = (unsigned int*)malloc(szBuffBytes);
   printf("Allocate Host Image Buffers...\n");
@@ -380,7 +394,7 @@ int main(int argc, char** argv)
   HostRecursiveGaussianRGBA(uiInput, uiTemp, uiGolden, uiImageWidth, uiImageHeight, &GP);
 
   printf("Comparing GPU Result to CPU Result...\n");
-  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
+  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, szBuff, 1.0f, 0.01f);
   printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match");
 
   free(uiGolden);

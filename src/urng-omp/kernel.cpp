@@ -52,9 +52,11 @@ float ran1(int idum, int *iv)
       idum += IM;
 
     if(j < NTAB)
-      iv[NTAB* tid + j] = idum;
+      //iv[NTAB* tid + j] = idum;
+      iv[NTAB * j + tid] = idum;
   }
-  iy = iv[NTAB* tid];
+  //iy = iv[NTAB* tid];
+  iy = iv[tid];
 
   k = idum / IQ;
   idum = IA * (idum - k * IQ) - IR * k;
@@ -63,7 +65,8 @@ float ran1(int idum, int *iv)
     idum += IM;
 
   j = iy / NDIV;
-  iy = iv[NTAB * tid + j];
+  //iy = iv[NTAB * tid + j];
+  iy = iv[NTAB * j + tid];
   return (AM * iy);  //AM *iy will be between 0.0 and 1.0
 }
 

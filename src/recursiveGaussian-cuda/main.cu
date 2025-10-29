@@ -44,11 +44,11 @@ unsigned int rgbaFloat4ToUint(const float4 rgba)
 __global__ 
 void Transpose(const unsigned int* uiDataIn, 
                      unsigned int* uiDataOut, 
-               const int iWidth, const int iHeight)
+               const size_t iWidth, const size_t iHeight)
 {
     // read the matrix tile into LMEM
-    unsigned int xIndex = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int yIndex = blockIdx.y * blockDim.y + threadIdx.y;
+    size_t xIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t yIndex = blockIdx.y * blockDim.y + threadIdx.y;
     __shared__ unsigned int uiLocalBuff[16*17];
 
     if((xIndex < iWidth) && (yIndex < iHeight))
@@ -61,8 +61,8 @@ void Transpose(const unsigned int* uiDataIn,
     __syncthreads();
 
     // write the transposed matrix tile to global memory
-    xIndex = __mul24(blockIdx.y, blockDim.y) + threadIdx.x;
-    yIndex = __mul24(blockIdx.x, blockDim.x) + threadIdx.y;
+    xIndex = blockIdx.y * blockDim.y + threadIdx.x;
+    yIndex = blockIdx.x * blockDim.x + threadIdx.y;
     if((xIndex < iHeight) && (yIndex < iWidth))
     {
         uiDataOut[(yIndex * iHeight) + xIndex] = 
@@ -84,10 +84,10 @@ void Transpose(const unsigned int* uiDataIn,
 __global__ void SimpleRecursiveRGBA(
   const unsigned int* uiDataIn,
         unsigned int* uiDataOut,
-  const int iWidth, const int iHeight, const float a)
+  const size_t iWidth, const size_t iHeight, const float a)
 {
     // compute X pixel location and check in-bounds
-  unsigned int X = blockIdx.x * blockDim.x + threadIdx.x;
+  size_t X = blockIdx.x * blockDim.x + threadIdx.x;
   if (X >= iWidth) return;
     
   // advance global pointers to correct column for this work item and x position
@@ -137,15 +137,14 @@ __global__ void SimpleRecursiveRGBA(
 __global__ void RecursiveRGBA(
   const unsigned int* uiDataIn, 
   unsigned int* uiDataOut, 
-  const int iWidth, const int iHeight, 
+  const size_t iWidth, const size_t iHeight, 
   const float a0, const float a1, 
   const float a2, const float a3, 
   const float b1, const float b2, 
   const float coefp, const float coefn)
 {
     // compute X pixel location and check in-bounds
-    //unsigned int X = mul24(get_group_id(0), get_local_size(0)) + get_local_id(0);
-    unsigned int X = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t X = blockIdx.x * blockDim.x + threadIdx.x;
     if (X >= iWidth) return;
 
     // advance global pointers to correct column for this work item and x position
@@ -228,7 +227,7 @@ double GPUGaussianFilterRGBA(const unsigned int* uiInput,
   float coefn = pGP->coefn;
 #endif
 
-  unsigned int szBuffBytes = uiImageWidth * uiImageHeight * sizeof (unsigned int);
+  size_t szBuffBytes = (size_t)uiImageWidth * uiImageHeight * sizeof (unsigned int);
   cudaMemcpy(d_BufIn, uiInput, szBuffBytes, cudaMemcpyHostToDevice); 
 
   auto start = std::chrono::steady_clock::now();
@@ -298,21 +297,33 @@ int main(int argc, char** argv)
 
   const float fSigma = 10.0f;         // filter sigma (blur factor)
   const int iOrder = 0;               // filter order
-  unsigned int uiImageWidth = 1920;   // Image width
-  unsigned int uiImageHeight = 1080;  // Image height
+  const unsigned int uiMaxImageWidth = 1920;   // Image width
+  const unsigned int uiMaxImageHeight = 1080;  // Image height
+  unsigned int uiImageWidth;
+  unsigned int uiImageHeight;
   unsigned int* uiInput = NULL;       // Host buffer to hold input image data
   unsigned int* uiTemp = NULL;        // Host buffer to hold intermediate image data
   unsigned int* uiOutput = NULL;      // Host buffer to hold output image data
 
-  shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
-  const int iCycles = atoi(argv[2]);
+  bool status = shrLoadPPM4ub(argv[1], (unsigned char **)&uiInput, &uiImageWidth, &uiImageHeight);
 
   printf("Image Width = %i, Height = %i, bpp = %lu\n\n",
          uiImageWidth, uiImageHeight, sizeof(unsigned int)<<3);
 
+  if (uiImageWidth > uiMaxImageWidth || uiImageHeight > uiMaxImageHeight) {
+    printf("Error: Image Dimensions exceed the maximum values");
+    status = 0;
+  }
+  if (!status) {
+     free(uiInput);
+     return 1;
+  }
+
+  const int iCycles = atoi(argv[2]);
+
   // Allocate intermediate and output host image buffers
-  unsigned int szBuff = uiImageWidth * uiImageHeight;
-  unsigned int szBuffBytes = szBuff * sizeof (unsigned int);
+  size_t szBuff = (size_t)uiImageWidth * uiImageHeight;
+  size_t szBuffBytes = szBuff * sizeof (unsigned int);
   uiTemp = (unsigned int*)malloc(szBuffBytes);
   uiOutput = (unsigned int*)malloc(szBuffBytes);
   printf("Allocate Host Image Buffers...\n"); 
@@ -349,7 +360,7 @@ int main(int argc, char** argv)
   HostRecursiveGaussianRGBA(uiInput, uiTemp, uiGolden, uiImageWidth, uiImageHeight, &GP);
 
   printf("Comparing GPU Result to CPU Result...\n"); 
-  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, (uiImageWidth * uiImageHeight), 1.0f, 0.01f);
+  shrBOOL bMatch = shrCompareuit(uiGolden, uiOutput, szBuff, 1.0f, 0.01f);
   printf("\nGPU Result %s CPU Result within tolerance...\n", (bMatch == shrTRUE) ? "matches" : "DOESN'T match"); 
 
   free(uiGolden);

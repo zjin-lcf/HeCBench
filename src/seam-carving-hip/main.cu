@@ -16,11 +16,22 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#define HIP_CHECK(call)                                                    \
+do {                                                                       \
+    hipError_t err_ = call;                                                \
+    if (err_ != hipSuccess) {                                              \
+        fprintf(stderr, "HIP error at %s:%d code=%d(%s) \"%s\" \n",        \
+                __FILE__, __LINE__, err_, hipGetErrorString(err_), #call); \
+        exit(EXIT_FAILURE);                                                \
+    }                                                                      \
+} while (0)
+
+
 int main(int argc, char **argv) {
   if(argc < 3){
     printf("Usage: %s <file> <number of seams to remove> [options]\n"
-        "valid options:\n-u\tupdate costs instead of recomputing them\n"
-        "-a\tapproximate computation\n", argv[0]);
+           "valid options:\n-u\tupdate costs instead of recomputing them\n"
+           "-a\tapproximate computation\n", argv[0]);
     return 1;
   }
 
@@ -34,7 +45,8 @@ int main(int argc, char **argv) {
   int w, h, ncomp;
   unsigned char* imgv = stbi_load(argv[1], &w, &h, &ncomp, 0);
   if(imgv == NULL){
-    printf("ERROR: can't load image \"%s\" (maybe the file does not exist?), exiting.\n", argv[1]);
+    printf("ERROR: can't load image \"%s\", exiting.\n", argv[1]);
+    printf("Reason: %s\n", stbi_failure_reason());
     return 1;
   }
 
@@ -59,7 +71,7 @@ int main(int argc, char **argv) {
       mode = SEAM_CARVER_APPROX_MODE;
       printf("approximation mode selected.\n");
     }
-    else{    
+    else{
       printf("an invalid option was specified and will be ignored. Valid options are: -u, -a.\n");
     }
   }
@@ -68,7 +80,7 @@ int main(int argc, char **argv) {
 
   int current_w = w;
   uchar4 *h_pixels = build_pixels(imgv, w, h);
-  const int img_bytes = w * h * sizeof(uchar4);
+  const size_t img_bytes = (size_t)w * h * sizeof(uchar4);
   const int cost_bytes = w * h * sizeof(short);
   const int h_bytes = h * sizeof(int);
   const int w_bytes = w * sizeof(int);
@@ -87,17 +99,17 @@ int main(int argc, char **argv) {
   int *d_M;
 
   if(mode != SEAM_CARVER_APPROX_MODE) {
-    hipMalloc((void**)&d_costs_left, cost_bytes); 
-    hipMalloc((void**)&d_costs_up, cost_bytes); 
-    hipMalloc((void**)&d_costs_right, cost_bytes); 
+    HIP_CHECK(hipMalloc((void**)&d_costs_left, cost_bytes));
+    HIP_CHECK(hipMalloc((void**)&d_costs_up, cost_bytes));
+    HIP_CHECK(hipMalloc((void**)&d_costs_right, cost_bytes));
   }
   if(mode == SEAM_CARVER_UPDATE_MODE){
-    hipMalloc((void**)&d_costs_swap_left, cost_bytes); 
-    hipMalloc((void**)&d_costs_swap_up, cost_bytes); 
-    hipMalloc((void**)&d_costs_swap_right, cost_bytes);
+    HIP_CHECK(hipMalloc((void**)&d_costs_swap_left, cost_bytes));
+    HIP_CHECK(hipMalloc((void**)&d_costs_swap_up, cost_bytes));
+    HIP_CHECK(hipMalloc((void**)&d_costs_swap_right, cost_bytes));
   }
   //sum map in approx mode
-  hipMalloc((void**)&d_M, img_bytes); 
+  HIP_CHECK(hipMalloc((void**)&d_M, img_bytes));
 
   // rows to consider for reduce
   if(mode == SEAM_CARVER_APPROX_MODE)
@@ -106,22 +118,22 @@ int main(int argc, char **argv) {
     reduce_row = d_M + w*(h-1); //last row
 
   if(mode == SEAM_CARVER_APPROX_MODE){
-    hipMalloc((void**)&d_index_map, img_bytes);
-    hipMalloc((void**)&d_offset_map, img_bytes);
+    HIP_CHECK(hipMalloc((void**)&d_index_map, img_bytes));
+    HIP_CHECK(hipMalloc((void**)&d_offset_map, img_bytes));
   }
 
   int* indices = (int*)malloc(w_bytes);
   for(int i = 0; i < w; i++) indices[i] = i;
 
-  hipMalloc((void**)&d_indices, w_bytes); 
+  HIP_CHECK(hipMalloc((void**)&d_indices, w_bytes));
 
-  hipMalloc((void**)&d_indices_ref, w_bytes); 
-  hipMemcpy(d_indices_ref, indices, w_bytes, hipMemcpyHostToDevice);   
-  hipMalloc((void**)&d_seam, h_bytes);    
+  HIP_CHECK(hipMalloc((void**)&d_indices_ref, w_bytes));
+  HIP_CHECK(hipMemcpy(d_indices_ref, indices, w_bytes, hipMemcpyHostToDevice));
+  HIP_CHECK(hipMalloc((void**)&d_seam, h_bytes));
 
-  hipMalloc((void**)&d_pixels, img_bytes);
-  hipMemcpy(d_pixels, h_pixels, img_bytes, hipMemcpyHostToDevice);       
-  hipMalloc((void**)&d_pixels_swap, img_bytes);
+  HIP_CHECK(hipMalloc((void**)&d_pixels, img_bytes));
+  HIP_CHECK(hipMemcpy(d_pixels, h_pixels, img_bytes, hipMemcpyHostToDevice));
+  HIP_CHECK(hipMalloc((void**)&d_pixels_swap, img_bytes));
 
   if(mode == SEAM_CARVER_UPDATE_MODE)
     compute_costs(current_w, w, h, d_pixels, d_costs_left, d_costs_up, d_costs_right);
@@ -151,7 +163,7 @@ int main(int argc, char **argv) {
     std::swap(d_pixels, d_pixels_swap);
 
     if(mode == SEAM_CARVER_UPDATE_MODE){
-      update_costs(current_w, w, h, d_M, d_pixels, 
+      update_costs(current_w, w, h, d_M, d_pixels,
                    d_costs_left, d_costs_up, d_costs_right,
                    d_costs_swap_left, d_costs_swap_up, d_costs_swap_right, d_seam );
       std::swap(d_costs_left, d_costs_swap_left);
@@ -163,41 +175,42 @@ int main(int argc, char **argv) {
     num_iterations++;
   }
 
-  hipDeviceSynchronize();
+  HIP_CHECK(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   float time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Execution time of seam carver kernels: %f (ms)\n", time * 1e-6f);
 
-  hipMemcpy(h_pixels, d_pixels, img_bytes, hipMemcpyDeviceToHost);
-  unsigned char* output = flatten_pixels(h_pixels, w, h, current_w); 
+  HIP_CHECK(hipMemcpy(h_pixels, d_pixels, img_bytes, hipMemcpyDeviceToHost));
+  unsigned char* output = flatten_pixels(h_pixels, w, h, current_w);
   printf("Image resized\n");
 
   printf("Saving in resized.bmp...\n");
   int success = stbi_write_bmp("resized.bmp", current_w, h, 3, output);
   printf("%s\n", success ? "Success" : "Failed");
 
-  hipFree(d_pixels);
-  hipFree(d_pixels_swap);
+  HIP_CHECK(hipFree(d_pixels));
+  HIP_CHECK(hipFree(d_pixels_swap));
   if(mode != SEAM_CARVER_APPROX_MODE){
-    hipFree(d_costs_left);
-    hipFree(d_costs_up);
-    hipFree(d_costs_right);
+    HIP_CHECK(hipFree(d_costs_left));
+    HIP_CHECK(hipFree(d_costs_up));
+    HIP_CHECK(hipFree(d_costs_right));
   }
   if(mode == SEAM_CARVER_UPDATE_MODE){
-    hipFree(d_costs_swap_left);
-    hipFree(d_costs_swap_up);
-    hipFree(d_costs_swap_right);
+    HIP_CHECK(hipFree(d_costs_swap_left));
+    HIP_CHECK(hipFree(d_costs_swap_up));
+    HIP_CHECK(hipFree(d_costs_swap_right));
   }
-  hipFree(d_M); 
-  hipFree(d_indices); 
-  hipFree(d_indices_ref); 
-  hipFree(d_seam);
+  HIP_CHECK(hipFree(d_M));
+  HIP_CHECK(hipFree(d_indices));
+  HIP_CHECK(hipFree(d_indices_ref));
+  HIP_CHECK(hipFree(d_seam));
   if(mode == SEAM_CARVER_APPROX_MODE){
-    hipFree(d_index_map);
-    hipFree(d_offset_map);
+    HIP_CHECK(hipFree(d_index_map));
+    HIP_CHECK(hipFree(d_offset_map));
   }
   free(h_pixels);
-  free(output);   
+  free(output);
   free(indices);
+  free(imgv);
   return 0;
 }

@@ -14,8 +14,6 @@
 
 // declaration, forward
 
-void reference(int NX, int NY, int NZ, float* h_u1, float* h_u2);
-
 void printHelp(void);
 
 // Main program
@@ -93,7 +91,8 @@ int main(int argc, char **argv){
     cgh.parallel_for<class warmup>(
       sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       laplace3d(item, NX, NY, NZ, pitch,
-                d_u1, d_u2, sm.get_pointer());
+                d_u1, d_u2,
+                sm.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   }).wait();
 
@@ -106,7 +105,8 @@ int main(int argc, char **argv){
       cgh.parallel_for<class eval>(
         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         laplace3d(item, NX, NY, NZ, pitch,
-                  d_u1, d_u2, sm.get_pointer());
+                  d_u1, d_u2,
+                  sm.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
     std::swap(d_u1, d_u2);
@@ -127,16 +127,21 @@ int main(int argc, char **argv){
     }
 
     // verify (may take long for large grid sizes)
+    bool ok = true;
     float err = 0.f;
     for (k=0; k<NZ; k++) {
       for (j=0; j<NY; j++) {
         for (i=0; i<NX; i++) {
           int ind = i + j*NX + k*NX*NY;
           err += (h_u1[ind]-h_u2[ind])*(h_u1[ind]-h_u2[ind]);
+          if (fabsf(h_u1[ind] - h_u2[ind]) > 1e-3f) {
+            ok = false;
+          }
         }
       }
     }
-    printf("\n rms error = %f \n",sqrtf(err/ NX*NY*NZ));
+    printf("\n RMS error = %f \n", sqrtf(err/ NX*NY*NZ));
+    printf(" %s\n", ok ? "PASS" : "FAIL");
   }
 
  // Release GPU and CPU memory

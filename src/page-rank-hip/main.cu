@@ -31,6 +31,7 @@
 #include <getopt.h>
 #include <chrono>
 #include <hip/hip_runtime.h>
+#include "reference.h"
 
 #define D_FACTOR (0.85f)
 #ifndef BLOCK_SIZE
@@ -53,7 +54,7 @@ void map(const int *__restrict__ pages,
   if(i < n){
     float outbound_rank = page_ranks[i]/(float)noutlinks[i];
     for(j=0; j<n; ++j){
-      maps[i*n+j] = pages[i*n+j]*outbound_rank;
+      maps[(size_t)i*n+j] = pages[(size_t)i*n+j]*outbound_rank;
     }
   }
 }
@@ -74,7 +75,7 @@ void reduce(      float *__restrict__ page_ranks,
     old_rank = page_ranks[j];
     new_rank = 0.0f;
     for(i=0; i< n; ++i){
-      new_rank += maps[i*n + j];
+      new_rank += maps[(size_t)i*n + j];
     }
 
     new_rank = ((1.f-D_FACTOR)/n)+(D_FACTOR*new_rank);
@@ -86,7 +87,7 @@ void reduce(      float *__restrict__ page_ranks,
 // generates an array of random pages and their links
 int *random_pages(int n, unsigned int *noutlinks, int divisor){
   int i, j, k;
-  int *pages = (int*) malloc(sizeof(int)*n*n); // matrix 1 means link from j->i
+  int *pages = (int*) malloc((size_t)n * n * sizeof(int)); // matrix 1 means link from j->i
 
   if (divisor <= 0) {
     fprintf(stderr, "ERROR: Invalid divisor '%d' for random initialization, divisor should be greater or equal to 1\n", divisor);
@@ -97,7 +98,7 @@ int *random_pages(int n, unsigned int *noutlinks, int divisor){
     noutlinks[i] = 0;
     for(j=0; j<n; ++j){
       if(i!=j && (abs(rand())%divisor == 0)){
-        pages[i*n+j] = 1;
+        pages[(size_t)i*n+j] = 1;
         noutlinks[i] += 1;
       }
     }
@@ -105,7 +106,7 @@ int *random_pages(int n, unsigned int *noutlinks, int divisor){
     // the case with no outlinks is avoided
     if(noutlinks[i] == 0){
       do { k = abs(rand()) % n; } while ( k == i);
-      pages[i*n + k] = 1;
+      pages[(size_t)i*n + k] = 1;
       noutlinks[i] = 1;
     }
   }
@@ -149,7 +150,7 @@ int main(int argc, char *argv[]) {
   float *page_ranks;
   unsigned int *noutlinks;
   int t;
-  float max_diff;
+  float max_diff, max_diff_ref;
 
   int i = 0;
   int j;
@@ -157,7 +158,6 @@ int main(int argc, char *argv[]) {
   int iter = max_iter;
   float thresh = threshold;
   int divisor = 2;
-  int nb_links = 0;
 
   int opt, opt_index = 0;
   while((opt = getopt_long(argc, argv, "::n:i:t:q:", size_opts, &opt_index)) != -1){
@@ -179,11 +179,17 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
   }
-  page_ranks = (float*)malloc(sizeof(float)*n);
-  maps = (float*)malloc(sizeof(float)*n*n);
-  noutlinks = (unsigned int*)malloc(sizeof(unsigned int)*n);
+  
+  size_t rank_size = (size_t)n * sizeof(float);
+  size_t map_size = (size_t)n * n * sizeof(float);
+  size_t page_size = (size_t)n * n * sizeof(int);
+  size_t link_size = (size_t)n * sizeof(unsigned int);
 
-  max_diff=99.0f;
+  page_ranks = (float*)malloc(rank_size);
+  maps = (float*)malloc(map_size);
+  noutlinks = (unsigned int*)malloc(link_size);
+
+  max_diff=max_diff_ref=99.0f;
 
   for (i=0; i<n; ++i) {
     noutlinks[i] = 0;
@@ -191,18 +197,8 @@ int main(int argc, char *argv[]) {
   pages = random_pages(n,noutlinks,divisor);
   init_array(page_ranks, n, 1.0f / (float) n);
 
-  nb_links = 0;
-  for (i=0; i<n; ++i) {
-    for (j=0; j<n; ++j) {
-      nb_links += pages[i*n+j];
-    }
-  }
-
   float *diffs;
-  diffs  = (float*) malloc(sizeof(float)*n);
-  for(i = 0; i < n; ++i){
-    diffs[i] = 0.0f;
-  }
+  diffs = (float*) malloc(rank_size);
 
   int *d_pages;
   float *d_maps;
@@ -210,40 +206,42 @@ int main(int argc, char *argv[]) {
   float *d_diffs;
   unsigned int *d_noutlinks;
 
-  hipMalloc((void**)&d_pages, sizeof(int)*n*n);
-  hipMalloc((void**)&d_page_ranks, sizeof(float)*n);
-  hipMalloc((void**)&d_maps, sizeof(float)*n*n);
-  hipMalloc((void**)&d_noutlinks, sizeof(unsigned int)*n);
-  hipMalloc((void**)&d_diffs, sizeof(float)*n);
+  hipMalloc((void**)&d_pages, page_size);
+  hipMalloc((void**)&d_page_ranks, rank_size);
+  hipMalloc((void**)&d_maps, map_size);
+  hipMalloc((void**)&d_noutlinks, link_size);
+  hipMalloc((void**)&d_diffs, rank_size);
+  hipMemset(d_diffs, 0, rank_size);
 
-  hipMemcpy(d_pages, pages, sizeof(int)*n*n, hipMemcpyHostToDevice);
-  hipMemcpy(d_page_ranks, page_ranks, sizeof(float)*n, hipMemcpyHostToDevice);
-  hipMemcpy(d_noutlinks, noutlinks, sizeof(unsigned int)*n, hipMemcpyHostToDevice);
+  hipMemcpy(d_pages, pages, page_size, hipMemcpyHostToDevice);
+  hipMemcpy(d_page_ranks, page_ranks, rank_size, hipMemcpyHostToDevice);
+  hipMemcpy(d_noutlinks, noutlinks, link_size, hipMemcpyHostToDevice);
 
   size_t block_size  = n < BLOCK_SIZE ? n : BLOCK_SIZE;
   size_t num_blocks = (n+block_size-1) / block_size;
 
   double ktime = 0.0;
+  printf("Threshold: %f\n", thresh);
  
   for (t=1; t<=iter && max_diff>=thresh; ++t) {
+    hipDeviceSynchronize();
     auto start = std::chrono::high_resolution_clock::now();
 
-    hipLaunchKernelGGL(map, dim3(num_blocks), dim3(block_size), 0, 0, 
+    map <<< dim3(num_blocks), dim3(block_size) >>> (
       d_pages, d_page_ranks, d_maps, d_noutlinks, n);
 
-    hipLaunchKernelGGL(reduce, dim3(num_blocks), dim3(block_size), 0, 0,
+    reduce <<< dim3(num_blocks), dim3(block_size) >>> (
       d_page_ranks, d_maps, n, d_diffs);
     
     hipDeviceSynchronize();
     auto end = std::chrono::high_resolution_clock::now();
-    ktime += std::chrono::duration_cast<std::chrono::duration<double> >(end - start).count();
+    ktime += std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
 
-    hipMemcpy(diffs, d_diffs, sizeof(float)*n, hipMemcpyDeviceToHost);
-    hipMemset(d_diffs, 0, sizeof(float)*n);
+    hipMemcpy(diffs, d_diffs, rank_size, hipMemcpyDeviceToHost);
     max_diff = maximum_dif(diffs, n);
   }
-  //hipMemcpy(maps, d_maps, sizeof(float)*n*n, hipMemcpyDeviceToHost);
-  //hipMemcpy(page_ranks, d_page_ranks, sizeof(float)*n, hipMemcpyDeviceToHost);
+  //hipMemcpy(maps, d_maps, page_size, hipMemcpyDeviceToHost);
+  //hipMemcpy(page_ranks, d_page_ranks, rank_size, hipMemcpyDeviceToHost);
 
   hipFree(d_pages);
   hipFree(d_maps);
@@ -254,6 +252,15 @@ int main(int argc, char *argv[]) {
   fprintf(stderr, "Max difference %f is reached at iteration %d\n", max_diff, t);
   printf("\"Options\": \"-n %d -i %d -t %f\". Total kernel execution time: %lf (s)\n",
          n, iter, thresh, ktime);
+
+  memset(diffs, 0, rank_size);
+  for (t=1; t<=iter && max_diff_ref>=thresh; ++t) {
+    map_ref(pages, page_ranks, maps, noutlinks, n);
+    reduce_ref(page_ranks, maps, n, diffs);
+    max_diff_ref = maximum_dif(diffs, n);
+  }
+  bool ok = fabsf(max_diff - max_diff_ref) < 1e-3f;
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   free(pages);
   free(maps);

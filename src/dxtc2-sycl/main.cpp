@@ -55,6 +55,18 @@ int main(int argc, char** argv)
     exit(EXIT_FAILURE);
   }
 
+  if (width % 4 != 0 || height % 4 != 0) {
+    printf("Error: the image dimensions must be a multiple of 4.\n");
+    free(h_img);
+    exit(EXIT_FAILURE);
+  }
+
+  if (width > 16384 || height > 16384) {
+    printf("Error: the image dimensions exceed the maximum values.\n");
+    free(h_img);
+    exit(EXIT_FAILURE);
+  }
+
   printf("Image Loaded '%s', %d x %d pixels\n\n", image_path, width, height);
 
   // Convert linear image to block linear. 
@@ -112,7 +124,7 @@ int main(int argc, char** argv)
   sycl::uint2 *d_result = sycl::malloc_device<sycl::uint2>(compressedSize/8, q); 
 
   // Determine launch configuration and run timed computation numIterations times
-  int blocks = ((width + 3) / 4) * ((height + 3) / 4); // rounds up by 1 block in each dim if %4 != 0
+  int blocks = width / 4 * height / 4;
 
   // Restrict the numbers of blocks to launch on low end GPUs to avoid kernel timeout
   int blocksPerLaunch = MIN(blocks, 768 * 24);
@@ -137,37 +149,107 @@ int main(int argc, char** argv)
 
       q.submit([&] (sycl::handler &cgh) {
         sycl::local_accessor<sycl::float4, 1> s_colors(sycl::range<1>(16), cgh);
-        sycl::local_accessor<sycl::float4, 1> s_sums(sycl::range<1>(16), cgh);
+        sycl::local_accessor<sycl::float4, 1> s_sums(sycl::range<1>(1), cgh);
         sycl::local_accessor<int, 1> s_int(sycl::range<1>(64), cgh);
-        sycl::local_accessor<float, 1> s_float(sycl::range<1>(96), cgh);
+        sycl::local_accessor<float, 1> s_dps(sycl::range<1>(16), cgh);
+        sycl::local_accessor<float, 1> s_covariance(sycl::range<1>(96), cgh);
         sycl::local_accessor<unsigned int, 1> s_permutations(sycl::range<1>(160), cgh);
         sycl::local_accessor<int, 1> s_xrefs(sycl::range<1>(16), cgh);
 
         cgh.parallel_for<class dxtc>(
           sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
 	  const int idx = item.get_local_id(0);
+          const int bid = item.get_group(0) + j;
     
-          loadColorBlock(item,
-                         d_image,
-                         s_colors.get_pointer(), 
-                         s_sums.get_pointer(),
-                         s_xrefs.get_pointer(),
-                         s_float.get_pointer(),
-                         j);
+          if (idx < 16) {
+            // Read color and copy to shared mem.
+            uint c = d_image[(bid)*16 + idx];
+
+            s_colors[idx].x()= ((c >> 0) & 0xFF) * (1.0f / 255.0f);
+            s_colors[idx].y()= ((c >> 8) & 0xFF) * (1.0f / 255.0f);
+            s_colors[idx].z()= ((c >> 16) & 0xFF) * (1.0f / 255.0f);
+          }
+
+          item.barrier(sycl::access::fence_space::local_space);
+
+          if (idx == 0) {
+            s_sums[0] = s_colors[0];
+            for (int i = 1; i < 16; i++)
+              s_sums[0] += s_colors[i];
+          }
+
+          item.barrier(sycl::access::fence_space::local_space);
+
+          if (idx < 16) {
+            // Sort colors along the best fit line.
+            sycl::float4 diff = s_colors[idx] - s_sums[0] * (sycl::float4)(1.0f / 16.0f);
+            s_covariance[6 * idx + 0] = diff.x()* diff.x();  // 0, 6, 12, 2, 8, 14, 4, 10, 0
+            s_covariance[6 * idx + 1] = diff.x()* diff.y();
+            s_covariance[6 * idx + 2] = diff.x()* diff.z();
+            s_covariance[6 * idx + 3] = diff.y()* diff.y();
+            s_covariance[6 * idx + 4] = diff.y()* diff.z();
+            s_covariance[6 * idx + 5] = diff.z()* diff.z();
+          }
+
+          item.barrier(sycl::access::fence_space::local_space);
+
+          for (int d = 8; d > 0; d >>= 1) {
+            if (idx < d) {
+              s_covariance[6 * idx + 0] += s_covariance[6 * (idx + d) + 0];
+              s_covariance[6 * idx + 1] += s_covariance[6 * (idx + d) + 1];
+              s_covariance[6 * idx + 2] += s_covariance[6 * (idx + d) + 2];
+              s_covariance[6 * idx + 3] += s_covariance[6 * (idx + d) + 3];
+              s_covariance[6 * idx + 4] += s_covariance[6 * (idx + d) + 4];
+              s_covariance[6 * idx + 5] += s_covariance[6 * (idx + d) + 5];
+            }
+            item.barrier(sycl::access::fence_space::local_space);
+          }
+           
+          if (idx < 16) {
+            // Compute first eigen vector.
+            sycl::float4 axis = firstEigenVector(s_covariance);
+
+            s_dps[idx] = s_colors[idx].x() * axis.x() + 
+                         s_colors[idx].y() * axis.y() +
+                         s_colors[idx].z() * axis.z();
+          }
+          item.barrier(sycl::access::fence_space::local_space);
+
+          if (idx < 16) {
+            int rank = 0;
+            #pragma unroll
+            for (int i = 0; i < 16; i++) {
+              rank += (s_dps[i] < s_dps[idx]);
+            }
           
+            s_xrefs[idx] = rank;
+          }
           item.barrier(sycl::access::fence_space::local_space);
           
+          // Resolve elements with the same index.
+          for (int i = 0; i < 15; i++) {
+            if (idx < 16 && idx > i && s_xrefs[idx] == s_xrefs[i]) {
+              ++s_xrefs[idx];
+            }
+            item.barrier(sycl::access::fence_space::local_space);
+          }
+          
+          if (idx < 16) {
+            s_colors[s_xrefs[idx]] = s_colors[idx];
+          }
+          item.barrier(sycl::access::fence_space::local_space);
+
           sycl::uint4 best = evalAllPermutations(item,
                                                  s_colors.get_pointer(),
                                                  d_permutations,
-                                                 s_float.get_pointer(),
+                                                 s_covariance.get_pointer(),
                                                  s_sums[0],
                                                  s_permutations.get_pointer(), 
                                                  d_alphaTable4, d_prods4, 
                                                  d_alphaTable3, d_prods3);
 
           // Use a parallel reduction to find minimum error.
-          const int minIdx = findMinError(item, s_float.get_pointer(), s_int.get_pointer());    
+          const int minIdx = findMinError(item, s_covariance.get_pointer(), s_int.get_pointer());    
 
           item.barrier(sycl::access::fence_space::local_space);
           

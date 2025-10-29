@@ -509,7 +509,7 @@ int main(int argc, char** argv)
       if (verbose)
       {
         std::cout << std::endl;
-        std::cout << "--- pass " << pass << " ---" << std::endl;
+        std::cout << "--- iteration " << pass << " ---" << std::endl;
         std::cout << "Looking for random key:" << std::endl;
         std::cout << " randomIndex = " << randomIndex << std::endl;
         std::cout << " randomKey   = 0x" << AsHex(randomKey, 8/*byteLength*/) << std::endl;
@@ -592,6 +592,7 @@ int main(int argc, char** argv)
         std::cout << " foundDigest = " << AsHex((unsigned char*)foundDigest, 16) << std::endl;
         std::cout << std::endl;
       }
+      std::cout << ((rate == FLT_MAX) ? "FAIL" : "PASS") << std::endl;
     }
   }
 

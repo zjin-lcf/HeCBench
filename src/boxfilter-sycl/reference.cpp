@@ -8,180 +8,191 @@
  * is strictly prohibited.
  *
  */
-unsigned int rgbaFloatToUint(const float* rgba, const float fScale)
+
+#include <chrono>
+#include <memory>
+#include <iostream>
+
+typedef struct __attribute__((__aligned__(4)))
 {
-    unsigned int uiPackedPix = 0U;
-    uiPackedPix |= 0x000000FF & (unsigned int)(rgba[0] * fScale);
-    uiPackedPix |= 0x0000FF00 & (((unsigned int)(rgba[1] * fScale)) << 8);
-    uiPackedPix |= 0x00FF0000 & (((unsigned int)(rgba[2] * fScale)) << 16);
-    uiPackedPix |= 0xFF000000 & (((unsigned int)(rgba[3] * fScale)) << 24);
-    return uiPackedPix;
+  unsigned char x;
+  unsigned char y;
+  unsigned char z;
+  unsigned char w;
+} uchar4;
+
+typedef struct __attribute__((__aligned__(16)))
+{
+  float x;
+  float y;
+  float z;
+  float w;
+} float4;
+
+inline uint DivUp(uint a, uint b){
+    return (a % b != 0) ? (a / b + 1) : (a / b);
 }
 
-// CPU row box filter implementation
+// Helper function to convert float[4] rgba color to 32-bit unsigned integer
 //*****************************************************************
-void BoxFilterHostX(unsigned char* uiInputImage, unsigned int* uiOutputImage, 
-                    unsigned int uiWidth, unsigned int uiHeight, int r, float fScale)
+static float4 rgbaUintToFloat4(const unsigned int c)
 {
-    // do all rows, one row at a time
-    for (unsigned int y = 0; y < uiHeight; y++) 
+  float4 rgba;
+  rgba.x = c & 0xff;
+  rgba.y = (c >> 8) & 0xff;
+  rgba.z = (c >> 16) & 0xff;
+  rgba.w = (c >> 24) & 0xff;
+  return rgba;
+}
+
+static uchar4 rgbaUintToUchar4(unsigned int c)
+{
+    uchar4 rgba;
+    rgba.x = c & 0xff;
+    rgba.y = (c >> 8) & 0xff;
+    rgba.z = (c >> 16) & 0xff;
+    rgba.w = (c >> 24) & 0xff;
+    return rgba;
+}
+
+static unsigned int rgbaFloat4ToUint(const float4 rgba, const float fScale)
+{
+  unsigned int uiPackedPix = 0U;
+  uiPackedPix |= 0x000000FF & (unsigned int)(rgba.x * fScale);
+  uiPackedPix |= 0x0000FF00 & (((unsigned int)(rgba.y * fScale)) << 8);
+  uiPackedPix |= 0x00FF0000 & (((unsigned int)(rgba.z * fScale)) << 16);
+  uiPackedPix |= 0xFF000000 & (((unsigned int)(rgba.w * fScale)) << 24);
+  return uiPackedPix;
+}
+
+inline float4 operator*(float4 a, float4 b)
+{
+    return {a.x * b.x, a.y * b.y, a.z * b.z,  a.w * b.w};
+}
+
+inline void operator+=(float4 &a, float4 b)
+{
+    a.x += b.x;
+    a.y += b.y;
+    a.z += b.z;
+    a.w += b.w;
+}
+
+inline void operator-=(float4 &a, float4 b)
+{
+    a.x -= b.x;
+    a.y -= b.y;
+    a.z -= b.z;
+    a.w -= b.w;
+}
+
+void BoxFilterHost( unsigned int *uiInput,
+                    unsigned int *uiTmp,
+                    unsigned int *uiDevOutput,
+                    const int uiWidth,
+                    const int uiHeight,
+                    const int iRadius,
+                    const float fScale)
+{
+  const int szMaxWorkgroupSize = 256;
+  const int iRadiusAligned = ((iRadius + 15)/16) * 16;  // 16
+  unsigned int uiNumOutputPix = 64;  // Default output pix per workgroup
+
+  if (szMaxWorkgroupSize < (iRadiusAligned + uiNumOutputPix + iRadius))
+    uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - iRadius;
+
+  const int uiBlockWidth = DivUp((size_t)uiWidth, (size_t)uiNumOutputPix);
+  const int numTeams = uiHeight * uiBlockWidth;
+  const int blockSize = iRadiusAligned + uiNumOutputPix + iRadius;
+
+  for (int team = 0; team < numTeams; team++)
+  {
+    uchar4 uc4LocalData[iRadiusAligned+uiNumOutputPix+iRadius];
+    for (int lid = 0; lid < blockSize; lid++)
     {
-        // init with dark edges
-        float f4Sum [4] = {0.0f, 0.0f, 0.0f, 0.0f};
+      int gidx = team % uiBlockWidth;
+      int gidy = team / uiBlockWidth;
 
-        // do left edge first 
-        for (int x = 0; x <= r; x++) 
-        {
-            int iBase = (y * uiWidth + x) << 2;
-            f4Sum[0] += uiInputImage[iBase];
-            f4Sum[1] += uiInputImage[iBase + 1];
-            f4Sum[2] += uiInputImage[iBase + 2];
-            f4Sum[3] += uiInputImage[iBase + 3];
-        }
-        uiOutputImage[y * uiWidth] = rgbaFloatToUint(f4Sum, fScale);
+      int globalPosX = gidx * uiNumOutputPix + lid - iRadiusAligned;
+      int globalPosY = gidy;
+      int iGlobalOffset = globalPosY * uiWidth + globalPosX;
 
-        // then do pixels within/including a radius of left edge, using rolling method
-        for(int x = 1; x <= r; x++) 
-        {
-            // add the next rolling pix
-            int iBase = (y * uiWidth + x + r) << 2;
-            f4Sum[0] += uiInputImage[iBase];
-            f4Sum[1] += uiInputImage[iBase + 1];
-            f4Sum[2] += uiInputImage[iBase + 2];
-            f4Sum[3] += uiInputImage[iBase + 3];
-
-            // nothing to delete for trailing edge... fade up from dark edge
-
-            uiOutputImage[y * uiWidth + x] = rgbaFloatToUint(f4Sum, fScale);
-        }
-        
-        // do main body of image (beyond a radius of left and right edges), using rolling method
-        for(unsigned int x = r + 1; x < uiWidth - r; x++) 
-        {
-            // add the next rolling pix
-            int iBase = (y * uiWidth + x + r) << 2;
-            f4Sum[0] += uiInputImage[iBase];
-            f4Sum[1] += uiInputImage[iBase + 1];
-            f4Sum[2] += uiInputImage[iBase + 2];
-            f4Sum[3] += uiInputImage[iBase + 3];
-
-            // delete the trailing pix
-            iBase = (y * uiWidth + x - r - 1) << 2;
-            f4Sum[0] -= uiInputImage[iBase];
-            f4Sum[1] -= uiInputImage[iBase + 1];
-            f4Sum[2] -= uiInputImage[iBase + 2];
-            f4Sum[3] -= uiInputImage[iBase + 3];
-
-            uiOutputImage[y * uiWidth + x] = rgbaFloatToUint(f4Sum, fScale);
-        }
-
-        // do pixels within a radius of right edge 
-        for (unsigned int x = uiWidth - r; x < uiWidth; x++) 
-        {
-            // No additions for next rolling pix... fade out to dark edge
-
-            // delete the trailing pix
-            int iBase = (y * uiWidth + x - r - 1) << 2;
-            f4Sum[0] -= uiInputImage[iBase];
-            f4Sum[1] -= uiInputImage[iBase + 1];
-            f4Sum[2] -= uiInputImage[iBase + 2];
-            f4Sum[3] -= uiInputImage[iBase + 3];
-
-            uiOutputImage[y * uiWidth + x] = rgbaFloatToUint(f4Sum, fScale);
-        }
+      if (globalPosX >= 0 && globalPosX < uiWidth)
+          uc4LocalData[lid] = rgbaUintToUchar4(uiInput[iGlobalOffset]);
+      else
+          uc4LocalData[lid] = {0, 0, 0, 0};
     }
-}
 
-// CPU column box filter implementation
-//*****************************************************************
-void BoxFilterHostY(unsigned char* uiInputImage, unsigned int* uiOutputImage, 
-                    unsigned int uiWidth, unsigned int uiHeight, int r, float fScale)
-{
-    // do all columns, one column at a time
-    for (unsigned int x = 0; x < uiWidth; x++) 
+    for (int lid = 0; lid < blockSize; lid++)
     {
-        // init with dark edges
-        float f4Sum [4] = {0.0f, 0.0f, 0.0f, 0.0f};
+      int gidx = team % uiBlockWidth;
+      int gidy = team / uiBlockWidth;
+      int globalPosX = gidx * uiNumOutputPix + lid - iRadiusAligned;
+      int globalPosY = gidy;
+      int iGlobalOffset = globalPosY * uiWidth + globalPosX;
 
-        // do top edge first 
-        for (int y = 0; y <= r; y++) 
-        {
-            int iBase = (y * uiWidth + x) << 2;
-            f4Sum[0] += uiInputImage[iBase];
-            f4Sum[1] += uiInputImage[iBase + 1];
-            f4Sum[2] += uiInputImage[iBase + 2];
-            f4Sum[3] += uiInputImage[iBase + 3];
-        }
-        uiOutputImage[x] = rgbaFloatToUint(f4Sum, fScale);
+      if((globalPosX >= 0) && (globalPosX < uiWidth) && (lid >= iRadiusAligned) &&
+         (lid < (iRadiusAligned + (int)uiNumOutputPix)))
+      {
+          float4 f4Sum = {0.0f, 0.0f, 0.0f, 0.0f};
 
-        // then do pixels within/including a radius of top edge, using rolling method
-        for(int y = 1; y <= r; y++) 
-        {
-            // add the next rolling pix
-            int iBase = ((y + r) * uiWidth + x) << 2;
-            f4Sum[0] += uiInputImage[iBase];
-            f4Sum[1] += uiInputImage[iBase + 1];
-            f4Sum[2] += uiInputImage[iBase + 2];
-            f4Sum[3] += uiInputImage[iBase + 3];
+          int iOffsetX = lid - iRadius;
+          int iLimit = iOffsetX + (2 * iRadius) + 1;
+          for(; iOffsetX < iLimit; iOffsetX++)
+          {
+              f4Sum.x += uc4LocalData[iOffsetX].x;
+              f4Sum.y += uc4LocalData[iOffsetX].y;
+              f4Sum.z += uc4LocalData[iOffsetX].z;
+              f4Sum.w += uc4LocalData[iOffsetX].w;
+          }
 
-
-            // nothing to delete for trailing edge... fade up from dark edge
-
-            uiOutputImage[y * uiWidth + x] = rgbaFloatToUint(f4Sum, fScale);
-        }
-        
-        // do main body of image (beyond a radius of top and bottom edges), using rolling method
-        for(unsigned int y = r + 1; y < uiHeight - r; y++) 
-        {
-            // add the next rolling pix
-            int iBase = ((y + r) * uiWidth + x) << 2;
-            f4Sum[0] += uiInputImage[iBase];
-            f4Sum[1] += uiInputImage[iBase + 1];
-            f4Sum[2] += uiInputImage[iBase + 2];
-            f4Sum[3] += uiInputImage[iBase + 3];
-
-            // delete the trailing pix
-            iBase = ((y - r) * uiWidth + x - uiWidth) << 2;
-            f4Sum[0] -= uiInputImage[iBase];
-            f4Sum[1] -= uiInputImage[iBase + 1];
-            f4Sum[2] -= uiInputImage[iBase + 2];
-            f4Sum[3] -= uiInputImage[iBase + 3];
-
-            uiOutputImage[y * uiWidth + x] = rgbaFloatToUint(f4Sum, fScale); 
-        }
-
-        // do bottom edge
-        for (unsigned int y = uiHeight - r; y < uiHeight; y++) 
-        {
-            // No additions for next rolling pix... dark edges
-
-            // delete the trailing pix
-            int iBase = ((y - r) * uiWidth + x - uiWidth) << 2;
-            f4Sum[0] -= uiInputImage[iBase];
-            f4Sum[1] -= uiInputImage[iBase + 1];
-            f4Sum[2] -= uiInputImage[iBase + 2];
-            f4Sum[3] -= uiInputImage[iBase + 3];
-
-            uiOutputImage[y * uiWidth + x] = rgbaFloatToUint(f4Sum, fScale); 
-        }
+          uiTmp[iGlobalOffset] = rgbaFloat4ToUint(f4Sum, fScale);
+      }
     }
-}
+  }
 
-//*****************************************************************
-//! Compute reference data set
-//! @param uiInputImage     pointer to input data
-//! @param uiTempImage      pointer to temporary store
-//! @param uiOutputImage    pointer to output data
-//! @param uiWidth          width of image
-//! @param uiHeight         height of image
-//! @param r                radius of filter
-//! @param r                rescale factor
-//*****************************************************************
-void BoxFilterHost( unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage, 
-                    unsigned int uiWidth, unsigned int uiHeight, int r, float fScale )
-{
-    // Run the computations
-    BoxFilterHostX((unsigned char*)uiInputImage, uiTempImage, uiWidth, uiHeight, r, fScale);
-    BoxFilterHostY((unsigned char*)uiTempImage, uiOutputImage, uiWidth, uiHeight, r, fScale);
+  for (int globalPosX = 0; globalPosX < uiWidth; globalPosX++) {
+    unsigned int* uiInputImage = &uiTmp[globalPosX];
+    unsigned int* uiOutputImage = &uiDevOutput[globalPosX];
+
+    float4 f4Sum;
+    float4 f4iRadius = {(float)iRadius, (float)iRadius, (float)iRadius, (float)iRadius};
+    float4 top_color = rgbaUintToFloat4(uiInputImage[0]);
+    float4 bot_color = rgbaUintToFloat4(uiInputImage[(uiHeight - 1) * uiWidth]);
+
+    f4Sum = top_color * f4iRadius;
+    for (int y = 0; y < iRadius + 1; y++)
+    {
+      if (y < uiHeight)
+        f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
+    }
+    uiOutputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
+    for(int y = 1; y < iRadius + 1; y++)
+    {
+      if (y + iRadius < uiHeight) {
+        f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
+        f4Sum -= top_color;
+        uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+      }
+    }
+
+    for(int y = iRadius + 1; y < uiHeight - iRadius; y++)
+    {
+      if (y + iRadius < uiHeight && y - iRadius >= 0) {
+        f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
+        f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
+        uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+      }
+    }
+
+    for (int y = uiHeight - iRadius; y < uiHeight; y++)
+    {
+      if (y < uiHeight && y - iRadius >= 0) {
+        f4Sum += bot_color;
+        f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
+        uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+      }
+    }
+  }
 }
 

@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <chrono>
 #include <omp.h>
 
 #define BLOCK_SIZE 256
+#include "reference.h"
 
 template <typename T>
 void BlockRangeAtomicOnGlobalMem(const int numTeams, const int numThreads, T* data, int n)
@@ -35,7 +37,7 @@ void SingleRangeAtomicOnGlobalMem(const int numTeams, const int numThreads, T* d
    num_teams(numTeams) num_threads(numThreads)
   for ( unsigned int i = 0; i < n; i++) {
     #pragma omp atomic update
-    data[0]++;    //arbitrary number to add
+    data[offset]++;    //arbitrary number to add
   }
 }
 // end of SingleRangeAtomicOnGlobalMem
@@ -54,6 +56,7 @@ void BlockRangeAtomicOnSharedMem(const int numTeams, const int numThreads, T* da
       unsigned int threadIdx_x = omp_get_thread_num();
       unsigned int tid = (blockIdx_x * blockDim_x) + threadIdx_x;
       for ( unsigned int i = tid; i < n; i += blockDim_x*gridDim_x){
+        #pragma omp atomic update
         smem_data[threadIdx_x]++;
       }
       if (blockIdx_x == gridDim_x)
@@ -76,6 +79,7 @@ void WarpRangeAtomicOnSharedMem(const int numTeams, const int numThreads, T* dat
       unsigned int threadIdx_x = omp_get_thread_num();
       unsigned int tid = (blockIdx_x * blockDim_x) + threadIdx_x;
       for ( unsigned int i = tid; i < n; i += blockDim_x*gridDim_x){
+        #pragma omp atomic update
         smem_data[i & 0x1F]++;
       }
       if (blockIdx_x == gridDim_x && threadIdx_x < 0x1F)
@@ -98,6 +102,7 @@ void SingleRangeAtomicOnSharedMem(const int numTeams, const int numThreads, T* d
       unsigned int threadIdx_x = omp_get_thread_num();
       unsigned int tid = (blockIdx_x * blockDim_x) + threadIdx_x;
       for ( unsigned int i = tid; i < n; i += blockDim_x*gridDim_x){
+        #pragma omp atomic update
         smem_data[offset]++;
       }
       if (blockIdx_x == gridDim_x && threadIdx_x == 0)
@@ -112,8 +117,13 @@ void atomicPerf (int n, int t, int repeat)
   size_t data_size = sizeof(T) * t;
 
   T* data = (T*) malloc (data_size);
+  T* h_data = (T*) malloc (data_size);
+  T* r_data = (T*) malloc (data_size);
+  int fail;
 
-  for(int i=0; i<t; i++) data[i] = i%1024+1;
+  for(int i=0; i<t; i++) {
+    data[i] = h_data[i] = i%1024+1;
+  }
 
   #pragma omp target data map(alloc: data[0:t])
   {
@@ -131,7 +141,14 @@ void atomicPerf (int n, int t, int repeat)
     printf("Average execution time of BlockRangeAtomicOnGlobalMem: %f (us)\n",
             time * 1e-3f / repeat);
 
-    for(int i=0; i<t; i++) data[i] = i%1024+1;
+    #pragma omp target update from (data[0:t])
+    memcpy(r_data, h_data, data_size);
+    for(int i=0; i<repeat; i++)
+      BlockRangeAtomicOnGlobalMem_ref<T>(r_data, n);
+    fail = memcmp(data, r_data, data_size);
+    printf("%s\n", fail ? "FAIL" : "PASS");
+
+    memcpy(data, h_data, data_size);
     #pragma omp target update to (data[0:t])
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
@@ -143,7 +160,14 @@ void atomicPerf (int n, int t, int repeat)
     printf("Average execution time of WarpRangeAtomicOnGlobalMem: %f (us)\n",
             time * 1e-3f / repeat);
 
-    for(int i=0; i<t; i++) data[i] = i%1024+1;
+    memcpy(r_data, h_data, data_size);
+    #pragma omp target update from (data[0:t])
+    for(int i=0; i<repeat; i++)
+      WarpRangeAtomicOnGlobalMem_ref<T>(r_data, n);
+    fail = memcmp(data, r_data, data_size);
+    printf("%s\n", fail ? "FAIL" : "PASS");
+
+    memcpy(data, h_data, data_size);
     #pragma omp target update to (data[0:t])
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
@@ -155,7 +179,14 @@ void atomicPerf (int n, int t, int repeat)
     printf("Average execution time of SingleRangeAtomicOnGlobalMem: %f (us)\n",
             time * 1e-3f / repeat);
 
-    for(int i=0; i<t; i++) data[i] = i%1024+1;
+    memcpy(r_data, h_data, data_size);
+    #pragma omp target update from (data[0:t])
+    for(int i=0; i<repeat; i++)
+      SingleRangeAtomicOnGlobalMem_ref<T>(r_data, i % BLOCK_SIZE, n);
+    fail = memcmp(data, r_data, data_size);
+    printf("%s\n", fail ? "FAIL" : "PASS");
+
+    memcpy(data, h_data, data_size);
     #pragma omp target update to (data[0:t])
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
@@ -167,7 +198,11 @@ void atomicPerf (int n, int t, int repeat)
     printf("Average execution time of BlockRangeAtomicOnSharedMem: %f (us)\n",
             time * 1e-3f / repeat);
 
-    for(int i=0; i<t; i++) data[i] = i%1024+1;
+    #pragma omp target update from (data[0:t])
+    fail = memcmp(h_data, data, data_size);
+    printf("%s\n", fail ? "FAIL" : "PASS");
+
+    memcpy(data, h_data, data_size);
     #pragma omp target update to (data[0:t])
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
@@ -179,7 +214,11 @@ void atomicPerf (int n, int t, int repeat)
     printf("Average execution time of WarpRangeAtomicOnSharedMem: %f (us)\n",
             time * 1e-3f / repeat);
 
-    for(int i=0; i<t; i++) data[i] = i%1024+1;
+    #pragma omp target update from (data[0:t])
+    fail = memcmp(h_data, data, data_size);
+    printf("%s\n", fail ? "FAIL" : "PASS");
+
+    memcpy(data, h_data, data_size);
     #pragma omp target update to (data[0:t])
     start = std::chrono::steady_clock::now();
     for(int i=0; i<repeat; i++)
@@ -191,8 +230,14 @@ void atomicPerf (int n, int t, int repeat)
     printf("Average execution time of SingleRangeAtomicOnSharedMem: %f (us)\n",
             time * 1e-3f / repeat);
 
+    #pragma omp target update from (data[0:t])
+    fail = memcmp(h_data, data, data_size);
+    printf("%s\n", fail ? "FAIL" : "PASS");
+
   }
   free(data);
+  free(h_data);
+  free(r_data);
 }
 
 int main(int argc, char* argv[])

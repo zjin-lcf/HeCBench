@@ -24,14 +24,12 @@
 
 int main(int argc, char** argv) 
 {
-  if (argc != 5) {
-    printf("Usage: %s <path to file> <blockSizeX> <blockSizeY> <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <path to file> <repeat>\n", argv[0]);
     return 1;
   }
   const char* filePath = argv[1];
-  const int blockSizeX = atoi(argv[2]);
-  const int blockSizeY = atoi(argv[3]);
-  const int iterations = atoi(argv[4]);
+  const int iterations = atoi(argv[2]);
 
   // load input bitmap image
   SDKBitMap inputBitmap;   
@@ -45,7 +43,8 @@ int main(int argc, char** argv)
   // get width and height of input image
   int height = inputBitmap.getHeight();
   int width = inputBitmap.getWidth();
-  size_t imageSize = height * width * sizeof(uchar4);
+  int size = height * width;
+  size_t imageSize = size * sizeof(uchar4);
 
   std::cout << "Image " << filePath;
   std::cout << " height: " << height;
@@ -81,14 +80,14 @@ int main(int argc, char** argv)
 
   const int factor = FACTOR;
 
-  const int block = blockSizeY * blockSizeX;  // maximum work-group size is 256
-  const int teams = height * width / block;
+  const int block = 256;
+  const int teams = (size + 255) / block;
 
   std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
 
-  #pragma omp target data map(to: inputImageData[0:width*height]) \
-                          map(from: outputImageData[0:width*height])
+  #pragma omp target data map(to: inputImageData[0:size]) \
+                          map(from: outputImageData[0:size])
   {
     auto start = std::chrono::steady_clock::now();
 
@@ -100,17 +99,19 @@ int main(int argc, char** argv)
         #pragma omp parallel 
         {
           int pos = omp_get_team_num() * block + omp_get_thread_num(); 
-          float4 temp = convert_float4(inputImageData[pos]);
+          if (pos < size) {
+            float4 temp = convert_float4(inputImageData[pos]);
 
-          /* compute average value of a pixel from its compoments */
-          float avg = (temp.x + temp.y + temp.z + temp.w) / 4.0f;
+            /* compute average value of a pixel from its compoments */
+            float avg = (temp.x + temp.y + temp.z + temp.w) / 4.0f;
 
-          /* Calculate deviation from the avg value of a pixel */
-          float dev = ran1(-avg, iv);
-          dev = (dev - 0.55f) * (float)factor;
+            /* Calculate deviation from the avg value of a pixel */
+            float dev = ran1(-avg, iv);
+            dev = (dev - 0.55f) * (float)factor;
 
-          /* Saturate(clamp) the values */
-          outputImageData[pos] = convert_uchar4_sat(temp + dev);
+            /* Saturate(clamp) the values */
+            outputImageData[pos] = convert_uchar4_sat(temp + dev);
+          }
         }
       }
     }
@@ -122,7 +123,7 @@ int main(int argc, char** argv)
 
   // verify
   float mean = 0;
-  for(int i = 0; i < (int)(width * height); i++)
+  for(int i = 0; i < size; i++)
   {
     mean += outputImageData[i].x - inputImageData[i].x;
     mean += outputImageData[i].y - inputImageData[i].y;

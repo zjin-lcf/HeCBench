@@ -19,10 +19,7 @@ It is given as is, without any guarantee.
 //output chaining values hashes are copied to h_outBuffer
 //************************
 
-#pragma omp declare target 
 void KeccakTreeGPU(tKeccakLane * h_inBuffer, tKeccakLane * h_outBuffer,  const tKeccakLane *h_KeccakF_RoundConstants);
-#pragma omp end declare target 
-
 
 
 #endif // KECCAKTREEGPU_H_INCLUDED

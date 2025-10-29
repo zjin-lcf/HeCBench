@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <omp.h>
 #include "utils.h"
+#include "reference.h"
 
 void L2_norm(const int numTeams, const int numThreads,
              const float *x, float* l2_norm, int n)
@@ -112,6 +113,12 @@ int main(int argc, const char *argv[]) {
   float l2_norm[1];
   int   correct[1];
 
+  const int numTeams = ((m+255)/256);
+  const int numThreads = 256;
+
+  const int numTeams2 =  ((n+255)/256);
+  const int numThreads2 = 256;
+
   #pragma omp target data map (to: d_x[0:n], \
                                    d_row_ptr[0:A.row_ptr.size()], \
                                    d_value[0:A.values.size()], \
@@ -121,70 +128,65 @@ int main(int argc, const char *argv[]) {
                                       total_obj_val[0:1], \
                                       l2_norm[0:1], \
                                       correct[0:1])
-{
-  long long train_start = get_time();
+  {
+    long long train_start = get_time();
 
-  const int numTeams = ((m+255)/256);
-  const int numThreads = 256;
+    float obj_val = 0.f;
+    float train_error = 0.f;
 
-  const int numTeams2 =  ((n+255)/256);
-  const int numThreads2 = 256;
+    for (int k = 0; k < iters; k++) {
 
-  float obj_val = 0.f;
-  float train_error = 0.f;
+      // reset the training status
+      total_obj_val[0] = 0.f;
+      l2_norm[0] = 0.f;
+      correct[0] = 0;
+      
+      #pragma omp target update to (total_obj_val[0:1])
+      #pragma omp target update to (l2_norm[0:1])
+      #pragma omp target update to (correct[0:1])
 
-  for (int k = 0; k < iters; k++) {
+      //reset gradient vector
+      std::fill(grad.begin(), grad.end(), 0.f);
 
-    // reset the training status
-    total_obj_val[0] = 0.f;
-    l2_norm[0] = 0.f;
-    correct[0] = 0;
+      #pragma omp target update to (d_grad[0:n])
+      
+      // compute the total objective, correct rate, and gradient
+      compute(
+          numTeams,
+          numThreads,
+          d_x, 
+          d_grad, 
+          d_row_ptr,
+          d_col_index,
+          d_value,
+          d_y_label,
+          total_obj_val,
+          correct,
+          m
+        ); 
+
+      // display training status for verification
+      L2_norm(numTeams2, numThreads2, d_x, l2_norm, n);
+
+      #pragma omp target update from (total_obj_val[0:1])
+      #pragma omp target update from (l2_norm[0:1])
+      #pragma omp target update from (correct[0:1])
+
+      obj_val = total_obj_val[0] / (float)m + 0.5f * lambda * l2_norm[0];
+      train_error = 1.f - (correct[0]/(float)m); 
+
+      // update x (gradient does not need to be updated)
+      update(numTeams2, numThreads2, d_x, d_grad, m, n, lambda, alpha);
+    }
     
-    #pragma omp target update to (total_obj_val[0:1])
-    #pragma omp target update to (l2_norm[0:1])
-    #pragma omp target update to (correct[0:1])
-
-    //reset gradient vector
-    std::fill(grad.begin(), grad.end(), 0.f);
-
-    #pragma omp target update to (d_grad[0:n])
+    long long train_end = get_time();
+    printf("Training time takes %lf (s) for %d iterations\n\n",
+            (train_end - train_start) * 1e-6, iters);
     
-    // compute the total objective, correct rate, and gradient
-    compute(
-        numTeams,
-        numThreads,
-        d_x, 
-        d_grad, 
-        d_row_ptr,
-        d_col_index,
-        d_value,
-        d_y_label,
-        total_obj_val,
-        correct,
-        m
-      ); 
+    printf("object value = %f train_error = %f\n", obj_val, train_error);
 
-    // display training status for verification
-    L2_norm(numTeams2, numThreads2, d_x, l2_norm, n);
-
-    #pragma omp target update from (total_obj_val[0:1])
-    #pragma omp target update from (l2_norm[0:1])
-    #pragma omp target update from (correct[0:1])
-
-    obj_val = total_obj_val[0] / (float)m + 0.5f * lambda * l2_norm[0];
-    train_error = 1.f - (correct[0]/(float)m); 
-
-    // update x (gradient does not need to be updated)
-    update(numTeams2, numThreads2, d_x, d_grad, m, n, lambda, alpha);
+    reference(A, x, grad, m, n, iters, alpha, lambda, obj_val, train_error);
   }
-
-  long long train_end = get_time();
-  printf("Training time takes %lf (s) for %d iterations\n\n",
-         (train_end - train_start) * 1e-6, iters);
-
-  // After 100 iterations, the expected obj_val and train_error are 0.3358405828 and 0.07433331013
-  printf("object value = %f train_error = %f\n", obj_val, train_error);
-}
 
   return 0; 
 }

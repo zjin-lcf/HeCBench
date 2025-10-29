@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DUMP      = no
@@ -57,7 +57,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../backprop-cuda/backprop.h bpnn_kernels.h
+%.o: %.cpp ../backprop-cuda/backprop.h bpnn_kernels.h ../backprop-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

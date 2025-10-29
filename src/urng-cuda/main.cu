@@ -24,14 +24,12 @@
 
 int main(int argc, char** argv) 
 {
-  if (argc != 5) {
-    printf("Usage: %s <path to file> <blockSizeX> <blockSizeY> <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <path to file> <repeat>\n", argv[0]);
     return 1;
   }
   const char* filePath = argv[1];
-  const int blockSizeX = atoi(argv[2]);
-  const int blockSizeY = atoi(argv[3]);
-  const int iterations = atoi(argv[4]);
+  const int iterations = atoi(argv[2]);
 
   // load input bitmap image
   SDKBitMap inputBitmap;   
@@ -45,7 +43,8 @@ int main(int argc, char** argv)
   // get width and height of input image
   int height = inputBitmap.getHeight();
   int width = inputBitmap.getWidth();
-  size_t imageSize = height * width * sizeof(uchar4);
+  int size = height * width;
+  size_t imageSize = size * sizeof(uchar4);
 
   std::cout << "Image " << filePath;
   std::cout << " height: " << height;
@@ -88,8 +87,8 @@ int main(int argc, char** argv)
   uchar4 *outputImageBuffer;
   cudaMalloc((void**)&outputImageBuffer, imageSize);
 
-  dim3 grid (height * width / (blockSizeY * blockSizeX));
-  dim3 block (blockSizeY * blockSizeX);  // maximum work-group size is 256
+  dim3 grid ((size + 255) / 256);
+  dim3 block (256);
 
   std::cout << "Executing kernel for " << iterations << " iterations" <<std::endl;
   std::cout << "-------------------------------------------" << std::endl;
@@ -99,7 +98,7 @@ int main(int argc, char** argv)
 
   for(int i = 0; i < iterations; i++)
   {
-    noise_uniform<<<grid, block>>>(inputImageBuffer, outputImageBuffer, factor);
+    noise_uniform<<<grid, block>>>(inputImageBuffer, outputImageBuffer, size, factor);
   }
 
   cudaDeviceSynchronize();
@@ -113,7 +112,7 @@ int main(int argc, char** argv)
 
   // verify
   float mean = 0;
-  for(int i = 0; i < (int)(width * height); i++)
+  for(int i = 0; i < size; i++)
   {
     mean += outputImageData[i].x - inputImageData[i].x;
     mean += outputImageData[i].y - inputImageData[i].y;

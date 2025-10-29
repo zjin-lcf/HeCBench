@@ -4,8 +4,8 @@
 
 template <int TPB>
 __global__ void moeSoftmax(
-    const float* input,
-    const bool* finished,
+    const float* __restrict__ input,
+    const bool* __restrict__ finished,
     float* output,
     const int num_cols)
 {
@@ -61,9 +61,9 @@ __global__ void moeSoftmax(
 
 template <int TPB>
 __global__ void moeTopK(
-    const float* inputs_after_softmax,
-    const bool* finished,
-    float* output,
+    const float* __restrict__ inputs_after_softmax,
+    const bool* __restrict__ finished,
+    float* __restrict__ output,
     int* __restrict__ indices,
     int* __restrict__ source_rows,
     const int num_experts,

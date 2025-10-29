@@ -15,8 +15,8 @@
 #include <hip/hip_runtime.h>
 #include "shrUtils.h"
 
-extern void BoxFilterHost(unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage, 
-                          unsigned int uiWidth, unsigned int uiHeight, int iRadius, float fScale );
+extern void BoxFilterHost(unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage,
+                          int uiWidth, int uiHeight, int iRadius, float fScale );
 
 
 const unsigned int RADIUS = 10;                   // initial radius of 2D box filter mask
@@ -51,20 +51,20 @@ unsigned int rgbaFloat4ToUint(const float4 rgba, const float fScale)
 }
 
 __global__ void row_kernel (
-    const uchar4* __restrict__ ucSource, 
+    const uchar4* __restrict__ ucSource,
             uint* __restrict__ uiDest,
-    const unsigned int uiWidth,
-    const unsigned int uiHeight,
+    const int uiWidth,
+    const int uiHeight,
     const int iRadius,
-    const int iRadiusAligned, 
-    const float fScale, 
+    const int iRadiusAligned,
+    const float fScale,
     const unsigned int uiNumOutputPix)
 {
   extern __shared__ uchar4 uc4LocalData[];
 
   int lid = threadIdx.x;
   int gidx = blockIdx.x;
-  int gidy = blockIdx.y; 
+  int gidy = blockIdx.y;
 
   int globalPosX = gidx * uiNumOutputPix + lid - iRadiusAligned;
   int globalPosY = gidy;
@@ -76,11 +76,11 @@ __global__ void row_kernel (
     uc4LocalData[lid] = ucSource[iGlobalOffset];
   }
   else
-    uc4LocalData[lid] = {0, 0, 0, 0}; 
+    uc4LocalData[lid] = {0, 0, 0, 0};
 
   __syncthreads();
 
-  if((globalPosX >= 0) && (globalPosX < uiWidth) && (lid >= iRadiusAligned) && 
+  if((globalPosX >= 0) && (globalPosX < uiWidth) && (lid >= iRadiusAligned) &&
       (lid < (iRadiusAligned + (int)uiNumOutputPix)))
   {
     // Init summation registers to zero
@@ -94,10 +94,10 @@ __global__ void row_kernel (
       f4Sum.x += uc4LocalData[iOffsetX].x;
       f4Sum.y += uc4LocalData[iOffsetX].y;
       f4Sum.z += uc4LocalData[iOffsetX].z;
-      f4Sum.w += uc4LocalData[iOffsetX].w; 
+      f4Sum.w += uc4LocalData[iOffsetX].w;
     }
 
-    // Use inline function to scale and convert registers to packed RGBA values in a uchar4, 
+    // Use inline function to scale and convert registers to packed RGBA values in a uchar4,
     // and write back out to GMEM
     uiDest[iGlobalOffset] = rgbaFloat4ToUint(f4Sum, fScale);
   }
@@ -106,12 +106,14 @@ __global__ void row_kernel (
 __global__ void col_kernel (
     const uint* __restrict__ uiSource,
           uint* __restrict__ uiDest,
-    const unsigned int uiWidth, 
-    const unsigned int uiHeight, 
-    const int iRadius, 
+    const int uiWidth,
+    const int uiHeight,
+    const int iRadius,
     const float fScale)
 {
-  size_t globalPosX = blockIdx.x * blockDim.x + threadIdx.x;
+  int globalPosX = blockIdx.x * blockDim.x + threadIdx.x;
+  if (globalPosX >= uiWidth) return;
+
   const uint* uiInputImage = &uiSource[globalPosX];
   uint* uiOutputImage = &uiDest[globalPosX];
 
@@ -121,41 +123,46 @@ __global__ void col_kernel (
   float4 bot_color = rgbaUintToFloat4(uiInputImage[(uiHeight - 1) * uiWidth]);
 
   f4Sum = top_color *
-          make_float4((float)iRadius, (float)iRadius, (float)iRadius, (float)iRadius); 
-  for (int y = 0; y < iRadius + 1; y++) 
+          make_float4((float)iRadius, (float)iRadius, (float)iRadius, (float)iRadius);
+  for (int y = 0; y < iRadius + 1; y++)
   {
-    f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
+    if (y < uiHeight)
+      f4Sum += rgbaUintToFloat4(uiInputImage[y * uiWidth]);
   }
-  uiOutputImage[0] = rgbaFloat4ToUint(f4Sum, fScale);
-
-  for(int y = 1; y < iRadius + 1; y++) 
+  for(int y = 1; y < iRadius + 1; y++)
   {
-    f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
-    f4Sum -= top_color;
-    uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
-  }
-
-  for(int y = iRadius + 1; y < uiHeight - iRadius; y++) 
-  {
-    f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
-    f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
-    uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    if (y + iRadius < uiHeight) {
+      f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
+      f4Sum -= top_color;
+      uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    }
   }
 
-  for (int y = uiHeight - iRadius; y < uiHeight; y++) 
+  for(int y = iRadius + 1; y < uiHeight - iRadius; y++)
   {
-    f4Sum += bot_color;
-    f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
-    uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    if (y + iRadius < uiHeight && y - iRadius >= 0) {
+      f4Sum += rgbaUintToFloat4(uiInputImage[(y + iRadius) * uiWidth]);
+      f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
+      uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    }
+  }
+
+  for (int y = uiHeight - iRadius; y < uiHeight; y++)
+  {
+    if (y < uiHeight && y - iRadius >= 0) {
+      f4Sum += bot_color;
+      f4Sum -= rgbaUintToFloat4(uiInputImage[((y - iRadius) * uiWidth) - uiWidth]);
+      uiOutputImage[y * uiWidth] = rgbaFloat4ToUint(f4Sum, fScale);
+    }
   }
 }
 
 void BoxFilterGPU (uchar4* cmBufIn,
     unsigned int* cmBufTmp,
     unsigned int* cmBufOut,
-    const unsigned int uiWidth, 
-    const unsigned int uiHeight, 
-    const int iRadius, 
+    const int uiWidth,
+    const int uiHeight,
+    const int iRadius,
     const float fScale,
     const int iCycles )
 {
@@ -166,11 +173,11 @@ void BoxFilterGPU (uchar4* cmBufIn,
     uiNumOutputPix = szMaxWorkgroupSize - iRadiusAligned - iRadius;
 
   // Set global and local work sizes for row kernel // Workgroup padded left and right
-  dim3 row_grid(DivUp((size_t)uiWidth, (size_t)uiNumOutputPix), uiHeight); 
-  dim3 row_block((size_t)(iRadiusAligned + uiNumOutputPix + iRadius), 1);
+  dim3 row_grid(DivUp(uiWidth, uiNumOutputPix), uiHeight);
+  dim3 row_block(iRadiusAligned + uiNumOutputPix + iRadius, 1);
 
   // Set global and local work sizes for column kernel
-  dim3 col_grid(DivUp((size_t)uiWidth, 64));
+  dim3 col_grid(DivUp(uiWidth, 64));
   dim3 col_block(64);
 
   hipDeviceSynchronize();
@@ -198,25 +205,37 @@ int main(int argc, char** argv)
     printf("Usage %s <PPM image> <repeat>\n", argv[0]);
     return 1;
   }
+  const unsigned int uiMaxImageWidth = 1920;   // Image width
+  const unsigned int uiMaxImageHeight = 1080;  // Image height
   unsigned int uiImageWidth = 0;     // Image width
   unsigned int uiImageHeight = 0;    // Image height
   unsigned int* uiInput = NULL;      // Host buffer to hold input image data
   unsigned int* uiTmp = NULL;        // Host buffer to hold intermediate image data
-  unsigned int* uiDevOutput = NULL;      
-  unsigned int* uiHostOutput = NULL;      
+  unsigned int* uiDevOutput = NULL;
+  unsigned int* uiHostOutput = NULL;
 
-  shrLoadPPM4ub(argv[1], (unsigned char**)&uiInput, &uiImageWidth, &uiImageHeight);
-  printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n", 
+  bool status = shrLoadPPM4ub(argv[1], (unsigned char**)&uiInput,
+                              &uiImageWidth, &uiImageHeight);
+  printf("Image Width = %u, Height = %u, bpp = %u, Mask Radius = %u\n",
       uiImageWidth, uiImageHeight, unsigned(sizeof(unsigned int) * 8), RADIUS);
+  if (uiImageWidth > uiMaxImageWidth || uiImageHeight > uiMaxImageHeight) {
+    printf("Error: Image Dimensions exceed the maximum values");
+    status = 0;
+  }
+  if (!status) {
+     free(uiInput);
+     return 1;
+  }
+
   printf("Using Local Memory for Row Processing\n\n");
 
-  size_t szBuff= uiImageWidth * uiImageHeight;
+  size_t szBuff = uiImageWidth * uiImageHeight;
   size_t szBuffBytes = szBuff * sizeof (unsigned int);
 
   // Allocate intermediate and output host image buffers
-  uiTmp = (unsigned int*)malloc(szBuffBytes);
+  uiTmp = (unsigned int*)calloc(szBuff, sizeof(unsigned int));
+  uiHostOutput = (unsigned int*)calloc(szBuff, sizeof(unsigned int));
   uiDevOutput = (unsigned int*)malloc(szBuffBytes);
-  uiHostOutput = (unsigned int*)malloc(szBuffBytes);
 
   uchar4* cmDevBufIn;
   unsigned int* cmDevBufTmp;
@@ -226,17 +245,20 @@ int main(int argc, char** argv)
   hipMalloc((void**)&cmDevBufTmp, szBuffBytes);
   hipMalloc((void**)&cmDevBufOut, szBuffBytes);
 
-  // Copy input data from host to device 
+  // Copy input data from host to device
   hipMemcpy(cmDevBufIn, uiInput, szBuffBytes, hipMemcpyHostToDevice);
+  // Initialize buffer data
+  hipMemset(cmDevBufTmp, 0, szBuffBytes);
+  hipMemset(cmDevBufOut, 0, szBuffBytes);
 
   const int iCycles = atoi(argv[2]);
 
   printf("Warmup..\n");
-  BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
+  BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut,
                 uiImageWidth, uiImageHeight, RADIUS, SCALE, iCycles);
 
   printf("\nRunning BoxFilterGPU for %d cycles...\n\n", iCycles);
-  BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut, 
+  BoxFilterGPU (cmDevBufIn, cmDevBufTmp, cmDevBufOut,
                 uiImageWidth, uiImageHeight, RADIUS, SCALE, iCycles);
 
   // Copy output from device to host
@@ -249,13 +271,13 @@ int main(int argc, char** argv)
   // Do filtering on the host
   BoxFilterHost(uiInput, uiTmp, uiHostOutput, uiImageWidth, uiImageHeight, RADIUS, SCALE);
 
-  // Verification 
-  // The entire images do not match due to the difference between BoxFilterHostY and the column kernel )
+  // Verification
   int error = 0;
-  for (unsigned i = RADIUS * uiImageWidth; i < (uiImageHeight-RADIUS)*uiImageWidth; i++)
-  {
+  const int64_t start = RADIUS * uiImageWidth;
+  const int64_t end  = (int64_t)szBuff - (int64_t)start;
+  for (int64_t i = start; i < end; i++) {
     if (uiDevOutput[i] != uiHostOutput[i]) {
-      printf("%d %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
+      printf("%ld %08x %08x\n", i, uiDevOutput[i], uiHostOutput[i]);
       error = 1;
       break;
     }

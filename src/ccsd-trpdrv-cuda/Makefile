@@ -49,7 +49,13 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+ccsd_tengy.o : ccsd_tengy.cu Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+ccsd_trpdrv.o : ccsd_trpdrv.cu Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+main.o : main.cu reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
