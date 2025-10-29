@@ -4,7 +4,7 @@ DEBUG     = no
 LAUNCHER  =
 
 # Standard flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++11 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
 
 
 # Debug Flags

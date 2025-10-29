@@ -25,7 +25,7 @@ obj = main.o kernels.o mttkrp_cpu.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -I$(BOOST) -std=c++11 -I../mmcsf-cuda
+CFLAGS := $(EXTRA_CFLAGS) -I$(BOOST) -std=c++17 -I../mmcsf-cuda
 
 # Linker Flags
 LDFLAGS = -lpthread
