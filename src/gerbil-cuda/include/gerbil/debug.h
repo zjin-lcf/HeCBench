@@ -22,6 +22,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef DEBUG_H_
 #define DEBUG_H_
 
+#include <cstdint>
 #include <iostream>
 #include <queue>
 #include "config.h"
