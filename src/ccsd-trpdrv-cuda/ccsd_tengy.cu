@@ -1,5 +1,6 @@
-#include <chrono>
+#include <stdio.h>
 #include <cuda.h>
+#include <cub/cub.cuh>
 
 #define BLOCK_SIZE 16
 
@@ -15,8 +16,13 @@ void ccsd_kernel(const double * __restrict__ f1n,    const double * __restrict__
                  double * __restrict__ emp4k, double * __restrict__ emp5k,
                  const int ncor, const int nocc, const int nvir)
 {
+  typedef cub::BlockReduce<double, BLOCK_SIZE, cub::BLOCK_REDUCE_WARP_REDUCTIONS, BLOCK_SIZE> BlockReduce;
+  __shared__ typename BlockReduce::TempStorage t1, t2, t3, t4;
+
   const int b = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y * blockDim.y + threadIdx.y;
+
+  double s1 = 0.0, s2 = 0.0, s3 = 0.0, s4 = 0.0;
 
   if (b < nvir && c < nvir) {
 
@@ -46,13 +52,13 @@ void ccsd_kernel(const double * __restrict__ f1n,    const double * __restrict__
     const double f4ncb = f4n[cb];
     const double f4tcb = f4t[cb];
 
-    atomicAdd(emp4i , denom * (f1tbc+f1ncb+f2tcb+f3nbc+f4ncb) * (f1tbc-f2tbc*2-f3tbc*2+f4tbc)
+    s1 = denom * (f1tbc+f1ncb+f2tcb+f3nbc+f4ncb) * (f1tbc-f2tbc*2-f3tbc*2+f4tbc)
                       - denom * (f1nbc+f1tcb+f2ncb+f3ncb) * (f1tbc*2-f2tbc-f3tbc+f4tbc*2)
-                      + denom * 3 * (f1nbc*(f1nbc+f3ncb+f4tcb*2) +f2nbc*f2tcb+f3nbc*f4tbc));
+                      + denom * 3 * (f1nbc*(f1nbc+f3ncb+f4tcb*2) +f2nbc*f2tcb+f3nbc*f4tbc);
 
-    atomicAdd(emp4k , denom * (f1nbc+f1tcb+f2ncb+f3tbc+f4tcb) * (f1nbc-f2nbc*2-f3nbc*2+f4nbc)
+    s2 =  denom * (f1nbc+f1tcb+f2ncb+f3tbc+f4tcb) * (f1nbc-f2nbc*2-f3nbc*2+f4nbc)
                       - denom * (f1tbc+f1ncb+f2tcb+f3tcb) * (f1nbc*2-f2nbc-f3nbc+f4nbc*2)
-                      + denom * 3 * (f1tbc*(f1tbc+f3tcb+f4ncb*2) +f2tbc*f2ncb+f3tbc*f4nbc));
+                      + denom * 3 * (f1tbc*(f1tbc+f3tcb+f4ncb*2) +f2tbc*f2ncb+f3tbc*f4nbc);
 
     const double t1v1b = t1v1[b];
     const double t1v2b = t1v2[b];
@@ -62,12 +68,24 @@ void ccsd_kernel(const double * __restrict__ f1n,    const double * __restrict__
     const double dintc1c = dintc1[c];
     const double dintc2c = dintc2[c];
 
-    atomicAdd(emp5i, denom * t1v1b * dintx1c * (f1tbc+f2nbc+f4ncb-(f3tbc+f4nbc+f2ncb+f1nbc+f2tbc+f3ncb)*2
+    s3 = denom * t1v1b * dintx1c * (f1tbc+f2nbc+f4ncb-(f3tbc+f4nbc+f2ncb+f1nbc+f2tbc+f3ncb)*2
                      +(f3nbc+f4tbc+f1ncb)*4)
-                     + denom * t1v1b * dintc1c * (f1nbc+f4nbc+f1tcb -(f2nbc+f3nbc+f2tcb)*2));
-    atomicAdd(emp5k, denom * t1v2b * dintx2c * (f1nbc+f2tbc+f4tcb -(f3nbc+f4tbc+f2tcb +f1tbc+f2nbc+f3tcb)*2
+                     + denom * t1v1b * dintc1c * (f1nbc+f4nbc+f1tcb -(f2nbc+f3nbc+f2tcb)*2);
+
+    s4 = denom * t1v2b * dintx2c * (f1nbc+f2tbc+f4tcb -(f3nbc+f4tbc+f2tcb +f1tbc+f2nbc+f3tcb)*2
                      +(f3tbc+f4nbc+f1tcb)*4)
-                     + denom * t1v2b * dintc2c * (f1tbc+f4tbc+f1ncb -(f2tbc+f3tbc+f2ncb)*2));
+                     + denom * t1v2b * dintc2c * (f1tbc+f4tbc+f1ncb -(f2tbc+f3tbc+f2ncb)*2);
+  }
+  s1 = BlockReduce(t1).Sum(s1);
+  s2 = BlockReduce(t2).Sum(s2);
+  s3 = BlockReduce(t3).Sum(s3);
+  s4 = BlockReduce(t4).Sum(s4);
+
+  if (threadIdx.x == 0 && threadIdx.y == 0) {
+    atomicAdd(emp4i, s1);
+    atomicAdd(emp4k, s2);
+    atomicAdd(emp5i, s3);
+    atomicAdd(emp5k, s4);
   }
 }
 
