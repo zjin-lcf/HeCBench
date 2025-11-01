@@ -3,27 +3,39 @@
 #include <vector>
 #include <algorithm>
 #include <hip/hip_runtime.h>
+#include <hipcub/hipcub.hpp>
 #include "utils.h"
 #include "reference.h"
 
-__global__ void 
-L2_norm(const float *x, float* l2_norm, int n)
+__global__ void
+update(float *__restrict__ x,
+       const float * __restrict__ grad,
+       float* l2_norm,
+       int m, int n, float lambda, float alpha)
 {
+  typedef hipcub::BlockReduce<float, 256> BlockReduce;
+  __shared__ typename BlockReduce::TempStorage t;
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < n) atomicAdd(l2_norm, x[i]*x[i]);
+  float s = 0;
+  if (i < n) {
+    s = BlockReduce(t).Sum(x[i]*x[i]);
+    float g = grad[i] / (float)m + lambda * x[i];
+    x[i] = x[i] - alpha * g;
+  }
+  if (threadIdx.x == 0) atomicAdd(l2_norm, s);
 }
 
 __global__ void
 compute (
-    const float * __restrict__ x, 
-          float * __restrict__ grad, 
+    const float * __restrict__ x,
+          float * __restrict__ grad,
     const int   * __restrict__ A_row_ptr,
     const int   * __restrict__ A_col_index,
-    const float * __restrict__ A_value, 
+    const float * __restrict__ A_value,
     const int   * __restrict__ A_y_label,
     float * __restrict__ total_obj_val,
     int   * __restrict__ correct,
-    int m ) 
+    int m )
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -34,7 +46,7 @@ compute (
       xp += A_value[j] * x[A_col_index[j]];
     }
 
-    // compute objective 
+    // compute objective
     float v = logf(1.f + expf(-xp * A_y_label[i]));
     atomicAdd(total_obj_val, v);
 
@@ -56,11 +68,11 @@ compute (
 __global__ void
 update(float * __restrict__ x,
        const float * __restrict__ grad,
-       int m, int n, float lambda, float alpha) 
+       int m, int n, float lambda, float alpha)
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n) {
-    float g = grad[i] / (float)m + lambda * x[i]; 
+    float g = grad[i] / (float)m + lambda * x[i];
     x[i] = x[i] - alpha * g;
   }
 }
@@ -70,7 +82,7 @@ int main(int argc, const char *argv[]) {
     printf("Usage: %s <path to file> <lambda> <alpha> <repeat>\n", argv[0]);
     return 1;
   }
-  const std::string file_path = argv[1]; 
+  const std::string file_path = argv[1];
   const float lambda = atof(argv[2]);
   const float alpha = atof(argv[3]);
   const int iters = atof(argv[4]);
@@ -89,7 +101,7 @@ int main(int argc, const char *argv[]) {
   hipMalloc((void**)&d_x, n * sizeof(float));
   hipMemcpy(d_x, x.data(), n * sizeof(float), hipMemcpyHostToDevice);
 
-  float *d_grad; 
+  float *d_grad;
   hipMalloc((void**)&d_grad, n * sizeof(float));
 
   float *d_total_obj_val;
@@ -103,22 +115,22 @@ int main(int argc, const char *argv[]) {
 
   int *d_row_ptr;
   hipMalloc((void**)&d_row_ptr, A.row_ptr.size() * sizeof(int));
-  hipMemcpy(d_row_ptr, A.row_ptr.data(), 
+  hipMemcpy(d_row_ptr, A.row_ptr.data(),
              A.row_ptr.size() * sizeof(int), hipMemcpyHostToDevice);
 
   int *d_col_index;
   hipMalloc((void**)&d_col_index, A.col_index.size() * sizeof(int));
-  hipMemcpy(d_col_index, A.col_index.data(), 
+  hipMemcpy(d_col_index, A.col_index.data(),
              A.col_index.size() * sizeof(int), hipMemcpyHostToDevice);
 
   float *d_value;
   hipMalloc((void**)&d_value, A.values.size() * sizeof(float));
-  hipMemcpy(d_value, A.values.data(), 
+  hipMemcpy(d_value, A.values.data(),
              A.values.size() * sizeof(float), hipMemcpyHostToDevice);
 
   int *d_y_label;
   hipMalloc((void**)&d_y_label, A.y_label.size() * sizeof(int));
-  hipMemcpy(d_y_label, A.y_label.data(), 
+  hipMemcpy(d_y_label, A.y_label.data(),
              A.y_label.size() * sizeof(int), hipMemcpyHostToDevice);
 
   dim3 grid ((m+255)/256);
@@ -127,32 +139,30 @@ int main(int argc, const char *argv[]) {
   dim3 grid2 ((n+255)/256);
   dim3 block2 (256);
 
-  float obj_val = 0.f;
-  float train_error = 0.f;
+  float obj_val;
+  float train_error;
 
   hipDeviceSynchronize();
   long long train_start = get_time();
 
+  float total_obj_val;
+  float l2_norm;
+  int correct;
+
   for (int k = 0; k < iters; k++) {
 
     // reset the training status
-    float total_obj_val = 0.f;
-    float l2_norm = 0.f;
-    int correct = 0;
-
-    hipMemcpy(d_total_obj_val, &total_obj_val, sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_l2_norm, &l2_norm, sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_correct, &correct, sizeof(int), hipMemcpyHostToDevice);
+    hipMemset(d_total_obj_val, 0, sizeof(float));
+    hipMemset(d_l2_norm, 0, sizeof(float));
+    hipMemset(d_correct, 0, sizeof(int));
 
     //reset gradient vector
-    std::fill(grad.begin(), grad.end(), 0.f);
-
-    hipMemcpy(d_grad, grad.data(), n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemset(d_grad, 0, n * sizeof(float));
 
     // compute the total objective, correct rate, and gradient
     compute<<<grid, block>>>(
-        d_x, 
-        d_grad, 
+        d_x,
+        d_grad,
         d_row_ptr,
         d_col_index,
         d_value,
@@ -160,26 +170,23 @@ int main(int argc, const char *argv[]) {
         d_total_obj_val,
         d_correct,
         m
-      ); 
-
-    // display training status for verification
-    L2_norm<<<grid2, block2>>>(d_x, d_l2_norm, n);
-
-    hipMemcpy(&total_obj_val, d_total_obj_val, sizeof(float), hipMemcpyDeviceToHost);
-    hipMemcpy(&l2_norm, d_l2_norm, sizeof(float), hipMemcpyDeviceToHost);
-    hipMemcpy(&correct, d_correct, sizeof(int), hipMemcpyDeviceToHost);
-
-    obj_val = total_obj_val / (float)m + 0.5f * lambda * l2_norm;
-    train_error = 1.f-(correct/(float)m); 
+      );
 
     // update x (gradient does not need to be updated)
-    update<<<grid2, block2>>>(d_x, d_grad, m, n, lambda, alpha);
+    update<<<grid2, block2>>>(d_x, d_grad, d_l2_norm, m, n, lambda, alpha);
   }
-
   hipDeviceSynchronize();
+
   long long train_end = get_time();
   printf("Training time takes %lf (s) for %d iterations\n\n",
          (train_end - train_start) * 1e-6, iters);
+
+  hipMemcpy(&total_obj_val, d_total_obj_val, sizeof(float), hipMemcpyDeviceToHost);
+  hipMemcpy(&l2_norm, d_l2_norm, sizeof(float), hipMemcpyDeviceToHost);
+  hipMemcpy(&correct, d_correct, sizeof(int), hipMemcpyDeviceToHost);
+
+  obj_val = total_obj_val / (float)m + 0.5f * lambda * l2_norm;
+  train_error = 1.f-(correct/(float)m);
 
   printf("object value = %f train_error = %f\n", obj_val, train_error);
 
@@ -195,5 +202,5 @@ int main(int argc, const char *argv[]) {
   hipFree(d_l2_norm);
   hipFree(d_correct);
 
-  return 0; 
+  return 0;
 }
