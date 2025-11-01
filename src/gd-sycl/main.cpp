@@ -21,7 +21,7 @@ int main(int argc, const char *argv[]) {
     printf("Usage: %s <path to file> <lambda> <alpha> <repeat>\n", argv[0]);
     return 1;
   }
-  const std::string file_path = argv[1]; 
+  const std::string file_path = argv[1];
   const float lambda = atof(argv[2]);
   const float alpha = atof(argv[3]);
   const int iters = atof(argv[4]);
@@ -77,22 +77,20 @@ int main(int argc, const char *argv[]) {
   q.wait();
   long long train_start = get_time();
 
+  float total_obj_val;
+  float l2_norm;
+  int correct;
+
   for (int k = 0; k < iters; k++) {
 
     // reset the training status
-    float total_obj_val = 0.f;
-    float l2_norm = 0.f;
-    int correct = 0;
-
-    q.memcpy(d_total_obj_val, &total_obj_val, sizeof(float));
-    q.memcpy(d_l2_norm, &l2_norm, sizeof(float));
-    q.memcpy(d_correct, &correct, sizeof(int));
+    q.memset(d_total_obj_val, 0, sizeof(float));
+    q.memset(d_l2_norm, 0, sizeof(float));
+    q.memset(d_correct, 0, sizeof(int));
 
     //reset gradient vector
-    std::fill(grad.begin(), grad.end(), 0.f);
+    q.memset(d_grad, 0, n * sizeof(float));
 
-    q.memcpy(d_grad, grad.data(), n * sizeof(float));
-    
     // compute the total objective, correct rate, and gradient
     q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class compute>(
@@ -105,7 +103,7 @@ int main(int argc, const char *argv[]) {
             xp += d_value[j] * d_x[d_col_index[j]];
           }
 
-          // compute objective 
+          // compute objective
           float v = sycl::log(1.f + sycl::exp(-xp * d_y_label[i]));
           atomicAdd(d_total_obj_val, v);
 
@@ -124,46 +122,37 @@ int main(int argc, const char *argv[]) {
             atomicAdd(d_grad+d_col_index[j], temp);
           }
         }
-      }); 
-    }); 
+      });
+    });
 
-    // display training status for verification
+    // update x (gradient does not need to be updated)
     q.submit([&] (sycl::handler &cgh) {
       cgh.parallel_for<class norm>(
         sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         int i = item.get_global_id(0);
+        float s = 0;
         if (i < n) {
-          atomicAdd(d_l2_norm, d_x[i]*d_x[i]);
-        }
-      });
-    });
-
-    q.memcpy(&total_obj_val, d_total_obj_val, sizeof(float));
-    q.memcpy(&l2_norm, d_l2_norm, sizeof(float));
-    q.memcpy(&correct, d_correct, sizeof(int));
-    
-    q.wait();
-
-    obj_val = total_obj_val / (float)m + 0.5f * lambda * l2_norm;
-    train_error = 1.f-(correct/(float)m); 
-
-    // update x (gradient does not need to be updated)
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class update>(
-        sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
-        int i = item.get_global_id(0);
-        if (i < n) {
+          s = sycl::reduce_over_group(item.get_group(), d_x[i]*d_x[i], sycl::plus<>());
           float g = d_grad[i] / (float)m + lambda * d_x[i];
           d_x[i] = d_x[i] - alpha * g;
         }
+        if (item.get_local_id(0) == 0) atomicAdd(d_l2_norm, s);
       });
     });
   }
-
   q.wait();
+
   long long train_end = get_time();
-  printf("Training time takes %lf (s) for %d iterations\n\n", 
+  printf("Training time takes %lf (s) for %d iterations\n\n",
          (train_end - train_start) * 1e-6, iters);
+
+  q.memcpy(&total_obj_val, d_total_obj_val, sizeof(float));
+  q.memcpy(&l2_norm, d_l2_norm, sizeof(float));
+  q.memcpy(&correct, d_correct, sizeof(int));
+  q.wait();
+
+  obj_val = total_obj_val / (float)m + 0.5f * lambda * l2_norm;
+  train_error = 1.f-(correct/(float)m);
 
   printf("object value = %f train_error = %f\n", obj_val, train_error);
 
@@ -179,5 +168,5 @@ int main(int argc, const char *argv[]) {
   sycl::free(d_l2_norm, q);
   sycl::free(d_correct, q);
 
-  return 0; 
+  return 0;
 }
