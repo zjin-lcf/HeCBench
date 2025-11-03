@@ -1,12 +1,12 @@
 #pragma omp declare target
 template<typename T, int BLOCK_WIDTH, int BLOCK_HEIGHT, int MARGIN_X, int MARGIN_Y, int BACKWARDS>
 inline void trotter_vert_pair(
-    T a, T b, 
+    T a, T b,
     int width, int height,
-    T &cell_r, T &cell_i, 
-    int kx, int ky, int py, 
+    T &cell_r, T &cell_i,
+    int kx, int ky, int py,
     T rl[BLOCK_HEIGHT][BLOCK_WIDTH],
-    T im[BLOCK_HEIGHT][BLOCK_WIDTH]) 
+    T im[BLOCK_HEIGHT][BLOCK_WIDTH])
 {
   T peer_r;
   T peer_i;
@@ -25,12 +25,12 @@ inline void trotter_vert_pair(
 
 template<typename T, int BLOCK_WIDTH, int BLOCK_HEIGHT, int MARGIN_X, int MARGIN_Y, int BACKWARDS>
 inline void trotter_horz_pair(
-    T a, T b, 
+    T a, T b,
     int width, int height,
-    T &cell_r, T &cell_i, 
-    int kx, int ky, int px, 
+    T &cell_r, T &cell_i,
+    int kx, int ky, int px,
     T rl[BLOCK_HEIGHT][BLOCK_WIDTH],
-    T im[BLOCK_HEIGHT][BLOCK_WIDTH]) 
+    T im[BLOCK_HEIGHT][BLOCK_WIDTH])
 {
   T peer_r;
   T peer_i;
@@ -50,11 +50,11 @@ inline void trotter_horz_pair(
 template<typename T, int STEPS, int BLOCK_X, int BLOCK_Y, int MARGIN_X, int MARGIN_Y, int STRIDE_Y>
 void kernel(
     int teamX, int teamY,
-    T a, T b, int width, int height, 
+    T a, T b, int width, int height,
     const T * __restrict p_real,
     const T * __restrict p_imag,
           T * __restrict p2_real,
-          T * __restrict p2_imag) 
+          T * __restrict p2_imag)
 {
   const int teams = teamX * teamY;
   const int threads = BLOCK_X * STRIDE_Y;
@@ -115,7 +115,7 @@ void kernel(
         #pragma unroll
         for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
           trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>(
-              a, b, width, height, cell_r[part], cell_i[part], 
+              a, b, width, height, cell_r[part], cell_i[part],
               sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
         }
         #pragma omp barrier
@@ -129,7 +129,7 @@ void kernel(
         #pragma unroll
         for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
           trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 1>(
-              a, b, width, height, cell_r[part], cell_i[part], 
+              a, b, width, height, cell_r[part], cell_i[part],
               sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
         }
         #pragma omp barrier
@@ -165,7 +165,7 @@ void kernel(
         #pragma unroll
         for (int part = 0; part < BLOCK_Y / (STRIDE_Y * 2); ++part) {
           trotter_vert_pair<T, BLOCK_X, BLOCK_Y, STEPS * MARGIN_X, STEPS * MARGIN_Y, 0>
-            (a, b, width, height, cell_r[part], cell_i[part], 
+            (a, b, width, height, cell_r[part], cell_i[part],
              sx, sy + part * 2 * STRIDE_Y, checkerboard_py + part * 2 * STRIDE_Y, rl, im);
         }
         #pragma omp barrier

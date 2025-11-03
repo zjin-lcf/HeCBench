@@ -26,10 +26,13 @@ void init_p(T *p_real, T *p_imag, int width, int height) {
 template <typename T>
 void tsa(int width, int height, int repeat) {
 
-  T * p_real = new T[width * height];
-  T * p_imag = new T[width * height];
-  T * h_real = new T[width * height];
-  T * h_imag = new T[width * height];
+  int numel = width * height;
+  size_t matrix_size = numel * sizeof(T);
+
+  T * p_real = new T[numel];
+  T * p_imag = new T[numel];
+  T * h_real = new T[numel];
+  T * h_imag = new T[numel];
 
   // initialize p_real and p_imag matrices
   init_p(p_real, p_imag, width, height);
@@ -39,8 +42,8 @@ void tsa(int width, int height, int repeat) {
   T b = sin(0.02);
 
   // compute reference results
-  memcpy(h_imag, p_imag, sizeof(T)*width*height);
-  memcpy(h_real, p_real, sizeof(T)*width*height);
+  memcpy(h_imag, p_imag, matrix_size);
+  memcpy(h_real, p_real, matrix_size);
   reference(h_real, h_imag, a, b, width, height, repeat);
 
   // thread block / shared memory block width
@@ -66,12 +69,12 @@ void tsa(int width, int height, int repeat) {
   T *d_real[2];
   T *d_imag[2];
 
-  cudaMalloc((void**)(&d_real[0]), width * height * sizeof(T));
-  cudaMalloc((void**)(&d_real[1]), width * height * sizeof(T));
-  cudaMalloc((void**)(&d_imag[0]), width * height * sizeof(T));
-  cudaMalloc((void**)(&d_imag[1]), width * height * sizeof(T));
-  cudaMemcpy(d_real[0], p_real, width * height * sizeof(T), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_imag[0], p_imag, width * height * sizeof(T), cudaMemcpyHostToDevice);
+  cudaMalloc((void**)(&d_real[0]), matrix_size);
+  cudaMalloc((void**)(&d_real[1]), matrix_size);
+  cudaMalloc((void**)(&d_imag[0]), matrix_size);
+  cudaMalloc((void**)(&d_imag[1]), matrix_size);
+  cudaMemcpy(d_real[0], p_real, matrix_size, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_imag[0], p_imag, matrix_size, cudaMemcpyHostToDevice);
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
@@ -88,12 +91,12 @@ void tsa(int width, int height, int repeat) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-  cudaMemcpy(p_real, d_real[sense], width * height * sizeof(T), cudaMemcpyDeviceToHost);
-  cudaMemcpy(p_imag, d_imag[sense], width * height * sizeof(T), cudaMemcpyDeviceToHost);
+  cudaMemcpy(p_real, d_real[sense], matrix_size, cudaMemcpyDeviceToHost);
+  cudaMemcpy(p_imag, d_imag[sense], matrix_size, cudaMemcpyDeviceToHost);
 
   // verify
   bool ok = true;
-  for (int i = 0; i < width * height; i++) {
+  for (int i = 0; i < numel; i++) {
     if (fabs(p_real[i] - h_real[i]) > 1e-3) {
       ok = false;
       break;
