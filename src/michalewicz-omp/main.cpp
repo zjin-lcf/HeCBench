@@ -44,9 +44,9 @@ int main(int argc, char* argv[])
   // generate random numbers
   std::mt19937 gen(19937);
   std::uniform_real_distribution<float> dis(0.0, 4.0);
- 
-  // dimensions 
-  const int dims[] = {2, 5, 10}; 
+
+  // dimensions
+  const int dims[] = {2, 5, 10};
 
   for (int d = 0; d < 3; d++) {
 
@@ -55,15 +55,15 @@ int main(int argc, char* argv[])
     const size_t size = n * dim;
 
     const size_t size_bytes = size * sizeof(float);
-    
+
     float *values = (float*) malloc (size_bytes);
-    
+
     for (size_t i = 0; i < size; i++) {
       values[i] = dis(gen);
     }
 
     float minValue = 0;
-    
+
     #pragma omp target data map(to: values[0:size]) \
                             map(tofrom: minValue)
     {

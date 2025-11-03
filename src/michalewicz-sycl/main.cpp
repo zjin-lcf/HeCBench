@@ -11,7 +11,7 @@ float michalewicz(const float *xValues, const int dim) {
   for (int i = 0; i < dim; ++i) {
       float a = sycl::sin(xValues[i]);
       float b = sycl::sin(((i + 1) * xValues[i] * xValues[i]) / (float)M_PI);
-      float c = sycl::pow(b, 20.f); // m = 10
+      float c = sycl::pown(b, 20); // m = 10
       result += a * c;
   }
   return -1.0f * result;
@@ -48,9 +48,9 @@ int main(int argc, char* argv[])
 #else
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  
+
   // dimensions
-  const int dims[] = {2, 5, 10}; 
+  const int dims[] = {2, 5, 10};
 
   for (int d = 0; d < 3; d++) {
 
@@ -58,13 +58,13 @@ int main(int argc, char* argv[])
 
     const size_t size = n * dim;
     const size_t size_bytes = size * sizeof(float);
-    
+
     float *values = (float*) malloc (size_bytes);
-    
+
     for (int i = 0; i < size; i++) {
       values[i] = dis(gen);
     }
-    
+
     float *d_values = sycl::malloc_device<float>(size, q);
     q.memcpy(d_values, values, size_bytes);
 
