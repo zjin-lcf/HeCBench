@@ -6,7 +6,7 @@
 #include <cuda.h>
 
 __device__ __forceinline__
-float atomic_min(float *addr, float value)
+float atomicMin(float *addr, float value)
 {
   unsigned ret = __float_as_uint(*addr);
   while(value < __uint_as_float(ret))
@@ -35,7 +35,7 @@ __global__ void eval (const float *values, float *minima,
 {
   size_t n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n < nVectors) {
-    atomic_min(minima, michalewicz(values + n * dim, dim));
+    atomicMin(minima, michalewicz(values + n * dim, dim));
   }
 }
 
