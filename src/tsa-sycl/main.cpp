@@ -3,14 +3,9 @@
 #include <cstdio>
 #include <cstring>
 #include <chrono>
-#include <vector>
 #include <sycl/sycl.hpp>
 #include "kernels.h"
 #include "reference.h"
-
-// Forward declarations
-template<typename T, int STEPS, int BLOCK_X, int BLOCK_Y, int MARGIN_X, int MARGIN_Y, int STRIDE_Y>
-class k;
 
 template <typename T>
 void init_p(T *p_real, T *p_imag, int width, int height) {
@@ -31,10 +26,13 @@ void init_p(T *p_real, T *p_imag, int width, int height) {
 template <typename T>
 void tsa(sycl::queue &q, int width, int height, int repeat) {
 
-  T * p_real = new T[width * height];
-  T * p_imag = new T[width * height];
-  T * h_real = new T[width * height];
-  T * h_imag = new T[width * height];
+  int numel = width * height;
+  size_t matrix_size = numel * sizeof(T);
+
+  T * p_real = new T[numel];
+  T * p_imag = new T[numel];
+  T * h_real = new T[numel];
+  T * h_imag = new T[numel];
 
   // initialize p_real and p_imag matrices
   init_p(p_real, p_imag, width, height);
@@ -44,8 +42,8 @@ void tsa(sycl::queue &q, int width, int height, int repeat) {
   T b = sin(0.02);
 
   // compute reference results
-  memcpy(h_imag, p_imag, sizeof(T)*width*height);
-  memcpy(h_real, p_real, sizeof(T)*width*height);
+  memcpy(h_imag, p_imag, matrix_size);
+  memcpy(h_real, p_real, matrix_size);
   reference(h_real, h_imag, a, b, width, height, repeat);
 
   // thread block / shared memory block width
@@ -62,36 +60,45 @@ void tsa(sycl::queue &q, int width, int height, int repeat) {
   // time step
   const int STEPS = 1;
 
-  sycl::range<2> gws ((height + (BLOCK_Y - 2 * STEPS * MARGIN_Y) - 1) /
+
+  sycl::range<3> gws (1, (height + (BLOCK_Y - 2 * STEPS * MARGIN_Y) - 1) /
                       (BLOCK_Y - 2 * STEPS * MARGIN_Y) * STRIDE_Y,
                       (width + (BLOCK_X - 2 * STEPS * MARGIN_X) - 1) /
                       (BLOCK_X - 2 * STEPS * MARGIN_X)  * BLOCK_X);
 
-  sycl::range<2> lws (STRIDE_Y, BLOCK_X);
-
+  sycl::range<3> lws (1, STRIDE_Y, BLOCK_X);
   int sense = 0;
 
+  // pointers to ping-pong arrays
   T *d_real[2];
   T *d_imag[2];
 
-  // ping-pong arrays
-  d_real[0] = sycl::malloc_device<T>(width * height, q);
-  d_real[1] = sycl::malloc_device<T>(width * height, q);
-  d_imag[0] = sycl::malloc_device<T>(width * height, q);
-  d_imag[1] = sycl::malloc_device<T>(width * height, q);
-  q.memcpy(d_real[0], p_real, width * height * sizeof(T));
-  q.memcpy(d_imag[0], p_imag, width * height * sizeof(T));
+  d_real[0] = sycl::malloc_device<T>(numel, q);
+  d_real[1] = sycl::malloc_device<T>(numel, q);
+  d_imag[0] = sycl::malloc_device<T>(numel, q);
+  d_imag[1] = sycl::malloc_device<T>(numel, q);
+  q.memcpy(d_real[0], p_real, matrix_size);
+  q.memcpy(d_imag[0], p_imag, matrix_size);
 
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class k<T, STEPS, BLOCK_X, BLOCK_Y, MARGIN_X, MARGIN_Y, STRIDE_Y>>(
-        sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-        tsa_kernel<T, STEPS, BLOCK_X, BLOCK_Y, MARGIN_X, MARGIN_Y, STRIDE_Y>
-          (item, a, b, width, height,
-           d_real[sense], d_imag[sense], d_real[1-sense], d_imag[1-sense]);
+    q.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<T[BLOCK_Y][BLOCK_X], 0> rl_acc(cgh);
+      sycl::local_accessor<T[BLOCK_Y][BLOCK_X], 0> im_acc(cgh);
+
+      auto d_real_ping = d_real[sense];
+      auto d_real_pong = d_real[1 - sense];
+      auto d_imag_ping = d_imag[sense];
+      auto d_imag_pong = d_imag[1 - sense];
+
+      cgh.parallel_for(
+          sycl::nd_range<3>(gws, lws),
+          [=](sycl::nd_item<3> item) {
+            kernel<T, STEPS, BLOCK_X, BLOCK_Y, MARGIN_X, MARGIN_Y, STRIDE_Y>(
+                a, b, width, height, d_real_ping, d_imag_ping,
+                d_real_pong, d_imag_pong, item, rl_acc, im_acc);
       });
     });
     sense = 1 - sense; // swap
@@ -102,14 +109,12 @@ void tsa(sycl::queue &q, int width, int height, int repeat) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", (time * 1e-3f) / repeat);
 
-  q.memcpy(p_real, d_real[sense], width * height * sizeof(T));
-  q.memcpy(p_imag, d_imag[sense], width * height * sizeof(T));
-
-  q.wait();
+  q.memcpy(p_real, d_real[sense], matrix_size).wait();
+  q.memcpy(p_imag, d_imag[sense], matrix_size).wait();
 
   // verify
   bool ok = true;
-  for (int i = 0; i < width * height; i++) {
+  for (int i = 0; i < numel; i++) {
     if (fabs(p_real[i] - h_real[i]) > 1e-3) {
       ok = false;
       break;
