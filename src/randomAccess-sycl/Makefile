@@ -47,7 +47,8 @@ endif
 
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
-	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) 
+	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH) \
+            -mllvm --amdgpu-oclc-unsafe-int-atomics=true
 endif
 
 # Debug Flags
