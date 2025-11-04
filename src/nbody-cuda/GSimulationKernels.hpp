@@ -20,7 +20,7 @@ accelerate_particles( Particle* p, const int n, const float kSofteningSquared, c
 
     distance_sqr =
       dx * dx + dy * dy + dz * dz + kSofteningSquared;  // 6flops
-    distance_inv = 1.0f / sqrt(distance_sqr);       // 1div+1sqrt
+    distance_inv = rsqrtf(distance_sqr);       // 1div+1sqrt
 
     acc0 += dx * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
     acc1 += dy * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops

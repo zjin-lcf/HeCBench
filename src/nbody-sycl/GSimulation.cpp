@@ -146,7 +146,7 @@ void GSimulation::Start() {
 
           distance_sqr =
               dx * dx + dy * dy + dz * dz + kSofteningSquared;  // 6flops
-          distance_inv = 1.0f / sycl::sqrt(distance_sqr);       // 1div+1sqrt
+          distance_inv = sycl::rsqrt(distance_sqr);       // 1div+1sqrt
 
           acc0 += dx * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
           acc1 += dy * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
