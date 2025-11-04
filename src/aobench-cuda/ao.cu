@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <math.h>
 #include <chrono>
 #include <cuda.h>
@@ -284,13 +283,15 @@ void saveppm(const char *fname, int w, int h, unsigned char *img)
   FILE *fp;
 
   fp = fopen(fname, "wb");
-  assert(fp);
-
-  fprintf(fp, "P6\n");
-  fprintf(fp, "%d %d\n", w, h);
-  fprintf(fp, "255\n");
-  fwrite(img, w * h * 3, 1, fp);
-  fclose(fp);
+  if (!fp) {
+    printf("Failed to open the file %s\n", fname);
+  } else {
+    fprintf(fp, "P6\n");
+    fprintf(fp, "%d %d\n", w, h);
+    fprintf(fp, "255\n");
+    fwrite(img, w * h * 3, 1, fp);
+    fclose(fp);
+  }
 }
 
   __global__ void
@@ -345,7 +346,6 @@ render_kernel (unsigned char *fimg, const Sphere *spheres, const Plane plane,
   }
 }
 
-#ifdef DEBUG
 #define gpuErrchk(ans) gpuAssert((ans), __FILE__, __LINE__)
 
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
@@ -356,29 +356,35 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
     if (abort) exit(code);
   }
 }
-#else
-#define gpuErrchk(ans) ans
-#endif
 
-void render(unsigned char *img, int w, int h, int nsubsamples, const Sphere* spheres, const Plane &plane)
+long render(unsigned char *img, int w, int h, int nsubsamples, const Sphere* spheres, const Plane &plane)
 {
   unsigned char *d_img;
   Sphere *d_spheres;
+ 
+  size_t image_size = (size_t)w * h * 3 * sizeof(unsigned char); 
 
-  gpuErrchk( cudaMalloc((void**)&d_img, sizeof(unsigned char) * w * h * 3) );
+  gpuErrchk( cudaMalloc((void**)&d_img,  image_size) );
   gpuErrchk( cudaMalloc((void**)&d_spheres, sizeof(Sphere) * 3) );
   gpuErrchk( cudaMemcpy(d_spheres, spheres, sizeof(Sphere) * 3, cudaMemcpyHostToDevice) );
+
+  gpuErrchk( cudaDeviceSynchronize() );
+  auto start = std::chrono::steady_clock::now();
 
   render_kernel <<< dim3((w+BLOCK_SIZE-1)/BLOCK_SIZE, (h+BLOCK_SIZE-1)/BLOCK_SIZE), 
                     dim3(BLOCK_SIZE, BLOCK_SIZE) >>> (d_img, d_spheres, plane, h, w, nsubsamples);
 
+  gpuErrchk( cudaDeviceSynchronize() );
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 #ifdef DEBUG
   gpuErrchk( cudaPeekAtLastError() );
 #endif
 
-  gpuErrchk( cudaMemcpy(img, d_img, sizeof(unsigned char) * w * h * 3, cudaMemcpyDeviceToHost) );
-  cudaFree(d_img);
-  cudaFree(d_spheres);
+  gpuErrchk( cudaMemcpy(img, d_img, image_size, cudaMemcpyDeviceToHost) );
+  gpuErrchk( cudaFree(d_img) );
+  gpuErrchk( cudaFree(d_spheres) );
+  return time;
 }
 
 int main(int argc, char **argv)
@@ -397,15 +403,11 @@ int main(int argc, char **argv)
 
   unsigned char *img = ( unsigned char * )malloc( WIDTH * HEIGHT * 3 );
 
-  auto start = std::chrono::steady_clock::now();
+  long time = 0;
   for( int i = 0; i < LOOPMAX; ++i ){
-    render( img, WIDTH, HEIGHT, NSUBSAMPLES, spheres, plane );
+    time += render( img, WIDTH, HEIGHT, NSUBSAMPLES, spheres, plane );
   }
-  auto end = std::chrono::steady_clock::now();
-  auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  printf( "Total render time (%d iterations): %f sec.\n", LOOPMAX, msec / 1000.0 );
-  printf( "Average render time: %f sec.\n", msec / 1000.0 / (float)LOOPMAX );
+  printf( "Average kernel time: %lf usec.\n", (double)time / (1e3 * LOOPMAX));
 
   saveppm( "ao.ppm", WIDTH, HEIGHT, img );
   free( img );

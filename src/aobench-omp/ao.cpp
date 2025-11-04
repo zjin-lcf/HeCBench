@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <math.h>
 #include <chrono>
 #include <omp.h>
@@ -288,66 +287,73 @@ void saveppm(const char *fname, int w, int h, unsigned char *img)
   FILE *fp;
 
   fp = fopen(fname, "wb");
-  assert(fp);
-
-  fprintf(fp, "P6\n");
-  fprintf(fp, "%d %d\n", w, h);
-  fprintf(fp, "255\n");
-  fwrite(img, w * h * 3, 1, fp);
-  fclose(fp);
+  if (!fp) {
+    printf("Failed to open the file %s\n", fname);
+  } else {
+    fprintf(fp, "P6\n");
+    fprintf(fp, "%d %d\n", w, h);
+    fprintf(fp, "255\n");
+    fwrite(img, w * h * 3, 1, fp);
+    fclose(fp);
+  }
 }
 
 
-void render(unsigned char *img, int w, int h, int nsubsamples, 
+long render(unsigned char *img, int w, int h, int nsubsamples, 
             const Sphere* spheres, const Plane &plane)
 {
-  #pragma omp target map(from: img[0:w*h*3]) map(to:spheres[0:3])
+  long time;
+  #pragma omp target data map(from: img[0:w*h*3]) map(to:spheres[0:3], plane)
   {
-  #pragma omp teams distribute parallel for simd collapse(2) thread_limit(256) 
-  for (int x = 0; x < w; x++) 
-    for (int y = 0; y < h; y++) {
-          RNG rng(y * w + x);
-          float s0 = 0;
-          float s1 = 0;
-          float s2 = 0;
+    auto start = std::chrono::steady_clock::now();
+    #pragma omp target teams distribute parallel for simd collapse(2) thread_limit(256) 
+    for (int x = 0; x < w; x++) 
+      for (int y = 0; y < h; y++) {
+        RNG rng(y * w + x);
+        float s0 = 0;
+        float s1 = 0;
+        float s2 = 0;
 
-          for(int  v = 0; v < nsubsamples; v++ ) {
-            for(int  u = 0; u < nsubsamples; u++ ) {
-              float px = ( x + ( u / ( float )nsubsamples ) - ( w / 2.0f ) ) / ( w / 2.0f );
-              float py = -( y + ( v / ( float )nsubsamples ) - ( h / 2.0f ) ) / ( h / 2.0f );
+        for(int  v = 0; v < nsubsamples; v++ ) {
+          for(int  u = 0; u < nsubsamples; u++ ) {
+            float px = ( x + ( u / ( float )nsubsamples ) - ( w / 2.0f ) ) / ( w / 2.0f );
+            float py = -( y + ( v / ( float )nsubsamples ) - ( h / 2.0f ) ) / ( h / 2.0f );
 
-              Ray ray;
-              ray.org.x = 0.0;
-              ray.org.y = 0.0;
-              ray.org.z = 0.0;
-              ray.dir.x = px;
-              ray.dir.y = py;
-              ray.dir.z = -1.0;
-              vnormalize( &( ray.dir ) );
+            Ray ray;
+            ray.org.x = 0.0;
+            ray.org.y = 0.0;
+            ray.org.z = 0.0;
+            ray.dir.x = px;
+            ray.dir.y = py;
+            ray.dir.z = -1.0;
+            vnormalize( &( ray.dir ) );
 
-              Isect isect;
-              isect.t = 1.0e+17f;
-              isect.hit = 0;
+            Isect isect;
+            isect.t = 1.0e+17f;
+            isect.hit = 0;
 
-              ray_sphere_intersect( &isect, &ray, spheres   );
-              ray_sphere_intersect( &isect, &ray, spheres + 1  );
-              ray_sphere_intersect( &isect, &ray, spheres + 2  );
-              ray_plane_intersect ( &isect, &ray, &plane );
+            ray_sphere_intersect( &isect, &ray, spheres   );
+            ray_sphere_intersect( &isect, &ray, spheres + 1  );
+            ray_sphere_intersect( &isect, &ray, spheres + 2  );
+            ray_plane_intersect ( &isect, &ray, &plane );
 
-              if( isect.hit ) {
-                Vec col;
-                ambient_occlusion( &col, &isect, spheres, &plane, rng );
-                s0 += col.x;
-                s1 += col.y;
-                s2 += col.z;
-              }
+            if( isect.hit ) {
+              Vec col;
+              ambient_occlusion( &col, &isect, spheres, &plane, rng );
+              s0 += col.x;
+              s1 += col.y;
+              s2 += col.z;
             }
           }
-          img[ 3 * ( y * w + x ) + 0 ] = my_clamp ( s0 / ( float )( nsubsamples * nsubsamples ) );
-          img[ 3 * ( y * w + x ) + 1 ] = my_clamp ( s1 / ( float )( nsubsamples * nsubsamples ) );
-          img[ 3 * ( y * w + x ) + 2 ] = my_clamp ( s2 / ( float )( nsubsamples * nsubsamples ) );
         }
-     }
+        img[ 3 * ( y * w + x ) + 0 ] = my_clamp ( s0 / ( float )( nsubsamples * nsubsamples ) );
+        img[ 3 * ( y * w + x ) + 1 ] = my_clamp ( s1 / ( float )( nsubsamples * nsubsamples ) );
+        img[ 3 * ( y * w + x ) + 2 ] = my_clamp ( s2 / ( float )( nsubsamples * nsubsamples ) );
+      }
+    auto end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  }
+  return time;
 }
 
 int main(int argc, char **argv)
@@ -366,15 +372,11 @@ int main(int argc, char **argv)
 
   unsigned char *img = ( unsigned char * )malloc( WIDTH * HEIGHT * 3 );
 
-  auto start = std::chrono::steady_clock::now();
+  long time = 0;
   for( int i = 0; i < LOOPMAX; ++i ){
-    render( img, WIDTH, HEIGHT, NSUBSAMPLES, spheres, plane );
+    time += render( img, WIDTH, HEIGHT, NSUBSAMPLES, spheres, plane );
   }
-  auto end = std::chrono::steady_clock::now();
-  auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  printf( "Total render time (%d iterations): %f sec.\n", LOOPMAX, msec / 1000.0 );
-  printf( "Average render time: %f sec.\n", msec / 1000.0 / (float)LOOPMAX );
+  printf( "Average kernel time: %lf usec.\n", (double)time / (1e3 * LOOPMAX));
 
   saveppm( "ao.ppm", WIDTH, HEIGHT, img );
   free( img );
