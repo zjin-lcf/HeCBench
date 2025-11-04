@@ -109,13 +109,14 @@
 //
 //     https://github.com/boris-dimitrov/z4_planar_langford
 
-#include <assert.h>
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <iomanip>
-#include <chrono>
 #include <vector>
-#include <algorithm>
-#include <stdlib.h>
 #include <sycl/sycl.hpp>
 using namespace std;
 
@@ -140,20 +141,20 @@ constexpr int div_up(int p, int q) {
   return (p + (q - 1)) / q;
 };
 
-int ffsll(int64_t x) {
-  for (int i = 0; i < 64; i++)
-    if ((x >> i) & 1) return (i+1);
-  return 0;
-};
+// DPCT
+template <typename T> inline int ffs(T a) {
+  return (sycl::ctz(a) + 1) % (sizeof(T) * 8 + 1);
+}
+
 
 // This type represents a solution by letting pos[m-1] be
 // the position of the closing m, for m = 1, 2, ... n.
 template <int n>
-using Positions = array<int8_t, n>;
+using Positions = std::array<int8_t, n>;
 
 // All planar sequences (including duplicates) are stored in a vector for sorting.
 template <int n>
-using Results = vector<Positions<n>>;
+using Results = std::vector<Positions<n>>;
 
 // 8-byte alignment probably helps with concurrent writes to adjacent instances
 template <int n>
@@ -283,8 +284,7 @@ if (k == two_n) {
   int8_t offset = k - two_n - 2;
   for (d=0; d<2; ++d) {
     if (openings[d]) { // if there is an opening, try closing it
-      //m = offset + __ffsll(openings[d]);
-      m = offset + ffsll(openings[d]);
+      m = offset + ffs(openings[d]);
       // m could be -1, for example if the decision at pos k-1 was to open;
       // only m from 0 .. n - 1 are useful
       if (((unsigned)m < n) && ((avail >> m) & 1)) {
@@ -335,13 +335,14 @@ class langford;
 
 // Start and manage the computation on GPU device "device"
 template <int n>
-void run_gpu_d(sycl::queue &q, int64_t* count, Results<n>& final_results) {
+void run_gpu_d(sycl::queue &q, Results<n>& final_results) {
   assert(sizeof(int64_t) == 8);
 
+  int64_t count = 0;
   constexpr int64_t kAlignedCnt = (n + 7) / 8;
 
   int64_t *result_device = sycl::malloc_device<int64_t>(1 + kLimit * kAlignedCnt, q);
-  q.memcpy(result_device, count, sizeof(int64_t));
+  q.memcpy(result_device, &count, sizeof(int64_t));
 
   int blocks_x = div_up(kNumLogicalThreads, kThreadsPerBlock);
   sycl::range<1> gws (blocks_x*kThreadsPerBlock);
@@ -379,21 +380,20 @@ void run_gpu_d(sycl::queue &q, int64_t* count, Results<n>& final_results) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   cout << "Kernel execution time:  " << time * 1e-9f << " (s)\n";
 
-  q.memcpy(count, result_device, sizeof(int64_t)).wait();
+  q.memcpy(&count, result_device, sizeof(int64_t)).wait();
 
-  if (*count >= kLimit) {
+  if (count >= kLimit) {
     cout << "Result for n = " << n << " will be bogus because GPU "
       << " exceeded " << kLimit << " solutions.\n";
   }
-  int64_t r_count = *count;
 
-  int64_t data_size = (1 + r_count * kAlignedCnt) * sizeof(int64_t);
+  int64_t data_size = (1 + count * kAlignedCnt) * sizeof(int64_t);
   int64_t* results_host = (int64_t*) malloc (data_size);
   q.memcpy(results_host, result_device, data_size).wait();
   sycl::free(result_device, q);
 
   // Compact results into a vector
-  for (int i=0; i<r_count; ++i) {
+  for (int i=0; i<count; ++i) {
     Positions<n> pos;
     PositionsGPU<n>& gpos = *((PositionsGPU<n>*)(results_host + 1 + (kAlignedCnt * i)));
     for (int j=0; j<n; ++j) {
@@ -415,11 +415,10 @@ void run_gpu(sycl::queue &q, const int64_t* known_results) {
     return;
   }
 
-  int64_t count = 0;
   int64_t total;
   Results<n> final_results;
 
-  run_gpu_d<n>(q, &count, final_results);
+  run_gpu_d<n>(q, final_results);
 
   // Sort and unique count on CPU.
   total = unique_count<n>(final_results);
