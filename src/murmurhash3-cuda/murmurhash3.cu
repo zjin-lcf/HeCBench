@@ -199,7 +199,7 @@ int main(int argc, char** argv)
   uint64_t* dev_out;
   cudaMalloc((void**)&dev_out, sizeof(uint64_t)*(numKeys*2));
 
-  dim3 gridDim ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+  dim3 gridDim ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE);
   dim3 blockDim(BLOCK_SIZE);
 
   cudaDeviceSynchronize();
