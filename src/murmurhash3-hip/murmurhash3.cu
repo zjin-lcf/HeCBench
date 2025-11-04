@@ -199,14 +199,14 @@ int main(int argc, char** argv)
   uint64_t* dev_out;
   hipMalloc((void**)&dev_out, sizeof(uint64_t)*(numKeys*2));
 
-  dim3 gridDim ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+  dim3 gridDim ((numKeys+BLOCK_SIZE-1)/BLOCK_SIZE);
   dim3 blockDim(BLOCK_SIZE);
 
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (uint32_t n = 0; n < repeat; n++)  
-    hipLaunchKernelGGL(MurmurHash3_x64_128_kernel, gridDim, blockDim, 0, 0, 
+    MurmurHash3_x64_128_kernel<<<gridDim, blockDim>>>(
       dev_keys, dev_length, key_length, dev_out, numKeys);
 
   hipDeviceSynchronize();
