@@ -1,6 +1,8 @@
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <random>
 #include <cuda.h>
 #include "kernels.h"
 #include "reference.h"
@@ -26,13 +28,15 @@ void topk_softmax(int num_tokens, int num_experts, int topk, int repeat)
   int *topk_indices_ref = (int*) malloc (index_size_bytes);
   int *token_expert_indices_ref = (int*) malloc (index_size_bytes);
 
-  srand(123);
+  std::mt19937 gen(19937);
+  std::uniform_int_distribution<> distrib(-1e5, 1e5);
   for (int i = 0; i < output_size; i++) {
-    gating_output[i] = rand() % 20; 
+    gating_output[i] = distrib(gen);
   }
   for (int i = 0; i < topk; i++) {
     for (int j = 0; j < num_tokens; j++) {
-      topk_indices[i * num_tokens + j] = rand() % num_experts;   
+      topk_indices_ref[i * num_tokens + j] =
+      topk_indices[i * num_tokens + j] = abs(distrib(gen)) % num_experts;
     }
   }
 
