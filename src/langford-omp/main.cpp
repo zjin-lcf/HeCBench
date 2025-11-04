@@ -109,13 +109,14 @@
 //
 //     https://github.com/boris-dimitrov/z4_planar_langford
 
-#include <assert.h>
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <iomanip>
-#include <chrono>
 #include <vector>
-#include <algorithm>
-#include <stdlib.h>
 #include <omp.h>
 using namespace std;
 
@@ -150,11 +151,11 @@ int ffsll(int64_t x) {
 // This type represents a solution by letting pos[m-1] be
 // the position of the closing m, for m = 1, 2, ... n.
 template <int n>
-using Positions = array<int8_t, n>;
+using Positions = std::array<int8_t, n>;
 
 // All planar sequences (including duplicates) are stored in a vector for sorting.
 template <int n>
-using Results = vector<Positions<n>>;
+using Results = std::vector<Positions<n>>;
 
 // 8-byte alignment probably helps with concurrent writes to adjacent instances
 template <int n>
@@ -190,7 +191,7 @@ constexpr int kNumLogicalThreads = 16383;
 // To do:  Run on CPU (right now only runs on GPU).
 #pragma omp declare target
 template <int n>
-void dfs(int64_t* p_count,
+void dfs(int64_t *p_count,
          int64_t* p_result,
          Availability<n> &availability,
          Open<n> &open,
@@ -285,7 +286,6 @@ if (k == two_n) {
   int8_t offset = k - two_n - 2;
   for (d=0; d<2; ++d) {
     if (openings[d]) { // if there is an opening, try closing it
-      //m = offset + __ffsll(openings[d]);
       m = offset + ffsll(openings[d]);
       // m could be -1, for example if the decision at pos k-1 was to open;
       // only m from 0 .. n - 1 are useful
@@ -333,60 +333,55 @@ long unixtime() {
 
 // Start and manage the computation on GPU device "device"
 template <int n>
-void run_gpu_d(int64_t* count, Results<n>& final_results) {
+void run_gpu_d(Results<n>& final_results) {
   assert(sizeof(int64_t) == 8);
 
+  int64_t count[1] = {0};
   constexpr int64_t kAlignedCnt = (n + 7) / 8;
   int64_t *results = (int64_t*) malloc (sizeof(int64_t) * kLimit * kAlignedCnt); 
 
   int blocks_x = div_up(kNumLogicalThreads, kThreadsPerBlock);
 
-#pragma omp target data map(to: count[0:1]) map(alloc: results[0:kLimit * kAlignedCnt])
-{
-  auto start = std::chrono::steady_clock::now();
-
-  #pragma omp target teams num_teams(blocks_x) thread_limit(kThreadsPerBlock) 
+  #pragma omp target data map(tofrom: count[0:1]) map(from: results[0:kLimit * kAlignedCnt])
   {
-    Availability<n> availability[kThreadsPerBlock]; 
-    Open<n> open[kThreadsPerBlock]; 
-    Stack<n> stack[kThreadsPerBlock];
-    PositionsGPUAligned<n> pgpualigned[kThreadsPerBlock];
-
-    #pragma omp parallel
+    auto start = std::chrono::steady_clock::now();
+  
+    #pragma omp target teams num_teams(blocks_x) thread_limit(kThreadsPerBlock) 
     {
-      int lid = omp_get_thread_num();
-      int tid = omp_get_team_num();
-
-      const int32_t result_index = tid * kThreadsPerBlock + lid;
-      dfs<n>(
-      count,
-      results,
-      availability[lid],
-      open[lid],
-      stack[lid],
-      pgpualigned[lid],
-      result_index);
+      Availability<n> availability[kThreadsPerBlock]; 
+      Open<n> open[kThreadsPerBlock]; 
+      Stack<n> stack[kThreadsPerBlock];
+      PositionsGPUAligned<n> pgpualigned[kThreadsPerBlock];
+  
+      #pragma omp parallel
+      {
+        int lid = omp_get_thread_num();
+        int tid = omp_get_team_num();
+  
+        const int32_t result_index = tid * kThreadsPerBlock + lid;
+        dfs<n>(
+        count,
+        results,
+        availability[lid],
+        open[lid],
+        stack[lid],
+        pgpualigned[lid],
+        result_index);
+      }
     }
+  
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    cout << "Kernel execution time:  " << time * 1e-9f << " (s)\n";
   }
-
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  cout << "Kernel execution time:  " << time * 1e-9f << " (s)\n";
-
-#pragma omp target update from(count[0:1])
-
+  
   if (*count >= kLimit) {
     cout << "Result for n = " << n << " will be bogus because GPU "
       << " exceeded " << kLimit << " solutions.\n";
   }
-
-  int64_t r_count = *count;
-  int64_t data_size = r_count * kAlignedCnt;
-
-#pragma omp target update from(results[0:data_size])
-
+  
   // Compact results into a vector
-  for (int i=0; i<r_count; ++i) {
+  for (int i=0; i<*count; ++i) {
     Positions<n> pos;
     PositionsGPU<n>& gpos = *((PositionsGPU<n>*)(results + (kAlignedCnt * i)));
     for (int j=0; j<n; ++j) {
@@ -394,9 +389,8 @@ void run_gpu_d(int64_t* count, Results<n>& final_results) {
     }
     final_results.push_back(pos);
   }
-
+  
   free(results);
-} 
 }
 
 // Start a CPU thread to manage each GPU device and wait for the computation to end.
@@ -410,11 +404,10 @@ void run_gpu(const int64_t* known_results) {
     return;
   }
 
-  int64_t count = 0;
   int64_t total;
   Results<n> final_results;
 
-  run_gpu_d<n>(&count, final_results);
+  run_gpu_d<n>(final_results);
 
   // Sort and unique count on CPU.
   total = unique_count<n>(final_results);
