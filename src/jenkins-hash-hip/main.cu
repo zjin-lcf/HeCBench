@@ -179,7 +179,7 @@ unsigned int hashlittle( const void *key, size_t length, unsigned int initval)
   return c;
 }
 
-__global__ void kernel (
+__global__ void jk3_hash_kernel (
     const unsigned int *__restrict__ lengths,
     const unsigned int *__restrict__ initvals,
     const unsigned int *__restrict__ keys,
@@ -261,15 +261,15 @@ int main(int argc, char** argv) {
 
   unsigned int* d_keys;
   hipMalloc((void**)&d_keys, sizeof(unsigned int)*N*16);
-  hipMemcpyAsync(d_keys, keys, sizeof(unsigned int)*N*16, hipMemcpyHostToDevice, 0);
+  hipMemcpy(d_keys, keys, sizeof(unsigned int)*N*16, hipMemcpyHostToDevice);
 
   unsigned int* d_lens;
   hipMalloc((void**)&d_lens, sizeof(unsigned int)*N);
-  hipMemcpyAsync(d_lens, lens, sizeof(unsigned int)*N, hipMemcpyHostToDevice, 0);
+  hipMemcpy(d_lens, lens, sizeof(unsigned int)*N, hipMemcpyHostToDevice);
 
   unsigned int* d_initvals;
   hipMalloc((void**)&d_initvals, sizeof(unsigned int)*N);
-  hipMemcpyAsync(d_initvals, initvals, sizeof(unsigned int)*N, hipMemcpyHostToDevice, 0);
+  hipMemcpy(d_initvals, initvals, sizeof(unsigned int)*N, hipMemcpyHostToDevice);
 
   unsigned int* d_out;
   hipMalloc((void**)&d_out, sizeof(unsigned int)*N);
@@ -281,7 +281,7 @@ int main(int argc, char** argv) {
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    hipLaunchKernelGGL(kernel, grids, threads, 0, 0, d_lens, d_initvals, d_keys, d_out, N);
+    jk3_hash_kernel<<< grids, threads >>>(d_lens, d_initvals, d_keys, d_out, N);
   }
 
   hipDeviceSynchronize();
