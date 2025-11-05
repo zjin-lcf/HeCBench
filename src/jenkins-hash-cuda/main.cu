@@ -179,7 +179,7 @@ unsigned int hashlittle( const void *key, size_t length, unsigned int initval)
   return c;
 }
 
-__global__ void kernel (
+__global__ void jk3_hash_kernel (
     const unsigned int *__restrict__ lengths,
     const unsigned int *__restrict__ initvals,
     const unsigned int *__restrict__ keys,
@@ -260,15 +260,15 @@ int main(int argc, char** argv) {
 
   unsigned int* d_keys;
   cudaMalloc((void**)&d_keys, sizeof(unsigned int)*N*16);
-  cudaMemcpyAsync(d_keys, keys, sizeof(unsigned int)*N*16, cudaMemcpyHostToDevice, 0);
+  cudaMemcpy(d_keys, keys, sizeof(unsigned int)*N*16, cudaMemcpyHostToDevice);
 
   unsigned int* d_lens;
   cudaMalloc((void**)&d_lens, sizeof(unsigned int)*N);
-  cudaMemcpyAsync(d_lens, lens, sizeof(unsigned int)*N, cudaMemcpyHostToDevice, 0);
+  cudaMemcpy(d_lens, lens, sizeof(unsigned int)*N, cudaMemcpyHostToDevice);
 
   unsigned int* d_initvals;
   cudaMalloc((void**)&d_initvals, sizeof(unsigned int)*N);
-  cudaMemcpyAsync(d_initvals, initvals, sizeof(unsigned int)*N, cudaMemcpyHostToDevice, 0);
+  cudaMemcpy(d_initvals, initvals, sizeof(unsigned int)*N, cudaMemcpyHostToDevice);
 
   unsigned int* d_out;
   cudaMalloc((void**)&d_out, sizeof(unsigned int)*N);
@@ -280,7 +280,7 @@ int main(int argc, char** argv) {
   auto start = std::chrono::steady_clock::now();
 
   for (int n = 0; n < repeat; n++) {
-    kernel<<<grids,threads>>>(d_lens, d_initvals, d_keys, d_out, N);
+    jk3_hash_kernel<<<grids,threads>>>(d_lens, d_initvals, d_keys, d_out, N);
   }
 
   cudaDeviceSynchronize();
