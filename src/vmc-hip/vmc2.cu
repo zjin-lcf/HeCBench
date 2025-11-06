@@ -14,7 +14,6 @@ const int NBLOCK  = 56*4;               // Number of CUDA blocks (SMs on P100)
 const int Npoint = NBLOCK*NTHR_PER_BLK; // No. of independent samples
 const int Neq = 100000;                 // No. of generations to equilibrate 
 const int Ngen_per_block = 5000;        // No. of generations per block
-const int Nsample = 100;                // No. of blocks to sample
 const float DELTA = 2.0;                // Random step size
 
 // Explicitly typed constants so can easily work with both floats and floats
@@ -114,7 +113,15 @@ __global__ void zero_stats(int Npoint, FLOAT* stats) {
 }
 
 // initializes samples
-__global__ void initialize(FLOAT* x1, FLOAT* y1, FLOAT* z1, FLOAT* x2, FLOAT* y2, FLOAT* z2, FLOAT* psi, unsigned int* states) {
+__global__ void initialize(FLOAT* __restrict__ x1,
+                           FLOAT* __restrict__ y1,
+                           FLOAT* __restrict__ z1,
+                           FLOAT* __restrict__ x2,
+                           FLOAT* __restrict__ y2,
+                           FLOAT* __restrict__ z2,
+                           FLOAT* __restrict__ psi,
+                           unsigned int* __restrict__ states)
+{
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   x1[i] = (LCG_random(states+i) - HALF)*FOUR;
   y1[i] = (LCG_random(states+i) - HALF)*FOUR;
@@ -125,8 +132,17 @@ __global__ void initialize(FLOAT* x1, FLOAT* y1, FLOAT* z1, FLOAT* x2, FLOAT* y2
   psi[i] = wave_function(x1[i], y1[i], z1[i], x2[i], y2[i], z2[i]);
 }
 
-__global__ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y1, FLOAT* Z1, 
-                          FLOAT* X2, FLOAT* Y2, FLOAT* Z2, FLOAT* P, FLOAT* stats, unsigned int* states) {
+__global__ void propagate(const int Npoint, const int nstep,
+                          FLOAT* __restrict__  X1,
+                          FLOAT* __restrict__  Y1,
+                          FLOAT* __restrict__  Z1,
+                          FLOAT* __restrict__  X2,
+                          FLOAT* __restrict__  Y2,
+                          FLOAT* __restrict__  Z2,
+                          FLOAT* __restrict__  P,
+                          FLOAT* __restrict__  stats,
+                          unsigned int* __restrict__  states)
+{
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   FLOAT x1 = X1[i];
   FLOAT y1 = Y1[i];
@@ -172,7 +188,13 @@ __global__ void propagate(const int Npoint, const int nstep, FLOAT* X1, FLOAT* Y
   P[i] = p;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Usage: %s <number of blocks to sample>\n", argv[0]);
+    return 1;
+  }
+  const int Nsample = atoi(argv[1]); // No. of blocks to sample
+
   FLOAT *x1, *y1, *z1, *x2, *y2, *z2, *psi, *stats, *statsum, *blocksums;
   unsigned int *ranstates;  
 
