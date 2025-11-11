@@ -3,6 +3,7 @@
 #include <hip/hip_runtime.h>
 #include <chrono>
 #include "kernel.h"
+#include "reference.h"
 
 // threads per block
 #define BS 256
@@ -64,7 +65,7 @@ int main(int argc, char* argv[]) {
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < repeat; i++) 
+  for (int i = 0; i < repeat; i++)
     damage_of_node <<< grids, blocks, BS*sizeof(int) >>> (
       n, d_nlist, d_family, d_n_neigh, d_damage);
 
@@ -76,9 +77,7 @@ int main(int argc, char* argv[]) {
   hipMemcpy(n_neigh, d_n_neigh, sizeof(int)*m, hipMemcpyDeviceToHost);
   hipMemcpy(damage, d_damage, sizeof(double)*m, hipMemcpyDeviceToHost);
 
-  double sum = 0.0;
-  for (int i = 0; i < m; i++) sum += damage[i]; 
-  printf("Checksum: total damage = %lf\n", sum);
+  validate(BS, m, n, nlist, family, n_neigh, damage);
 
   hipFree(d_nlist);
   hipFree(d_family);
