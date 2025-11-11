@@ -3,6 +3,7 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 #include "kernel.h"
+#include "reference.h"
 
 // threads per block
 #define BS 256
@@ -79,7 +80,7 @@ int main(int argc, char* argv[]) {
                         d_family,
                         d_n_neigh,
                         d_damage,
-                        sm.get_pointer());
+                        sm.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
   }
@@ -89,10 +90,11 @@ int main(int argc, char* argv[]) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
-  q.memcpy(damage, d_damage, sizeof(double) * m).wait();
-  double sum = 0.0;
-  for (int i = 0; i < m; i++) sum += damage[i]; 
-  printf("Checksum: total damage = %lf\n", sum);
+  q.memcpy(n_neigh, d_n_neigh, sizeof(int)*m);
+  q.memcpy(damage, d_damage, sizeof(double)*m);
+  q.wait();
+
+  validate(BS, m, n, nlist, family, n_neigh, damage);
 
   sycl::free(d_nlist, q);
   sycl::free(d_family, q);

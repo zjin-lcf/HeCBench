@@ -7,6 +7,7 @@
 #define BS 256
 
 #include "kernel.h"
+#include "reference.h"
 
 double LCG_random_double(uint64_t * seed)
 {
@@ -51,7 +52,7 @@ int main(int argc, char* argv[]) {
   {
     auto start = std::chrono::steady_clock::now();
 
-    for (int i = 0; i < repeat; i++) 
+    for (int i = 0; i < repeat; i++)
       damage_of_node (n, nlist, family, n_neigh, damage);
 
     auto end = std::chrono::steady_clock::now();
@@ -59,9 +60,7 @@ int main(int argc, char* argv[]) {
     printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
   }
 
-  double sum = 0.0;
-  for (int i = 0; i < m; i++) sum += damage[i]; 
-  printf("Checksum: total damage = %lf\n", sum);
+  validate(BS, m, n, nlist, family, n_neigh, damage);
 
   free(nlist);
   free(family);
