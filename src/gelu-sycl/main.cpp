@@ -30,17 +30,15 @@ void gelu_bias_loop(sycl::half *src, const sycl::half *bias, int width,
   int y = item.get_local_id(1) * 2;
   int batch = item.get_group(0);
 
-  if (x < height) {
-    int    index = batch * width * height + x * width;
-    for (; y < width; y = y + item.get_local_range(1) * 2) {
-      sycl::half2 v_bias = ((sycl::half2 *)bias)[y >> 1];
-      sycl::half2 v_src = ((sycl::half2 *)src)[(index + y) >> 1];
-      sycl::half2 v = v_src + v_bias;
-      sycl::float2 t = v.convert<float, sycl::rounding_mode::automatic>();
-      t.x() = (0.5f * t.x() * (1.0f + sycl::tanh(0.79788456f * (t.x() + 0.044715f * t.x() * t.x() * t.x()))));
-      t.y() = (0.5f * t.y() * (1.0f + sycl::tanh(0.79788456f * (t.y() + 0.044715f * t.y() * t.y() * t.y()))));
-      ((sycl::half2 *)src)[(index + y) >> 1] = t.convert<sycl::half, sycl::rounding_mode::rte>();
-    }
+  int    index = batch * width * height + x * width;
+  for (; y < width; y = y + item.get_local_range(1) * 2) {
+    sycl::half2 v_bias = ((sycl::half2 *)bias)[y >> 1];
+    sycl::half2 v_src = ((sycl::half2 *)src)[(index + y) >> 1];
+    sycl::half2 v = v_src + v_bias;
+    sycl::float2 t = v.convert<float, sycl::rounding_mode::automatic>();
+    t.x() = (0.5f * t.x() * (1.0f + sycl::tanh(0.79788456f * (t.x() + 0.044715f * t.x() * t.x() * t.x()))));
+    t.y() = (0.5f * t.y() * (1.0f + sycl::tanh(0.79788456f * (t.y() + 0.044715f * t.y() * t.y() * t.y()))));
+    ((sycl::half2 *)src)[(index + y) >> 1] = t.convert<sycl::half, sycl::rounding_mode::rte>();
   }
 }
 
@@ -50,18 +48,16 @@ void gelu_bias_loop_base(sycl::half *src, const sycl::half *bias, int width,
   int x = item.get_group(1); // seq length
   int batch = item.get_group(0);
 
-  if (x < height) {
-    int    index = batch * width * height + x * width;
-    for (int y = item.get_local_id(1); y < width; y = y + item.get_local_range(1)) {
-      auto v_bias = bias[y];
-      auto v_src = src[index + y];
-      auto v = v_src + v_bias;
-      auto t = sycl::vec<sycl::half, 1>(v)
-                   .convert<float, sycl::rounding_mode::automatic>()[0];
-      t = (0.5f * t * (1.0f + sycl::tanh(0.79788456f * (t + 0.044715f * t * t * t))));
-      src[index + y] = sycl::vec<float, 1>(t)
-                           .convert<sycl::half, sycl::rounding_mode::rte>()[0];
-    }
+  int    index = batch * width * height + x * width;
+  for (int y = item.get_local_id(1); y < width; y = y + item.get_local_range(1)) {
+    auto v_bias = bias[y];
+    auto v_src = src[index + y];
+    auto v = v_src + v_bias;
+    auto t = sycl::vec<sycl::half, 1>(v)
+                 .convert<float, sycl::rounding_mode::automatic>()[0];
+    t = (0.5f * t * (1.0f + sycl::tanh(0.79788456f * (t + 0.044715f * t * t * t))));
+    src[index + y] = sycl::vec<float, 1>(t)
+                         .convert<sycl::half, sycl::rounding_mode::rte>()[0];
   }
 }
 
