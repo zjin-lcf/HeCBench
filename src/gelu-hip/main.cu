@@ -30,17 +30,15 @@ __global__ void gelu_bias_loop(__half* src, const __half* bias, int width, int h
   int y     = threadIdx.x * 2;
   int batch = blockIdx.y;
 
-  if (x < height) {
-    int    index = batch * width * height + x * width;
-    for (; y < width; y = y + blockDim.x * 2) {
-      auto v_bias = ((half2*)bias)[y >> 1];
-      auto v_src  = ((half2*)src)[(index + y) >> 1];
-      auto v      = __hadd2(v_src, v_bias);
-      auto t      = __half22float2(v);
-      t.x    = (0.5f * t.x * (1.0f + tanhf(0.79788456f * (t.x + 0.044715f * t.x * t.x * t.x))));
-      t.y    = (0.5f * t.y * (1.0f + tanhf(0.79788456f * (t.y + 0.044715f * t.y * t.y * t.y))));
-      ((half2*)src)[(index + y) >> 1] = __float22half2_rn(t);
-    }
+  int    index = batch * width * height + x * width;
+  for (; y < width; y = y + blockDim.x * 2) {
+    auto v_bias = ((half2*)bias)[y >> 1];
+    auto v_src  = ((half2*)src)[(index + y) >> 1];
+    auto v      = __hadd2(v_src, v_bias);
+    auto t      = __half22float2(v);
+    t.x    = (0.5f * t.x * (1.0f + tanhf(0.79788456f * (t.x + 0.044715f * t.x * t.x * t.x))));
+    t.y    = (0.5f * t.y * (1.0f + tanhf(0.79788456f * (t.y + 0.044715f * t.y * t.y * t.y))));
+    ((half2*)src)[(index + y) >> 1] = __float22half2_rn(t);
   }
 }
 
@@ -49,16 +47,14 @@ __global__ void gelu_bias_loop_base(__half* src, const __half* bias, int width, 
   int x     = blockIdx.x;  // seq length
   int batch = blockIdx.y;
 
-  if (x < height) {
-    int   index = batch * width * height + x * width;
-    for (int y = threadIdx.x; y < width; y = y + blockDim.x) {
-      auto v_bias = bias[y];
-      auto v_src  = src[index + y];
-      auto v      = v_src + v_bias;
-      auto t      = __half2float(v);
-      t      = (0.5f * t * (1.0f + tanhf(0.79788456f * (t + 0.044715f * t * t * t))));
-      src[index + y] = __float2half_rn(t);
-    }
+  int   index = batch * width * height + x * width;
+  for (int y = threadIdx.x; y < width; y = y + blockDim.x) {
+    auto v_bias = bias[y];
+    auto v_src  = src[index + y];
+    auto v      = v_src + v_bias;
+    auto t      = __half2float(v);
+    t      = (0.5f * t * (1.0f + tanhf(0.79788456f * (t + 0.044715f * t * t * t))));
+    src[index + y] = __float2half_rn(t);
   }
 }
 
