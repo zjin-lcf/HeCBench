@@ -54,11 +54,12 @@ int main(int argc, char* argv[])
 
     int batch_size_bytes = (batch_size + 1) * sizeof(float);
 
-    float *input, *dense, *output_k1, *output_k2, *output_ref;
+    float *input, *dense, *output_k1, *output_k2, *output_k3, *output_ref;
     input = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     dense = (float*) malloc (dense_size_bytes); // [batch_size x embedding_dim]
     output_k1 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     output_k2 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
+    output_k3 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     output_ref = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     int *offset = (int*) malloc (batch_size_bytes);  // [batch_size]
 
@@ -88,7 +89,8 @@ int main(int argc, char* argv[])
                                     dense[0:dense_size], \
                                     offset[0:batch_size+1], \
                                     output_k1[0:input_size], \
-                                    output_k2[0:input_size])
+                                    output_k2[0:input_size], \
+                                    output_k3[0:input_size])
     {
       for (int block_size = 128; block_size <= 1024; block_size = block_size * 2) {
         printf("block size: %d\n", block_size);
@@ -146,10 +148,32 @@ int main(int argc, char* argv[])
 
         #pragma omp target update from (output_k2[0:input_size])
 
+        start = std::chrono::steady_clock::now();
+
+        for (int i = 0; i < repeat; i++) {
+          #pragma omp target teams distribute num_teams(batch_size)
+          for (int batch_idx = 0; batch_idx < batch_size; batch_idx++) { 
+            const int start = offset[batch_idx];
+            const int range = offset[batch_idx + 1] - start;
+            #pragma omp parallel for num_threads(block_size)
+            for (int idx = 0; idx < range; idx++) {
+              auto input_elem = input[start + idx];
+              auto dense_elem = dense[batch_idx * ncols + idx % ncols];
+              output_k3[start + idx] = input_elem + dense_elem;
+            }
+          }
+        }
+
+        end = std::chrono::steady_clock::now();
+        time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        printf("Average execution time of dense embedding kernel (k3): %f (us)\n", (time * 1e-3f) / repeat);
+
+        #pragma omp target update from (output_k3[0:input_size])
         bool ok = true;
         for (int i = 0; i < input_size; i++) {
           if (fabsf(output_k1[i] - output_ref[i]) > 1e-3f ||
-              fabsf(output_k2[i] - output_ref[i]) > 1e-3f) {
+              fabsf(output_k2[i] - output_ref[i]) > 1e-3f ||
+              fabsf(output_k3[i] - output_ref[i]) > 1e-3f) {
             ok = false;
             break;
           }
@@ -162,6 +186,7 @@ int main(int argc, char* argv[])
     free(dense);
     free(output_k1);
     free(output_k2);
+    free(output_k3);
     free(output_ref);
     free(offset);
   }

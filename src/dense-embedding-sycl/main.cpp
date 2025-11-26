@@ -69,6 +69,30 @@ void dense_esuhm2(
   }
 }
 
+// modified AI-generated kernel
+template <typename T>
+void dense_esuhm3(
+    sycl::nd_item<1> &item,
+    const T* input,
+    const T* dense,
+          T* output,
+    int embedding_dim,
+    const int* offset)
+{
+  const int batch_idx = item.get_group(0);
+  const int start = offset[batch_idx];
+  const int range = offset[batch_idx + 1] - start;
+  for (int s = 0; s < range; s += item.get_local_range(0)) {
+    int idx = s + item.get_local_id(0);
+    if (idx < range) {
+      T input_elem = input[start + idx];
+      T dense_elem = dense[batch_idx * embedding_dim + idx % embedding_dim];
+      output[start + idx] = input_elem + dense_elem;
+    }
+  }
+}
+
+
 int main(int argc, char* argv[])
 {
   if (argc != 4) {
@@ -103,11 +127,12 @@ int main(int argc, char* argv[])
 
     int batch_size_bytes = (batch_size + 1) * sizeof(float);
 
-    float *input, *dense, *output_k1, *output_k2, *output_ref;
+    float *input, *dense, *output_k1, *output_k2, *output_k3, *output_ref;
     input = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     dense = (float*) malloc (dense_size_bytes); // [batch_size x embedding_dim]
     output_k1 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     output_k2 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
+    output_k3 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     output_ref = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     int *input_offset = (int*) malloc (batch_size_bytes);  // [batch_size]
 
@@ -190,10 +215,31 @@ int main(int argc, char* argv[])
       printf("Average execution time of dense embedding kernel (k2): %f (us)\n", (time * 1e-3f) / repeat);
       q.memcpy(output_k2, d_output, input_size_bytes).wait();
 
+      q.memset(d_output, 0, input_size_bytes);
+      q.wait();
+      start = std::chrono::steady_clock::now();
+
+      for (int i = 0; i < repeat; i++) {
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for<class de3>(
+            sycl::nd_range<1>(sycl::range<1>(batch_size * block_size),
+                              sycl::range<1>(block_size)), [=] (sycl::nd_item<1> item) {
+            dense_esuhm3(item, d_input, d_dense, d_output, ncols, d_input_offset);
+          });
+        });
+      }
+
+      q.wait();
+      end = std::chrono::steady_clock::now();
+      time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average execution time of dense embedding kernel (k3): %f (us)\n", (time * 1e-3f) / repeat);
+      q.memcpy(output_k3, d_output, input_size_bytes).wait();
+
       bool ok = true;
       for (int i = 0; i < input_size; i++) {
         if (fabsf(output_k1[i] - output_ref[i]) > 1e-3f ||
-            fabsf(output_k2[i] - output_ref[i]) > 1e-3f) {
+            fabsf(output_k2[i] - output_ref[i]) > 1e-3f ||
+            fabsf(output_k3[i] - output_ref[i]) > 1e-3f) {
           ok = false;
           break;
         }
@@ -210,6 +256,7 @@ int main(int argc, char* argv[])
     free(dense);
     free(output_k1);
     free(output_k2);
+    free(output_k3);
     free(output_ref);
     free(input_offset);
   }
