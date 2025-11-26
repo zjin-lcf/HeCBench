@@ -28,11 +28,11 @@ void reference(
 
 template <typename T>
 __global__ void dense_esuhm(
-    const T* input,
-    const T* dense,
+    const T* __restrict__ input,
+    const T* __restrict__ dense,
           T* output,
     int embedding_dim,
-    const int* offset)
+    const int* __restrict__ offset)
 {
   const int batch_idx  = blockIdx.x; // each batch is handled by a block
   const int grain_size = blockDim.x;
@@ -48,11 +48,11 @@ __global__ void dense_esuhm(
 
 template <typename T>
 __global__ void dense_esuhm2(
-    const T* input,
-    const T* dense,
+    const T* __restrict__ input,
+    const T* __restrict__ dense,
           T* output,
     int embedding_dim,
-    const int* offset)
+    const int* __restrict__ offset)
 {
   const int batch_idx  = blockIdx.x;
   const int start = offset[batch_idx];
@@ -64,6 +64,30 @@ __global__ void dense_esuhm2(
     }
   }
 }
+
+// modified AI-generated kernel
+template <typename T>
+__global__ void dense_esuhm3(
+    const T* __restrict__ input,
+    const T* __restrict__ dense,
+          T* output,
+    int embedding_dim,
+    const int* __restrict__ offset)
+{
+  const int batch_idx = blockIdx.x;
+  const int start = offset[batch_idx];
+  const int range = offset[batch_idx + 1] - start;
+
+  for (int s = 0; s < range; s += blockDim.x) {
+    int idx = s + threadIdx.x;
+    if (idx < range) {
+      T input_elem = input[start + idx];
+      T dense_elem = dense[batch_idx * embedding_dim + idx % embedding_dim];
+      output[start + idx] = input_elem + dense_elem;
+    }
+  }
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -93,11 +117,12 @@ int main(int argc, char* argv[])
 
     int batch_size_bytes = (batch_size + 1) * sizeof(float);
 
-    float *input, *dense, *output_k1, *output_k2, *output_ref;
+    float *input, *dense, *output_k1, *output_k2, *output_k3, *output_ref;
     input = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     dense = (float*) malloc (dense_size_bytes); // [batch_size x embedding_dim]
     output_k1 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     output_k2 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
+    output_k3 = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     output_ref = (float*) malloc (input_size_bytes); // [sum(*) x embedding_dim]
     int *input_offset = (int*) malloc (batch_size_bytes);  // [batch_size]
 
@@ -165,10 +190,24 @@ int main(int argc, char* argv[])
       printf("Average execution time of dense embedding kernel (k2): %f (us)\n", (time * 1e-3f) / repeat);
       cudaMemcpy(output_k2, d_output, input_size_bytes, cudaMemcpyDeviceToHost);
 
+      cudaMemset(d_output, 0, input_size_bytes);
+      cudaDeviceSynchronize();
+      start = std::chrono::steady_clock::now();
+
+      for (int i = 0; i < repeat; i++)
+        dense_esuhm3<<<batch_size, block_size>>>(d_input, d_dense, d_output, ncols, d_input_offset);
+
+      cudaDeviceSynchronize();
+      end = std::chrono::steady_clock::now();
+      time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average execution time of dense embedding kernel (k3): %f (us)\n", (time * 1e-3f) / repeat);
+      cudaMemcpy(output_k3, d_output, input_size_bytes, cudaMemcpyDeviceToHost);
+
       bool ok = true;
       for (int i = 0; i < input_size; i++) {
         if (fabsf(output_k1[i] - output_ref[i]) > 1e-3f ||
-            fabsf(output_k2[i] - output_ref[i]) > 1e-3f) {
+            fabsf(output_k2[i] - output_ref[i]) > 1e-3f ||
+            fabsf(output_k3[i] - output_ref[i]) > 1e-3f) {
           ok = false;
           break;
         }
@@ -185,6 +224,7 @@ int main(int argc, char* argv[])
     free(dense);
     free(output_k1);
     free(output_k2);
+    free(output_k3);
     free(output_ref);
     free(input_offset);
   }
