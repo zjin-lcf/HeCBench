@@ -292,8 +292,9 @@ int main(int argc, char **argv)
   const int loop_num = atoi(argv[1]);
 
   // set device
+  int dev_id = 0;
   cudaDeviceProp device_prop;
-  cudaGetDeviceProperties(&device_prop, 0);
+  cudaGetDeviceProperties(&device_prop, dev_id);
 
   if (!device_prop.managedMemory) {
     // This samples requires being run on a device that supports Unified Memory
@@ -301,7 +302,10 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  if (device_prop.computeMode == cudaComputeModeProhibited)
+  int computeMode;
+  cudaDeviceGetAttribute(&computeMode, cudaDevAttrComputeMode, dev_id);
+
+  if (computeMode == cudaComputeModeProhibited)
   {
     // This sample requires being run with a default or process exclusive mode
     fprintf(stderr, "This sample requires a device in either default or process exclusive mode\n");
