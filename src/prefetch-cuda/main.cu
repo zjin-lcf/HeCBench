@@ -66,13 +66,17 @@ void prefetch (const int gpuDeviceId, const int numElements, const int repeat)
 
   for (int i = 0; i < repeat; i++) {
 
-    //CUDACHECK(cudaMemAdvise(A, numElements*sizeof(float), cudaMemAdviseSetReadMostly, cudaCpuDeviceId));
-    CUDACHECK(cudaMemPrefetchAsync(A, numElements*sizeof(float), gpuDeviceId));
-    CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), gpuDeviceId));
+    cudaMemLocation deviceLoc;
+    deviceLoc.type = cudaMemLocationTypeDevice;
+    deviceLoc.id   = gpuDeviceId;
+    CUDACHECK(cudaMemPrefetchAsync(A, numElements*sizeof(float), deviceLoc, 0));
+    CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), deviceLoc, 0));
+
+    //CUDACHECK(cudaMemPrefetchAsync(A, numElements*sizeof(float), gpuDeviceId));
+    //CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), gpuDeviceId));
 
     add <<< dimGrid, dimBlock >>> (numElements, A, B);
 
-    //CUDACHECK(cudaMemPrefetchAsync(B, numElements*sizeof(float), cudaCpuDeviceId));
     CUDACHECK(cudaDeviceSynchronize());
   }
 
