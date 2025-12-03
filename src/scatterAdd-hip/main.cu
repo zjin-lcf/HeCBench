@@ -77,8 +77,11 @@ void index_accumulate (int batch_size, int output_size, int vector_dim, int repe
 
   CHECK_HIP(hipMalloc(&d_output, output_size_bytes));
 
-  int thread_x = warpSize;
-  int thread_y = MAX_THREADS_PER_BLOCK / warpSize;
+  int WarpSize;
+  CHECK_HIP(hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0));
+
+  int thread_x = WarpSize;
+  int thread_y = MAX_THREADS_PER_BLOCK / WarpSize;
   int block_x = batch_size / WORK_SIZE + 1;
   dim3 threads(thread_x, thread_y);
   dim3 blocks(block_x);
