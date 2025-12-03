@@ -26,6 +26,7 @@ inline int ceildiv(int a, int b) { return (a + b - 1) / b; }
 const int F = 9;
 const int THREAD_M = 16;
 
+template <unsigned int WarpSize>
 __global__ void Code1x16MatVec(
     const int4* __restrict__ A, const int4* __restrict__ B,
     int4* __restrict__ C, const int4* __restrict__ codebook, const int prob_m,
@@ -35,7 +36,7 @@ __global__ void Code1x16MatVec(
     const int codebook_stride     // as int4.
 ) {
   int a_gl_stride = prob_k / 8 / 8;
-  int a_gl_rd = (blockDim.x / warpSize) * blockIdx.x + (threadIdx.x / warpSize);
+  int a_gl_rd = (blockDim.x / WarpSize) * blockIdx.x + (threadIdx.x / WarpSize);
   bool pred = a_gl_rd < prob_m;
 
   if (pred) {
@@ -50,23 +51,23 @@ __global__ void Code1x16MatVec(
 
   int b_gl_rd = 0;
   int c_gl_wr = a_gl_rd;
-  a_gl_rd = a_gl_stride * a_gl_rd + threadIdx.x % warpSize;
-  int a_gl_end = a_gl_rd + a_gl_stride - threadIdx.x % warpSize;
+  a_gl_rd = a_gl_stride * a_gl_rd + threadIdx.x % WarpSize;
+  int a_gl_end = a_gl_rd + a_gl_stride - threadIdx.x % WarpSize;
 
   // We pad shared memory to avoid bank conflicts during reads
-  __shared__ int4 sh_b[warpSize * F];
+  __shared__ int4 sh_b[WarpSize * F];
   float res = 0;
 
-  int iters = (prob_k / 8 + 8 * warpSize - 1) / (8 * warpSize);
+  int iters = (prob_k / 8 + 8 * WarpSize - 1) / (8 * WarpSize);
   while (iters--) {
     __syncthreads();
-    for (int i = threadIdx.x; i < warpSize * 8; i += blockDim.x) {
+    for (int i = threadIdx.x; i < WarpSize * 8; i += blockDim.x) {
       if (b_gl_rd + i < prob_k / 8) sh_b[F * (i / 8) + i % 8] = B[b_gl_rd + i];
     }
     __syncthreads();
-    b_gl_rd += warpSize * 8;
+    b_gl_rd += WarpSize * 8;
 
-    int b_sh_rd = F * (threadIdx.x % warpSize);
+    int b_sh_rd = F * (threadIdx.x % WarpSize);
     if (pred && a_gl_rd < a_gl_end) {
       const uint16_t* enc = reinterpret_cast<const uint16_t*>(&A[a_gl_rd]);
 #pragma unroll
@@ -86,14 +87,14 @@ __global__ void Code1x16MatVec(
         res += __half2float(res2.x) + __half2float(res2.y);
         b_sh_rd++;
       }
-      a_gl_rd += warpSize;
+      a_gl_rd += WarpSize;
     }
   }
 
   if (pred) {
 #pragma unroll
-    for (int i = warpSize/2; i > 0; i /= 2) res += __shfl_down(res, i);
-    if (threadIdx.x % warpSize == 0) {
+    for (int i = WarpSize/2; i > 0; i /= 2) res += __shfl_down(res, i);
+    if (threadIdx.x % WarpSize == 0) {
       reinterpret_cast<__half*>(C)[c_gl_wr] = __float2half(res);
     }
   }
@@ -114,14 +115,22 @@ void code1x16_matvec(const void* __restrict__ A,
   } while (thread_m > THREAD_M);
 
   int blocks = ceildiv(prob_m, thread_m);
-  int threads = warpSize * thread_m;
+
+  int WarpSize;
+  hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
+  int threads = WarpSize * thread_m;
 
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
   
-  Code1x16MatVec<<<blocks, threads, sizeof(int4) * warpSize * F, 0>>>(
-      (const int4*)A, (const int4*)B, (int4*)C, (const int4*)codebook, prob_m,
-      prob_k, codebook_a_sizes, codebook_stride);
+  if (WarpSize == 64)
+    Code1x16MatVec<64><<<blocks, threads, sizeof(int4) * WarpSize * F, 0>>>(
+        (const int4*)A, (const int4*)B, (int4*)C, (const int4*)codebook, prob_m,
+        prob_k, codebook_a_sizes, codebook_stride);
+  else
+    Code1x16MatVec<32><<<blocks, threads, sizeof(int4) * WarpSize * F, 0>>>(
+        (const int4*)A, (const int4*)B, (int4*)C, (const int4*)codebook, prob_m,
+        prob_k, codebook_a_sizes, codebook_stride);
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
