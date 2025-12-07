@@ -68,9 +68,11 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        'accuracy', 'ace', 'adam', 'adamw', 'aes',
-        'affine', 'aidw', 'amgmk', 'aobench', 'backprop',
-        'bilateral', 'cfd', 'clenergy', 'dct8x8', 'fft'
+        # Batch 4: Q-Z alphabetically
+        'qtclustering', 'radixsort', 'randomAccess', 'remap', 'sad',
+        'scan', 'scatter', 'srad', 'sssp', 'stencil', 'streamcluster',
+        'su3', 'sw', 'tensor', 'transpose', 'triad', 'tsa',
+        'unrolling', 'varlen', 'vectorAdd', 'xsbench'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']

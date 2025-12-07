@@ -1,0 +1,8 @@
+# md-sycl/CMakeLists.txt
+
+add_hecbench_benchmark(
+    NAME md
+    MODEL sycl
+    SOURCES main.cpp
+    CATEGORIES algorithms
+)
