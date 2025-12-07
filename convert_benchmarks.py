@@ -68,11 +68,10 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        # Batch 4: Q-Z alphabetically
-        'qtclustering', 'radixsort', 'randomAccess', 'remap', 'sad',
-        'scan', 'scatter', 'srad', 'sssp', 'stencil', 'streamcluster',
-        'su3', 'sw', 'tensor', 'transpose', 'triad', 'tsa',
-        'unrolling', 'varlen', 'vectorAdd', 'xsbench'
+        # Batch 6: C-D benchmarks with good coverage
+        'chi2', 'clink', 'compute-score', 'convolution1D', 'convolutionSeparable',
+        'crs', 'cobahh', 'crc64', 'damage', 'degrid', 'diamond', 'dslash',
+        'burger', 'bwt', 'channelSum', 'blas-gemm'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']
