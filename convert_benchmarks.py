@@ -68,16 +68,13 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        # Batch 13: S benchmarks (62 benchmarks)
-        's3d', 's8n', 'sa', 'sampling', 'saxpy-ompt', 'sc', 'scan2', 'scan3',
-        'scatterAdd', 'scatterThrust', 'scel', 'score', 'sddmm-batch', 'seam-carving',
-        'secp256k1', 'segment-reduce', 'segsort', 'sheath', 'shmembench', 'shuffle',
-        'simplemoc', 'simpleMultiDevice', 'simpleSpmv', 'slit', 'slu', 'snake', 'snicit',
-        'sobel', 'sobol', 'sort', 'sortKV', 'sosfil', 'sparkler', 'spaxpby', 'spd2s',
-        'spgeam', 'spgemm', 'sph', 'split', 'spm', 'spmm', 'spmv', 'spnnz', 'sps2d',
-        'spsm', 'spsort', 'sptrsv', 'ss', 'ssim', 'sss', 'stddev', 'stencil1d', 'stencil3d',
-        'streamCreateCopyDestroy', 'streamOrderedAllocation', 'streamPriority', 'streamUM',
-        'stsg', 'surfel', 'svd3x3', 'sw4ck', 'swish'
+        # Batch 14: T-Z benchmarks (34 benchmarks)
+        'tensorAccessor', 'tensorT', 'testSNAP', 'tgvnn', 'thomas', 'threadfence',
+        'tissue', 'tonemapping', 'tpacf', 'tqs', 'tsne', 'tsp', 'unfold',
+        'urng', 'vanGenuchten', 'vmc', 'vol2col', 'vote', 'voxelization',
+        'warpexchange', 'warpsort', 'wedford', 'winograd', 'wlcpow', 'wmma',
+        'word2vec', 'wordcount', 'wsm5', 'wyllie', 'xlqc',
+        'zerocopy', 'zeropoint', 'zmddft', 'zoom'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']

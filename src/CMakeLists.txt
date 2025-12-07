@@ -416,6 +416,40 @@ set(HECBENCH_POC_BENCHMARKS
     svd3x3
     sw4ck
     swish
+    # Batch 14: T-Z benchmarks (33 benchmarks)
+    tensorAccessor
+    tensorT
+    testSNAP
+    thomas
+    threadfence
+    tissue
+    tonemapping
+    tpacf
+    tqs
+    tsne
+    tsp
+    unfold
+    urng
+    vanGenuchten
+    vmc
+    vol2col
+    vote
+    voxelization
+    warpexchange
+    warpsort
+    wedford
+    winograd
+    wlcpow
+    wmma
+    word2vec
+    wordcount
+    wsm5
+    wyllie
+    xlqc
+    zerocopy
+    zeropoint
+    zmddft
+    zoom
 )
 
 # Include benchmark subdirectories
