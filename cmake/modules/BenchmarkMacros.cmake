@@ -88,6 +88,18 @@ function(add_hecbench_benchmark)
     # Add common include directory
     target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/include")
 
+    # Add benchmark's own directory for local headers (reference.h, kernels.h, etc.)
+    target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+
+    # For non-CUDA models, also check the CUDA variant directory for shared headers
+    # Many benchmarks share reference.h, kernels.h, etc. between CUDA and other models
+    if(NOT BENCH_MODEL_LOWER STREQUAL "cuda")
+        set(CUDA_VARIANT_DIR "${CMAKE_SOURCE_DIR}/src/${BENCH_NAME}-cuda")
+        if(EXISTS "${CUDA_VARIANT_DIR}")
+            target_include_directories(${TARGET_NAME} PRIVATE "${CUDA_VARIANT_DIR}")
+        endif()
+    endif()
+
     # Model-specific configuration
     if(BENCH_MODEL_LOWER STREQUAL "cuda")
         # CUDA configuration

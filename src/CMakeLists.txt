@@ -5,12 +5,29 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # List of benchmarks to build (will be expanded over time)
-# For now, we start with a proof-of-concept set
+# Started with proof-of-concept, now expanding coverage
 set(HECBENCH_POC_BENCHMARKS
+    # Original POC
     jacobi
     bfs
     softmax
     attention
+    # Batch 1: A-F alphabetically (15 benchmarks)
+    accuracy
+    ace
+    adam
+    adamw
+    aes
+    affine
+    aidw
+    amgmk
+    aobench
+    backprop
+    bilateral
+    cfd
+    clenergy
+    dct8x8
+    fft
 )
 
 # Include benchmark subdirectories
