@@ -68,14 +68,17 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        # Batch 9: J-L benchmarks (42 benchmarks)
-        'jaccard', 'jenkins-hash', 'kalman', 'keccaktreehash', 'keogh', 'kernelLaunch',
-        'kiss', 'kmc', 'kmeans', 'kurtosis',
-        'lanczos', 'langevin', 'langford', 'laplace', 'laplace3d', 'lavaMD',
-        'layernorm', 'layout', 'lci', 'lda', 'ldpc', 'leukocyte', 'lfib4', 'libor',
-        'lid-driven-cavity', 'lif', 'linearprobing', 'local-ht', 'log2', 'logan',
-        'logic-resim', 'logic-rewrite', 'logprob', 'lombscargle', 'loopback',
-        'lr', 'lrn', 'lsqt', 'ludb', 'lulesh', 'lut-gemm', 'lzss'
+        # Batch 10: M-N benchmarks (56 benchmarks)
+        'mallocFree', 'mandelbrot', 'marchingCubes', 'mask', 'match', 'matern',
+        'matrix-rotate', 'matrixT', 'maxFlops', 'maxpool3d', 'mcmd', 'mcpr',
+        'mdh', 'meanshift', 'medianfilter', 'memcpy', 'memtest', 'merge',
+        'merkle', 'metropolis', 'mf-sgd', 'michalewicz', 'minibude', 'miniDGS',
+        'miniFE', 'minimap2', 'minisweep', 'miniWeather', 'minmax', 'mis',
+        'mmcsf', 'mnist', 'moe', 'morphology', 'mpc', 'mr', 'mrc', 'mrg32k3a',
+        'mriQ', 'mt', 'mtf', 'multimaterial', 'multinomial', 'murmurhash3',
+        'mxfp4', 'myocyte',
+        'nbnxm', 'nbody', 'ne', 'nlll', 'nms', 'nonzero', 'norm2', 'nosync',
+        'nqueen', 'ntt'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']
