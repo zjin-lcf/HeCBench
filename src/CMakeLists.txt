@@ -75,6 +75,44 @@ set(HECBENCH_POC_BENCHMARKS
     triad
     tsa
     xsbench
+    # Batch 5: A-B benchmarks (20 benchmarks)
+    adjacent
+    adv
+    aligned-types
+    all-pairs-distance
+    ans
+    aop
+    asmooth
+    assert
+    asta
+    atan2
+    atomicCost
+    atomicIntrinsics
+    atomicPerf
+    atomicReduction
+    babelstream
+    background-subtract
+    bezier-surface
+    binomial
+    bitonic-sort
+    black-scholes
+    # Batch 6: B-D benchmarks (16 benchmarks)
+    blas-gemm
+    burger
+    bwt
+    channelSum
+    chi2
+    clink
+    cobahh
+    compute-score
+    convolution1D
+    convolutionSeparable
+    crc64
+    crs
+    damage
+    degrid
+    diamond
+    dslash
 )
 
 # Include benchmark subdirectories

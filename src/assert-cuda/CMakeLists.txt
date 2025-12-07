@@ -1,0 +1,8 @@
+# assert-cuda/CMakeLists.txt
+
+add_hecbench_benchmark(
+    NAME assert
+    MODEL cuda
+    SOURCES main.cu
+    CATEGORIES algorithms
+)
