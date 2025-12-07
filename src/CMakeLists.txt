@@ -163,6 +163,46 @@ set(HECBENCH_POC_BENCHMARKS
     frna
     fsm
     fwt
+    # Batch 8: G-I benchmarks (39 benchmarks)
+    ga
+    gabor
+    gamma-correction
+    gc
+    gd
+    geam
+    geglu
+    gels
+    gelu
+    gemv
+    ge-spmm
+    gibbs
+    goulash
+    gpp
+    graphB+
+    graphExecution
+    grep
+    grrt
+    gru
+    haccmk
+    hausdorff
+    haversine
+    hbc
+    heat
+    heat2d
+    hellinger
+    henry
+    hexciton
+    histogram
+    hogbom
+    hotspot3D
+    hungarian
+    hwt1d
+    hypterm
+    interval
+    intrinsics-cast
+    intrinsics-simd
+    is
+    iso2dfd
 )
 
 # Include benchmark subdirectories
