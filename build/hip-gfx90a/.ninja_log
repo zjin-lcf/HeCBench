@@ -1,0 +1,3 @@
+# ninja log v5
+5	1416	1765071002786541012	src/jacobi-hip/CMakeFiles/jacobi-hip.dir/main.cu.o	c5674e22c2e06c08
+1420	1491	1765071002870542946	bin/hip/jacobi	79ac4e60010a9ca4
