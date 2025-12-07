@@ -323,6 +323,38 @@ set(HECBENCH_POC_BENCHMARKS
     prna
     projectile
     pso
+    # Batch 12: Q-R benchmarks (31 benchmarks)
+    qem
+    qkv
+    qrg
+    quant3MatMul
+    quantAQLM
+    quantBnB
+    quantVLLM
+    quicksort
+    radixsort2
+    rainflow
+    rayleighBenardConvection
+    reaction
+    recursiveGaussian
+    relu
+    resize
+    resnet-kernels
+    reverse
+    reverse2D
+    rfs
+    ring
+    rle
+    rng-wallace
+    rodrigues
+    romberg
+    rotary
+    rowwiseMoments
+    rsbench
+    rsc
+    rsmt
+    rtm8
+    rushlarsen
 )
 
 # Include benchmark subdirectories

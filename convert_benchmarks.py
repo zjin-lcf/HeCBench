@@ -68,12 +68,12 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        # Batch 11: O-P benchmarks (27 benchmarks)
-        'openmp', 'opticalFlow', 'overlap', 'overlay', 'p2p', 'p4', 'pad',
-        'page-rank', 'particle-diffusion', 'particles', 'pcc', 'perlin',
-        'permutate', 'permute', 'phmm', 'pingpong', 'pitch', 'pnpoly', 'pns',
-        'pointwise', 'pool', 'popcount', 'prefetch', 'present', 'prna',
-        'projectile', 'pso'
+        # Batch 12: Q-R benchmarks (31 benchmarks)
+        'qem', 'qkv', 'qrg', 'quant3MatMul', 'quantAQLM', 'quantBnB', 'quantVLLM',
+        'quicksort', 'radixsort2', 'rainflow', 'rayleighBenardConvection', 'reaction',
+        'recursiveGaussian', 'relu', 'resize', 'resnet-kernels', 'reverse', 'reverse2D',
+        'rfs', 'ring', 'rle', 'rng-wallace', 'rodrigues', 'romberg', 'rotary',
+        'rowwiseMoments', 'rsbench', 'rsc', 'rsmt', 'rtm8', 'rushlarsen'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']
