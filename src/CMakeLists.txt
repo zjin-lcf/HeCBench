@@ -8,7 +8,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # For now, we start with a proof-of-concept set
 set(HECBENCH_POC_BENCHMARKS
     jacobi
-    nbody
+    bfs
     softmax
     attention
 )
