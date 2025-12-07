@@ -355,6 +355,67 @@ set(HECBENCH_POC_BENCHMARKS
     rsmt
     rtm8
     rushlarsen
+    # Batch 13: S benchmarks (59 benchmarks)
+    s3d
+    s8n
+    sa
+    sampling
+    sc
+    scan2
+    scan3
+    scatterAdd
+    scatterThrust
+    scel
+    score
+    sddmm-batch
+    seam-carving
+    secp256k1
+    segment-reduce
+    segsort
+    sheath
+    shmembench
+    shuffle
+    simplemoc
+    simpleMultiDevice
+    simpleSpmv
+    slit
+    slu
+    snake
+    sobel
+    sobol
+    sort
+    sortKV
+    sosfil
+    sparkler
+    spaxpby
+    spd2s
+    spgeam
+    spgemm
+    sph
+    split
+    spm
+    spmm
+    spmv
+    spnnz
+    sps2d
+    spsm
+    spsort
+    sptrsv
+    ss
+    ssim
+    sss
+    stddev
+    stencil1d
+    stencil3d
+    streamCreateCopyDestroy
+    streamOrderedAllocation
+    streamPriority
+    streamUM
+    stsg
+    surfel
+    svd3x3
+    sw4ck
+    swish
 )
 
 # Include benchmark subdirectories
