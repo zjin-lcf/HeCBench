@@ -68,10 +68,15 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        # Batch 6: C-D benchmarks with good coverage
-        'chi2', 'clink', 'compute-score', 'convolution1D', 'convolutionSeparable',
-        'crs', 'cobahh', 'crc64', 'damage', 'degrid', 'diamond', 'dslash',
-        'burger', 'bwt', 'channelSum', 'blas-gemm'
+        # Batch 7: D-F benchmarks (51 benchmarks)
+        'd2q9-bgk', 'd3q19-bgk', 'daphne', 'ddbp', 'debayer', 'dense-embedding',
+        'depixel', 'deredundancy', 'determinant', 'dispatch', 'distort', 'divergence',
+        'doh', 'dp', 'dpid', 'dropout', 'dwconv', 'dwconv1d', 'dxtc2',
+        'easyWave', 'ecdh', 'egs', 'eigenvalue', 'eikonal', 'entropy', 'epistasis',
+        'ert', 'expdist', 'extend2', 'extrema',
+        'f16atomic', 'f16max', 'f16sp', 'face', 'fdtd3d', 'feynman-kac', 'fhd',
+        'filter', 'flame', 'flip', 'floydwarshall', 'floydwarshall2', 'fluidSim',
+        'fma', 'fpc', 'fpdc', 'frechet', 'fresnel', 'frna', 'fsm', 'fwt'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']
