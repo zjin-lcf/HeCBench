@@ -93,6 +93,8 @@ function(add_hecbench_benchmark)
 
     elseif(BENCH_MODEL_LOWER STREQUAL "hip")
         # HIP configuration
+        # Set source file language to HIP
+        set_source_files_properties(${BENCH_SOURCES} PROPERTIES LANGUAGE CXX)
         target_compile_options(${TARGET_NAME} PRIVATE
             -std=c++17
             --offload-arch=${HECBENCH_HIP_ARCH}
