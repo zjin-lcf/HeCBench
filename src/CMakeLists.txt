@@ -242,6 +242,59 @@ set(HECBENCH_POC_BENCHMARKS
     lulesh
     lut-gemm
     lzss
+    # Batch 10: M-N benchmarks (50 benchmarks)
+    mallocFree
+    mandelbrot
+    marchingCubes
+    mask
+    match
+    matern
+    matrix-rotate
+    matrixT
+    maxFlops
+    maxpool3d
+    mcmd
+    mcpr
+    mdh
+    meanshift
+    medianfilter
+    memcpy
+    memtest
+    merge
+    merkle
+    metropolis
+    michalewicz
+    minibude
+    minisweep
+    miniWeather
+    minmax
+    mis
+    mmcsf
+    mnist
+    moe
+    morphology
+    mpc
+    mr
+    mrc
+    mrg32k3a
+    mriQ
+    mt
+    mtf
+    multimaterial
+    multinomial
+    murmurhash3
+    mxfp4
+    myocyte
+    nbnxm
+    nbody
+    ne
+    nlll
+    nms
+    nonzero
+    norm2
+    nosync
+    nqueen
+    ntt
 )
 
 # Include benchmark subdirectories
