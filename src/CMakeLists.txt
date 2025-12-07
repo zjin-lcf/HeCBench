@@ -113,6 +113,56 @@ set(HECBENCH_POC_BENCHMARKS
     degrid
     diamond
     dslash
+    # Batch 7: D-F benchmarks (49 benchmarks)
+    d2q9-bgk
+    d3q19-bgk
+    ddbp
+    debayer
+    dense-embedding
+    depixel
+    deredundancy
+    determinant
+    dispatch
+    distort
+    divergence
+    doh
+    dp
+    dpid
+    dropout
+    dwconv
+    dxtc2
+    easyWave
+    ecdh
+    egs
+    eigenvalue
+    eikonal
+    entropy
+    epistasis
+    ert
+    expdist
+    extend2
+    extrema
+    f16atomic
+    f16max
+    f16sp
+    face
+    fdtd3d
+    feynman-kac
+    fhd
+    filter
+    flame
+    flip
+    floydwarshall
+    floydwarshall2
+    fluidSim
+    fma
+    fpc
+    fpdc
+    frechet
+    fresnel
+    frna
+    fsm
+    fwt
 )
 
 # Include benchmark subdirectories
