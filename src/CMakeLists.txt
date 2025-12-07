@@ -203,6 +203,45 @@ set(HECBENCH_POC_BENCHMARKS
     intrinsics-simd
     is
     iso2dfd
+    # Batch 9: J-L benchmarks (35 benchmarks)
+    jaccard
+    jenkins-hash
+    kalman
+    keccaktreehash
+    keogh
+    kernelLaunch
+    kiss
+    kmc
+    kmeans
+    kurtosis
+    lanczos
+    langevin
+    langford
+    laplace
+    laplace3d
+    lavaMD
+    layernorm
+    layout
+    lci
+    lda
+    ldpc
+    lfib4
+    libor
+    lid-driven-cavity
+    lif
+    linearprobing
+    log2
+    logic-rewrite
+    logprob
+    lombscargle
+    loopback
+    lr
+    lrn
+    lsqt
+    ludb
+    lulesh
+    lut-gemm
+    lzss
 )
 
 # Include benchmark subdirectories
