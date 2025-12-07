@@ -122,3 +122,303 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/attention-omp/cmake_install.cmake")
 endif()
 
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/accuracy-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/accuracy-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/accuracy-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/accuracy-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/ace-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/ace-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/ace-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/ace-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/adam-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/adam-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/adam-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/adam-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/adamw-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/adamw-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/adamw-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/adamw-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aes-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aes-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aes-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aes-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/affine-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/affine-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/affine-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/affine-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aidw-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aidw-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aidw-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aidw-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/amgmk-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/amgmk-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/amgmk-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/amgmk-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aobench-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aobench-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aobench-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/aobench-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/backprop-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/backprop-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/backprop-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/backprop-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/bilateral-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/bilateral-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/bilateral-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/bilateral-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/cfd-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/cfd-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/cfd-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/cfd-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/clenergy-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/clenergy-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/clenergy-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/clenergy-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/dct8x8-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/dct8x8-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/dct8x8-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/dct8x8-omp/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/fft-cuda/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/fft-hip/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/fft-sycl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/vjj/dev/2025-12-05/HeCBench/build/hip-gfx90a/src/fft-omp/cmake_install.cmake")
+endif()
+

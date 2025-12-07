@@ -1,3 +1,11 @@
 # ninja log v5
-5	1416	1765071002786541012	src/jacobi-hip/CMakeFiles/jacobi-hip.dir/main.cu.o	c5674e22c2e06c08
-1420	1491	1765071002870542946	bin/hip/jacobi	79ac4e60010a9ca4
+6	1490	1765076977816017937	src/adam-hip/CMakeFiles/adam-hip.dir/main.cu.o	ea773c4f9f416485
+1497	1560	1765076977891019663	bin/hip/adam	2d64195404b74a1a
+6	3884	1765076980201072806	src/accuracy-hip/CMakeFiles/accuracy-hip.dir/main.cu.o	80c6215228142f85
+3889	3950	1765076980288074808	bin/hip/accuracy	7b9b754953e3acba
+10	900	1765076991610335278	src/backprop-hip/CMakeFiles/backprop-hip.dir/facetrain.cu.o	86d47207862d6674
+9	932	1765076991633335806	src/backprop-hip/CMakeFiles/backprop-hip.dir/backprop.cu.o	fd4f90750de17bc1
+10	937	1765076991632335783	src/backprop-hip/CMakeFiles/backprop-hip.dir/imagenet.cu.o	5e57729ec2dcae61
+11	1389	1765076992087346251	src/backprop-hip/CMakeFiles/backprop-hip.dir/main.cu.o	1e421d4c0e309cc
+7	1478	1765076992183348460	src/aes-hip/CMakeFiles/aes-hip.dir/main.cu.o	f9652d833a691f49
+12	1777	1765076992476355201	src/fft-hip/CMakeFiles/fft-hip.dir/main.cu.o	5a87767ed113415e

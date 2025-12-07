@@ -96,6 +96,291 @@ rule HIP_EXECUTABLE_LINKER__attention-hip_
 
 
 #############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__accuracy-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__accuracy-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__ace-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__ace-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__adam-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__adam-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__adamw-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__adamw-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__aes-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__aes-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__affine-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__affine-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__aidw-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__aidw-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__amgmk-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__amgmk-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__aobench-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__aobench-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__backprop-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__backprop-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__bilateral-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__bilateral-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__cfd-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__cfd-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__clenergy-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__clenergy-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__dct8x8-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__dct8x8-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling HIP files.
+
+rule HIP_COMPILER__fft-hip_unscanned_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}/opt/rocm-7.0.1/lib/llvm/bin/clang++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -x hip -c $in
+  description = Building HIP object $out
+
+
+#############################################
+# Rule for linking HIP executable.
+
+rule HIP_EXECUTABLE_LINKER__fft-hip_
+  command = $PRE_LINK && /opt/rocm-7.0.1/lib/llvm/bin/clang++ $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD
+  description = Linking HIP executable $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
