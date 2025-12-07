@@ -295,6 +295,34 @@ set(HECBENCH_POC_BENCHMARKS
     nosync
     nqueen
     ntt
+    # Batch 11: O-P benchmarks (27 benchmarks)
+    openmp
+    opticalFlow
+    overlap
+    overlay
+    p2p
+    p4
+    pad
+    page-rank
+    particle-diffusion
+    particles
+    pcc
+    perlin
+    permutate
+    permute
+    phmm
+    pingpong
+    pitch
+    pnpoly
+    pns
+    pointwise
+    pool
+    popcount
+    prefetch
+    present
+    prna
+    projectile
+    pso
 )
 
 # Include benchmark subdirectories
