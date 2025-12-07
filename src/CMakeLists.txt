@@ -28,6 +28,53 @@ set(HECBENCH_POC_BENCHMARKS
     clenergy
     dct8x8
     fft
+    # Batch 2: G-L alphabetically (15 benchmarks)
+    gaussian
+    geodesic
+    glu
+    gmm
+    heartwall
+    hmm
+    hotspot
+    hybridsort
+    idivide
+    interleave
+    inversek2j
+    ising
+    knn
+    lebesgue
+    lud
+    # Batch 3: M-P alphabetically (11 benchmarks)
+    md
+    md5hash
+    miniDGS
+    minimod
+    minkowski
+    mixbench
+    nn
+    nw
+    particlefilter
+    pathfinder
+    perplexity
+    # Batch 4: Q-Z alphabetically (18 benchmarks - some not found)
+    qtclustering
+    radixsort
+    randomAccess
+    remap
+    sad
+    scan
+    scatter
+    srad
+    sssp
+    stencil
+    streamcluster
+    su3
+    sw
+    tensor
+    transpose
+    triad
+    tsa
+    xsbench
 )
 
 # Include benchmark subdirectories
