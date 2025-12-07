@@ -1,9 +1,19 @@
 cmake_minimum_required(VERSION 3.21)
-project(HeCBench
-    LANGUAGES C CXX
-    VERSION 1.0.0
-    DESCRIPTION "Heterogeneous Computing Benchmark Suite"
-)
+
+# Enable HIP language if requested
+if(DEFINED HECBENCH_ENABLE_HIP AND HECBENCH_ENABLE_HIP)
+    project(HeCBench
+        LANGUAGES C CXX HIP
+        VERSION 1.0.0
+        DESCRIPTION "Heterogeneous Computing Benchmark Suite"
+    )
+else()
+    project(HeCBench
+        LANGUAGES C CXX
+        VERSION 1.0.0
+        DESCRIPTION "Heterogeneous Computing Benchmark Suite"
+    )
+endif()
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)

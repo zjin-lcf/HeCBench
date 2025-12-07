@@ -66,6 +66,11 @@ function(add_hecbench_benchmark)
     # Create target name
     set(TARGET_NAME "${BENCH_NAME}-${BENCH_MODEL_LOWER}")
 
+    # For HIP, ensure .cu files are treated as HIP language
+    if(BENCH_MODEL_LOWER STREQUAL "hip")
+        set_source_files_properties(${BENCH_SOURCES} PROPERTIES LANGUAGE HIP)
+    endif()
+
     # Add executable
     add_executable(${TARGET_NAME} ${BENCH_SOURCES})
 
@@ -93,16 +98,13 @@ function(add_hecbench_benchmark)
 
     elseif(BENCH_MODEL_LOWER STREQUAL "hip")
         # HIP configuration
-        # Set source file language to HIP
-        set_source_files_properties(${BENCH_SOURCES} PROPERTIES LANGUAGE CXX)
-        target_compile_options(${TARGET_NAME} PRIVATE
-            -std=c++17
-            --offload-arch=${HECBENCH_HIP_ARCH}
-        )
         set_target_properties(${TARGET_NAME} PROPERTIES
-            LINKER_LANGUAGE CXX
+            HIP_STANDARD 17
+            HIP_ARCHITECTURES ${HECBENCH_HIP_ARCH}
         )
-        target_link_libraries(${TARGET_NAME} PRIVATE hip::host)
+        target_compile_options(${TARGET_NAME} PRIVATE
+            $<$<COMPILE_LANGUAGE:HIP>:--offload-arch=${HECBENCH_HIP_ARCH}>
+        )
 
     elseif(BENCH_MODEL_LOWER STREQUAL "sycl")
         # SYCL configuration
