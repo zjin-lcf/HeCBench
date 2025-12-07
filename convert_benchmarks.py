@@ -68,17 +68,12 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        # Batch 10: M-N benchmarks (56 benchmarks)
-        'mallocFree', 'mandelbrot', 'marchingCubes', 'mask', 'match', 'matern',
-        'matrix-rotate', 'matrixT', 'maxFlops', 'maxpool3d', 'mcmd', 'mcpr',
-        'mdh', 'meanshift', 'medianfilter', 'memcpy', 'memtest', 'merge',
-        'merkle', 'metropolis', 'mf-sgd', 'michalewicz', 'minibude', 'miniDGS',
-        'miniFE', 'minimap2', 'minisweep', 'miniWeather', 'minmax', 'mis',
-        'mmcsf', 'mnist', 'moe', 'morphology', 'mpc', 'mr', 'mrc', 'mrg32k3a',
-        'mriQ', 'mt', 'mtf', 'multimaterial', 'multinomial', 'murmurhash3',
-        'mxfp4', 'myocyte',
-        'nbnxm', 'nbody', 'ne', 'nlll', 'nms', 'nonzero', 'norm2', 'nosync',
-        'nqueen', 'ntt'
+        # Batch 11: O-P benchmarks (27 benchmarks)
+        'openmp', 'opticalFlow', 'overlap', 'overlay', 'p2p', 'p4', 'pad',
+        'page-rank', 'particle-diffusion', 'particles', 'pcc', 'perlin',
+        'permutate', 'permute', 'phmm', 'pingpong', 'pitch', 'pnpoly', 'pns',
+        'pointwise', 'pool', 'popcount', 'prefetch', 'present', 'prna',
+        'projectile', 'pso'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']
