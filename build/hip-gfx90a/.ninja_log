@@ -1,11 +1,8 @@
 # ninja log v5
-6	1490	1765076977816017937	src/adam-hip/CMakeFiles/adam-hip.dir/main.cu.o	ea773c4f9f416485
-1497	1560	1765076977891019663	bin/hip/adam	2d64195404b74a1a
-6	3884	1765076980201072806	src/accuracy-hip/CMakeFiles/accuracy-hip.dir/main.cu.o	80c6215228142f85
-3889	3950	1765076980288074808	bin/hip/accuracy	7b9b754953e3acba
-10	900	1765076991610335278	src/backprop-hip/CMakeFiles/backprop-hip.dir/facetrain.cu.o	86d47207862d6674
-9	932	1765076991633335806	src/backprop-hip/CMakeFiles/backprop-hip.dir/backprop.cu.o	fd4f90750de17bc1
-10	937	1765076991632335783	src/backprop-hip/CMakeFiles/backprop-hip.dir/imagenet.cu.o	5e57729ec2dcae61
-11	1389	1765076992087346251	src/backprop-hip/CMakeFiles/backprop-hip.dir/main.cu.o	1e421d4c0e309cc
-7	1478	1765076992183348460	src/aes-hip/CMakeFiles/aes-hip.dir/main.cu.o	f9652d833a691f49
-12	1777	1765076992476355201	src/fft-hip/CMakeFiles/fft-hip.dir/main.cu.o	5a87767ed113415e
+18	893	1765077647277421187	src/gaussian-hip/CMakeFiles/gaussian-hip.dir/utils.cu.o	aa05ff5a7335892e
+18	1367	1765077647749432055	src/gaussian-hip/CMakeFiles/gaussian-hip.dir/gaussianElim.cu.o	7df377f2b29de49a
+1368	1432	1765077647827433851	bin/hip/gaussian	a504dc5517f1636e
+19	1458	1765077647837434082	src/md5hash-hip/CMakeFiles/md5hash-hip.dir/MD5Hash.cu.o	d0ff91d04962a6b7
+1458	1515	1765077647910435762	bin/hip/md5hash	a894b17ad680c632
+19	1773	1765077648145441170	src/scan-hip/CMakeFiles/scan-hip.dir/main.cu.o	5f7cd9fe67e8f64a
+1774	1849	1765077648242443405	bin/hip/scan	655ce8d12771e167
