@@ -68,15 +68,14 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        # Batch 7: D-F benchmarks (51 benchmarks)
-        'd2q9-bgk', 'd3q19-bgk', 'daphne', 'ddbp', 'debayer', 'dense-embedding',
-        'depixel', 'deredundancy', 'determinant', 'dispatch', 'distort', 'divergence',
-        'doh', 'dp', 'dpid', 'dropout', 'dwconv', 'dwconv1d', 'dxtc2',
-        'easyWave', 'ecdh', 'egs', 'eigenvalue', 'eikonal', 'entropy', 'epistasis',
-        'ert', 'expdist', 'extend2', 'extrema',
-        'f16atomic', 'f16max', 'f16sp', 'face', 'fdtd3d', 'feynman-kac', 'fhd',
-        'filter', 'flame', 'flip', 'floydwarshall', 'floydwarshall2', 'fluidSim',
-        'fma', 'fpc', 'fpdc', 'frechet', 'fresnel', 'frna', 'fsm', 'fwt'
+        # Batch 8: G-I benchmarks (42 benchmarks)
+        'ga', 'gabor', 'gamma-correction', 'gc', 'gd', 'geam', 'geglu', 'gels',
+        'gelu', 'gemv', 'gerbil', 'ge-spmm', 'gibbs', 'goulash', 'gpp', 'graphB+',
+        'graphExecution', 'grep', 'grrt', 'gru',
+        'haccmk', 'halo-finder', 'hausdorff', 'haversine', 'hbc', 'heat', 'heat2d',
+        'hellinger', 'henry', 'hexciton', 'histogram', 'hogbom', 'hotspot3D', 'hpl',
+        'hungarian', 'hwt1d', 'hypterm',
+        'interval', 'intrinsics-cast', 'intrinsics-simd', 'is', 'iso2dfd'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']
