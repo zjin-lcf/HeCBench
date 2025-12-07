@@ -68,14 +68,14 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        # Batch 8: G-I benchmarks (42 benchmarks)
-        'ga', 'gabor', 'gamma-correction', 'gc', 'gd', 'geam', 'geglu', 'gels',
-        'gelu', 'gemv', 'gerbil', 'ge-spmm', 'gibbs', 'goulash', 'gpp', 'graphB+',
-        'graphExecution', 'grep', 'grrt', 'gru',
-        'haccmk', 'halo-finder', 'hausdorff', 'haversine', 'hbc', 'heat', 'heat2d',
-        'hellinger', 'henry', 'hexciton', 'histogram', 'hogbom', 'hotspot3D', 'hpl',
-        'hungarian', 'hwt1d', 'hypterm',
-        'interval', 'intrinsics-cast', 'intrinsics-simd', 'is', 'iso2dfd'
+        # Batch 9: J-L benchmarks (42 benchmarks)
+        'jaccard', 'jenkins-hash', 'kalman', 'keccaktreehash', 'keogh', 'kernelLaunch',
+        'kiss', 'kmc', 'kmeans', 'kurtosis',
+        'lanczos', 'langevin', 'langford', 'laplace', 'laplace3d', 'lavaMD',
+        'layernorm', 'layout', 'lci', 'lda', 'ldpc', 'leukocyte', 'lfib4', 'libor',
+        'lid-driven-cavity', 'lif', 'linearprobing', 'local-ht', 'log2', 'logan',
+        'logic-resim', 'logic-rewrite', 'logprob', 'lombscargle', 'loopback',
+        'lr', 'lrn', 'lsqt', 'ludb', 'lulesh', 'lut-gemm', 'lzss'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']
