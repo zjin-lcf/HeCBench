@@ -68,12 +68,16 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        # Batch 12: Q-R benchmarks (31 benchmarks)
-        'qem', 'qkv', 'qrg', 'quant3MatMul', 'quantAQLM', 'quantBnB', 'quantVLLM',
-        'quicksort', 'radixsort2', 'rainflow', 'rayleighBenardConvection', 'reaction',
-        'recursiveGaussian', 'relu', 'resize', 'resnet-kernels', 'reverse', 'reverse2D',
-        'rfs', 'ring', 'rle', 'rng-wallace', 'rodrigues', 'romberg', 'rotary',
-        'rowwiseMoments', 'rsbench', 'rsc', 'rsmt', 'rtm8', 'rushlarsen'
+        # Batch 13: S benchmarks (62 benchmarks)
+        's3d', 's8n', 'sa', 'sampling', 'saxpy-ompt', 'sc', 'scan2', 'scan3',
+        'scatterAdd', 'scatterThrust', 'scel', 'score', 'sddmm-batch', 'seam-carving',
+        'secp256k1', 'segment-reduce', 'segsort', 'sheath', 'shmembench', 'shuffle',
+        'simplemoc', 'simpleMultiDevice', 'simpleSpmv', 'slit', 'slu', 'snake', 'snicit',
+        'sobel', 'sobol', 'sort', 'sortKV', 'sosfil', 'sparkler', 'spaxpby', 'spd2s',
+        'spgeam', 'spgemm', 'sph', 'split', 'spm', 'spmm', 'spmv', 'spnnz', 'sps2d',
+        'spsm', 'spsort', 'sptrsv', 'ss', 'ssim', 'sss', 'stddev', 'stencil1d', 'stencil3d',
+        'streamCreateCopyDestroy', 'streamOrderedAllocation', 'streamPriority', 'streamUM',
+        'stsg', 'surfel', 'svd3x3', 'sw4ck', 'swish'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']
