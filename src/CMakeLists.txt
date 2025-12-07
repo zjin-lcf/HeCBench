@@ -450,6 +450,70 @@ set(HECBENCH_POC_BENCHMARKS
     zeropoint
     zmddft
     zoom
+    # Final batch: remaining benchmarks (63 benchmarks)
+    addBiasQKV
+    addBiasResidualLayerNorm
+    allreduce
+    atomicAggregate
+    atomicCAS
+    atomicSystemWide
+    attentionMultiHead
+    axhelm
+    bh
+    bicgstab
+    bincount
+    bitcracker
+    bitpacking
+    bitpermute
+    blas-dot
+    blas-fp8gemm
+    blas-gemmBatched
+    blas-gemmEx
+    blas-gemmEx2
+    blas-gemmStridedBatched
+    blockAccess
+    blockexchange
+    bm3d
+    bn
+    bonds
+    boxfilter
+    bscan
+    bsearch
+    bspline-vgh
+    bsw
+    b+tree
+    btree
+    car
+    cbsfil
+    cc
+    ccl
+    ccs
+    ccsd-trpdrv
+    ced
+    chacha20
+    channelShuffle
+    che
+    chemv
+    clock
+    cm
+    cmembench
+    cmp
+    collision
+    colorwheel
+    columnarSolver
+    complex
+    concat
+    concurrentKernels
+    contract
+    conversion
+    convolution3D
+    cooling
+    coordinates
+    cross
+    crossEntropy
+    softmax-fused
+    softmax-online
+    tridiagonal
 )
 
 # Include benchmark subdirectories

@@ -68,13 +68,19 @@ def main():
             sys.exit(1)
 
     benchmarks_to_convert = [
-        # Batch 14: T-Z benchmarks (34 benchmarks)
-        'tensorAccessor', 'tensorT', 'testSNAP', 'tgvnn', 'thomas', 'threadfence',
-        'tissue', 'tonemapping', 'tpacf', 'tqs', 'tsne', 'tsp', 'unfold',
-        'urng', 'vanGenuchten', 'vmc', 'vol2col', 'vote', 'voxelization',
-        'warpexchange', 'warpsort', 'wedford', 'winograd', 'wlcpow', 'wmma',
-        'word2vec', 'wordcount', 'wsm5', 'wyllie', 'xlqc',
-        'zerocopy', 'zeropoint', 'zmddft', 'zoom'
+        # Final batch: remaining benchmarks with source files (63 benchmarks)
+        'addBiasQKV', 'addBiasResidualLayerNorm', 'allreduce', 'atomicAggregate',
+        'atomicCAS', 'atomicSystemWide', 'attentionMultiHead', 'axhelm',
+        'bh', 'bicgstab', 'bincount', 'bitcracker', 'bitpacking', 'bitpermute',
+        'blas-dot', 'blas-fp8gemm', 'blas-gemmBatched', 'blas-gemmEx2', 'blas-gemmEx',
+        'blas-gemmStridedBatched', 'blockAccess', 'blockexchange', 'bm3d', 'bn',
+        'bonds', 'boxfilter', 'bscan', 'bsearch', 'bspline-vgh', 'bsw', 'b+tree',
+        'btree', 'car', 'cbsfil', 'cc', 'ccl', 'ccs', 'ccsd-trpdrv', 'ced',
+        'chacha20', 'channelShuffle', 'che', 'chemv', 'clock', 'cm', 'cmembench',
+        'cmp', 'collision', 'colorwheel', 'columnarSolver', 'complex', 'concat',
+        'concurrentKernels', 'contract', 'conversion', 'convolution3D', 'cooling',
+        'coordinates', 'cross', 'crossEntropy', 'softmax-fused', 'softmax-online',
+        'tridiagonal'
     ]
 
     models = ['cuda', 'hip', 'sycl', 'omp']
