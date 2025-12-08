@@ -162,7 +162,7 @@ build/<preset>/bin/<model>/
 │   ├── jacobi
 │   ├── bfs
 │   ├── softmax
-│   └── attention
+│   └── ...
 ├── hip/
 │   └── ...
 ├── sycl/
@@ -181,22 +181,44 @@ build/<preset>/bin/<model>/
 CUDA_VISIBLE_DEVICES=0 ./build/cuda-sm80/bin/cuda/attention
 ```
 
-## Current Status (Proof of Concept)
+## Migration Status
 
-The CMake build system currently supports **4 benchmarks** (16 implementations):
+The CMake build system migration is **98% complete**:
 
-| Benchmark | CUDA | HIP | SYCL | OpenMP | Categories |
-|-----------|------|-----|------|--------|------------|
-| jacobi | ✓ | ✓ | ✓ | ✓ | simulation, math |
-| bfs | ✓ | ✓ | ✓ | ✓ | graph, algorithms |
-| softmax | ✓ | ✓ | ✓ | ✓ | ml, math |
-| attention | ✓ | ✓ | ✓ | ✓ | ml |
+| Metric | Count |
+|--------|-------|
+| Total benchmark implementations | 1,818 |
+| Converted to CMake | **1,790** |
+| Remaining | 28 |
+| Coverage | **98.5%** |
 
-### Migration Status
+### Converted Benchmarks
 
-- **Phase 1**: ✅ Infrastructure complete
-- **Phase 2**: 🔄 Proof of concept (4/508 benchmarks)
-- **Phase 3**: ⏳ Full migration pending
+**497 of 508 unique benchmarks** now have CMake support across their implementations:
+- CUDA: ~495 benchmarks
+- HIP: ~490 benchmarks
+- SYCL: ~475 benchmarks
+- OpenMP: ~320 benchmarks
+
+### Benchmarks Not Yet Converted
+
+The following 11 benchmarks (28 implementations) have complex dependencies that require additional work:
+
+| Benchmark | Variants | Reason |
+|-----------|----------|--------|
+| `convolutionDeformable` | cuda, hip, sycl | Python/PyTorch extension (setup.py build) |
+| `dwconv1d` | cuda, hip, sycl | Python/PyTorch extension (run.py build) |
+| `diamond` | sycl | Complex source structure (90+ files) |
+| `gerbil` | cuda, hip | Requires Boost libraries |
+| `halo-finder` | cuda, hip, sycl | MPI dependency + complex archive build |
+| `hpl` | cuda, hip, sycl | HPL benchmark with external dependencies |
+| `leukocyte` | cuda, hip, sycl, omp | External meschach library (requires pre-build) |
+| `miniDGS` | cuda | MPI + ParMetis dependency |
+| `miniFE` | cuda, hip, sycl, omp | Script-based build (get_common_files, generate_info_header) |
+| `saxpy-ompt` | cuda, hip, sycl | Requires nvc++ compiler (OpenMP target offload) |
+| `slu` | cuda | External nicslu library |
+
+These benchmarks still work with their original Makefiles.
 
 ## Adding New Benchmarks
 
@@ -212,15 +234,17 @@ add_hecbench_benchmark(
 )
 ```
 
-Then add the benchmark name to `src/CMakeLists.txt`:
+### Available Options
 
 ```cmake
-set(HECBENCH_POC_BENCHMARKS
-    jacobi
-    bfs
-    softmax
-    attention
-    mybench  # <-- Add here
+add_hecbench_benchmark(
+    NAME mybench                    # Benchmark name (required)
+    MODEL cuda                      # Programming model: cuda, hip, sycl, omp (required)
+    SOURCES main.cu kernel.cu       # Source files (required)
+    CATEGORIES simulation physics   # Categories for grouping (optional)
+    INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include  # Additional include paths (optional)
+    COMPILE_OPTIONS -maxrregcount=32                  # Extra compiler flags (optional)
+    LINK_LIBRARIES CUDA::cublas                       # Libraries to link (optional)
 )
 ```
 
@@ -250,7 +274,7 @@ cmake --preset cuda-sm80 -DHECBENCH_CUDA_ARCH=86
 
 ### Missing Dependencies
 
-Some benchmarks may require additional libraries (oneDPL, TBB, etc.). These will be detected automatically if present.
+Some benchmarks may require additional libraries (oneDPL, TBB, cuFFT, cuBLAS, etc.). These will be detected automatically if present.
 
 ## IDE Integration
 
@@ -283,7 +307,8 @@ CLion automatically detects `CMakePresets.json`:
 ## Future Enhancements
 
 Planned improvements:
-- [ ] Migrate remaining 504 benchmarks
+- [x] Migrate benchmarks to CMake (98% complete)
+- [ ] Convert remaining 11 complex benchmarks
 - [ ] CTest integration for automated testing
 - [ ] CPack support for distribution
 - [ ] Benchmark performance regression tracking
@@ -298,5 +323,5 @@ Planned improvements:
 
 ---
 
-**Last Updated**: 2025-12-06
-**Status**: Proof of Concept (Phase 2)
+**Last Updated**: 2025-12-07
+**Status**: Phase 2 Nearly Complete (98% migration)
