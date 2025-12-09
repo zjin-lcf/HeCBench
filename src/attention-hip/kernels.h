@@ -73,13 +73,15 @@ void attention_kernel1_blockReduce (
   }
 }
 
-__device__ inline float warpReduceSum(cooperative_groups::thread_block_tile<warpSize> &warp, float val) {
-    for (int offset = warpSize/2; offset > 0; offset /= 2) {
+template <unsigned int WarpSize>
+__device__ inline float warpReduceSum(cooperative_groups::thread_block_tile<WarpSize> &warp, float val) {
+    for (int offset = WarpSize/2; offset > 0; offset /= 2) {
         val += warp.shfl_xor(val, offset);
     }
     return val;
 }
 
+template <unsigned int WarpSize>
 __global__
 void attention_kernel1_warpReduce (
     const float*__restrict__ key,
@@ -91,7 +93,7 @@ void attention_kernel1_warpReduce (
 {
   namespace cg = cooperative_groups;
   cg::thread_block block = cg::this_thread_block();
-  cg::thread_block_tile<warpSize> warp = cg::tiled_partition<warpSize>(block);
+  cg::thread_block_tile<WarpSize> warp = cg::tiled_partition<WarpSize>(block);
   // each i iteration is assigned to a warp
   // meta_group_size is the number of warps in a block, and meta_group_rank is the warp index
   int i = blockIdx.x * warp.meta_group_size() + warp.meta_group_rank();
@@ -131,6 +133,7 @@ void attention_kernel2_blockReduce (
     output[j] = sum;
 }
 
+template <unsigned int WarpSize>
 __global__
 void attention_kernel2_warpReduce (
     const float*__restrict__ exp_sum,
@@ -142,7 +145,7 @@ void attention_kernel2_warpReduce (
 {
   namespace cg = cooperative_groups;
   cg::thread_block block = cg::this_thread_block();
-  cg::thread_block_tile<warpSize> warp = cg::tiled_partition<warpSize>(block);
+  cg::thread_block_tile<WarpSize> warp = cg::tiled_partition<WarpSize>(block);
   int j = blockIdx.x * warp.meta_group_size() + warp.meta_group_rank();
   if (j < d) {
     float sum = 0;
