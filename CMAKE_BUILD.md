@@ -317,7 +317,7 @@ Planned improvements:
 
 ## Getting Help
 
-- Report issues: https://github.com/anthropics/hecbench/issues
+- Report issues: https://github.com/zjin-lcf/HeCBench/issues
 - Main README: [README.md](README.md)
 - Full renovation plan: [plan.md](plan.md)
 
