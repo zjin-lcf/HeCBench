@@ -1,0 +1,565 @@
+#!/usr/bin/env python3
+"""
+hecbench - Unified CLI for HeCBench benchmark suite
+
+A command-line interface for building, running, and analyzing HeCBench benchmarks
+with the new CMake build system.
+
+Usage:
+    hecbench list [--model MODEL] [--category CATEGORY]
+    hecbench build [BENCHMARK...] [--preset PRESET] [--parallel N]
+    hecbench run [BENCHMARK...] [--repeat N] [--output FILE]
+    hecbench info BENCHMARK
+    hecbench compare FILE1 FILE2
+"""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
+
+# Constants
+HECBENCH_ROOT = Path(__file__).parent.parent.resolve()
+SRC_DIR = HECBENCH_ROOT / "src"
+SCRIPTS_DIR = SRC_DIR / "scripts"
+BENCHMARKS_DATA = SCRIPTS_DIR / "benchmarks" / "subset.json"
+
+MODELS = ["cuda", "hip", "sycl", "omp"]
+DEFAULT_PRESET = "cuda-sm80"
+
+
+@dataclass
+class BenchmarkInfo:
+    """Information about a benchmark implementation."""
+    name: str
+    model: str
+    path: Path
+    has_cmake: bool = False
+    sources: List[str] = field(default_factory=list)
+    categories: List[str] = field(default_factory=list)
+    regex: str = ""
+    run_args: List[str] = field(default_factory=list)
+
+
+def discover_benchmarks() -> Dict[str, List[BenchmarkInfo]]:
+    """Discover all benchmarks in the src directory."""
+    benchmarks: Dict[str, List[BenchmarkInfo]] = {}
+
+    for entry in SRC_DIR.iterdir():
+        if not entry.is_dir():
+            continue
+
+        # Parse benchmark-model pattern
+        name = entry.name
+        model = None
+        for m in MODELS:
+            suffix = f"-{m}"
+            if name.endswith(suffix):
+                model = m
+                name = name[:-len(suffix)]
+                break
+
+        if model is None:
+            continue
+
+        # Check for CMakeLists.txt
+        has_cmake = (entry / "CMakeLists.txt").exists()
+
+        info = BenchmarkInfo(
+            name=name,
+            model=model,
+            path=entry,
+            has_cmake=has_cmake,
+        )
+
+        # Parse CMakeLists.txt for categories if available
+        if has_cmake:
+            cmake_content = (entry / "CMakeLists.txt").read_text()
+            cat_match = re.search(r'CATEGORIES\s+([^\)]+)', cmake_content)
+            if cat_match:
+                info.categories = cat_match.group(1).split()
+
+        if name not in benchmarks:
+            benchmarks[name] = []
+        benchmarks[name].append(info)
+
+    return benchmarks
+
+
+def load_benchmark_metadata() -> Dict[str, Tuple[str, List[str]]]:
+    """Load benchmark metadata (regex patterns and run args) from subset.json."""
+    if not BENCHMARKS_DATA.exists():
+        return {}
+
+    with open(BENCHMARKS_DATA) as f:
+        data = json.load(f)
+
+    result = {}
+    for name, values in data.items():
+        if isinstance(values, list) and len(values) >= 1:
+            regex = values[0]
+            args = values[1] if len(values) > 1 else []
+            binary = values[2] if len(values) > 2 else "main"
+            result[name] = (regex, args, binary)
+
+    return result
+
+
+def get_all_categories(benchmarks: Dict[str, List[BenchmarkInfo]]) -> Set[str]:
+    """Get all unique categories from benchmarks."""
+    categories = set()
+    for bench_list in benchmarks.values():
+        for bench in bench_list:
+            categories.update(bench.categories)
+    return categories
+
+
+def list_benchmarks(args):
+    """List available benchmarks."""
+    benchmarks = discover_benchmarks()
+    metadata = load_benchmark_metadata()
+
+    # Filter by model
+    if args.model:
+        for name in list(benchmarks.keys()):
+            benchmarks[name] = [b for b in benchmarks[name] if b.model == args.model]
+            if not benchmarks[name]:
+                del benchmarks[name]
+
+    # Filter by category
+    if args.category:
+        for name in list(benchmarks.keys()):
+            benchmarks[name] = [b for b in benchmarks[name] if args.category in b.categories]
+            if not benchmarks[name]:
+                del benchmarks[name]
+
+    if args.categories:
+        # Just list categories
+        all_categories = get_all_categories(discover_benchmarks())
+        print("Available categories:")
+        for cat in sorted(all_categories):
+            print(f"  {cat}")
+        return
+
+    if args.json:
+        output = []
+        for name, bench_list in sorted(benchmarks.items()):
+            for bench in bench_list:
+                output.append({
+                    "name": name,
+                    "model": bench.model,
+                    "path": str(bench.path),
+                    "has_cmake": bench.has_cmake,
+                    "categories": bench.categories,
+                    "has_metadata": name in metadata,
+                })
+        print(json.dumps(output, indent=2))
+        return
+
+    # Summary view
+    if args.summary:
+        total = len(benchmarks)
+        cmake_count = sum(1 for bl in benchmarks.values() for b in bl if b.has_cmake)
+        total_impls = sum(len(bl) for bl in benchmarks.values())
+
+        print(f"HeCBench Summary")
+        print(f"================")
+        print(f"Total benchmarks: {total}")
+        print(f"Total implementations: {total_impls}")
+        print(f"CMake support: {cmake_count}/{total_impls} ({100*cmake_count/total_impls:.1f}%)")
+        print()
+        print("Implementations by model:")
+        for model in MODELS:
+            count = sum(1 for bl in benchmarks.values() for b in bl if b.model == model)
+            print(f"  {model}: {count}")
+        return
+
+    # Default: table view
+    print(f"{'Benchmark':<30} {'Models':<20} {'CMake':<8} {'Categories'}")
+    print("-" * 80)
+
+    for name in sorted(benchmarks.keys()):
+        bench_list = benchmarks[name]
+        models = [b.model[0].upper() for b in sorted(bench_list, key=lambda x: x.model)]
+        cmake = all(b.has_cmake for b in bench_list)
+        categories = set()
+        for b in bench_list:
+            categories.update(b.categories)
+
+        models_str = "".join(models)
+        cmake_str = "Yes" if cmake else "Partial" if any(b.has_cmake for b in bench_list) else "No"
+        cat_str = ", ".join(sorted(categories)[:3])
+        if len(categories) > 3:
+            cat_str += "..."
+
+        print(f"{name:<30} {models_str:<20} {cmake_str:<8} {cat_str}")
+
+    print()
+    print(f"Total: {len(benchmarks)} benchmarks")
+    print(f"Models: C=CUDA, H=HIP, S=SYCL, O=OpenMP")
+
+
+def build_benchmarks(args):
+    """Build benchmarks using CMake."""
+    preset = args.preset or DEFAULT_PRESET
+    build_dir = HECBENCH_ROOT / "build" / preset
+
+    # Check if configured
+    if not build_dir.exists():
+        print(f"Configuring with preset '{preset}'...")
+        result = subprocess.run(
+            ["cmake", "--preset", preset],
+            cwd=HECBENCH_ROOT,
+            capture_output=not args.verbose,
+        )
+        if result.returncode != 0:
+            print(f"Configuration failed")
+            if not args.verbose:
+                print(result.stderr.decode() if result.stderr else "")
+            return 1
+
+    # Build targets
+    cmd = ["cmake", "--build", str(build_dir)]
+
+    if args.parallel:
+        cmd.extend(["--parallel", str(args.parallel)])
+    else:
+        cmd.append("--parallel")
+
+    if args.benchmarks:
+        # Build specific targets
+        for bench in args.benchmarks:
+            if "-" in bench:
+                # Already has model suffix
+                target = bench
+            else:
+                # Build all models for this benchmark
+                target = f"{bench}-all"
+            cmd.extend(["--target", target])
+
+    print(f"Building: {' '.join(cmd)}")
+    result = subprocess.run(cmd, cwd=HECBENCH_ROOT)
+    return result.returncode
+
+
+def run_benchmark(bench_info: BenchmarkInfo, metadata: Dict, args) -> Optional[Dict]:
+    """Run a single benchmark and return results."""
+    bench_name = bench_info.name
+
+    # Get metadata
+    if bench_name not in metadata:
+        if args.verbose:
+            print(f"  Warning: No metadata for {bench_name}, skipping")
+        return None
+
+    regex, run_args, binary = metadata[bench_name]
+
+    # Find binary
+    binary_path = bench_info.path / binary
+    if not binary_path.exists():
+        # Try build directory
+        preset = args.preset or DEFAULT_PRESET
+        build_bin = HECBENCH_ROOT / "build" / preset / "bin" / bench_info.model / bench_name
+        if build_bin.exists():
+            binary_path = build_bin
+        else:
+            if args.verbose:
+                print(f"  Warning: Binary not found for {bench_info.path.name}")
+            return None
+
+    # Run benchmark
+    cmd = [str(binary_path)] + run_args
+
+    results = []
+    repeat = args.repeat or 1
+
+    for i in range(repeat):
+        try:
+            start = time.time()
+            proc = subprocess.run(
+                cmd,
+                cwd=bench_info.path,
+                capture_output=True,
+                text=True,
+                timeout=args.timeout or 600,
+            )
+            elapsed = time.time() - start
+
+            if proc.returncode != 0:
+                if args.verbose:
+                    print(f"  Warning: {bench_info.path.name} returned {proc.returncode}")
+                continue
+
+            # Extract result using regex
+            matches = re.findall(regex, proc.stdout)
+            if not matches:
+                if args.verbose:
+                    print(f"  Warning: No regex match in {bench_info.path.name}")
+                    if args.verbose > 1:
+                        print(f"    Regex: {regex}")
+                        print(f"    Output: {proc.stdout[:500]}")
+                continue
+
+            value = sum(float(m) for m in matches)
+            results.append({
+                "value": value,
+                "wall_time": elapsed,
+            })
+
+        except subprocess.TimeoutExpired:
+            print(f"  Warning: {bench_info.path.name} timed out")
+        except Exception as e:
+            print(f"  Error running {bench_info.path.name}: {e}")
+
+    if not results:
+        return None
+
+    return {
+        "benchmark": bench_name,
+        "model": bench_info.model,
+        "results": results,
+        "mean": sum(r["value"] for r in results) / len(results),
+        "min": min(r["value"] for r in results),
+        "max": max(r["value"] for r in results),
+    }
+
+
+def run_benchmarks(args):
+    """Run benchmarks and collect results."""
+    benchmarks = discover_benchmarks()
+    metadata = load_benchmark_metadata()
+
+    # Filter benchmarks
+    to_run = []
+
+    if args.benchmarks:
+        for spec in args.benchmarks:
+            if "-" in spec:
+                # Specific implementation (e.g., "jacobi-cuda")
+                parts = spec.rsplit("-", 1)
+                name, model = parts[0], parts[1]
+                if name in benchmarks:
+                    for b in benchmarks[name]:
+                        if b.model == model:
+                            to_run.append(b)
+            else:
+                # All implementations for this benchmark
+                if spec in benchmarks:
+                    to_run.extend(benchmarks[spec])
+    else:
+        # Run all benchmarks for specified model
+        model = args.model or "cuda"
+        for bench_list in benchmarks.values():
+            for b in bench_list:
+                if b.model == model:
+                    to_run.append(b)
+
+    if args.category:
+        to_run = [b for b in to_run if args.category in b.categories]
+
+    if not to_run:
+        print("No benchmarks to run")
+        return 1
+
+    print(f"Running {len(to_run)} benchmark(s)...")
+
+    all_results = []
+    for i, bench in enumerate(to_run, 1):
+        print(f"[{i}/{len(to_run)}] {bench.path.name}...", end=" ", flush=True)
+        result = run_benchmark(bench, metadata, args)
+        if result:
+            all_results.append(result)
+            print(f"{result['mean']:.6f}")
+        else:
+            print("skipped")
+
+    # Output results
+    if args.output:
+        output_path = Path(args.output)
+        if args.format == "json":
+            with open(output_path, "w") as f:
+                json.dump(all_results, f, indent=2)
+        else:  # csv
+            with open(output_path, "w") as f:
+                f.write("benchmark,model,mean,min,max\n")
+                for r in all_results:
+                    f.write(f"{r['benchmark']},{r['model']},{r['mean']},{r['min']},{r['max']}\n")
+        print(f"\nResults written to {output_path}")
+
+    return 0
+
+
+def show_info(args):
+    """Show detailed information about a benchmark."""
+    benchmarks = discover_benchmarks()
+    metadata = load_benchmark_metadata()
+
+    name = args.benchmark
+    if name not in benchmarks:
+        print(f"Benchmark '{name}' not found")
+        return 1
+
+    bench_list = benchmarks[name]
+
+    print(f"Benchmark: {name}")
+    print(f"{'=' * 60}")
+    print()
+
+    # Implementations
+    print("Implementations:")
+    for b in sorted(bench_list, key=lambda x: x.model):
+        cmake_str = "[CMake]" if b.has_cmake else "[Makefile]"
+        print(f"  {b.model:<8} {cmake_str:<12} {b.path}")
+
+    # Categories
+    all_categories = set()
+    for b in bench_list:
+        all_categories.update(b.categories)
+    if all_categories:
+        print(f"\nCategories: {', '.join(sorted(all_categories))}")
+
+    # Run metadata
+    if name in metadata:
+        regex, run_args, binary = metadata[name]
+        print(f"\nRun Configuration:")
+        print(f"  Binary: {binary}")
+        print(f"  Arguments: {' '.join(run_args) if run_args else '(none)'}")
+        print(f"  Result regex: {regex[:60]}..." if len(regex) > 60 else f"  Result regex: {regex}")
+    else:
+        print(f"\nNote: No run metadata available in subset.json")
+
+    return 0
+
+
+def compare_results(args):
+    """Compare two result files."""
+    def load_results(path: Path) -> Dict[str, Dict]:
+        with open(path) as f:
+            if path.suffix == ".json":
+                data = json.load(f)
+                return {f"{r['benchmark']}-{r['model']}": r for r in data}
+            else:  # csv
+                results = {}
+                next(f)  # skip header
+                for line in f:
+                    parts = line.strip().split(",")
+                    key = f"{parts[0]}-{parts[1]}"
+                    results[key] = {
+                        "benchmark": parts[0],
+                        "model": parts[1],
+                        "mean": float(parts[2]),
+                    }
+                return results
+
+    results1 = load_results(Path(args.file1))
+    results2 = load_results(Path(args.file2))
+
+    common = set(results1.keys()) & set(results2.keys())
+
+    print(f"Comparing {len(common)} common benchmarks")
+    print(f"{'Benchmark':<40} {'File1':>12} {'File2':>12} {'Diff':>10}")
+    print("-" * 80)
+
+    for key in sorted(common):
+        r1, r2 = results1[key], results2[key]
+        v1, v2 = r1["mean"], r2["mean"]
+        diff = (v2 - v1) / v1 * 100 if v1 != 0 else 0
+
+        diff_str = f"{diff:+.1f}%"
+        if diff > 5:
+            diff_str = f"\033[91m{diff_str}\033[0m"  # red
+        elif diff < -5:
+            diff_str = f"\033[92m{diff_str}\033[0m"  # green
+
+        print(f"{key:<40} {v1:>12.4f} {v2:>12.4f} {diff_str:>10}")
+
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="HeCBench unified CLI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("-v", "--verbose", action="count", default=0,
+                        help="Increase verbosity")
+
+    subparsers = parser.add_subparsers(dest="command", help="Command")
+
+    # list command
+    list_parser = subparsers.add_parser("list", help="List benchmarks")
+    list_parser.add_argument("-m", "--model", choices=MODELS,
+                            help="Filter by programming model")
+    list_parser.add_argument("-c", "--category", help="Filter by category")
+    list_parser.add_argument("--categories", action="store_true",
+                            help="List available categories")
+    list_parser.add_argument("--json", action="store_true",
+                            help="Output as JSON")
+    list_parser.add_argument("--summary", action="store_true",
+                            help="Show summary statistics")
+
+    # build command
+    build_parser = subparsers.add_parser("build", help="Build benchmarks")
+    build_parser.add_argument("benchmarks", nargs="*", metavar="BENCHMARK",
+                             help="Benchmarks to build (default: all)")
+    build_parser.add_argument("-p", "--preset", help="CMake preset to use")
+    build_parser.add_argument("-j", "--parallel", type=int,
+                             help="Number of parallel jobs")
+
+    # run command
+    run_parser = subparsers.add_parser("run", help="Run benchmarks")
+    run_parser.add_argument("benchmarks", nargs="*", metavar="BENCHMARK",
+                           help="Benchmarks to run")
+    run_parser.add_argument("-m", "--model", choices=MODELS,
+                           help="Programming model (default: cuda)")
+    run_parser.add_argument("-c", "--category", help="Filter by category")
+    run_parser.add_argument("-r", "--repeat", type=int, default=1,
+                           help="Number of repetitions")
+    run_parser.add_argument("-o", "--output", help="Output file")
+    run_parser.add_argument("-f", "--format", choices=["json", "csv"],
+                           default="json", help="Output format")
+    run_parser.add_argument("-p", "--preset", help="CMake preset (for binary location)")
+    run_parser.add_argument("-t", "--timeout", type=int, default=600,
+                           help="Timeout per benchmark (seconds)")
+
+    # info command
+    info_parser = subparsers.add_parser("info", help="Show benchmark info")
+    info_parser.add_argument("benchmark", help="Benchmark name")
+
+    # compare command
+    compare_parser = subparsers.add_parser("compare", help="Compare result files")
+    compare_parser.add_argument("file1", help="First result file")
+    compare_parser.add_argument("file2", help="Second result file")
+
+    args = parser.parse_args()
+
+    if args.command is None:
+        parser.print_help()
+        return 0
+
+    if args.command == "list":
+        return list_benchmarks(args)
+    elif args.command == "build":
+        return build_benchmarks(args)
+    elif args.command == "run":
+        return run_benchmarks(args)
+    elif args.command == "info":
+        return show_info(args)
+    elif args.command == "compare":
+        return compare_results(args)
+
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except BrokenPipeError:
+        # Handle broken pipe (e.g., when piping to head)
+        sys.exit(0)

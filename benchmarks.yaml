@@ -1,0 +1,3035 @@
+# HeCBench Benchmark Metadata
+#
+# Auto-generated from subset.json and CMakeLists.txt files
+# Manual edits may be required for accuracy
+#
+# Format:
+#   benchmark_name:
+#     categories: [list of categories]
+#     description: Brief description
+#     models: [available implementations]
+#     test:
+#       regex: Regular expression to match success output
+#       args: [list of command-line arguments for testing]
+#       timeout: Timeout in seconds (default: 300)
+#
+
+accuracy:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of accuracy kernel: )([0-9.+-e]+)(?: \(us\))'
+    args: ["8192", "10000", "10", "100"]
+    timeout: 300
+
+ace:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Offload time: )([0-9.+-e]+)(?: \(ms\))'
+    args: ["100"]
+    timeout: 300
+
+adam:
+  categories: [ml]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(ms\))'
+    args: ["10000", "200", "100"]
+    timeout: 300
+
+adamw:
+  categories: [ml]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+addBiasQKV:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+addBiasResidualLayerNorm:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+adjacent:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+adv:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:elapsed time=)([0-9.+-e]+)(?: )'
+    args: ["16", "16", "16"]
+    timeout: 300
+
+aes:
+  categories: [cryptography]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+affine:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+aidw:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of AIDW_Kernel_Tiled )([0-9.+-e]+)(?: \(s\))'
+    args: ["10", "1", "100"]
+    timeout: 300
+
+aligned-types:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+all-pairs-distance:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time \(w/o? shared memory\): )([0-9.+-e]+)(?: \(us\))'
+    args: ["1000"]
+    timeout: 300
+
+allreduce:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+amgmk:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+ans:
+  categories: [algorithms, compression]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+aobench:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average render time: )([0-9.+-e]+)(?: sec)'
+    args: ["1000"]
+    timeout: 300
+
+aop:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:elapsed time for each run *: )([0-9.+-e]+)(?:ms)'
+    args: ["-paths", "200"]
+    timeout: 300
+
+asmooth:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average filtering time )([0-9.+-e]+)(?: \(s\))'
+    args: ["10000", "1", "5", "1"]
+    timeout: 300
+
+assert:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Kernel time : )([0-9.+-e]+)'
+    args: []
+    timeout: 300
+
+asta:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: []
+    timeout: 300
+
+atan2:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+atomicAggregate:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Total kernel time \(32 locations\): )([0-9.+-e]+)(?: \(s\))'
+    args: ["1000"]
+    timeout: 300
+
+atomicCAS:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["10000"]
+    timeout: 300
+
+atomicCost:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of WithoutAtomicOnGlobalMem: )([0-9.+-e]+)(?: \(us\))'
+    args: ["16", "10"]
+    timeout: 300
+
+atomicIntrinsics:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+atomicPerf:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of SingleRangeAtomicOnGlobalMem: )([0-9.+-e]+)(?: \(us\))'
+    args: ["10"]
+    timeout: 300
+
+atomicReduction:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:The average performance of reduction is )([0-9.+-e]+)(?: GBytes/sec)'
+    args: []
+    timeout: 300
+
+atomicSystemWide:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+attention:
+  categories: [ml]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of kernels )([0-9.+-e]+)(?: \(ms\))'
+    args: ["8192", "8192", "0", "5"]
+    timeout: 300
+
+attentionMultiHead:
+  categories: [ml]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+axhelm:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:elapsed time=)([0-9.+-e]+)(?: )'
+    args: ["3", "8000", "100"]
+    timeout: 300
+
+b+tree:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+babelstream:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+background-subtract:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(us\))'
+    args: ["4096", "2048", "1", "102"]
+    timeout: 300
+
+backprop:
+  categories: [ml]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Device offloading time = )([0-9.+-e]+)(?:\(s\))'
+    args: ["65536"]
+    timeout: 300
+
+bezier-surface:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:kernel execution time: )([0-9.+-e]+)(?: ms)'
+    args: ["-n", "8192"]
+    timeout: 300
+
+bfs:
+  categories: [algorithms, graph]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+bh:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Total kernel execution time: )([0-9.+-e]+)(?: s)'
+    args: ["300", "30"]
+    timeout: 300
+
+bicgstab:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+bilateral:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time \([1-9]x[1-9]\) )([0-9.+-e]+)(?: \(ms\))'
+    args: ["2960", "1440", "0.5", "0.5", "1000"]
+    timeout: 300
+
+bincount:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+binomial:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total binomialOptionsGPU\(\) time: )([0-9.+-e]+)(?: msec)'
+    args: []
+    timeout: 300
+
+bitcracker:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+bitonic-sort:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total kernel execution time: )([0-9.+-e]+)(?: \(ms\))'
+    args: ["25", "2"]
+    timeout: 300
+
+bitpacking:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Device offload time = )([0-9.+-e]+)(?: \((?:s|ms|us)\))'
+    args: []
+    timeout: 300
+
+bitpermute:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+black-scholes:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Processing time on GPU: )([0-9.+-e]+)(?: \(ms\))'
+    args: ["100"]
+    timeout: 300
+
+blas-dot:
+  categories: [math]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+blas-fp8gemm:
+  categories: [math]
+  models: [cuda, hip]
+  # No test metadata available
+
+blas-gemm:
+  categories: [math]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+blas-gemmBatched:
+  categories: [math]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+blas-gemmEx:
+  categories: [math]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+blas-gemmEx2:
+  categories: [math]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+blas-gemmStridedBatched:
+  categories: [math]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+blockAccess:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+blockexchange:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+bm3d:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+bmf:
+  categories: [algorithms, matrix]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+bn:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of genScoreKernel: )([0-9.+-e]+)(?: \(s\))'
+    args: ["result", "10"]
+    timeout: 300
+
+bonds:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average processing time on GPU: )([0-9.+-e]+)(?: \(ms\))'
+    args: ["100"]
+    timeout: 300
+
+boxfilter:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(us\))'
+    args: ["../boxfilter-sycl/data/lenaRGB.ppm", "10000"]
+    timeout: 300
+
+bscan:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+bsearch:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time \(bs[1-9]\) )([0-9.+-e]+)(?: \(s\))'
+    args: ["16384", "1"]
+    timeout: 300
+
+bspline-vgh:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: []
+    timeout: 300
+
+bsw:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+btree:
+  categories: [algorithms]
+  models: [cuda, sycl]
+  # No test metadata available
+
+burger:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["8193", "8193", "100"]
+    timeout: 300
+
+bwt:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Device time: )([0-9.+-e]+)(?: (?:s|ms|us))'
+    args: ["10000000"]
+    timeout: 300
+
+car:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+cbsfil:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["10000", "10000", "5"]
+    timeout: 300
+
+cc:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+ccl:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+ccs:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+ccsd-trpdrv:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:avg=)([0-9.+-e]+)'
+    args: ["200", "200"]
+    timeout: 300
+
+ced:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+cfd:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+chacha20:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+channelShuffle:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average time of channel shuffle \(\w+\): )([0-9.+-e]+)(?: \(ms\))'
+    args: ["2", "224", "224", "100"]
+    timeout: 300
+
+channelSum:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average time of channel sum \(\w+\): )([0-9.+-e]+)(?: \(ms\))'
+    args: ["224", "224", "100"]
+    timeout: 300
+
+che:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+chemv:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of chemv kernels: )([0-9.+-e]+)(?: \(us\))'
+    args: []
+    timeout: 300
+
+chi2:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time = )([0-9.+-e]+)(?: \(s\))'
+    args: ["4000", "400000", "2000", "2000", "256", "1000"]
+    timeout: 300
+
+clenergy:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Kernel time: )([0-9.+-e]+)(?: seconds)'
+    args: []
+    timeout: 300
+
+clink:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel time: )([0-9.+-e]+)(?: ms)'
+    args: ["10"]
+    timeout: 300
+
+clock:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+cm:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+cmembench:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+cmp:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?: Giga semblances traces per second: )([0-9.+-e]+)'
+    args: ["-c0", "1.98e-7", "-c1", "1.77e-6", "-nc", "5", "-aph", "600", "-tau", "0.002", "-v", "2", "-i", "../cmp-cuda/data/simple-synthetic.su"]
+    timeout: 300
+
+cobahh:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(us\))'
+    args: ["1000000", "10"]
+    timeout: 300
+
+collision:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+colorwheel:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+columnarSolver:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+complex:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time \([a-z]+\) )([0-9.+-e]+)(?: \(s\))'
+    args: ["10000000", "1000"]
+    timeout: 300
+
+compute-score:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Kernel Time = )([0-9.+-e]+)(?: ms)'
+    args: ["-p=1000"]
+    timeout: 300
+
+concat:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(us\))'
+    args: ["1000"]
+    timeout: 300
+
+concurrentKernels:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Measured time for sample = )([0-9.+-e]+)(?:s)'
+    args: ["4"]
+    timeout: 300
+
+contract:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+conversion:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+convolution1D:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+convolution3D:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time of conv3d_s3 kernel: )([0-9.+-e]+)(?: \(us\))'
+    args: ["32", "6", "16", "14", "14", "5", "100"]
+    timeout: 300
+
+convolutionDeformable:
+  categories: [math]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+convolutionSeparable:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["8192", "8192", "1000"]
+    timeout: 300
+
+cooling:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \((?:s|ms|us)\))'
+    args: ["1000000", "1000"]
+    timeout: 300
+
+coordinates:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+crc64:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+cross:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of cross[0-9]+ kernel: )([0-9.+-e]+)(?: \((?:s|ms|us)\))'
+    args: ["10000000", "100"]
+    timeout: 300
+
+crossEntropy:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average GPU kernel time \(ms\) : )([0-9.+-e]+)'
+    args: ["100"]
+    timeout: 300
+
+crs:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total encoding time )([0-9.+-e]+)(?: \(s\))'
+    args: ["1", "1"]
+    timeout: 300
+
+d2q9-bgk:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+d3q19-bgk:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+damage:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["50000000", "1000"]
+    timeout: 300
+
+daphne:
+  categories: [automotive, imaging]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+dct8x8:
+  categories: [math]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average DCT8x8 kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["8192", "8192", "100"]
+    timeout: 300
+
+ddbp:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+debayer:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+degrid:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: []
+    timeout: 300
+
+dense-embedding:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of dense embedding kernel \(k1\): )([0-9.+-e]+)(?: \(us\))'
+    args: ["100000", "256", "1000"]
+    timeout: 300
+
+depixel:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+deredundancy:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+determinant:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+diamond:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+dispatch:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+distort:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+divergence:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+doh:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+dp:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["10000000", "10"]
+    timeout: 300
+
+dpid:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+dropout:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+dslash:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+dwconv:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average execution time of dwconv2d_forward kernel: )([0-9.+-e]+)(?: \(ms\))'
+    args: ["128", "16", "224", "224", "100"]
+    timeout: 300
+
+dwconv1d:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+dwt2d:
+  categories: [algorithms, imaging]
+  models: [sycl]
+  # No test metadata available
+
+dxtc2:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(us\))'
+    args: ["../dxtc2-sycl/data/lena_std.ppm", "../dxtc2-sycl/data/lena_ref.dds", "100"]
+    timeout: 300
+
+easyWave:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+ecdh:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:: )([0-9.+-e]+)(?: s)'
+    args: ["50000000", "100"]
+    timeout: 300
+
+egs:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+eigenvalue:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(us\))'
+    args: ["2048", "10000"]
+    timeout: 300
+
+eikonal:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+entropy:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["8192", "8192", "100"]
+    timeout: 300
+
+epistasis:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["146", "31339", "100"]
+    timeout: 300
+
+ert:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:runtime \([a-z1-9]*\): )([0-9.+-e]+)(?: \(s\))'
+    args: ["128", "1024"]
+    timeout: 300
+
+expdist:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["10000", "10"]
+    timeout: 300
+
+extend2:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average offload time )([0-9.+-e]+)(?: \(us\))'
+    args: ["300"]
+    timeout: 300
+
+extrema:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+f16atomic:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+f16max:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+f16sp:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(us\))'
+    args: ["100000"]
+    timeout: 300
+
+face:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+fdtd3d:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \((?:s|ms|us)\))'
+    args: ["--dimx=192", "--dimy=184", "--timesteps=90"]
+    timeout: 300
+
+feynman-kac:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+fft:
+  categories: [math]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["3", "100"]
+    timeout: 300
+
+fhd:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+filter:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of filter \(shared memory\) )([0-9.+-e]+)(?: \(ms\))'
+    args: ["100000000", "256", "100"]
+    timeout: 300
+
+flame:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+flip:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of the flip kernel: )([0-9.+-e]+)(?: \(ms\))'
+    args: ["3", "1024", "100"]
+    timeout: 300
+
+floydwarshall:
+  categories: [cryptography, graph]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["1024", "100", "16"]
+    timeout: 300
+
+floydwarshall2:
+  categories: [cryptography, graph]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+fluidSim:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+fma:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+fpc:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:fpc2: average device offload time )([0-9.+-e]+)(?: \(s\))'
+    args: ["256", "100"]
+    timeout: 300
+
+fpdc:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+frechet:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+fresnel:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+frna:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+fsm:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '([0-9.+-e]+)(?:\s*#runtime \[s\])'
+    args: ["65536"]
+    timeout: 300
+
+fwt:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average device execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["100"]
+    timeout: 300
+
+ga:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+gabor:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(us\))'
+    args: ["8640", "15360", "1000"]
+    timeout: 300
+
+gamma-correction:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["7680", "4320", "256", "100"]
+    timeout: 300
+
+gaussian:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Device offloading time )([0-9.+-e]+)(?: \(us\))'
+    args: ["-q", "-t", "-s", "4096"]
+    timeout: 300
+
+gc:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+gd:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Training time takes )([0-9.+-e]+)(?: \(s\))'
+    args: ["../gd-cuda/gisette_scale", "0.0001", "10", "100"]
+    timeout: 300
+
+ge-spmm:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+geam:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+geglu:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+gels:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+gelu:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(ms\))'
+    args: ["512", "8192", "512", "100"]
+    timeout: 300
+
+gemv:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+geodesic:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(us\))'
+    args: ["1000"]
+    timeout: 300
+
+gerbil:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+gibbs:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+glu:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of GLU kernel \(split dimension = 2\): )([0-9.+-e]+)(?: \(us\))'
+    args: ["3", "1024", "100"]
+    timeout: 300
+
+gmm:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+goulash:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:total kernel time )([0-9.+-e]+)(?:\(s\))'
+    args: ["101", "5"]
+    timeout: 300
+
+gpp:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: []
+    timeout: 300
+
+graphB+:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+graphExecution:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+grep:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+grrt:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+gru:
+  categories: [ml]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+haccmk:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["1000"]
+    timeout: 300
+
+halo-finder:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+hausdorff:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of kernels: )([0-9.+-e]+)(?: \(ms\))'
+    args: ["100000", "100000", "100"]
+    timeout: 300
+
+haversine:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+hbc:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+heartwall:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+heat:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Solve time \(s\): )([0-9.+-e]+)'
+    args: ["4096", "1000"]
+    timeout: 300
+
+heat2d:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '([0-9.+-e]+)(?: usec/iter)'
+    args: ["1024", "1024", "100"]
+    timeout: 300
+
+hellinger:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+henry:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+hexciton:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+histogram:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Avg time )([0-9.+-e]+)(?: us )'
+    args: ["--width=3840", "--height=2160"]
+    timeout: 300
+
+hmm:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Device execution time of Viterbi iterations )([0-9.+-e]+)(?: \(s\))'
+    args: []
+    timeout: 300
+
+hogbom:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+hotspot:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+hotspot3D:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(us\))'
+    args: ["512", "8", "5000", "../data/hotspot3D/power_512x8", "../data/hotspot3D/temp_512x8", "output.out"]
+    timeout: 300
+
+hpl:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+hungarian:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+hwt1d:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average device offload time )([0-9.+-e]+)(?: \(s\))'
+    args: ["8388608", "100"]
+    timeout: 300
+
+hybridsort:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:GPU execution time: )([0-9.+-e]+)(?: ms)'
+    args: ["r"]
+    binary: hybridsort
+    timeout: 300
+
+hypterm:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+idivide:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+interleave:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+interval:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+intrinsics-cast:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+intrinsics-simd:
+  categories: [algorithms]
+  models: [cuda]
+  # No test metadata available
+
+inversek2j:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(us\))'
+    args: ["../inversek2j-sycl/coord_in.txt", "100000"]
+    timeout: 300
+
+is:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+ising:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:elapsed time: )([0-9.+-e]+)(?: sec)'
+    args: []
+    timeout: 300
+
+iso2dfd:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total kernel execution time )([0-9.+-e]+)(?: \(ms\))'
+    args: ["2048", "2048", "1000"]
+    timeout: 300
+
+jaccard:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+jacobi:
+  categories: [math, simulation]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total elapsed time: )([0-9.+-e]+)(?: seconds)'
+    args: []
+    timeout: 300
+
+jenkins-hash:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time : )([0-9.+-e]+)(?: \(s\))'
+    args: ["256", "16777216", "100"]
+    timeout: 300
+
+kalman:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+keccaktreehash:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+keogh:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+kernelLaunch:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+kiss:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+kmc:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+kmeans:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+knn:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:100 iterations \()([0-9.+-e]+)(?: s by iteration\))'
+    args: ["100"]
+    timeout: 300
+
+kurtosis:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+lanczos:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+langevin:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+langford:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+laplace:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:iterations: )([0-9.+-e]+)(?: s)'
+    args: []
+    timeout: 300
+
+laplace3d:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["128", "128", "128", "100", "1"]
+    timeout: 300
+
+lavaMD:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Device offloading time:\s)([0-9.+-e]+)(?: s)'
+    args: ["-boxes1d", "16"]
+    timeout: 300
+
+layernorm:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+layout:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time \(SoA\): )([0-9.+-e]+)(?: \(us\))'
+    args: ["1000"]
+    timeout: 300
+
+lci:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+lda:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+ldpc:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+lebesgue:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+leukocyte:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+lfib4:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+libor:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time : )([0-9.+-e]+)(?: \(s\))'
+    args: ["100"]
+    timeout: 300
+
+lid-driven-cavity:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total execution time of the iteration loop: )([0-9.+-e]+)(?: \(s\))'
+    args: []
+    timeout: 300
+
+lif:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(us\))'
+    args: ["1000", "1000", "400"]
+    timeout: 300
+
+linearprobing:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Kernel execution time \(iterate\): )([0-9.+-e]+)(?: \(s\))'
+    args: ["16", "8"]
+    timeout: 300
+
+local-ht:
+  categories: [algorithms, bioinformatics]
+  models: [cuda]
+  # No test metadata available
+
+log2:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+logan:
+  categories: [algorithms, bioinformatics]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+logic-resim:
+  categories: [eda, simulation]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+logic-rewrite:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+logprob:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average execution time of kernels: )([0-9.+-e]+)(?: \(us\))'
+    args: ["100", "128", "60000", "100"]
+    timeout: 300
+
+lombscargle:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(us\))'
+    args: ["100"]
+    timeout: 300
+
+loopback:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+lr:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: us)'
+    args: ["100000", "0"]
+    timeout: 300
+
+lrn:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+lsqt:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+lud:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+ludb:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+lulesh:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+lut-gemm:
+  categories: [math]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+lzss:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+mallocFree:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+mandelbrot:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: ms)'
+    args: ["1000"]
+    timeout: 300
+
+marchingCubes:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+mask:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of \w+ kernel: )([0-9.+-e]+)(?: \(us\))'
+    args: ["512", "512", "512", "100"]
+    timeout: 300
+
+match:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+matern:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+matrix-rotate:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["5000", "100"]
+    timeout: 300
+
+matrixT:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+maxFlops:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+maxpool3d:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["2048", "2048", "96", "100"]
+    timeout: 300
+
+mcmd:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+mcpr:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of compute_probs_unitStrides kernel: )([0-9.+-e]+)(?: \(s\))'
+    args: ["../mcpr-cuda/alphas.csv", "10"]
+    timeout: 300
+
+md:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["3", "1000"]
+    timeout: 300
+
+md5hash:
+  categories: [cryptography]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+mdh:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+meanshift:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of mean-shift \(opt\) )([0-9.+-e]+)(?: ms)'
+    args: ["../meanshift-cuda/dataset/data.csv", "../meanshift-cuda/dataset/centroids.csv"]
+    timeout: 300
+
+medianfilter:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["../medianfilter-sycl/data/SierrasRGB.ppm", "1000"]
+    timeout: 300
+
+memcpy:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+memtest:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+merge:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(us\))'
+    args: ["100000", "100"]
+    timeout: 300
+
+merkle:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?: )([0-9.+-e]+)(?: ms)'
+    args: []
+    timeout: 300
+
+metropolis:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+mf-sgd:
+  categories: [algorithms, machinelearning]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+michalewicz:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+miniDGS:
+  categories: [algorithms]
+  models: [cuda]
+  # No test metadata available
+
+miniFE:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+miniWeather:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+minibude:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+minimap2:
+  categories: [algorithms, bioinformatics]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+minimod:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average kernel time per iteration: )([0-9.+-e]+)(?: s)'
+    args: []
+    timeout: 300
+
+minisweep:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:kernel time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["--niterations", "5"]
+    timeout: 300
+
+minkowski:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["100"]
+    timeout: 300
+
+minmax:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+mis:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+mixbench:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+mmcsf:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+mnist:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Total time \(learn \+ test\) )([0-9.+-e]+)(?: secs)'
+    args: ["2"]
+    timeout: 300
+
+moe:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+morphology:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+mpc:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+mr:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total kernel execution time \(\w+\s*\): )([0-9.+-e]+)(?: \(ms\))'
+    args: []
+    timeout: 300
+
+mrc:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of MRC2 kernel: )([0-9.+-e]+)(?: \(us\))'
+    args: ["10000000", "1000"]
+    timeout: 300
+
+mrg32k3a:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+mriQ:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+mt:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+mtf:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+multimaterial:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+multinomial:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average execution time of sampleMultinomialOnce kernel: )([0-9.+-e]+)(?: \(us\))'
+    args: ["65536", "2048", "100"]
+    timeout: 300
+
+murmurhash3:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time )([0-9.+-e]+)(?: \(s\))'
+    args: ["100000", "100"]
+    timeout: 300
+
+mxfp4:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+myocyte:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+nbnxm:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average kernel execution time \(w/o shift\): )([0-9.+-e]+)(?: \(us\))'
+    args: ["100"]
+    timeout: 300
+
+nbody:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total Time \(s\)[ ]*: )([0-9.+-e]+)'
+    args: ["20000", "100"]
+    timeout: 300
+
+ne:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+nlll:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of nll loss forward kernel: )([0-9.+-e]+)(?: \(us\))'
+    args: ["2048", "1000", "1000"]
+    timeout: 300
+
+nms:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+nn:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+nonzero:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+norm2:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+nosync:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+nqueen:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+ntt:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+nw:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+openmp:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+opticalFlow:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+overlap:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Avg. time when overlapped using [0-9]+ streams.*: )([0-9.+-e]+)(?: ms)'
+    args: []
+    timeout: 300
+
+overlay:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["640", "480"]
+    timeout: 300
+
+p2p:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+p4:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of postprocess kernel: )([0-9.+-e]+)(?: \(us\))'
+    args: ["10000"]
+    timeout: 300
+
+pad:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Total padding execution time for [0-9.+-e]+ iterations: )([0-9.+-e]+)(?: \((?:s|ms|us)\))'
+    args: ["-a", "0.1"]
+    timeout: 300
+
+page-rank:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["1000", "1000"]
+    timeout: 300
+
+particle-diffusion:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["10", "5"]
+    timeout: 300
+
+particlefilter:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Device offloading time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["-x", "200", "-y", "200", "-z", "200", "-np", "10000"]
+    timeout: 300
+
+particles:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+pathfinder:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["1000", "1000", "100"]
+    timeout: 300
+
+pcc:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+perlin:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+permutate:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+permute:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:block_size  256 | time )([0-9.+-e]+)(?: ms)'
+    args: ["8", "100"]
+    timeout: 300
+
+perplexity:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["10000", "50", "100"]
+    timeout: 300
+
+phmm:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+pingpong:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+pitch:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+pnpoly:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+pns:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total device execution time: )([0-9.+-e]+)(?: s)'
+    args: ["5000", "100", "100"]
+    timeout: 300
+
+pointwise:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["100", "8", "512", "64", "100"]
+    timeout: 300
+
+pool:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+popcount:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+prefetch:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+present:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+prna:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+projectile:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["1000"]
+    timeout: 300
+
+pso:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+qem:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+qkv:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+qrg:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+qtclustering:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+quant3MatMul:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+quantAQLM:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+quantBnB:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+quantVLLM:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+quicksort:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+radixsort:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+radixsort2:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+rainflow:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+randomAccess:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+rayleighBenardConvection:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+reaction:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+recursiveGaussian:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+relu:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+remap:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+resize:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+resnet-kernels:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+reverse:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+reverse2D:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+rfs:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+ring:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+rle:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+rng-wallace:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+rodrigues:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+romberg:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+rotary:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+rowwiseMoments:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+rsbench:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+rsc:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total task execution time for [0-9.+-e]+ iterations: )([0-9.+-e]+)(?: \((?:s|ms|us)\))'
+    args: ["-f", "../rsc-cuda/input/vectors.csv", "-g", "512"]
+    timeout: 300
+
+rsmt:
+  categories: [algorithms]
+  models: [cuda, sycl]
+  # No test metadata available
+
+rtm8:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+rushlarsen:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+s3d:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total time )([0-9.+-e]+)(?: secs)'
+    args: ["-s", "3", "-n", "100"]
+    timeout: 300
+
+s8n:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+sa:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+sad:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+sampling:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+saxpy-ompt:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+sc:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Total stream compaction time for [0-9.+-e]+ iterations: )([0-9.+-e]+)(?: \((?:s|ms|us)\))'
+    args: ["-a", "0.1"]
+    timeout: 300
+
+scan:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+scan2:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+scan3:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+scatter:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+scatterAdd:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+scatterThrust:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+scel:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+score:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+sddmm-batch:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+seam-carving:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+secp256k1:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+segment-reduce:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+segsort:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+sheath:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Time per time step: )([0-9.+-e]+)(?: \(ms\))'
+    args: []
+    timeout: 300
+
+shmembench:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+shuffle:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+si:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+simpleMultiDevice:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+simpleSpmv:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+simplemoc:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total kernel time:       )([0-9.+-e]+)(?: seconds)'
+    args: ["-s", "5000000", "-e", "128", "-n", "10"]
+    timeout: 300
+
+slit:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+slu:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+snake:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+snicit:
+  categories: [algorithms, neuralnetwork]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+sobel:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+sobol:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+softmax:
+  categories: [math, ml]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(ms\))'
+    args: ["100000", "784", "0", "100"]
+    timeout: 300
+
+softmax-fused:
+  categories: [ml]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+softmax-online:
+  categories: [ml]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+sort:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+sortKV:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+sosfil:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+sparkler:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+spaxpby:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+spd2s:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+spgeam:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+spgemm:
+  categories: [math]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+sph:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+split:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+spm:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+spmm:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+spmv:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+spnnz:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+sps2d:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+spsm:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+spsort:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+sptrsv:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+srad:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+ss:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+ssim:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+sss:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+sssp:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+stddev:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of stddev kernels: )([0-9.+-e]+)(?: \(s\))'
+    args: ["65536", "16384", "100"]
+    timeout: 300
+
+stencil1d:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+stencil3d:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+streamCreateCopyDestroy:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+streamOrderedAllocation:
+  categories: [algorithms]
+  models: [cuda, hip]
+  # No test metadata available
+
+streamPriority:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+streamUM:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+streamcluster:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+stsg:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+su3:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total kernel execution time = )([0-9.+-e]+)(?: \(s\))'
+    args: []
+    timeout: 300
+
+surfel:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+svd3x3:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+sw4ck:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+swish:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of SwishGradient kernel: )([0-9.+-e]+)(?: \(us\))'
+    args: ["10000000", "1000"]
+    timeout: 300
+
+tensorAccessor:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+tensorT:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+testSNAP:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+tgvnn:
+  categories: [algorithms, imaging]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+thomas:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+threadfence:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+tissue:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["32", "100"]
+    timeout: 300
+
+tonemapping:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+tpacf:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+tqs:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Total task execution time for [0-9.+-e]+ iterations: )([0-9.+-e]+)(?: \((?:s|ms|us)\))'
+    args: ["-f", "../tqs-cuda/input/patternsNP100NB512FB25.txt"]
+    timeout: 300
+
+triad:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+tridiagonal:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Time = )([0-9.+-e]+)(?: s)'
+    args: ["-num_systems=30000"]
+    timeout: 300
+
+tsa:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+tsne:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+tsp:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+unfold:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+urng:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+vanGenuchten:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
+    args: ["256", "256", "256", "1000"]
+    timeout: 300
+
+vmc:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+vol2col:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of vol2col kernel: )([0-9.+-e]+)(?: \(us\))'
+    args: ["1000"]
+    timeout: 300
+
+vote:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+voxelization:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+warpexchange:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+warpsort:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+wedford:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+winograd:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Co-execution time: )([0-9.+-e]+)(?: s)'
+    args: []
+    timeout: 300
+
+wlcpow:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+wmma:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+word2vec:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
+
+wordcount:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+wsm5:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+wyllie:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+xlqc:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+xsbench:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+zerocopy:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: ms)'
+    args: ["100"]
+    timeout: 300
+
+zeropoint:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  test:
+    regex: '(?:Average execution time of zero-point kernel: )([0-9.+-e]+)(?: \(us\))'
+    args: ["10000000", "100"]
+    timeout: 300
+
+zmddft:
+  categories: [algorithms]
+  models: [cuda, hip, omp, sycl]
+  # No test metadata available
+
+zoom:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  # No test metadata available
