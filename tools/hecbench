@@ -8,9 +8,11 @@ with the new CMake build system.
 Usage:
     hecbench list [--model MODEL] [--category CATEGORY]
     hecbench build [BENCHMARK...] [--preset PRESET] [--parallel N]
-    hecbench run [BENCHMARK...] [--repeat N] [--output FILE]
+    hecbench run [BENCHMARK...] [--repeat N] [--output FILE] [--store DB]
     hecbench info BENCHMARK
     hecbench compare FILE1 FILE2
+    hecbench results [--benchmark B] [--model M] [--stats]
+    hecbench export FILE [--format json|csv]
 """
 
 import argparse
@@ -32,6 +34,14 @@ BENCHMARKS_DATA = SCRIPTS_DIR / "benchmarks" / "subset.json"
 
 MODELS = ["cuda", "hip", "sycl", "omp"]
 DEFAULT_PRESET = "cuda-sm80"
+DEFAULT_DB = "hecbench_results.db"
+
+# Import results module if available
+try:
+    from hecbench_results import ResultsDB, BenchmarkResult, detect_gpu_info, get_git_commit
+    RESULTS_AVAILABLE = True
+except ImportError:
+    RESULTS_AVAILABLE = False
 
 
 @dataclass
@@ -379,7 +389,43 @@ def run_benchmarks(args):
         else:
             print("skipped")
 
-    # Output results
+    # Store results in database if requested
+    if hasattr(args, 'store') and args.store and RESULTS_AVAILABLE:
+        db_path = args.store if args.store != True else DEFAULT_DB
+        db = ResultsDB(db_path)
+
+        # Get system info
+        gpu_info = detect_gpu_info()
+        commit = get_git_commit()
+
+        # Start a run
+        run_id = db.start_run(
+            name=f"hecbench run {time.strftime('%Y-%m-%d %H:%M')}",
+            config={"model": args.model, "repeat": args.repeat}
+        )
+
+        stored_count = 0
+        for r in all_results:
+            for run_result in r.get("results", [{"value": r["mean"]}]):
+                result = BenchmarkResult(
+                    benchmark=r["benchmark"],
+                    model=r["model"],
+                    value=run_result["value"],
+                    wall_time=run_result.get("wall_time", 0),
+                    gpu_name=gpu_info.get("gpu_name", ""),
+                    gpu_arch=gpu_info.get("gpu_arch", ""),
+                    commit_hash=commit,
+                    iterations=args.repeat,
+                )
+                result_id = db.store_result(result)
+                db.add_result_to_run(run_id, result_id)
+                stored_count += 1
+
+        db.finish_run(run_id, **gpu_info, commit_hash=commit)
+        db.close()
+        print(f"\nStored {stored_count} results in {db_path}")
+
+    # Output results to file
     if args.output:
         output_path = Path(args.output)
         if args.format == "json":
@@ -434,6 +480,98 @@ def show_info(args):
     else:
         print(f"\nNote: No run metadata available in subset.json")
 
+    return 0
+
+
+def query_results(args):
+    """Query results from the database."""
+    if not RESULTS_AVAILABLE:
+        print("Error: Results module not available")
+        return 1
+
+    db_path = args.db if args.db else DEFAULT_DB
+    if not Path(db_path).exists():
+        print(f"Database not found: {db_path}")
+        return 1
+
+    db = ResultsDB(db_path)
+
+    if args.stats:
+        # Show statistics
+        stats = db.get_stats(benchmark=args.benchmark, model=args.model)
+        if not stats:
+            print("No results found")
+            return 0
+
+        print(f"{'Benchmark':<30} {'Model':<8} {'Count':>6} {'Mean':>12} "
+              f"{'Median':>12} {'StdDev':>10} {'Unit':<6}")
+        print("-" * 90)
+        for s in stats:
+            print(f"{s.benchmark:<30} {s.model:<8} {s.count:>6} "
+                  f"{s.mean:>12.4f} {s.median:>12.4f} {s.std_dev:>10.4f} {s.unit:<6}")
+    elif args.runs:
+        # Show recent runs
+        runs = db.get_runs(limit=args.limit or 10)
+        if not runs:
+            print("No runs found")
+            return 0
+
+        print(f"{'ID':<6} {'Name':<40} {'Started':<20} {'Results':>8}")
+        print("-" * 80)
+        for r in runs:
+            name = r['name'] or "(unnamed)"
+            if len(name) > 38:
+                name = name[:35] + "..."
+            started = r['started_at'][:19] if r['started_at'] else ""
+            print(f"{r['id']:<6} {name:<40} {started:<20} {r['result_count']:>8}")
+    else:
+        # Show individual results
+        results = db.query(
+            benchmark=args.benchmark,
+            model=args.model,
+            since=args.since,
+            limit=args.limit or 20
+        )
+
+        if not results:
+            print("No results found")
+            return 0
+
+        print(f"{'Benchmark':<25} {'Model':<8} {'Value':>12} {'Unit':<6} {'Timestamp':<20}")
+        print("-" * 80)
+        for r in results:
+            ts = r['timestamp'][:19] if r['timestamp'] else ""
+            print(f"{r['benchmark']:<25} {r['model']:<8} {r['value']:>12.4f} "
+                  f"{r['unit']:<6} {ts:<20}")
+
+    db.close()
+    return 0
+
+
+def export_results(args):
+    """Export results from the database."""
+    if not RESULTS_AVAILABLE:
+        print("Error: Results module not available")
+        return 1
+
+    db_path = args.db if args.db else DEFAULT_DB
+    if not Path(db_path).exists():
+        print(f"Database not found: {db_path}")
+        return 1
+
+    db = ResultsDB(db_path)
+
+    output_path = args.output
+    if args.format == "json" or output_path.endswith(".json"):
+        count = db.export_json(output_path, args.benchmark, args.model, args.since)
+    else:
+        if args.stats:
+            count = db.export_stats_csv(output_path, args.benchmark, args.model, args.since)
+        else:
+            count = db.export_csv(output_path, args.benchmark, args.model, args.since)
+
+    print(f"Exported {count} {'stats' if args.stats else 'results'} to {output_path}")
+    db.close()
     return 0
 
 
@@ -527,6 +665,8 @@ def main():
     run_parser.add_argument("-p", "--preset", help="CMake preset (for binary location)")
     run_parser.add_argument("-t", "--timeout", type=int, default=600,
                            help="Timeout per benchmark (seconds)")
+    run_parser.add_argument("-s", "--store", nargs="?", const=DEFAULT_DB,
+                           help="Store results in database (default: hecbench_results.db)")
 
     # info command
     info_parser = subparsers.add_parser("info", help="Show benchmark info")
@@ -536,6 +676,34 @@ def main():
     compare_parser = subparsers.add_parser("compare", help="Compare result files")
     compare_parser.add_argument("file1", help="First result file")
     compare_parser.add_argument("file2", help="Second result file")
+
+    # results command (query database)
+    results_parser = subparsers.add_parser("results", help="Query results database")
+    results_parser.add_argument("-b", "--benchmark", help="Filter by benchmark")
+    results_parser.add_argument("-m", "--model", choices=MODELS,
+                               help="Filter by model")
+    results_parser.add_argument("--since", help="Filter by date (YYYY-MM-DD)")
+    results_parser.add_argument("-n", "--limit", type=int, help="Limit results")
+    results_parser.add_argument("--stats", action="store_true",
+                               help="Show statistics instead of raw results")
+    results_parser.add_argument("--runs", action="store_true",
+                               help="Show recent runs")
+    results_parser.add_argument("--db", default=DEFAULT_DB,
+                               help="Database file path")
+
+    # export command
+    export_parser = subparsers.add_parser("export", help="Export results from database")
+    export_parser.add_argument("output", help="Output file path")
+    export_parser.add_argument("-b", "--benchmark", help="Filter by benchmark")
+    export_parser.add_argument("-m", "--model", choices=MODELS,
+                              help="Filter by model")
+    export_parser.add_argument("--since", help="Filter by date (YYYY-MM-DD)")
+    export_parser.add_argument("-f", "--format", choices=["json", "csv"],
+                              default="csv", help="Output format")
+    export_parser.add_argument("--stats", action="store_true",
+                              help="Export statistics instead of raw results")
+    export_parser.add_argument("--db", default=DEFAULT_DB,
+                              help="Database file path")
 
     args = parser.parse_args()
 
@@ -553,6 +721,10 @@ def main():
         return show_info(args)
     elif args.command == "compare":
         return compare_results(args)
+    elif args.command == "results":
+        return query_results(args)
+    elif args.command == "export":
+        return export_results(args)
 
     return 0
 
