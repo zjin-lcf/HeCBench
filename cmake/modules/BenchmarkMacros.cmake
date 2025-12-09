@@ -5,6 +5,9 @@
 set_property(GLOBAL PROPERTY HECBENCH_ALL_BENCHMARKS "")
 set_property(GLOBAL PROPERTY HECBENCH_CATEGORIES "")
 
+# Path to test runner script
+set(HECBENCH_TEST_RUNNER "${CMAKE_SOURCE_DIR}/cmake/scripts/run_benchmark_test.py")
+
 # add_hecbench_benchmark
 #
 # Register a HeCBench benchmark
@@ -16,6 +19,9 @@ set_property(GLOBAL PROPERTY HECBENCH_CATEGORIES "")
 #   CATEGORIES  - Categories (e.g., simulation, math)
 #   COMPILE_OPTIONS - Additional compile options (optional)
 #   LINK_LIBRARIES  - Additional libraries to link (optional)
+#   TEST_REGEX  - Regex pattern to match output for test verification (optional)
+#   TEST_ARGS   - Arguments to pass when running tests (optional)
+#   TEST_TIMEOUT - Timeout in seconds for test execution (optional, default 300)
 #
 # Example:
 #   add_hecbench_benchmark(
@@ -28,8 +34,8 @@ set_property(GLOBAL PROPERTY HECBENCH_CATEGORIES "")
 function(add_hecbench_benchmark)
     # Parse arguments
     set(options "")
-    set(oneValueArgs NAME MODEL)
-    set(multiValueArgs SOURCES CATEGORIES COMPILE_OPTIONS LINK_LIBRARIES INCLUDE_DIRS)
+    set(oneValueArgs NAME MODEL TEST_REGEX TEST_TIMEOUT)
+    set(multiValueArgs SOURCES CATEGORIES COMPILE_OPTIONS LINK_LIBRARIES INCLUDE_DIRS TEST_ARGS)
     cmake_parse_arguments(BENCH "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     # Validate required arguments
@@ -169,6 +175,45 @@ function(add_hecbench_benchmark)
         add_custom_target(${BENCH_NAME}-all)
     endif()
     add_dependencies(${BENCH_NAME}-all ${TARGET_NAME})
+
+    # Register CTest test if testing is enabled and we have a regex pattern
+    if(HECBENCH_ENABLE_TESTING AND BENCH_TEST_REGEX)
+        # Set default timeout
+        if(NOT BENCH_TEST_TIMEOUT)
+            set(BENCH_TEST_TIMEOUT 300)
+        endif()
+
+        # Build the test command
+        set(TEST_CMD
+            ${Python3_EXECUTABLE}
+            ${HECBENCH_TEST_RUNNER}
+            $<TARGET_FILE:${TARGET_NAME}>
+        )
+
+        # Add test arguments if specified
+        if(BENCH_TEST_ARGS)
+            list(APPEND TEST_CMD ${BENCH_TEST_ARGS})
+        endif()
+
+        # Add the regex pattern
+        list(APPEND TEST_CMD --regex "${BENCH_TEST_REGEX}")
+        list(APPEND TEST_CMD --timeout ${BENCH_TEST_TIMEOUT})
+        list(APPEND TEST_CMD --working-dir "${CMAKE_CURRENT_SOURCE_DIR}")
+
+        # Register the test
+        add_test(
+            NAME ${TARGET_NAME}
+            COMMAND ${TEST_CMD}
+        )
+
+        # Set test properties
+        set_tests_properties(${TARGET_NAME} PROPERTIES
+            TIMEOUT ${BENCH_TEST_TIMEOUT}
+            LABELS "${BENCH_MODEL_LOWER};${BENCH_CATEGORIES}"
+        )
+
+        message(STATUS "  -> Registered test: ${TARGET_NAME}")
+    endif()
 
     message(STATUS "Registered benchmark: ${TARGET_NAME}")
 endfunction()

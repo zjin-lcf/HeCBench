@@ -78,6 +78,15 @@ endif()
 # Include benchmark macros
 include(BenchmarkMacros)
 
+# Enable testing if requested
+if(HECBENCH_ENABLE_TESTING)
+    enable_testing()
+    include(CTest)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    message(STATUS "CTest enabled - use 'ctest' to run benchmarks")
+    message(STATUS "Python3 for tests: ${Python3_EXECUTABLE}")
+endif()
+
 # Add src directory with all benchmarks
 add_subdirectory(src)
 
