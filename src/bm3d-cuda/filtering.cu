@@ -13,7 +13,7 @@ template<typename T>
 __device__ inline T warpReduceSum(T val) 
 {
   for (int offset = warpSize/2; offset > 0; offset /= 2)
-    val += __shfl_down(val,offset);
+    val += __shfl_down_sync(0xFFFFFFFF, val,offset);
   return val;
 }
 
