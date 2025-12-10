@@ -106,6 +106,10 @@ if(DEFINED HECBENCH_SYCL_TARGET)
     list(APPEND SYCL_FLAGS "-fsycl-targets=${HECBENCH_SYCL_TARGET}")
 endif()
 
+if(DEFINED HECBENCH_SYCL_TARGET_BACKEND)
+    list(APPEND SYCL_FLAGS "-Xsycl-target-backend ${HECBENCH_SYCL_TARGET_BACKEND}")
+endif()
+
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(SYCL
     REQUIRED_VARS SYCL_COMPILER

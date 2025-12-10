@@ -52,12 +52,16 @@ cmake --build build/cuda-sm80 --parallel
 
 #### AMD GPUs (HIP)
 - `hip-gfx908` - MI100
-- `hip-gfx90a` - MI250X
+- `hip-gfx90a` - MI210, MI250X
 - `hip-gfx942` - MI300A/X
 
 #### SYCL
-- `sycl-cuda` - SYCL with CUDA backend
-- `sycl-hip` - SYCL with HIP backend
+- `sycl-cuda-sm70` - SYCL with CUDA backend targeting Volta
+- `sycl-cuda-sm80` - SYCL with CUDA backend targeting Ampere
+- `sycl-cuda-sm90` - SYCL with CUDA backend targeting Hopper
+- `sycl-hip-gfx908` - SYCL with HIP backend targeting MI100
+- `sycl-hip-gfx90a` - SYCL with HIP backend targeting MI210, MI250X
+- `sycl-hip-gfx942` - SYCL with HIP backend targeting MI300A/X
 - `sycl-cpu` - SYCL with CPU backend
 
 #### OpenMP
