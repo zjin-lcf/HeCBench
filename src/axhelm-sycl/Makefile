@@ -29,7 +29,7 @@ obj = main.o meshBasis.o
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -Ddfloat=float -Ddlong=int \
-          -std=c++17 -Wall -I../include -I../axhelm-cuda \
+          -std=c++17 -Wall -I../axhelm-cuda \
           -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
