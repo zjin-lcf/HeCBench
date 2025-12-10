@@ -103,7 +103,7 @@
       }
     },
     {
-      "name": "sycl-cuda",
+      "name": "sycl-cuda-sm70",
       "displayName": "SYCL with CUDA backend",
       "inherits": "default",
       "cacheVariables": {
@@ -112,11 +112,40 @@
         "HECBENCH_ENABLE_SYCL": "ON",
         "HECBENCH_ENABLE_OPENMP": "OFF",
         "HECBENCH_SYCL_TARGET": "nvptx64-nvidia-cuda",
+        "HECBENCH_SYCL_TARGET_BACKEND": "--cuda-gpu-arch=sm_70",
         "CMAKE_CXX_COMPILER": "icpx"
       }
     },
     {
-      "name": "sycl-hip",
+      "name": "sycl-cuda-sm80",
+      "displayName": "SYCL with CUDA backend",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "ON",
+        "HECBENCH_ENABLE_OPENMP": "OFF",
+        "HECBENCH_SYCL_TARGET": "nvptx64-nvidia-cuda",
+        "HECBENCH_SYCL_TARGET_BACKEND": "--cuda-gpu-arch=sm_80",
+        "CMAKE_CXX_COMPILER": "icpx"
+      }
+    },
+    {
+      "name": "sycl-cuda-sm90",
+      "displayName": "SYCL with CUDA backend",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "ON",
+        "HECBENCH_ENABLE_OPENMP": "OFF",
+        "HECBENCH_SYCL_TARGET": "nvptx64-nvidia-cuda",
+        "HECBENCH_SYCL_TARGET_BACKEND": "--cuda-gpu-arch=sm_90",
+        "CMAKE_CXX_COMPILER": "icpx"
+      }
+    },
+    {
+      "name": "sycl-hip-gfx908",
       "displayName": "SYCL with HIP backend",
       "inherits": "default",
       "cacheVariables": {
@@ -125,6 +154,35 @@
         "HECBENCH_ENABLE_SYCL": "ON",
         "HECBENCH_ENABLE_OPENMP": "OFF",
         "HECBENCH_SYCL_TARGET": "amdgcn-amd-amdhsa",
+        "HECBENCH_SYCL_TARGET_BACKEND": "--offload-arch=gfx908",
+        "CMAKE_CXX_COMPILER": "icpx"
+      }
+    },
+    {
+      "name": "sycl-hip-gfx90a",
+      "displayName": "SYCL with HIP backend",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "ON",
+        "HECBENCH_ENABLE_OPENMP": "OFF",
+        "HECBENCH_SYCL_TARGET": "amdgcn-amd-amdhsa",
+        "HECBENCH_SYCL_TARGET_BACKEND": "--offload-arch=gfx90a",
+        "CMAKE_CXX_COMPILER": "icpx"
+      }
+    },
+    {
+      "name": "sycl-hip-gfx942",
+      "displayName": "SYCL with HIP backend",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "ON",
+        "HECBENCH_ENABLE_OPENMP": "OFF",
+        "HECBENCH_SYCL_TARGET": "amdgcn-amd-amdhsa",
+        "HECBENCH_SYCL_TARGET_BACKEND": "--offload-arch=gfx942",
         "CMAKE_CXX_COMPILER": "icpx"
       }
     },
