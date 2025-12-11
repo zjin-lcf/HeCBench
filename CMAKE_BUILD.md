@@ -76,8 +76,8 @@ cmake --build build/cuda-sm80 --parallel
 ### Build a Single Benchmark (All Models)
 
 ```bash
-cmake --preset cuda-sm80
-cmake --build build/cuda-sm80 --target jacobi-all
+cmake --preset all-models
+cmake --build build/all-models --target jacobi-all
 ```
 
 This builds jacobi for all enabled models (if you used `all-models` preset).
@@ -86,6 +86,7 @@ This builds jacobi for all enabled models (if you used `all-models` preset).
 
 ```bash
 # Build only CUDA version of jacobi
+cmake --preset cuda-sm80
 cmake --build build/cuda-sm80 --target jacobi-cuda
 
 # Build only HIP version of attention
