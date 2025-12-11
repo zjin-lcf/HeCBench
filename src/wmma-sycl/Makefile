@@ -82,3 +82,4 @@ run: $(program)
 	$(LAUNCHER) ./$(program) 512 512 512 100 1
 	$(LAUNCHER) ./$(program) 1024 1024 1024 100 0
 	$(LAUNCHER) ./$(program) 4096 4096 4096 100 0
+	$(LAUNCHER) ./$(program) 8192 8192 8192 100 0
