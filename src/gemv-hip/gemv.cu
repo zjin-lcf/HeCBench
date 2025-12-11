@@ -24,12 +24,20 @@ SimpleTensor<__half> solve_gemv_int4_quantized_with_params(
   dim3 grid_dim(1, mat.height_ / block_dim_y);
   dim3 block_dim(block_dim_x, block_dim_y);
 
+  int WarpSize;
+  HIP_CHECK(hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0));
+
   HIP_CHECK(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; ++i) {
-    gemv_quantized_int4<<<grid_dim, block_dim>>>(
-      mat.data_, vec.data_, result.data_, vec.height_, scale,
-      zero_point, num_per_thread);
+    if (WarpSize == 64)
+      gemv_quantized_int4<64><<<grid_dim, block_dim>>>(
+        mat.data_, vec.data_, result.data_, vec.height_, scale,
+        zero_point, num_per_thread);
+    else
+      gemv_quantized_int4<32><<<grid_dim, block_dim>>>(
+        mat.data_, vec.data_, result.data_, vec.height_, scale,
+        zero_point, num_per_thread);
   }
   HIP_CHECK(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
@@ -55,13 +63,20 @@ SimpleTensor<__half> solve_gemv_int8_quantized_with_params(
   SimpleTensor<__half> result(vec.height_, 1);
   dim3 grid_dim(1, mat.height_ / block_dim_y);
   dim3 block_dim(block_dim_x, block_dim_y);
+  int WarpSize;
+  HIP_CHECK(hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0));
 
   HIP_CHECK(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; ++i) {
-    gemv_quantized_int8<<<grid_dim, block_dim>>>(
-      mat.data_, vec.data_, result.data_, mat.width_, scale,
-      zero_point, num_per_thread);
+    if (WarpSize == 64)
+      gemv_quantized_int8<64><<<grid_dim, block_dim>>>(
+        mat.data_, vec.data_, result.data_, mat.width_, scale,
+        zero_point, num_per_thread);
+    else
+      gemv_quantized_int8<32><<<grid_dim, block_dim>>>(
+        mat.data_, vec.data_, result.data_, mat.width_, scale,
+        zero_point, num_per_thread);
   }
   HIP_CHECK(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
@@ -86,12 +101,18 @@ SimpleTensor<__half> solve_gemv_with_params(
   SimpleTensor<__half> result(vec.height_, 1);
   dim3 grid_dim(1, mat.height_ / block_dim_y);
   dim3 block_dim(block_dim_x, block_dim_y);
+  int WarpSize;
+  HIP_CHECK(hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0));
 
   HIP_CHECK(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; ++i) {
-    gemv_fp16<<<grid_dim, block_dim>>>(
-      mat.data_, vec.data_, result.data_, mat.width_, num_per_thread);
+    if (WarpSize == 64)
+      gemv_fp16<64><<<grid_dim, block_dim>>>(
+        mat.data_, vec.data_, result.data_, mat.width_, num_per_thread);
+    else
+      gemv_fp16<32><<<grid_dim, block_dim>>>(
+        mat.data_, vec.data_, result.data_, mat.width_, num_per_thread);
   }
   HIP_CHECK(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();

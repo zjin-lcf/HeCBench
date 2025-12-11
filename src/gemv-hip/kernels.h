@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <stdio.h>
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
@@ -63,6 +62,7 @@ __device__ __forceinline__ float warpReduceSum(float sum,
 ///////////////////////////// NORMAL //////////////////////////////
 // thread_per_block = blockDim.x
 // blockDim.y <= SHARED_MEM_MAX_ROWS
+template <unsigned int WarpSize>
 __global__ void gemv_fp16(__half* mat, __half* vec, __half* res, unsigned int n,
                           unsigned int num_per_thread) {
   float sum = 0;
@@ -100,7 +100,7 @@ __global__ void gemv_fp16(__half* mat, __half* vec, __half* res, unsigned int n,
 
   sum = warpReduceSum(sum, blockDim.x);
 
-  if (blockDim.x <= warpSize) {
+  if (blockDim.x <= WarpSize) {
     if (tid == 0) {
       res[row] = __float2half(sum);
     }
@@ -108,17 +108,17 @@ __global__ void gemv_fp16(__half* mat, __half* vec, __half* res, unsigned int n,
   }
 
   // Shared mem for partial sums (one per warp in the block)
-  static __shared__ float warpLevelSums[SHARED_MEM_MAX_ROWS][warpSize];
-  const int laneId = threadIdx.x % warpSize;
-  const int warpId = threadIdx.x / warpSize;
+  static __shared__ float warpLevelSums[SHARED_MEM_MAX_ROWS][WarpSize];
+  const int laneId = threadIdx.x % WarpSize;
+  const int warpId = threadIdx.x / WarpSize;
   if (laneId == 0) warpLevelSums[threadIdx.y][warpId] = sum;
   __syncthreads();
   // read from shared memory only if that warp existed
-  sum = (threadIdx.x < blockDim.x / warpSize)
+  sum = (threadIdx.x < blockDim.x / WarpSize)
             ? warpLevelSums[threadIdx.y][laneId]
             : 0.0;
   // Final reduce using first warp
-  if (warpId == 0) sum = warpReduceSum(sum, blockDim.x / warpSize);
+  if (warpId == 0) sum = warpReduceSum(sum, blockDim.x / WarpSize);
   if (tid == 0) {
     res[row] = __float2half(sum);
   }
@@ -126,6 +126,7 @@ __global__ void gemv_fp16(__half* mat, __half* vec, __half* res, unsigned int n,
 
 ///////////////////////////// QUANTIZED-INT8 //////////////////////////////
 
+template <unsigned int WarpSize>
 __global__ void gemv_quantized_int8(int8_t* mat, __half* vec, __half* res,
                                     unsigned int n, __half scale, __half zero_point,
                                     unsigned int num_per_thread) {
@@ -177,7 +178,7 @@ __global__ void gemv_quantized_int8(int8_t* mat, __half* vec, __half* res,
 
   sum = warpReduceSum(sum, blockDim.x);
 
-  if (blockDim.x <= warpSize) {
+  if (blockDim.x <= WarpSize) {
     if (tid == 0) {
       res[row] = __float2half(sum);
     }
@@ -185,17 +186,17 @@ __global__ void gemv_quantized_int8(int8_t* mat, __half* vec, __half* res,
   }
 
   // Shared mem for partial sums (one per warp in the block)
-  static __shared__ float warpLevelSums[SHARED_MEM_MAX_ROWS][warpSize];
-  const int laneId = threadIdx.x % warpSize;
-  const int warpId = threadIdx.x / warpSize;
+  static __shared__ float warpLevelSums[SHARED_MEM_MAX_ROWS][WarpSize];
+  const int laneId = threadIdx.x % WarpSize;
+  const int warpId = threadIdx.x / WarpSize;
   if (laneId == 0) warpLevelSums[threadIdx.y][warpId] = sum;
   __syncthreads();
   // read from shared memory only if that warp existed
-  sum = (threadIdx.x < blockDim.x / warpSize)
+  sum = (threadIdx.x < blockDim.x / WarpSize)
             ? warpLevelSums[threadIdx.y][laneId]
             : 0.0;
   // Final reduce using first warp
-  if (warpId == 0) sum = warpReduceSum(sum, blockDim.x / warpSize);
+  if (warpId == 0) sum = warpReduceSum(sum, blockDim.x / WarpSize);
   if (tid == 0) {
     res[row] = __float2half(sum);
   }
@@ -204,6 +205,7 @@ __global__ void gemv_quantized_int8(int8_t* mat, __half* vec, __half* res,
 ///////////////////////////// QUANTIZED-INT4 //////////////////////////////
 
 // based on previous experiments, num_per_thread can >= 16
+template <unsigned int WarpSize>
 __global__ void gemv_quantized_int4(uint4_2* mat, __half* vec, __half* res,
                                     unsigned int n, __half scale, __half zero_point,
                                     unsigned int num_per_thread) {
@@ -283,7 +285,7 @@ __global__ void gemv_quantized_int4(uint4_2* mat, __half* vec, __half* res,
 
   sum = warpReduceSum(sum, blockDim.x);
 
-  if (blockDim.x <= warpSize) {
+  if (blockDim.x <= WarpSize) {
     if (tid == 0) {
       res[row] = __float2half(sum);
     }
@@ -291,17 +293,17 @@ __global__ void gemv_quantized_int4(uint4_2* mat, __half* vec, __half* res,
   }
 
   // Shared mem for partial sums (one per warp in the block)
-  static __shared__ float warpLevelSums[SHARED_MEM_MAX_ROWS][warpSize];
-  const int laneId = threadIdx.x % warpSize;
-  const int warpId = threadIdx.x / warpSize;
+  static __shared__ float warpLevelSums[SHARED_MEM_MAX_ROWS][WarpSize];
+  const int laneId = threadIdx.x % WarpSize;
+  const int warpId = threadIdx.x / WarpSize;
   if (laneId == 0) warpLevelSums[threadIdx.y][warpId] = sum;
   __syncthreads();
   // read from shared memory only if that warp existed
-  sum = (threadIdx.x < blockDim.x / warpSize)
+  sum = (threadIdx.x < blockDim.x / WarpSize)
             ? warpLevelSums[threadIdx.y][laneId]
             : 0.0;
   // Final reduce using first warp
-  if (warpId == 0) sum = warpReduceSum(sum, blockDim.x / warpSize);
+  if (warpId == 0) sum = warpReduceSum(sum, blockDim.x / WarpSize);
   if (tid == 0) {
     res[row] = __float2half(sum);
   }
