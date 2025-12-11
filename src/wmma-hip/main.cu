@@ -69,20 +69,15 @@ const int WMMA_M = 16;
 const int WMMA_N = 16;
 
 // : multiples of 16.
-const int WMMA_K = 16;
-
-// Device warp size
-const uint32_t WAVE_SIZE = warpSize;
+const int WMMA_K = 32;
 
 // Thread block
-// : T_BLOCK_X must be multiple of WAVE_SIZE.
+// : T_BLOCK_X must be multiple of warpSize.
 // Note: Each wave will compute one BLOCK_M x BLOCK_N output block
 // Note: A workgroup will compute
-//  T_BLOCK_X / WAVE_SIZE x T_BLOCK_Y output blocks
+//  T_BLOCK_X / warpSize x T_BLOCK_Y output blocks
 const int NUM_WAVES_X = 4;
 const int NUM_WAVES_Y = 4;
-const int T_BLOCK_X = NUM_WAVES_X * WAVE_SIZE;
-const int T_BLOCK_Y = NUM_WAVES_Y;
 
 // The following device kernel is a naive implementation
 // of blocked GEMM. Each wave will compute one BLOCK_M x BLOCK_N
@@ -97,6 +92,7 @@ const int T_BLOCK_Y = NUM_WAVES_Y;
 // : No LDS required
 //
 // Note: demonstrate API usage in context of wave-level GEMM computation, and is not optimized.
+template <unsigned int WarpSize>
 __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
                      fp16 const *__restrict__ a,
                      fp16 const *__restrict__ b,
@@ -115,7 +111,7 @@ __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
   rocwmma::fill_fragment(fragAcc, 0.0f);
 
   // Tile using a 2D grid
-  auto majorWarp = (blockIdx.x * blockDim.x + threadIdx.x) / WAVE_SIZE;
+  auto majorWarp = (blockIdx.x * blockDim.x + threadIdx.x) / WarpSize;
   auto minorWarp = (blockIdx.y * blockDim.y + threadIdx.y);
 
   // Target C block
@@ -202,6 +198,10 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32 alpha,
   CHECK_HIP_ERROR(
       hipMemcpy(d_d, matrixD.data(), bytesD, hipMemcpyHostToDevice));
 
+  int WarpSize;
+  CHECK_HIP_ERROR(hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0));
+  const int T_BLOCK_X = NUM_WAVES_X * WarpSize;
+  const int T_BLOCK_Y = NUM_WAVES_Y;
   auto blockDim = dim3(T_BLOCK_X, T_BLOCK_Y);
   auto gridDim = dim3((m + WMMA_M * NUM_WAVES_X - 1) / (WMMA_M * NUM_WAVES_X),
                       (n + WMMA_N * NUM_WAVES_Y - 1) / (WMMA_N * NUM_WAVES_Y));
@@ -218,8 +218,12 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32 alpha,
       start = std::chrono::steady_clock::now();
     }
 
-    gemm<<<gridDim, blockDim, 0, 0>>>(m, n, k, d_a, d_b, d_c, d_d, lda, ldb,
-                                      ldc, ldd, alpha, beta);
+    if (WarpSize == 64)
+       gemm<64><<<gridDim, blockDim, 0, 0>>>(
+         m, n, k, d_a, d_b, d_c, d_d, lda, ldb, ldc, ldd, alpha, beta);
+    else
+       gemm<32><<<gridDim, blockDim, 0, 0>>>(
+         m, n, k, d_a, d_b, d_c, d_d, lda, ldb, ldc, ldd, alpha, beta);
 
     if (w == repeat) {
       CHECK_HIP_ERROR(hipDeviceSynchronize()); // throughput
