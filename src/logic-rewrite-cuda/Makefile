@@ -53,7 +53,7 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) *.aig
 
 run: $(program)
 	$(LAUNCHER) ./$(program) -c "read ./benchmarks/arithmetic/hyp.aig; resyn2; write hyp_resyn2.aig"
