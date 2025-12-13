@@ -4,7 +4,7 @@
 #include <omp.h>
 
 // threads per block
-#define BS 256
+#define BLOCK_SIZE 256
 
 #include "kernel.h"
 #include "reference.h"
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
 
   const int n = atoi(argv[1]);
   const int repeat = atoi(argv[2]);
-  const int m = (n + BS - 1) / BS; // number of groups
+  const int m = (n + BLOCK_SIZE - 1) / BLOCK_SIZE; // number of groups
 
   int *nlist = (int*) malloc (sizeof(int) * n);
   int *family = (int*) malloc (sizeof(int) * m);
@@ -40,8 +40,8 @@ int main(int argc, char* argv[]) {
 
   for (int i = 0; i < m; i++) {
     int s = 0;
-    for (int j = 0; j < BS; j++) {
-      s += (nlist[i*BS+j] != -1) ? 1 : 0;
+    for (int j = 0; j < BLOCK_SIZE; j++) {
+      s += (nlist[i*BLOCK_SIZE+j] != -1) ? 1 : 0;
     }
     // non-zero values
     family[i] = s + 1 + s * LCG_random_double(&seed);
@@ -60,7 +60,22 @@ int main(int argc, char* argv[]) {
     printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
   }
 
-  validate(BS, m, n, nlist, family, n_neigh, damage);
+  validate(BLOCK_SIZE, m, n, nlist, family, n_neigh, damage);
+
+  #pragma omp target data map(to: nlist[0:n], family[0:m]) \
+                          map(from: n_neigh[0:m], damage[0:m])
+  {
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < repeat; i++)
+      damage_of_node_optimized (m, n, nlist, family, n_neigh, damage);
+
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+  }
+
+  validate(BLOCK_SIZE, m, n, nlist, family, n_neigh, damage);
 
   free(nlist);
   free(family);
