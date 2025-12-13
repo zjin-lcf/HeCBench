@@ -14,13 +14,13 @@ void damage_of_node(
         int *__restrict n_neigh,
      double *__restrict damage)
 {
-  #pragma omp target teams num_teams((n+BS-1)/BS) thread_limit(BS)
+  #pragma omp target teams num_teams((n+BLOCK_SIZE-1)/BLOCK_SIZE) thread_limit(BLOCK_SIZE)
   {
-    int local_cache[BS];
+    int local_cache[BLOCK_SIZE];
     #pragma omp parallel
     {
       const int local_id = omp_get_thread_num();
-      const int local_size = BS;
+      const int local_size = BLOCK_SIZE;
       const int nid = omp_get_team_num();
       const int global_id = nid * local_size + local_id;
       if (global_id < n)
@@ -47,5 +47,28 @@ void damage_of_node(
         damage[nid] = 1.0 - (double) neighbours / (double) (family[nid]);
       }
     }
+  }
+}
+
+void damage_of_node_optimized(
+  const int m,
+  const int n,
+  const int *__restrict nlist,
+  const int *__restrict family,
+        int *__restrict n_neigh,
+     double *__restrict damage)
+{
+  #pragma omp target teams distribute num_teams(m) 
+  for (int nid = 0; nid < m; nid++) {
+    int lb = nid * BLOCK_SIZE;
+    int ub = (lb + BLOCK_SIZE < n) ? lb + BLOCK_SIZE : n;
+
+    int sum = 0;
+    #pragma omp parallel for reduction(+:sum) num_threads(BLOCK_SIZE)
+    for (int i = lb; i < ub; i++)
+      sum += nlist[i] != -1 ? 1 : 0;
+
+    n_neigh[nid] = sum;
+    damage[nid] = 1.0 - (double) sum / (double) (family[nid]);
   }
 }

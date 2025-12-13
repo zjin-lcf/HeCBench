@@ -2,11 +2,12 @@
 #include <stdio.h>
 #include <cuda.h>
 #include <chrono>
-#include "kernel.h"
 #include "reference.h"
 
 // threads per block
-#define BS 256
+#define BLOCK_SIZE 256
+
+#include "kernel.h"
 
 double LCG_random_double(uint64_t * seed)
 {
@@ -25,7 +26,7 @@ int main(int argc, char* argv[]) {
 
   const int n = atoi(argv[1]);
   const int repeat = atoi(argv[2]);
-  const int m = (n + BS - 1) / BS; // number of groups
+  const int m = (n + BLOCK_SIZE - 1) / BLOCK_SIZE; // number of groups
 
   int *nlist = (int*) malloc (sizeof(int) * n);
   int *family = (int*) malloc (sizeof(int) * m);
@@ -38,8 +39,8 @@ int main(int argc, char* argv[]) {
 
   for (int i = 0; i < m; i++) {
     int s = 0;
-    for (int j = 0; j < BS; j++) {
-      s += (nlist[i*BS+j] != -1) ? 1 : 0;
+    for (int j = 0; j < BLOCK_SIZE; j++) {
+      s += (nlist[i*BLOCK_SIZE+j] != -1) ? 1 : 0;
     }
     // non-zero values
     family[i] = s + 1 + s * LCG_random_double(&seed);
@@ -59,14 +60,14 @@ int main(int argc, char* argv[]) {
   double *d_damage;
   cudaMalloc((void**)&d_damage, sizeof(double)*m);
 
-  dim3 blocks (BS);
+  dim3 blocks (BLOCK_SIZE);
   dim3 grids (m);
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++)
-    damage_of_node <<< grids, blocks, BS*sizeof(int) >>> (
+    damage_of_node <<< grids, blocks, BLOCK_SIZE*sizeof(int) >>> (
       n, d_nlist, d_family, d_n_neigh, d_damage);
 
   cudaDeviceSynchronize();
@@ -77,7 +78,23 @@ int main(int argc, char* argv[]) {
   cudaMemcpy(n_neigh, d_n_neigh, sizeof(int)*m, cudaMemcpyDeviceToHost);
   cudaMemcpy(damage, d_damage, sizeof(double)*m, cudaMemcpyDeviceToHost);
 
-  validate(BS, m, n, nlist, family, n_neigh, damage);
+  validate(BLOCK_SIZE, m, n, nlist, family, n_neigh, damage);
+
+  start = std::chrono::steady_clock::now();
+
+  for (int i = 0; i < repeat; i++)
+    damage_of_node_optimized <<< grids, blocks >>> (
+      n, d_nlist, d_family, d_n_neigh, d_damage);
+
+  cudaDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
+
+  cudaMemcpy(n_neigh, d_n_neigh, sizeof(int)*m, cudaMemcpyDeviceToHost);
+  cudaMemcpy(damage, d_damage, sizeof(double)*m, cudaMemcpyDeviceToHost);
+
+  validate(BLOCK_SIZE, m, n, nlist, family, n_neigh, damage);
 
   cudaFree(d_nlist);
   cudaFree(d_family);

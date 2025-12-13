@@ -46,3 +46,27 @@ void damage_of_node(
     damage[nid] = 1.0 - (double) neighbours / (double) (family[nid]);
   }
 }
+
+void damage_of_node_optimized(
+  sycl::nd_item<1> &item,
+  const int n,
+  const int *__restrict nlist,
+  const int *__restrict family,
+        int *__restrict n_neigh,
+     double *__restrict damage)
+{
+  const int global_id = item.get_global_id(0);
+  const int local_id = item.get_local_id(0);
+
+  int thread_data = (global_id < n && nlist[global_id] != -1) ? 1 : 0;
+
+  int sum = sycl::reduce_over_group(item.get_group(), thread_data, sycl::plus<int>());
+
+  if (local_id == 0) {
+    //Get the reduced damages
+    int nid = item.get_group(0);
+    // Update damage and n_neigh
+    n_neigh[nid] = sum;
+    damage[nid] = 1.0 - (double) sum / (double) (family[nid]);
+  }
+}

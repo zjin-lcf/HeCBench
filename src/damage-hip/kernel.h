@@ -1,4 +1,4 @@
-#include <cub/cub.cuh>
+#include <hipcub/hipcub.hpp>
 
 /* Calculate the damage of each node.
  *
@@ -55,7 +55,7 @@ __global__ void damage_of_node_optimized(
         int *__restrict__ n_neigh,
      double *__restrict__ damage)
 {
-  using BlockReduce = cub::BlockReduce<int, BLOCK_SIZE>;
+  using BlockReduce = hipcub::BlockReduce<int, BLOCK_SIZE>;
   __shared__ typename BlockReduce::TempStorage temp_storage;
   const int local_id = threadIdx.x;
   const int nid = blockIdx.x;
