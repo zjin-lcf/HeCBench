@@ -17,19 +17,22 @@ void zoom_in_kernel(
   // H -> block Y, row
   // W -> block X, col
   int out_start_h = blockIdx.y * blockDim.y;
-  int out_end_h   = (blockIdx.y + 1) * blockDim.y - 1;
+  int out_end_h   = out_start_h + blockDim.y;
   int out_start_w = blockIdx.x * blockDim.x;
-  int out_end_w   = (blockIdx.x + 1) * blockDim.x - 1;
+  int out_end_w   = out_start_w + blockDim.x;
 
   int img_start_offset = blockIdx.z * pitch;
 
+  float ratio_h = (float)input_h / output_h;
+  float ratio_w = (float)input_w / output_w;
+
   // ideally should go in unified register
-  int smem_load_h_start = floorf((out_start_h * input_h) / (float)output_h);
-  int smem_load_h_end = ceilf(((out_end_h+1) * input_h) / (float)output_h);
+  int smem_load_h_start = floorf(out_start_h * ratio_h);
+  int smem_load_h_end = ceilf(out_end_h * ratio_h);
   int smem_h_load_stretch = smem_load_h_end - smem_load_h_start;
 
-  int smem_load_w_start = floorf((out_start_w * input_w) / (float)output_w);
-  int smem_load_w_end = ceilf(((out_end_w+1) * input_w) / (float)output_w);
+  int smem_load_w_start = floorf(out_start_w * ratio_w);
+  int smem_load_w_end = ceilf(out_end_w * ratio_w);
   int smem_w_load_stretch = smem_load_w_end - smem_load_w_start;
 
   for (int i = threadIdx.y; i < smem_h_load_stretch; i+=blockDim.y) {
@@ -48,19 +51,19 @@ void zoom_in_kernel(
   }
   __syncthreads();
 
-  int out_pixel_h = blockIdx.y * blockDim.y + threadIdx.y;
-  int out_pixel_w = blockIdx.x * blockDim.x + threadIdx.x;
+  int out_pixel_h = out_start_h + threadIdx.y;
+  int out_pixel_w = out_start_w + threadIdx.x;
 
   if (out_pixel_h < output_h && out_pixel_w < output_w
       && out_pixel_h >= out_h_start && out_pixel_h < out_h_end
       && out_pixel_w >= out_w_start && out_pixel_w < out_w_end) {
 
     // compute pixels oh, ow span
-    int start_h = floorf((out_pixel_h * input_h) / (float)output_h);
-    int end_h = ceilf(((out_pixel_h+1) * input_h) / (float)output_h);
+    int start_h = floorf(out_pixel_h * ratio_h);
+    int end_h = ceilf((out_pixel_h+1) * ratio_h);
 
-    int start_w = floorf((out_pixel_w * input_w) / (float)output_w);
-    int end_w = ceilf(((out_pixel_w+1) * input_w) / (float)output_w);
+    int start_w = floorf(out_pixel_w * ratio_w);
+    int end_w = ceilf((out_pixel_w+1) * ratio_w);
 
     int del_h = end_h - start_h;
     int del_w = end_w - start_w;
@@ -74,12 +77,10 @@ void zoom_in_kernel(
         sum_ += staging_tile[smem_row * smem_w_load_stretch + smem_col];
       }
     }
-    sum_ /= (float)del_h;
-    sum_ /= (float)del_w;
 
     output_tensor[(blockIdx.z * pitch) +
       ((out_pixel_h - out_h_start) * input_w) +
-      (out_pixel_w - out_w_start)] = sum_;
+      (out_pixel_w - out_w_start)] = sum_ / (del_h * del_w);
   }
 }
 
@@ -95,19 +96,22 @@ void zoom_out_kernel(
   // H -> block Y, row
   // W -> block X, col
   int out_start_h = blockIdx.y * blockDim.y;
-  int out_end_h   = (blockIdx.y + 1) * blockDim.y - 1;
+  int out_end_h   = out_start_h + blockDim.y;
   int out_start_w = blockIdx.x * blockDim.x;
-  int out_end_w   = (blockIdx.x + 1) * blockDim.x - 1;
+  int out_end_w   = out_start_w + blockDim.x;
 
   int img_start_offset = blockIdx.z * pitch;
 
+  float ratio_h = (float)input_h / output_h;
+  float ratio_w = (float)input_w / output_w;
+
   // ideally should go in unified register
-  int smem_load_h_start = floorf((out_start_h * input_h) / (float)output_h);
-  int smem_load_h_end = ceilf(((out_end_h+1) * input_h) / (float)output_h);
+  int smem_load_h_start = floorf(out_start_h * ratio_h);
+  int smem_load_h_end = ceilf(out_end_h * ratio_h);
   int smem_h_load_stretch = smem_load_h_end - smem_load_h_start;
 
-  int smem_load_w_start = floorf((out_start_w * input_w) / (float)output_w);
-  int smem_load_w_end = ceilf(((out_end_w+1) * input_w) / (float)output_w);
+  int smem_load_w_start = floorf(out_start_w * ratio_w);
+  int smem_load_w_end = ceilf(out_end_w * ratio_w);
   int smem_w_load_stretch = smem_load_w_end - smem_load_w_start;
 
   for (int i = threadIdx.y; i < smem_h_load_stretch; i+=blockDim.y) {
@@ -126,17 +130,17 @@ void zoom_out_kernel(
   }
   __syncthreads();
 
-  int out_pixel_h = blockIdx.y * blockDim.y + threadIdx.y;
-  int out_pixel_w = blockIdx.x * blockDim.x + threadIdx.x;
+  int out_pixel_h = out_start_h + threadIdx.y;
+  int out_pixel_w = out_start_w + threadIdx.x;
 
   if (out_pixel_h < output_h && out_pixel_w < output_w) {
 
     // compute pixels oh, ow span
-    int start_h = floorf((out_pixel_h * input_h) / (float)output_h);
-    int end_h = ceilf(((out_pixel_h+1) * input_h) / (float)output_h);
+    int start_h = floorf(out_pixel_h * ratio_h);
+    int end_h = ceilf((out_pixel_h+1) * ratio_h);
 
-    int start_w = floorf((out_pixel_w * input_w) / (float)output_w);
-    int end_w = ceilf(((out_pixel_w+1) * input_w) / (float)output_w);
+    int start_w = floorf(out_pixel_w * ratio_w);
+    int end_w = ceilf((out_pixel_w+1) * ratio_w);
 
     int del_h = end_h - start_h;
     int del_w = end_w - start_w;
@@ -150,12 +154,10 @@ void zoom_out_kernel(
         sum_ += staging_tile[smem_row * smem_w_load_stretch + smem_col];
       }
     }
-    sum_ /= (float)del_h;
-    sum_ /= (float)del_w;
 
     output_tensor[(blockIdx.z * pitch) +
       ((out_pixel_h + out_h_start) * input_w) +
-      (out_pixel_w + out_w_start)] = sum_;
+      (out_pixel_w + out_w_start)] = sum_ / (del_h * del_w);
   }
 }
 
