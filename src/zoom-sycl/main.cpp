@@ -16,19 +16,22 @@ void zoom_in_kernel(
   // H -> block Y, row
   // W -> block X, col
   int out_start_h = item.get_group(1) * item.get_local_range(1);
-  int out_end_h = (item.get_group(1) + 1) * item.get_local_range(1) - 1;
+  int out_end_h = out_start_h + item.get_local_range(1);
   int out_start_w = item.get_group(2) * item.get_local_range(2);
-  int out_end_w = (item.get_group(2) + 1) * item.get_local_range(2) - 1;
+  int out_end_w = out_start_w + item.get_local_range(2);
 
   int img_start_offset = item.get_group(0) * pitch;
 
+  float ratio_h = (float)input_h / output_h;
+  float ratio_w = (float)input_w / output_w;
+
   // ideally should go in unified register
-  int smem_load_h_start = sycl::floor((out_start_h * input_h) / (float)output_h);
-  int smem_load_h_end = sycl::ceil(((out_end_h + 1) * input_h) / (float)output_h);
+  int smem_load_h_start = sycl::floor(out_start_h * ratio_h);
+  int smem_load_h_end = sycl::ceil(out_end_h * ratio_h);
   int smem_h_load_stretch = smem_load_h_end - smem_load_h_start;
 
-  int smem_load_w_start = sycl::floor((out_start_w * input_w) / (float)output_w);
-  int smem_load_w_end = sycl::ceil(((out_end_w + 1) * input_w) / (float)output_w);
+  int smem_load_w_start = sycl::floor(out_start_w * ratio_w);
+  int smem_load_w_end = sycl::ceil(out_end_w * ratio_w);
   int smem_w_load_stretch = smem_load_w_end - smem_load_w_start;
 
   for (int i = item.get_local_id(1); i < smem_h_load_stretch;
@@ -50,19 +53,19 @@ void zoom_in_kernel(
 
   item.barrier(sycl::access::fence_space::local_space);
 
-  int out_pixel_h = item.get_global_id(1);
-  int out_pixel_w = item.get_global_id(2);
+  int out_pixel_h = out_start_h + item.get_local_id(1);
+  int out_pixel_w = out_start_w + item.get_local_id(2);
 
   if (out_pixel_h < output_h && out_pixel_w < output_w
       && out_pixel_h >= out_h_start && out_pixel_h < out_h_end
       && out_pixel_w >= out_w_start && out_pixel_w < out_w_end) {
 
     // compute pixels oh, ow span
-    int start_h = sycl::floor((out_pixel_h * input_h) / (float)output_h);
-    int end_h = sycl::ceil(((out_pixel_h + 1) * input_h) / (float)output_h);
+    int start_h = sycl::floor(out_pixel_h * ratio_h);
+    int end_h = sycl::ceil((out_pixel_h+1) * ratio_h);
 
-    int start_w = sycl::floor((out_pixel_w * input_w) / (float)output_w);
-    int end_w = sycl::ceil(((out_pixel_w + 1) * input_w) / (float)output_w);
+    int start_w = sycl::floor(out_pixel_w * ratio_w);
+    int end_w = sycl::ceil((out_pixel_w+1) * ratio_w);
 
     int del_h = end_h - start_h;
     int del_w = end_w - start_w;
@@ -76,12 +79,10 @@ void zoom_in_kernel(
         sum_ += staging_tile[smem_row * smem_w_load_stretch + smem_col];
       }
     }
-    sum_ /= (float)del_h;
-    sum_ /= (float)del_w;
 
     output_tensor[(item.get_group(0) * pitch) +
                   ((out_pixel_h - out_h_start) * input_w) +
-                  (out_pixel_w - out_w_start)] = sum_;
+                  (out_pixel_w - out_w_start)] = sum_ / (del_h * del_w);
   }
 }
 
@@ -97,19 +98,22 @@ void zoom_out_kernel(
   // H -> block Y, row
   // W -> block X, col
   int out_start_h = item.get_group(1) * item.get_local_range(1);
-  int out_end_h = (item.get_group(1) + 1) * item.get_local_range(1) - 1;
+  int out_end_h = out_start_h + item.get_local_range(1);
   int out_start_w = item.get_group(2) * item.get_local_range(2);
-  int out_end_w = (item.get_group(2) + 1) * item.get_local_range(2) - 1;
+  int out_end_w = out_start_w + item.get_local_range(2);
 
   int img_start_offset = item.get_group(0) * pitch;
 
+  float ratio_h = (float)input_h / output_h;
+  float ratio_w = (float)input_w / output_w;
+
   // ideally should go in unified register
-  int smem_load_h_start = sycl::floor((out_start_h * input_h) / (float)output_h);
-  int smem_load_h_end = sycl::ceil(((out_end_h + 1) * input_h) / (float)output_h);
+  int smem_load_h_start = sycl::floor(out_start_h * ratio_h);
+  int smem_load_h_end = sycl::ceil(out_end_h * ratio_h);
   int smem_h_load_stretch = smem_load_h_end - smem_load_h_start;
 
-  int smem_load_w_start = sycl::floor((out_start_w * input_w) / (float)output_w);
-  int smem_load_w_end = sycl::ceil(((out_end_w + 1) * input_w) / (float)output_w);
+  int smem_load_w_start = sycl::floor(out_start_w * ratio_w);
+  int smem_load_w_end = sycl::ceil(out_end_w * ratio_w);
   int smem_w_load_stretch = smem_load_w_end - smem_load_w_start;
 
   for (int i = item.get_local_id(1); i < smem_h_load_stretch;
@@ -131,17 +135,17 @@ void zoom_out_kernel(
 
   item.barrier(sycl::access::fence_space::local_space);
 
-  int out_pixel_h = item.get_global_id(1);
-  int out_pixel_w = item.get_global_id(2);
+  int out_pixel_h = out_start_h + item.get_local_id(1);
+  int out_pixel_w = out_start_w + item.get_local_id(2);
 
   if (out_pixel_h < output_h && out_pixel_w < output_w) {
 
     // compute pixels oh, ow span
-    int start_h = sycl::floor((out_pixel_h * input_h) / (float)output_h);
-    int end_h = sycl::ceil(((out_pixel_h + 1) * input_h) / (float)output_h);
+    int start_h = sycl::floor(out_pixel_h * ratio_h);
+    int end_h = sycl::ceil((out_pixel_h+1) * ratio_h);
 
-    int start_w = sycl::floor((out_pixel_w * input_w) / (float)output_w);
-    int end_w = sycl::ceil(((out_pixel_w + 1) * input_w) / (float)output_w);
+    int start_w = sycl::floor(out_pixel_w * ratio_w);
+    int end_w = sycl::ceil((out_pixel_w+1) * ratio_w);
 
     int del_h = end_h - start_h;
     int del_w = end_w - start_w;
@@ -155,12 +159,10 @@ void zoom_out_kernel(
         sum_ += staging_tile[smem_row * smem_w_load_stretch + smem_col];
       }
     }
-    sum_ /= (float)del_h;
-    sum_ /= (float)del_w;
 
     output_tensor[(item.get_group(0) * pitch) +
                   ((out_pixel_h + out_h_start) * input_w) +
-                  (out_pixel_w + out_w_start)] = sum_;
+                  (out_pixel_w + out_w_start)] = sum_ / (del_h * del_w);
   }
 }
 
@@ -349,7 +351,8 @@ void zoom (sycl::queue &q, int repeat, int input_sizes[4], float zoom_factor[2])
         auto o_w_end = slice_dims[1][1];
 
         cgh.parallel_for(sycl::nd_range<3>(grid * block, block), [=](sycl::nd_item<3> item) {
-          zoom_in_kernel(item, sm.get_pointer(), d_input_img, d_output_img, H, W,
+          zoom_in_kernel(item, sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                         d_input_img, d_output_img, H, W,
                          o_h, o_w, pitch, o_h_start, o_h_end, o_w_start, o_w_end);
         });
       });
@@ -366,7 +369,8 @@ void zoom (sycl::queue &q, int repeat, int input_sizes[4], float zoom_factor[2])
         auto o_w_end = pad_dims[1][1];
 
         cgh.parallel_for(sycl::nd_range<3>(grid * block, block), [=](sycl::nd_item<3> item) {
-          zoom_out_kernel(item, sm.get_pointer(), d_input_img, d_output_img, H, W,
+          zoom_out_kernel(item, sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          d_input_img, d_output_img, H, W,
                           o_h, o_w, pitch, o_h_start, o_h_end, o_w_start, o_w_end);
         });
       });
