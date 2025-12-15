@@ -42,7 +42,7 @@ using namespace nvcuda;
 #ifndef CHECK_CUDA_ERROR
 #define CHECK_CUDA_ERROR(status)                                               \
   if (status != cudaSuccess) {                                                 \
-    fprintf(stderr, "cuda error: '%s'(%d) at %s:%d\n",                         \
+    fprintf(stderr, "CUDA error: '%s'(%d) at %s:%d\n",                         \
             cudaGetErrorString(status), status, __FILE__, __LINE__);           \
     exit(EXIT_FAILURE);                                                        \
   }
@@ -64,28 +64,22 @@ __host__ static inline void fill(DataT *mat, uint32_t m, uint32_t n) {
   }
 }
 
-// : 16 x 16
+// Fragment size
 const int WMMA_M = 16;
 const int WMMA_N = 16;
 
-// : multiples of 16.
+// multiples of 16
 const int WMMA_K = 16;
 
 // Device warp size
 const uint32_t WAVE_SIZE = 32;
 
-// Thread block
-// : T_BLOCK_X must be multiple of WAVE_SIZE.
-// Note: Each wave will compute one BLOCK_M x BLOCK_N output block
-// Note: A workgroup will compute T_BLOCK_X / WAVE_SIZE x T_BLOCK_Y output blocks
-const int NUM_WAVES_X = 4;
-const int NUM_WAVES_Y = 4;
-const int T_BLOCK_X = NUM_WAVES_X * WAVE_SIZE;
-const int T_BLOCK_Y = NUM_WAVES_Y;
+// Tile size
+const int TILE_M = 64;
+const int TILE_N = 64;
 
-// The following device kernel is a naive implementation
-// of blocked GEMM. Each wave will compute one BLOCK_M x BLOCK_N
-// output block of the M x N x K GEMM, generalized as:
+
+// This kernel assumes that each thread block has warpSize threads
 // D = alpha * (A x B) + beta * C
 //
 // In this example, we assume:
@@ -94,15 +88,13 @@ const int T_BLOCK_Y = NUM_WAVES_Y;
 // : C, D are in row-major format (M x N)
 // : Multiplication is NOT in-place, output is written to D matrix
 // : No LDS required
-//
-// Note: demonstrate API usage in context of wave-level GEMM computation, and is not optimized.
-__global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
-                     fp16 const *__restrict__ a,
-                     fp16 const *__restrict__ b,
-                     fp32 const *c,
-                     fp32 *d, const uint32_t lda, const uint32_t ldb,
-                     const uint32_t ldc, const uint32_t ldd,
-                     const fp32 alpha, const fp32 beta) {
+__global__ void gemm_impl0(const uint32_t m, const uint32_t n, const uint32_t k,
+                           fp16 const *__restrict__ a,
+                           fp16 const *__restrict__ b,
+                           fp32 const *c,
+                           fp32 *d, const uint32_t lda, const uint32_t ldb,
+                           const uint32_t ldc, const uint32_t ldd,
+                           const fp32 alpha, const fp32 beta) {
   // Create frags
   auto fragA = wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, fp16,
                               wmma::row_major>();
@@ -113,47 +105,105 @@ __global__ void gemm(const uint32_t m, const uint32_t n, const uint32_t k,
 
   wmma::fill_fragment(fragAcc, 0.0f);
 
-  // Tile using a 2D grid
-  auto majorWarp = (blockIdx.x * blockDim.x + threadIdx.x) / WAVE_SIZE;
-  auto minorWarp = (blockIdx.y * blockDim.y + threadIdx.y);
+  auto cRow = blockIdx.x * WMMA_M;
+  auto cCol = blockIdx.y * WMMA_N;
 
-  // Target C block
-  auto cRow = majorWarp * WMMA_M;
-  auto cCol = minorWarp * WMMA_N;
+  // Load the inputs
+  for (int n = 0; n < k; n += WMMA_K) {
+    // Because the mapping of elements to threads in a warp is opaque,
+    // each thread just passes the address of the first element
+    wmma::load_matrix_sync(fragA, a + cRow * lda + n, lda);
+    wmma::load_matrix_sync(fragB, b + cCol * ldb + n, ldb);
 
-  // Bounds check
-  if (cRow < m && cCol < n) {
-    for (int i = 0; i < k; i += WMMA_K) {
-      // Load the inputs
-      wmma::load_matrix_sync(fragA, a + (cRow * lda + i), lda);
-      wmma::load_matrix_sync(fragB, b + (cCol * ldb + i), ldb);
-
-      // Matrix multiply - accumulate using MFMA units
-      wmma::mma_sync(fragAcc, fragA, fragB, fragAcc);
-    }
+    // Matrix multiply - accumulate using MFMA units
+    wmma::mma_sync(fragAcc, fragA, fragB, fragAcc);
 
     // Fetch C matrix
-    wmma::load_matrix_sync(fragC, c + (cRow * ldc + cCol), ldc,
-                           wmma::mem_row_major);
+    wmma::load_matrix_sync(fragC, c + cRow * ldc + cCol, ldc, wmma::mem_row_major);
 
     // D = alpha * A x B + beta * C
     for (int i = 0; i < fragC.num_elements; ++i) {
       fragC.x[i] = alpha * fragAcc.x[i] + beta * fragC.x[i];
     }
-
-    // Store to D
-    wmma::store_matrix_sync(d + (cRow * ldd + cCol), fragC, ldd,
-                            wmma::mem_row_major);
   }
+
+  // Store to D (by a single wave)
+  wmma::store_matrix_sync(d + cRow * ldd + cCol, fragC, ldd, wmma::mem_row_major);
 }
 
-__host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32 alpha,
+// D = alpha * (A x B) + beta * C
+//
+// In this example, we assume:
+// : A is in row-major format     (M x K)
+// : B is in col-major format     (K x N)
+// : C, D are in row-major format (M x N)
+// : Multiplication is NOT in-place, output is written to D matrix
+// : No LDS required
+//
+__global__ void gemm_impl1(const uint32_t m, const uint32_t n, const uint32_t k,
+                           fp16 const *__restrict__ a,
+                           fp16 const *__restrict__ b,
+                           fp32 const *c,
+                           fp32 *d, const uint32_t lda, const uint32_t ldb,
+                           const uint32_t ldc, const uint32_t ldd,
+                           const fp32 alpha, const fp32 beta) {
+  // Create frags
+  auto fragA = wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, fp16,
+                              wmma::row_major>();
+  auto fragB = wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, fp16,
+                              wmma::col_major>();
+  auto fragC = wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, fp32>();
+  auto fragAcc = wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, fp32>();
+
+  wmma::fill_fragment(fragAcc, 0.0f);
+
+  // Map threadIdx to warpIdx
+  auto warpIdx = threadIdx.x / WAVE_SIZE;
+  auto warpIdy = threadIdx.y;
+
+  // Target C block
+  auto cRow = blockIdx.x * TILE_M + warpIdx * WMMA_M;
+  auto cCol = blockIdx.y * TILE_N + warpIdy * WMMA_N;
+
+  // Bounds check
+  for (int n = 0; n < k; n += WMMA_K) {
+    // Load the inputs
+    wmma::load_matrix_sync(fragA, a + (cRow * lda + n), lda);
+    wmma::load_matrix_sync(fragB, b + (cCol * ldb + n), ldb);
+
+    // Matrix multiply - accumulate using MFMA units
+    wmma::mma_sync(fragAcc, fragA, fragB, fragAcc);
+  }
+
+  // Fetch C matrix
+  wmma::load_matrix_sync(fragC, c + (cRow * ldc + cCol), ldc,
+                         wmma::mem_row_major);
+
+  // D = alpha * A x B + beta * C
+  for (int i = 0; i < fragC.num_elements; ++i) {
+    fragC.x[i] = alpha * fragAcc.x[i] + beta * fragC.x[i];
+  }
+
+  // Store to D
+  wmma::store_matrix_sync(d + (cRow * ldd + cCol), fragC, ldd,
+                          wmma::mem_row_major);
+}
+
+__host__ void gemm_wmma(int impl, uint32_t m, uint32_t n, uint32_t k, fp32 alpha,
                         fp32 beta, int32_t repeat, int32_t verify) {
   // Bounds check
-  if ((m < (WMMA_M * NUM_WAVES_X) || n < (WMMA_N * NUM_WAVES_Y) ||
-       k < WMMA_K) || (m % WMMA_M || n % WMMA_N || k % WMMA_K)) {
-    std::cout << "Unsupported size!\n";
-    return;
+  if (impl == 0) {
+    if (m < WMMA_M || n < WMMA_N || k < WMMA_K || m % WMMA_M || n % WMMA_N || k % WMMA_K) {
+      std::cout << "Unsupported size!\n";
+      return;
+    }
+
+  } else {
+    if ((m < TILE_M) || n < TILE_N || k < WMMA_K || m % WMMA_M || n % WMMA_N || k % WMMA_K ||
+        TILE_M / WMMA_M * 32 * TILE_N / WMMA_N > 1024) {
+      std::cout << "Unsupported size!\n";
+      return;
+    }
   }
 
   int lda = k; // row major
@@ -201,51 +251,32 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32 alpha,
   CHECK_CUDA_ERROR(
       cudaMemcpy(d_d, matrixD.data(), bytesD, cudaMemcpyHostToDevice));
 
-  auto blockDim = dim3(T_BLOCK_X, T_BLOCK_Y);
-  auto gridDim = dim3((m + WMMA_M * NUM_WAVES_X - 1) / (WMMA_M * NUM_WAVES_X),
-                      (n + WMMA_N * NUM_WAVES_Y - 1) / (WMMA_N * NUM_WAVES_Y));
-
   std::cout << "Launching GEMM kernel..." << std::endl;
+  
+  dim3 gridDim(1, 1, 1);
+  dim3 blockDim(1, 1, 1);
 
-  double elapsedTimeMs;
-
-  std::chrono::time_point<std::chrono::steady_clock> start, end;
-
-  for (int32_t w = 0; w <= repeat; w++) {
-    if (w == 1) {
-      cudaDeviceSynchronize();
-      start = std::chrono::steady_clock::now();
-    }
-
-    gemm<<<gridDim, blockDim, 0, 0>>>(m, n, k, d_a, d_b, d_c, d_d, lda, ldb,
-                                      ldc, ldd, alpha, beta);
-
-    if (w == repeat) {
-      cudaDeviceSynchronize(); // throughput
-      end = std::chrono::steady_clock::now();
-      auto time =
-          std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
-              .count();
-      elapsedTimeMs = time * 1e-6;
-    }
+  if (impl == 0) {
+    // e.g. when m = n = 32, the kernel is launched with 4 thread blocks of 32 threads each
+    gridDim.x = m / WMMA_M;
+    gridDim.y = n / WMMA_N;
+    blockDim.x = WAVE_SIZE;
+  }
+  else {
+    // e.g. when m = n = 32, the kernel is launched with 1 thread block of 128 threads
+    gridDim.x = m / TILE_M;
+    gridDim.y = n / TILE_N;
+    blockDim.x = TILE_M / WMMA_M * WAVE_SIZE;
+    blockDim.y = TILE_N / WMMA_N;
   }
 
-  // GEMM flops converge to 2*mnk
-  auto gFlops = 2.0 * static_cast<double>(m) * n * k * 1.0e-9;
-  auto tFlopsPerSec = gFlops * repeat / static_cast<double>(elapsedTimeMs);
-
-  // Echo performance
-  std::cout << "BlkM, BlkN, BlkK, "
-            << "MatM, MatN, MatK, "
-            << "alpha, lda, ldb, "
-            << "beta, ldc, ldd, "
-            << "elapsedMs, Problem Size(GFlops), TFlops/s" << std::endl;
-
-  std::cout << WMMA_M << ", " << WMMA_N << ", " << WMMA_K << ", " << m << ", "
-            << n << ", " << k << ", " << alpha << ", " << lda << ", " << ldb
-            << ", " << beta << ", " << ldc << ", " << ldd << ", "
-            << elapsedTimeMs << ", " << gFlops << ", " << tFlopsPerSec
-            << std::endl;
+  // Warmup
+  for (int32_t w = 0; w < 30; w++) {
+    if (impl == 0)
+      gemm_impl0<<<gridDim, blockDim>>>(m, n, k, d_a, d_b, d_c, d_d, lda, ldb, ldc, ldd, alpha, beta);
+    else if (impl == 1)
+      gemm_impl1<<<gridDim, blockDim>>>(m, n, k, d_a, d_b, d_c, d_d, lda, ldb, ldc, ldd, alpha, beta);
+  }
 
   if (verify) {
     std::cout << "Validating result with reference..." << std::endl;
@@ -261,7 +292,40 @@ __host__ void gemm_wmma(uint32_t m, uint32_t n, uint32_t k, fp32 alpha,
                matrixD_ref.data(), lda, ldb, ldc, ldd, alpha, beta);
 
     compareEqual<fp32>(matrixD.data(), matrixD_ref.data(), m * n);
+  } else {
+    std::cout << "Skip validating result with reference" << std::endl;
   }
+
+  CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+  auto start = std::chrono::steady_clock::now();
+
+  for (int32_t w = 0; w < repeat; w++) {
+    if (impl == 0)
+      gemm_impl0<<<gridDim, blockDim>>>(m, n, k, d_a, d_b, d_c, d_d, lda, ldb, ldc, ldd, alpha, beta);
+    else if (impl == 1)
+      gemm_impl1<<<gridDim, blockDim>>>(m, n, k, d_a, d_b, d_c, d_d, lda, ldb, ldc, ldd, alpha, beta);
+
+  }
+  CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  double elapsedTimeMs = time * 1e-6;
+
+  auto gFlops = static_cast<double>(m) * n * (1.0 + 2.0 * k) * 1.0e-9;
+  auto tFlopsPerSec = gFlops * repeat / static_cast<double>(elapsedTimeMs);
+
+  // Echo performance
+  std::cout << "BlkM, BlkN, BlkK, "
+            << "MatM, MatN, MatK, "
+            << "alpha, lda, ldb, "
+            << "beta, ldc, ldd, "
+            << "elapsedMs, Problem Size(GFlops), TFlops/s" << std::endl;
+
+  std::cout << WMMA_M << ", " << WMMA_N << ", " << WMMA_K << ", " << m << ", "
+            << n << ", " << k << ", " << alpha << ", " << lda << ", " << ldb
+            << ", " << beta << ", " << ldc << ", " << ldd << ", "
+            << elapsedTimeMs << ", " << gFlops << ", " << tFlopsPerSec
+            << std::endl;
 
   // Release device memory
   CHECK_CUDA_ERROR(cudaFree(d_a));
@@ -276,7 +340,7 @@ void Usage(std::string program_name) {
   // Utility function to display argument usage
   std::cout << " Incorrect parameters\n";
   std::cout << " Usage: ";
-  std::cout << program_name << "<M> <N> <K> <repeat> <verify>\n\n";
+  std::cout << program_name << "<implementation> <M> <N> <K> <repeat> <verify>\n\n";
   std::cout
       << "Dense matrix-matrix multiplication: D = alpha * (A * B) + beta * C\n";
   std::cout << "A: M * K, B: K * N, C: M * N, D: M * N\n";
@@ -284,16 +348,17 @@ void Usage(std::string program_name) {
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 6) {
+  if (argc != 7) {
     Usage(argv[0]);
   }
 
-  const uint32_t m = atoi(argv[1]);
-  const uint32_t n = atoi(argv[2]);
-  const uint32_t k = atoi(argv[3]);
-  const int32_t repeat = atoi(argv[4]);
-  const int32_t verify = atoi(argv[5]);
-  gemm_wmma(m, n, k, 0.5f, 2.0f, repeat, verify);
+  const uint32_t impl = atoi(argv[1]);
+  const uint32_t m = atoi(argv[2]);
+  const uint32_t n = atoi(argv[3]);
+  const uint32_t k = atoi(argv[4]);
+  const int32_t repeat = atoi(argv[5]);
+  const int32_t verify = atoi(argv[6]);
+  gemm_wmma(impl, m, n, k, 0.5f, 2.0f, repeat, verify);
 
   return 0;
 }
