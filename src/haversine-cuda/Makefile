@@ -15,9 +15,9 @@ LAUNCHER  =
 
 program = main
 
-source = main.cpp distance.cu
+source = main.cu distance.cu
 
-obj = main.o distance.o
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
@@ -46,10 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: main.cpp distance.h Makefile
-	$(CC) -x cu $(CFLAGS) -c $< -o $@
-
-distance.o: distance.cu distance.h Makefile
+%.o: %.cu distance.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
