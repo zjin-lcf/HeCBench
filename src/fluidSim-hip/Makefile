@@ -14,7 +14,7 @@ LAUNCHER  =
 #===============================================================================
 program = main
 
-obj = main.o kernels.o reference.o
+obj = main.o kernels.o
 
 #===============================================================================
 # Sets Flags
@@ -50,11 +50,9 @@ $(program): $(obj) Makefile
 kernels.o: kernels.cu ../fluidSim-cuda/utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o: ../fluidSim-cuda/main.cpp ../fluidSim-cuda/utils.h Makefile
+main.o: ../fluidSim-cuda/main.cu ../fluidSim-cuda/reference.h \
+        ../fluidSim-cuda/utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
-
-reference.o: ../fluidSim-sycl/reference.cpp Makefile
-	$(CC) $(CFLAGS) -x hip -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

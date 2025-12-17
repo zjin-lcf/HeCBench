@@ -22,7 +22,7 @@ HIP_ARCH  = gfx908
 
 program = main
 
-source = main.cpp reference.cpp kernels.cpp
+source = main.cpp kernels.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -31,7 +31,8 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../fluidSim-cuda \
+          -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS_TMP := $(CFLAGS)
@@ -76,7 +77,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp utils.h
+%.o: %.cpp utils.h ../fluidSim-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

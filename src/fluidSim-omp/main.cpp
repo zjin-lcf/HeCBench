@@ -1,5 +1,5 @@
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include "utils.h"
 #include "reference.h"
 
@@ -17,36 +17,33 @@ int main(int argc, char * argv[])
   int dims[2] = {lbm_width, lbm_height};
   size_t temp = dims[0] * dims[1];
 
-  // Nine velocity directions for each cell
-  // 8  3  5
-  // 2  0  1
-  // 6  4  7 
-  double e[9][2] = {{0,0}, {1,0}, {0,1}, {-1,0}, {0,-1}, {1,1}, {-1,1}, {-1,-1}, {1,-1}};
+   // Directions
+   double e[9][2] = {{0,0}, {1,0}, {0,1}, {-1,0}, {0,-1}, {1,1}, {-1,1}, {-1,-1}, {1,-1}};
    
-  // Weights depend on lattice geometry
-  double w[9] = {4.0/9.0, 1.0/9.0, 1.0/9.0, 1.0/9.0, 1.0/9.0, 1.0/36.0, 1.0/36.0, 1.0/36.0, 1.0/36.0};
+   // Weights
+   double w[9] = {4.0/9.0, 1.0/9.0, 1.0/9.0, 1.0/9.0, 1.0/9.0, 1.0/36.0, 1.0/36.0, 1.0/36.0, 1.0/36.0};
 
-  // Omega equals time step divided by Tau (viscosity of the fluid) 
+  // Omega
   const double omega = 1.2f;
 
-  sycl::double8 dirX, dirY; // Directions
+  double8 dirX, dirY; // Directions
 
   // host inputs
   double *h_if0 = (double*)malloc(sizeof(double) * temp);
-  double *h_if1234 = (double*)malloc(sizeof(sycl::double4) * temp);
-  double *h_if5678 = (double*)malloc(sizeof(sycl::double4) * temp);
+  double *h_if1234 = (double*)malloc(sizeof(double4) * temp);
+  double *h_if5678 = (double*)malloc(sizeof(double4) * temp);
 
 #ifdef VERIFY
   // Reference outputs
   double *v_of0 = (double*)malloc(sizeof(double) * temp);
-  double *v_of1234 = (double*)malloc(sizeof(sycl::double4) * temp);
-  double *v_of5678 = (double*)malloc(sizeof(sycl::double4) * temp);
+  double *v_of1234 = (double*)malloc(sizeof(double4) * temp);
+  double *v_of5678 = (double*)malloc(sizeof(double4) * temp);
 #endif
 
   // Host outputs
   double *h_of0 = (double*)malloc(sizeof(double) * temp);
-  double *h_of1234 = (double*)malloc(sizeof(sycl::double4) * temp);
-  double *h_of5678 = (double*)malloc(sizeof(sycl::double4) * temp);
+  double *h_of1234 = (double*)malloc(sizeof(double4) * temp);
+  double *h_of5678 = (double*)malloc(sizeof(double4) * temp);
 
   // Cell Type - Boundary = 1 or Fluid = 0
   bool *h_type = (bool*)malloc(sizeof(bool) * temp);
@@ -55,7 +52,7 @@ int main(int argc, char * argv[])
   double *rho = (double*)malloc(sizeof(double) * temp);
   
   // Velocity
-  sycl::double2 *u = (sycl::double2*)malloc(sizeof(sycl::double2) * temp);
+  double2 *u = (double2*)malloc(sizeof(double2) * temp);
 
   // Initial velocity is nonzero for verifying host and device results
   double u0[2] = {0.01, 0.01};
@@ -67,15 +64,13 @@ int main(int argc, char * argv[])
     {
       int pos = x + y * dims[0];
 
-      // Random values for verification
-      double den = rand() % 10 + 1;
+      // Random values for verification 
+      double den = rand() % 10 + 1; 
 
       // Initialize the velocity buffer
-      u[pos].x() = u0[0];
-      u[pos].y() = u0[1];
+      u[pos].x = u0[0];
+      u[pos].y = u0[1];
 
-      // Initialize the frequency (i.e. the number of particles in 
-      // a cell going in each velocity direction)
       h_if0[pos]            = computefEq(den, w[0], e[0], u0);
       h_if1234[pos * 4 + 0] = computefEq(den, w[1], e[1], u0);
       h_if1234[pos * 4 + 1] = computefEq(den, w[2], e[2], u0);
@@ -96,15 +91,15 @@ int main(int argc, char * argv[])
     }
   }
 
-  // Initialize direction vectors for each cell
-  dirX.s0() = e[1][0]; dirY.s0() = e[1][1];
-  dirX.s1() = e[2][0]; dirY.s1() = e[2][1];
-  dirX.s2() = e[3][0]; dirY.s2() = e[3][1];
-  dirX.s3() = e[4][0]; dirY.s3() = e[4][1];
-  dirX.s4() = e[5][0]; dirY.s4() = e[5][1];
-  dirX.s5() = e[6][0]; dirY.s5() = e[6][1];
-  dirX.s6() = e[7][0]; dirY.s6() = e[7][1];
-  dirX.s7() = e[8][0]; dirY.s7() = e[8][1];
+  // initialize direction vectors
+  dirX.s0 = e[1][0]; dirY.s0 = e[1][1];
+  dirX.s1 = e[2][0]; dirY.s1 = e[2][1];
+  dirX.s2 = e[3][0]; dirY.s2 = e[3][1];
+  dirX.s3 = e[4][0]; dirY.s3 = e[4][1];
+  dirX.s4 = e[5][0]; dirY.s4 = e[5][1];
+  dirX.s5 = e[6][0]; dirY.s5 = e[6][1];
+  dirX.s6 = e[7][0]; dirY.s6 = e[7][1];
+  dirX.s7 = e[8][0]; dirY.s7 = e[8][1];
 
 #ifdef VERIFY
   reference (iterations, omega, dims, h_type, rho, e, w,
@@ -113,8 +108,8 @@ int main(int argc, char * argv[])
 #endif
 
   fluidSim (iterations, omega, dims, h_type, u, rho, dirX, dirY, w,
-             h_if0, h_if1234, h_if5678,
-             h_of0, h_of1234, h_of5678);
+            h_if0, h_if1234, h_if5678,
+            h_of0, h_of1234, h_of5678);
 
 #ifdef VERIFY
   verify(dims, h_of0, h_of1234, h_of5678,

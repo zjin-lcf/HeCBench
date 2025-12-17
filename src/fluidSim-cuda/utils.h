@@ -7,13 +7,13 @@
 #include <cuda.h>
 #endif
 
-typedef struct __align__(32)
+typedef struct alignas(32)
 {
   int s0, s1, s2, s3, s4, s5, s6, s7;
 }
 int8;
 
-typedef struct __align__(64)
+typedef struct alignas(64)
 {
   double s0, s1, s2, s3, s4, s5, s6, s7;
 }
