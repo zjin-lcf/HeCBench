@@ -248,17 +248,17 @@ void Vector::swap(Vector& other)
 __device__ void warp_reduce(volatile real* s, int t)
 {
   real v = s[t];
-  v += s[t + 32];   __syncwrap();
-  s[t] = v;         __syncwrap();
-  v += s[t + 16];   __syncwrap();
-  s[t] = v;         __syncwrap();
-  v += s[t + 8];    __syncwrap();
-  s[t] = v;         __syncwrap();
-  v += s[t + 4];    __syncwrap();
-  s[t] = v;         __syncwrap();
-  v += s[t + 2];    __syncwrap();
-  s[t] = v;         __syncwrap();
-  v += s[t + 1];    __syncwrap();
+  v += s[t + 32];   __syncwarp();
+  s[t] = v;         __syncwarp();
+  v += s[t + 16];   __syncwarp();
+  s[t] = v;         __syncwarp();
+  v += s[t + 8];    __syncwarp();
+  s[t] = v;         __syncwarp();
+  v += s[t + 4];    __syncwarp();
+  s[t] = v;         __syncwarp();
+  v += s[t + 2];    __syncwarp();
+  s[t] = v;         __syncwarp();
+  v += s[t + 1];    __syncwarp();
   s[t] = v;
 }
 #endif

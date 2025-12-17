@@ -4,7 +4,7 @@ CC = hipcc
 CFLAGS = -O3 -std=c++17 -ffast-math -DDEBUG
 
 
-SOURCES = main.cu lsqt.cu sigma.cu vector.cu hamiltonian.cu model.\
+SOURCES = main.cu lsqt.cu sigma.cu vector.cu hamiltonian.cu model.cu \
 	cu model_general.cu model_lattice.cu anderson.cu charge.cu
 	
 _OBJ = main.o lsqt.o sigma.o vector.o hamiltonian.o model.o model_general.o \
