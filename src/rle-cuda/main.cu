@@ -33,12 +33,9 @@
 // Ensure printing of CUDA runtime errors to console
 #define CUB_STDERR
 
-#include <cub/device/device_run_length_encode.cuh>
-#include <cub/util_allocator.cuh>
-
+#include <cub/cub.cuh>
 #include <chrono>
 #include <cstdio>
-
 #include "test_util.h"
 
 using namespace cub;
