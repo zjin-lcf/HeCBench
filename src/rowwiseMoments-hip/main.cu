@@ -4,6 +4,7 @@
 #include <chrono>
 #include <type_traits>
 #include <hip/hip_runtime.h>
+#include <thrust/pair.h>
 #include <thrust/tuple.h>
 #include "utils.h"
 
