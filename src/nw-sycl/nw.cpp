@@ -17,7 +17,7 @@
 #include <string>
 #include <chrono>
 #include <sycl/sycl.hpp>
-#include "reference.cpp"
+#include "reference.h"
 
 // kernel 
 #define SCORE(i, j) input_itemsets_l[j + i * (BLOCK_SIZE+1)]
