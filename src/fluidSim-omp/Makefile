@@ -16,14 +16,14 @@ LAUNCHER  =
 
 program = main
 
-obj = main.o kernels.o reference.o
+obj = main.o kernels.o
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -include utils.h
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../fluidSim-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -59,10 +59,7 @@ $(program): $(obj)
 kernels.o: kernels.cpp utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o: ../fluidSim-cuda/main.cpp utils.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-reference.o: ../fluidSim-sycl/reference.cpp
+main.o: main.cpp ../fluidSim-cuda/reference.h utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
