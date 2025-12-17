@@ -4,7 +4,7 @@
 #include <chrono>
 #include <cuda.h>
 
-#include "reference.cpp"
+#include "reference.h"
 
 __global__ void smoothingFilter(
     int Lx, int Ly, 
