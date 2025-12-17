@@ -4,7 +4,7 @@
 #include <chrono>
 #include <hip/hip_runtime.h>
 
-#include "reference.cpp"
+#include "reference.h"
 
 __global__ void smoothingFilter(
     int Lx, int Ly, 

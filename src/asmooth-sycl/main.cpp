@@ -4,7 +4,7 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 
-#include "reference.cpp"
+#include "reference.h"
 
 int main(int argc, char* argv[]) {
   if (argc != 5) {
