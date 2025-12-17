@@ -15,9 +15,9 @@ LAUNCHER  =
 
 program = main
 
-source = main.cpp svm.cpp
+source = main.cu svm.cpp
 
-obj = $(source:.cpp=.o)
+obj = main.o svm.o
 
 #===============================================================================
 # Sets Flags
@@ -46,7 +46,10 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp driver.c svm.h Makefile
+%.o: %.cu driver.c svm.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.cpp svm.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
