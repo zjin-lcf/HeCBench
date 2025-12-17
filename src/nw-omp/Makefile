@@ -54,10 +54,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp  ../nw-cuda/reference.cpp Makefile
+%.o: %.cpp  ../nw-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

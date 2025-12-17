@@ -79,7 +79,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp kernel1.sycl kernel2.sycl ../nw-cuda/reference.cpp
+%.o: %.cpp kernel1.sycl kernel2.sycl ../nw-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
