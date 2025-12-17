@@ -56,7 +56,7 @@ typedef struct
 } NON_INTERLEAVED_T;
 
 // data initialization and verification
-#include "util.cpp"
+#include "util.h"
 
 __global__ void add_kernel_interleaved(
     INTERLEAVED_T * const dest_ptr,

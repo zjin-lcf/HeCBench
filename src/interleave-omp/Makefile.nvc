@@ -51,10 +51,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp util.cpp Makefile
+%.o: %.cpp util.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
