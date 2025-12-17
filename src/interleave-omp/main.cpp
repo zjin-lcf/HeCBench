@@ -56,7 +56,7 @@ typedef struct
 } NON_INTERLEAVED_T;
 
 // data initialization and verification
-#include "util.cpp"
+#include "util.h"
 
 void add_test_interleaved(
     INTERLEAVED_T * const h_dst,

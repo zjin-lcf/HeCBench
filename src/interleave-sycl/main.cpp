@@ -55,7 +55,7 @@ typedef struct
 } NON_INTERLEAVED_T;
 
 // data initialization and verification
-#include "util.cpp"
+#include "util.h"
 
 void add_test_interleaved(
     sycl::queue &q,
