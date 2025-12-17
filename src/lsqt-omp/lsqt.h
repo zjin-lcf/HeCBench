@@ -19,6 +19,7 @@
 
 #pragma once
 #include "common.h"
+#include <chrono>
 #include <string>
 
 void lsqt(std::string input_directory);

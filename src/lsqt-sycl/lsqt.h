@@ -18,6 +18,7 @@
 */
 
 #pragma once
+#include <chrono>
 #include <string>
 #include <sycl/sycl.hpp>
 
