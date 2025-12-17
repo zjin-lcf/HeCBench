@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../haversine-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../haversine-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -53,10 +53,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: ../haversine-cuda/main.cpp ../haversine-cuda/distance.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-distance.o: distance.cpp ../haversine-cuda/distance.h
+%.o: %.cpp ../haversine-cuda/distance.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

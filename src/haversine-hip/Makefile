@@ -14,7 +14,7 @@ LAUNCHER  =
 
 program = main
 
-source = ../haversine-cuda/main.cpp distance.cu
+source = ../haversine-cuda/main.cu distance.cu
 
 obj = main.o distance.o
 
@@ -45,8 +45,8 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: ../haversine-cuda/main.cpp ../haversine-cuda/distance.h Makefile
-	$(CC) -x hip $(CFLAGS) -c $< -o $@
+main.o: ../haversine-cuda/main.cu ../haversine-cuda/distance.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
 
 distance.o: distance.cu ../haversine-cuda/distance.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
