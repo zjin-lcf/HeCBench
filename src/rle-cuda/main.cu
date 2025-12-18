@@ -56,14 +56,14 @@ template <typename InputIteratorT,
           typename LengthsOutputIteratorT,
           typename NumRunsIterator,
           typename OffsetT>
-CUB_RUNTIME_FUNCTION __forceinline__ cudaError_t Dispatch(int timing_iterations,
-                                                          void *d_temp_storage,
-                                                          size_t &temp_storage_bytes,
-                                                          InputIteratorT d_in,
-                                                          UniqueOutputIteratorT d_unique_out,
-                                                          LengthsOutputIteratorT d_lengths_out,
-                                                          NumRunsIterator d_num_runs,
-                                                          OffsetT num_items)
+__forceinline__ cudaError_t Dispatch(int timing_iterations,
+                                     void *d_temp_storage,
+                                     size_t &temp_storage_bytes,
+                                     InputIteratorT d_in,
+                                     UniqueOutputIteratorT d_unique_out,
+                                     LengthsOutputIteratorT d_lengths_out,
+                                     NumRunsIterator d_num_runs,
+                                     OffsetT num_items)
 {
   cudaError_t error = cudaSuccess;
   for (int i = 0; i < timing_iterations; ++i)
