@@ -131,7 +131,7 @@ int main(int argc, char** argv)
   const unsigned long used_bytes = half_n_cmplx * 2 * sizeof(T2);
   const int n_cmplx = half_n_cmplx*2;
 
-  fprintf(stdout, "used_bytes=%lu, n_cmplx=%g\n", used_bytes, n_cmplx);
+  fprintf(stdout, "used_bytes=%lu, n_cmplx=%d\n", used_bytes, n_cmplx);
 
   // allocate host memory, in-place FFT/iFFT operations
   T2 *source = (T2*) malloc (used_bytes);
