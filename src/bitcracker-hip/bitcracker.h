@@ -30,7 +30,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "sha256.h"
-#include "aes.h"
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define AUTHENTICATOR_LENGTH 16

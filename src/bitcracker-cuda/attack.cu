@@ -22,6 +22,7 @@
 #include <chrono>
 #include <iostream>
 #include "bitcracker.h"
+#include "aes.h"
 
 __device__
 void encrypt(
