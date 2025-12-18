@@ -20,8 +20,6 @@ OUTFILE   = ./small_results_test.dat
 
 program = main
 
-source = main.c args.c compute.cu
-
 obj = main.o args.o compute.o
 
 #===============================================================================
@@ -51,11 +49,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-main.o: ../tpacf-cuda/main.c ../tpacf-cuda/args.h ../tpacf-cuda/kernel.h Makefile
-	$(CC) -x hip $(CFLAGS) -c $< -o $@
+main.o: ../tpacf-cuda/main.cu ../tpacf-cuda/args.h ../tpacf-cuda/kernel.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
 
-args.o: ../tpacf-cuda/args.c ../tpacf-cuda/args.h Makefile
-	$(CC) -x hip $(CFLAGS) -c $< -o $@
+args.o: ../tpacf-cuda/args.cu ../tpacf-cuda/args.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
 
 compute.o: compute.cu ../tpacf-cuda/args.h ../tpacf-cuda/model_io.cu \
            ACF_kernel.cu histogram_kernel.cu ../tpacf-cuda/kernel.h Makefile

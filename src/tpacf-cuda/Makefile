@@ -21,9 +21,9 @@ OUTFILE   = ./small_results_test.dat
 
 program = main
 
-source = main.c args.c compute.cu
+source = main.cu args.cu compute.cu
 
-obj = main.o args.o compute.o
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
@@ -52,8 +52,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.c args.h kernel.h Makefile
-	$(CC) -x cu $(CFLAGS) -c $< -o $@
+main.o: main.cu args.h kernel.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+args.o: args.cu args.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
 
 compute.o: compute.cu model_io.cu ACF_kernel.cu histogram_kernel.cu args.h \
            kernel.h Makefile
