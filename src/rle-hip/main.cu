@@ -59,14 +59,14 @@ template <typename InputIteratorT,
           typename LengthsOutputIteratorT,
           typename NumRunsIterator,
           typename OffsetT>
-HIPCUB_RUNTIME_FUNCTION __forceinline__ hipError_t Dispatch(int timing_iterations,
-                                                          void *d_temp_storage,
-                                                          size_t &temp_storage_bytes,
-                                                          InputIteratorT d_in,
-                                                          UniqueOutputIteratorT d_unique_out,
-                                                          LengthsOutputIteratorT d_lengths_out,
-                                                          NumRunsIterator d_num_runs,
-                                                          OffsetT num_items)
+__forceinline__ hipError_t Dispatch(int timing_iterations,
+                                    void *d_temp_storage,
+                                    size_t &temp_storage_bytes,
+                                    InputIteratorT d_in,
+                                    UniqueOutputIteratorT d_unique_out,
+                                    LengthsOutputIteratorT d_lengths_out,
+                                    NumRunsIterator d_num_runs,
+                                    OffsetT num_items)
 {
   hipError_t error = hipSuccess;
   for (int i = 0; i < timing_iterations; ++i)
