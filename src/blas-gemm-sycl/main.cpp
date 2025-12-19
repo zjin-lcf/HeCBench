@@ -152,7 +152,7 @@ void run_gemm_example(MKL_INT m, MKL_INT k, MKL_INT n, int repeat) {
 
   q.wait();
   auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  double time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   performance(m, n, k, false, time / repeat);
 
   //
