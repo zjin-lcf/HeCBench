@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME loopback
     MODEL cuda
-    SOURCES kernels.cu main.cu
+    SOURCES main.cu
     CATEGORIES algorithms
 )

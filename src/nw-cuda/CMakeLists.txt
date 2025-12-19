@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME nw
     MODEL cuda
-    SOURCES nw.cu reference.cpp
+    SOURCES nw.cu
     CATEGORIES algorithms
 )

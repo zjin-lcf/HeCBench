@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME rng-wallace
     MODEL cuda
-    SOURCES main.cu wallace_kernel.cu
+    SOURCES main.cu
     CATEGORIES algorithms
 )

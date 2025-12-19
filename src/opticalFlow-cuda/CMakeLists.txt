@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL cuda
     SOURCES flowCUDA.cu flowGold.cu main.cu
     CATEGORIES algorithms
+    INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/Common
 )

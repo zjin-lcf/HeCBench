@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME minkowski
     MODEL cuda
-    SOURCES main.cu verify.cpp
+    SOURCES main.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -use_fast_math
 )

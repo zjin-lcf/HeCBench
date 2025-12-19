@@ -2,7 +2,7 @@
 # Benchmark discovery and registration
 
 # Add common include directory
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+#include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # List of benchmarks to build (will be expanded over time)
 # Started with proof-of-concept, now expanding coverage
@@ -47,7 +47,7 @@ set(HECBENCH_POC_BENCHMARKS
     # Batch 3: M-P alphabetically (11 benchmarks)
     md
     md5hash
-    miniDGS
+    #miniDGS
     minimod
     minkowski
     mixbench
@@ -230,6 +230,7 @@ set(HECBENCH_POC_BENCHMARKS
     lid-driven-cavity
     lif
     linearprobing
+    logan
     log2
     logic-rewrite
     logprob
@@ -266,7 +267,7 @@ set(HECBENCH_POC_BENCHMARKS
     michalewicz
     minibude
     minisweep
-    miniWeather
+    #miniWeather
     minmax
     mis
     mmcsf
@@ -311,7 +312,7 @@ set(HECBENCH_POC_BENCHMARKS
     permutate
     permute
     phmm
-    pingpong
+    #pingpong
     pitch
     pnpoly
     pns
@@ -386,7 +387,7 @@ set(HECBENCH_POC_BENCHMARKS
     sort
     sortKV
     sosfil
-    sparkler
+    #sparkler
     spaxpby
     spd2s
     spgeam
@@ -403,7 +404,7 @@ set(HECBENCH_POC_BENCHMARKS
     sptrsv
     ss
     ssim
-    sss
+    #sss
     stddev
     stencil1d
     stencil3d
@@ -411,7 +412,7 @@ set(HECBENCH_POC_BENCHMARKS
     streamOrderedAllocation
     streamPriority
     streamUM
-    stsg
+    #stsg
     surfel
     svd3x3
     sw4ck
@@ -445,7 +446,7 @@ set(HECBENCH_POC_BENCHMARKS
     wordcount
     wsm5
     wyllie
-    xlqc
+    #xlqc
     zerocopy
     zeropoint
     zmddft
@@ -453,7 +454,7 @@ set(HECBENCH_POC_BENCHMARKS
     # Final batch: remaining benchmarks (63 benchmarks)
     addBiasQKV
     addBiasResidualLayerNorm
-    allreduce
+    #allreduce
     atomicAggregate
     atomicCAS
     atomicSystemWide
@@ -486,7 +487,7 @@ set(HECBENCH_POC_BENCHMARKS
     car
     cbsfil
     cc
-    ccl
+    #ccl
     ccs
     ccsd-trpdrv
     ced

@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME frechet
     MODEL cuda
-    SOURCES main.cpp main.cu
+    SOURCES main.cu
     CATEGORIES algorithms
 )

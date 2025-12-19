@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME split
     MODEL cuda
-    SOURCES main.cu verify.cu
+    SOURCES main.cu
     CATEGORIES algorithms
 )

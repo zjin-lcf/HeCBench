@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME degrid
     MODEL cuda
-    SOURCES kernels.cu main.cu
+    SOURCES main.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DPRECISION=double
 )

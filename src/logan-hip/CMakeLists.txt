@@ -11,5 +11,5 @@ add_hecbench_benchmark(
     INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
     COMPILE_OPTIONS -maxrregcount=32 -DADAPTABLE
     LINK_LIBRARIES -lgomp
-    CATEGORIES bioinformatics algorithms
+    CATEGORIES bioinformatics
 )

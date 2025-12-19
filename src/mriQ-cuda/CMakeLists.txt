@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME mriQ
     MODEL cuda
-    SOURCES computeQ.cu main.cu
+    SOURCES main.cu file.cc
     CATEGORIES algorithms
+    COMPILE_OPTIONS -use_fast_math
 )

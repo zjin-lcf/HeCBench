@@ -10,5 +10,5 @@ add_hecbench_benchmark(
         src/logan_functions.cpp
     INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
     COMPILE_OPTIONS -DADAPTABLE
-    CATEGORIES bioinformatics algorithms
+    CATEGORIES bioinformatics
 )

@@ -1,8 +1,11 @@
 # heartwall-cuda/CMakeLists.txt
 
+set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/util")
+
 add_hecbench_benchmark(
     NAME heartwall
     MODEL cuda
-    SOURCES main.cu
+    SOURCES main.cu kernel/kernel.cu util/avi/avilib.c util/avi/avimod.c util/file/file.c util/timer/timer.c
     CATEGORIES algorithms
+    INCLUDE_DIRS  ${INC_DIR}/avi ${INC_DIR}/file ${INC_DIR}/timer
 )
