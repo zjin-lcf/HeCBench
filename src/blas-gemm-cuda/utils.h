@@ -23,7 +23,7 @@ template <typename fp> void rand_matrix(fp *M, int n_row, int n_col)
 void performance (int m, int n, int k, bool is_integer, double avg_time) {
   double total_ops = double(m) * double(n) * double(k) * 2 + 
                      double(m) * double(n);
-  std::cout << "Average GEMM execution time: " << avg_time * 1e-3f <<  " (us), ";
+  std::cout << "Average GEMM execution time: " << avg_time * 1e-3 <<  " (us), ";
   double perf = total_ops / avg_time;
 
   auto scale_string = "G";

@@ -117,7 +117,7 @@ void run_gemm_example(int m, int k, int n, int repeat) {
 
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  double time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   performance(m, n, k, false, time / repeat);
 
   //
