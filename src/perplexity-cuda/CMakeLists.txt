@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME perplexity
     MODEL cuda
-    SOURCES main.cu reference.cpp
+    SOURCES main.cu
     CATEGORIES algorithms
 )

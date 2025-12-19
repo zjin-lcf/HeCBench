@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL cuda
     SOURCES kernels.cu main.cu nQWeight_fp16.cu
     CATEGORIES math
+    LINK_LIBRARIES cublas
 )

@@ -19,6 +19,7 @@ set(HECBENCH_TEST_RUNNER "${CMAKE_SOURCE_DIR}/cmake/scripts/run_benchmark_test.p
 #   CATEGORIES  - Categories (e.g., simulation, math)
 #   COMPILE_OPTIONS - Additional compile options (optional)
 #   LINK_LIBRARIES  - Additional libraries to link (optional)
+#   INCLUDE_DIRS  - Additional include path required by the benchmark (optional)
 #   TEST_REGEX  - Regex pattern to match output for test verification (optional)
 #   TEST_ARGS   - Arguments to pass when running tests (optional)
 #   TEST_TIMEOUT - Timeout in seconds for test execution (optional, default 300)
@@ -92,7 +93,7 @@ function(add_hecbench_benchmark)
     endif()
 
     # Add common include directory
-    target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/include")
+    #target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/include")
 
     # Add benchmark's own directory for local headers (reference.h, kernels.h, etc.)
     target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -111,6 +112,7 @@ function(add_hecbench_benchmark)
         # CUDA configuration
         set_target_properties(${TARGET_NAME} PROPERTIES
             CUDA_SEPARABLE_COMPILATION ON
+            CUDA_ARCHITECTURES ${HECBENCH_CUDA_ARCH}
         )
         target_link_libraries(${TARGET_NAME} PRIVATE CUDA::cudart)
 
@@ -261,3 +263,36 @@ function(print_benchmark_summary)
     message(STATUS "======================================")
     message(STATUS "")
 endfunction()
+
+# Unzip
+#
+# Unzip data needed for certain benchmarks
+#
+MACRO(UNZIPFILE zipfile)
+    # get the filetype extension
+    GET_FILENAME_COMPONENT(FILEEXT "${zipfile}" EXT)
+    GET_FILENAME_COMPONENT(FILEDIR "${zipfile}" DIRECTORY)
+
+    MESSAGE("Going to unzip file ${zipfile}!")
+    MESSAGE("File extension: ${FILEEXT}")
+    MESSAGE("File dir: ${FILEDIR}")
+    IF(FILEEXT MATCHES "\.bz2")
+        set(TOEXEC "bzip2 -dkf ${zipfile}")
+    ELSEIF(FILEEXT MATCHES "\.tar")
+        set(TOEXEC "tar -xvf ${zipfile} -C ${FILEDIR}")
+    ELSEIF(FILEEXT MATCHES "\.zip")
+        set(TOEXEC "unzip ${zipfile}")
+    ENDIF()
+    MESSAGE("\tAssociated command to unzip: [${TOEXEC}]")
+    execute_process(
+        COMMAND /bin/bash -c "${TOEXEC}"
+        OUTPUT_VARIABLE EXEC_OUTPUT
+        RESULT_VARIABLE RESULT_CODE
+        WORKING_DIRECTORY ${FILEDIR}
+    )
+    # MESSAGE("Execution Result: \n${EXEC_OUTPUT}")
+    # if the result code was not 0
+    IF (NOT(RESULT_CODE EQUAL 0))
+        message("Problem unzipping file ${zipfile}!!") 
+    ENDIF()
+ENDMACRO()

@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME bonds
     MODEL cuda
-    SOURCES bondsEngine.cu bondsKernelsCpu.cu bondsKernelsGpu.cu
+    SOURCES bondsEngine.cu
     CATEGORIES algorithms
 )

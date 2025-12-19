@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME atomicIntrinsics
     MODEL cuda
-    SOURCES main-um.cu main.cu
+    SOURCES main.cu
     CATEGORIES algorithms
 )

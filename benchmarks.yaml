@@ -90,7 +90,7 @@ aligned-types:
   # No test metadata available
 
 all-pairs-distance:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   test:
     regex: '(?:Average kernel execution time \(w/o? shared memory\): )([0-9.+-e]+)(?: \(us\))'
@@ -436,7 +436,7 @@ bspline-vgh:
     timeout: 300
 
 bsw:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, sycl]
   # No test metadata available
 
@@ -485,7 +485,7 @@ ccl:
   # No test metadata available
 
 ccs:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
@@ -571,7 +571,7 @@ clock:
   # No test metadata available
 
 cm:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
@@ -784,7 +784,7 @@ depixel:
   # No test metadata available
 
 deredundancy:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
@@ -794,7 +794,7 @@ determinant:
   # No test metadata available
 
 diamond:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
@@ -907,7 +907,7 @@ entropy:
     timeout: 300
 
 epistasis:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   test:
     regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(s\))'
@@ -931,7 +931,7 @@ expdist:
     timeout: 300
 
 extend2:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   test:
     regex: '(?:Average offload time )([0-9.+-e]+)(?: \(us\))'
@@ -1060,12 +1060,12 @@ fresnel:
   # No test metadata available
 
 frna:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
 fsm:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   test:
     regex: '([0-9.+-e]+)(?:\s*#runtime \[s\])'
@@ -1073,7 +1073,7 @@ fsm:
     timeout: 300
 
 fwt:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   test:
     regex: '(?:Average device execution time )([0-9.+-e]+)(?: \(s\))'
@@ -1081,7 +1081,7 @@ fwt:
     timeout: 300
 
 ga:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
@@ -1598,7 +1598,7 @@ linearprobing:
     timeout: 300
 
 local-ht:
-  categories: [algorithms, bioinformatics]
+  categories: [bioinformatics]
   models: [cuda]
   # No test metadata available
 
@@ -1608,7 +1608,7 @@ log2:
   # No test metadata available
 
 logan:
-  categories: [algorithms, bioinformatics]
+  categories: [bioinformatics]
   models: [cuda, hip, sycl]
   # No test metadata available
 
@@ -1852,12 +1852,12 @@ miniWeather:
   # No test metadata available
 
 minibude:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
 minimap2:
-  categories: [algorithms, bioinformatics]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
@@ -1996,7 +1996,7 @@ myocyte:
   # No test metadata available
 
 nbnxm:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, sycl]
   test:
     regex: '(?:Average kernel execution time \(w/o shift\): )([0-9.+-e]+)(?: \(us\))'
@@ -2060,7 +2060,7 @@ ntt:
   # No test metadata available
 
 nw:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
@@ -2149,7 +2149,7 @@ pathfinder:
     timeout: 300
 
 pcc:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, sycl]
   # No test metadata available
 
@@ -2236,7 +2236,7 @@ present:
   # No test metadata available
 
 prna:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
@@ -2445,7 +2445,7 @@ s8n:
   # No test metadata available
 
 sa:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, sycl]
   # No test metadata available
 
@@ -2589,7 +2589,7 @@ slu:
   # No test metadata available
 
 snake:
-  categories: [algorithms]
+  categories: [bioinformatics]
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 

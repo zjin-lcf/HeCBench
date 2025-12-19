@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL cuda
     SOURCES kernels.cu main.cpp utils.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES cusparse
 )

@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME svd3x3
     MODEL cuda
-    SOURCES kernels.cu main.cu
+    SOURCES main.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -use_fast_math
 )

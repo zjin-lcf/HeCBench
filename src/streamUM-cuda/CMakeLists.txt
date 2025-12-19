@@ -5,4 +5,6 @@ add_hecbench_benchmark(
     MODEL cuda
     SOURCES main.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -Xcompiler -fopenmp 
+    LINK_LIBRARIES cublas -fopenmp
 )

@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME pns
     MODEL cuda
-    SOURCES main.cu petri_kernel.cu rand_gen.cu
+    SOURCES main.cu
     CATEGORIES algorithms
 )

@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL cuda
     SOURCES attack.cu main.cu utils.cu w_blocks.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -use_fast_math
 )

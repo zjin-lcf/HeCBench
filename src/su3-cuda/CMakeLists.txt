@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL cuda
     SOURCES su3_nn_bench.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DMILC_COMPLEX
 )

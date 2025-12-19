@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME kmc
     MODEL cuda
-    SOURCES main.cpp svm.cpp
+    SOURCES main.cu svm.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES cublas
 )

@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME minisweep
     MODEL cuda
-    SOURCES kernels.cu main.cu utils.cu
+    SOURCES main.cu
     CATEGORIES algorithms
 )

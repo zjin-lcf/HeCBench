@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME bsw
     MODEL cuda
-    SOURCES driver.cu kernel.cu main.cu utils.cu
+    SOURCES driver.cu main.cu utils.cu
     CATEGORIES algorithms
 )

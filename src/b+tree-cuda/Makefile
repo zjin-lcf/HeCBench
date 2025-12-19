@@ -46,50 +46,28 @@ b+tree.out:	./main.o \
 
 
 
-main.o:	./common.h \
-		./main.h \
-		./main.cu
-	$(CC)	$(CFLAGS) $(KERNEL_DIM) ./main.cu \
-			-c \
-			-o ./main.o
+main.o:	./common.h ./main.h ./main.cu
+	$(CC)	$(CFLAGS) $(KERNEL_DIM) ./main.cu -c -o ./main.o
 
 # ======================================================================================================================================================150
 #	KERNELS
 # ======================================================================================================================================================150
 
-./kernel/kernel_wrapper.o:	./common.h \
-									./kernel/kernel_wrapper.h \
-									./kernel/kernel_wrapper.cu
-	$(CC) $(KERNEL_DIM) ./kernel/kernel_wrapper.cu \
-				-c \
-				-o ./kernel/kernel_wrapper.o \
-				$(CFLAGS)
+./kernel/kernel_wrapper.o:	./common.h ./kernel/kernel_wrapper.h ./kernel/kernel_wrapper.cu
+	$(CC) $(KERNEL_DIM) ./kernel/kernel_wrapper.cu -c -o ./kernel/kernel_wrapper.o $(CFLAGS)
 
-./kernel/kernel2_wrapper.o:	./common.h \
-										./kernel/kernel2_wrapper.h \
-										./kernel/kernel2_wrapper.cu
-	$(CC) $(KERNEL_DIM) ./kernel/kernel2_wrapper.cu \
-				-c \
-				-o ./kernel/kernel2_wrapper.o \
-				$(CFLAGS)
+./kernel/kernel2_wrapper.o:	./common.h ./kernel/kernel2_wrapper.h ./kernel/kernel2_wrapper.cu
+	$(CC) $(KERNEL_DIM) ./kernel/kernel2_wrapper.cu -c -o ./kernel/kernel2_wrapper.o $(CFLAGS)
 
 # ======================================================================================================================================================150
 #	UTILITIES
 # ======================================================================================================================================================150
 
-./util/timer/timer.o:	./common.h \
-						./util/timer/timer.h \
-						./util/timer/timer.c
-	$(CC)	./util/timer/timer.c \
-			-c \
-			-o ./util/timer/timer.o 
+./util/timer/timer.o:	./common.h ./util/timer/timer.h ./util/timer/timer.c
+	$(CC)	./util/timer/timer.c -c -o ./util/timer/timer.o 
 
-./util/num/num.o:	./common.h \
-					./util/num/num.h \
-					./util/num/num.c
-	$(CC)	./util/num/num.c \
-			-c \
-			-o ./util/num/num.o 
+./util/num/num.o:	./common.h ./util/num/num.h ./util/num/num.c
+	$(CC)	./util/num/num.c -c -o ./util/num/num.o 
 
 run: b+tree.out
 	$(LAUNCHER) ./b+tree.out file ../data/b+tree/mil.txt command ../data/b+tree/command.txt
