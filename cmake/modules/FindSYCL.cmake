@@ -103,7 +103,7 @@ endif()
 
 # Set additional flags based on cache variables
 if(DEFINED HECBENCH_SYCL_TARGET)
-    list(APPEND SYCL_FLAGS "-fsycl-targets=${HECBENCH_SYCL_TARGET}")
+    list(APPEND SYCL_FLAGS "-DUSE_GPU -fsycl-targets=${HECBENCH_SYCL_TARGET}")
 endif()
 
 if(DEFINED HECBENCH_SYCL_TARGET_BACKEND)
