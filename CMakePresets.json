@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 3,
   "cmakeMinimumRequired": {
     "major": 3,
     "minor": 21,
@@ -195,6 +195,20 @@
         "HECBENCH_ENABLE_HIP": "OFF",
         "HECBENCH_ENABLE_SYCL": "ON",
         "HECBENCH_ENABLE_OPENMP": "OFF",
+        "HECBENCH_SYCL_TARGET_BACKEND": "",
+        "CMAKE_CXX_COMPILER": "icpx"
+      }
+    },
+    {
+      "name": "sycl-xpu",
+      "displayName": "SYCL with XPU backend",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "ON",
+        "HECBENCH_ENABLE_OPENMP": "OFF",
+        "HECBENCH_SYCL_TARGET": "spir64",
         "CMAKE_CXX_COMPILER": "icpx"
       }
     },
