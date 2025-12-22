@@ -17,20 +17,20 @@
  ****/
 
 #include "masking.h"
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 
 #define SEQ_LEN 33
 inline double firstRepeatOffsetProb(const double probMult, const int maxRepeatOffset) {
   if (probMult < 1 || probMult > 1)
-    return (1 - probMult) / (1 - cl::sycl::pow(probMult, (double)maxRepeatOffset));
+    return (1 - probMult) / (1 - sycl::pow(probMult, (double)maxRepeatOffset));
   else
     return 1.0 / maxRepeatOffset;
 }
 
 void maskProbableLetters(const int size,
     unsigned char *seqBeg,
-    const float *probabilities, 
+    const float *probabilities,
     const unsigned char *maskTable) {
 
   const double minMaskProb = 0.5;
@@ -40,8 +40,8 @@ void maskProbableLetters(const int size,
 }
 
 int calcRepeatProbs(float *letterProbs,
-    const unsigned char *seqBeg, 
-    const int size, 
+    const unsigned char *seqBeg,
+    const int size,
     const int maxRepeatOffset,
     const double *likelihoodRatioMatrix, // 64 by 64 matrix,
     const double b2b,
@@ -51,7 +51,7 @@ int calcRepeatProbs(float *letterProbs,
     const double *pow_lkp,
     double *foregroundProbs,
     const int scaleStepSize,
-    double *scaleFactors)		      	
+    double *scaleFactors)
 {
 
   double backgroundProb = 1.0;
@@ -74,8 +74,8 @@ int calcRepeatProbs(float *letterProbs,
 
       const int v1 = seqBeg[idx3];
       accu += foregroundProbs[idx1];
-      foregroundProbs[idx1] = ( (f2f0 * foregroundProbs[idx1]) +  
-          (backgroundProb * pow_lkp[idx2]) ) * 
+      foregroundProbs[idx1] = ( (f2f0 * foregroundProbs[idx1]) +
+          (backgroundProb * pow_lkp[idx2]) ) *
         likelihoodRatioMatrix[v0*size+v1];
     }
 
@@ -107,11 +107,10 @@ int calcRepeatProbs(float *letterProbs,
   for (int k=(size-1) ; k >= 0 ; k--){
 
 
-    double nonRepeatProb = letterProbs[k] * backgroundProb * fTot_inv;
-    letterProbs[k] = 1 - (float)(nonRepeatProb);
+    float nonRepeatProb = letterProbs[k] * backgroundProb * fTot_inv;
+    letterProbs[k] = 1.f - nonRepeatProb;
 
-    //const int k_cap  = std::min(k, maxRepeatOffset);
-    const int k_cap = k < maxRepeatOffset ? k : maxRepeatOffset;
+    const int k_cap  = sycl::min(k, maxRepeatOffset);
 
     if (k % scaleStepSize == scaleStepSize - 1) {
       const double scale = scaleFactors[k/ scaleStepSize];
@@ -141,7 +140,66 @@ int calcRepeatProbs(float *letterProbs,
   }
 
   const double bTot = backgroundProb;
-  return (cl::sycl::fabs(fTot - bTot) > cl::sycl::fmax(fTot, bTot) / 1e6);
+  return (sycl::fabs(fTot - bTot) > sycl::fmax(fTot, bTot) / 1e6);
+}
+
+void maskSequences(
+    unsigned char * seqs,
+    const double * likelihoodRatioMatrix,
+    const unsigned char * maskTable,
+    const int size                     ,
+    const int maxRepeatOffset          ,
+    const double repeatProb            ,
+    const double repeatEndProb         ,
+    const double repeatOffsetProbDecay ,
+    const double firstGapProb          ,
+    const double otherGapProb          ,
+    const double minMaskProb           ,
+    int seqs_len,
+    sycl::nd_item<1> &item )
+{
+  int gid = item.get_global_id(0);
+  if (gid >= seqs_len) return;
+
+  unsigned char* seqBeg = seqs+gid*33;
+
+  float probabilities[SEQ_LEN];
+
+  const double b2b = 1 - repeatProb;
+  const double f2f0 = 1 - repeatEndProb;
+  const double f2b = repeatEndProb;
+
+  const double b2fGrowth = 1 / repeatOffsetProbDecay;
+
+  const double  b2fLast = repeatProb * firstRepeatOffsetProb(b2fGrowth, maxRepeatOffset);
+  const double b2fLast_inv = 1 / b2fLast ;
+
+  double p = b2fLast;
+  double ar_1[50];
+
+  for (int i=0 ; i < maxRepeatOffset; i++){
+    ar_1[i] = p ;
+    p *= b2fGrowth;
+  }
+
+  const int scaleStepSize = 16;
+
+  double scaleFactors[SEQ_LEN / scaleStepSize];
+
+  double foregroundProbs[50];
+
+  for (int i=0 ; i < maxRepeatOffset; i++){
+    foregroundProbs[i] = 0;
+  };
+
+  const int err  = calcRepeatProbs(probabilities,seqBeg, size,
+      maxRepeatOffset, likelihoodRatioMatrix,
+      b2b, f2f0, f2b,
+      b2fLast_inv,ar_1,foregroundProbs,scaleStepSize, scaleFactors);
+
+  //if (err)  printf("tantan: warning: possible numeric inaccuracy\n");
+
+  maskProbableLetters(size,seqBeg, probabilities, maskTable);
 }
 
 
@@ -206,87 +264,64 @@ unsigned char* Masking::call_opt(Sequence_set &seqs) const
 
   int len = 33;
 
-  printf("Timing the mask sequences on device...\n"); 
+  printf("Timing the mask sequences on device...\n");
   Timer t;
   t.start();
-  {
 
-#ifdef USE_GPU 
-    gpu_selector dev_sel;
+#ifdef USE_GPU
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-    queue q(dev_sel);
 
-    const int BLOCK_SIZE=128;
-    range<1> global_work_size ((n+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
-    range<1> local_work_size (BLOCK_SIZE);
+  const int BLOCK_SIZE=128;
+  sycl::range<1> gws ((n+BLOCK_SIZE-1)/BLOCK_SIZE*BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
-    const int size = len;
-    const int maxRepeatOffset = 50;
-    const double repeatProb = 0.005; 
-    const double repeatEndProb = 0.05;
-    const double repeatOffsetProbDecay = 0.9;
-    const double firstGapProb = 0; 
-    const double otherGapProb = 0;
-    const double minMaskProb = 0.5; 
-    const int seqs_len = n;
+  const int size = len;
+  const int maxRepeatOffset = 50;
+  const double repeatProb = 0.005;
+  const double repeatEndProb = 0.05;
+  const double repeatOffsetProbDecay = 0.9;
+  const double firstGapProb = 0;
+  const double otherGapProb = 0;
+  const double minMaskProb = 0.5;
+  const int seqs_len = n;
 
-    buffer<unsigned char,1> d_seqs (seqs_device, total);
-    buffer<double,1> d_probMat (probMat_device, size*size);
-    buffer<unsigned char,1> d_mask_table (mask_table_device, size);
-    q.submit([&](handler &h) {
-        auto seqs = d_seqs.get_access<sycl_read_write>(h);
-        auto likelihoodRatioMatrix = d_probMat.get_access<sycl_read>(h);
-        auto maskTable = d_mask_table.get_access<sycl_read>(h);
-        h.parallel_for<class mask_sequences>(nd_range<1>(global_work_size, local_work_size), [=](nd_item<1> item) {
-          int gid = item.get_global_id(0); 
-          if (gid >= seqs_len) return;
+  unsigned char *d_seqs = (unsigned char*) sycl::malloc_device(total, q);
+  q.memcpy(d_seqs, seqs_device, total);
 
-          unsigned char* seqBeg = seqs.get_pointer()+gid*33;
+  unsigned char *d_maskTable = sycl::malloc_device<unsigned char>(size, q);
+  q.memcpy(d_maskTable, mask_table_device, size);
 
-          float probabilities[SEQ_LEN];
+  double *d_probMat = sycl::malloc_device<double>(size*size, q);
+  q.memcpy(d_probMat, probMat_device, sizeof(double)*size*size);
 
-          const double b2b = 1 - repeatProb;
-          const double f2f0 = 1 - repeatEndProb;
-          const double f2b = repeatEndProb;
+  q.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+     maskSequences(
+         d_seqs,
+         d_probMat,
+         d_maskTable,
+         size,
+         maxRepeatOffset,
+         repeatProb,
+         repeatEndProb,
+         repeatOffsetProbDecay,
+         firstGapProb,
+         otherGapProb,
+         minMaskProb,
+         seqs_len,
+         item);
+     });
+  });
 
-          const double b2fGrowth = 1 / repeatOffsetProbDecay;
+  q.memcpy(seqs_device, d_seqs, total).wait();
+  sycl::free(d_seqs, q);
+  sycl::free(d_maskTable, q);
+  sycl::free(d_probMat, q);
 
-          const double  b2fLast = repeatProb * firstRepeatOffsetProb(b2fGrowth, maxRepeatOffset);
-          const double b2fLast_inv = 1 / b2fLast ;
-
-          double p = b2fLast;
-          double ar_1[50];
-
-          for (int i=0 ; i < maxRepeatOffset; i++){
-            ar_1[i] = p ;
-            p *= b2fGrowth;
-          }
-
-          const int scaleStepSize = 16;
-
-          double scaleFactors[SEQ_LEN / scaleStepSize];
-
-          double foregroundProbs[50];
-
-          for (int i=0 ; i < maxRepeatOffset; i++){
-            foregroundProbs[i] = 0;
-          };
-
-          const int err  = calcRepeatProbs(probabilities,seqBeg, size, 
-              maxRepeatOffset, likelihoodRatioMatrix.get_pointer(),
-              b2b, f2f0, f2b,
-              b2fLast_inv,ar_1,foregroundProbs,scaleStepSize, scaleFactors);
-
-          //if (err)  printf("tantan: warning: possible numeric inaccuracy\n");
-
-          maskProbableLetters(size,seqBeg, probabilities, maskTable.get_pointer());
-        });
-    });
-  }
-
-  message_stream << "Total time (maskSequences) on the device = " << 
+  message_stream << "Total time (maskSequences) on the device = " <<
     t.getElapsedTimeInMicroSec() / 1e6 << " s" << std::endl;
 
   free(probMat_device);
@@ -337,9 +372,9 @@ void Masking::remove_bit_mask(Letter *seq, size_t len) const
 void mask_worker(Atomic<size_t> *next, Sequence_set *seqs, const Masking *masking, bool hard_mask)
 {
   size_t i;
-  int cnt = 0;
+  //int cnt = 0;
 
-  while ((i = (*next)++) < seqs->get_length()) 
+  while ((i = (*next)++) < seqs->get_length())
   {
     if (hard_mask)
       //masking->operator()(seqs->ptr(i), seqs->length(i));
@@ -357,7 +392,7 @@ void mask_seqs(Sequence_set &seqs, const Masking &masking, bool hard_mask)
   assert(hard_mask==true);
   const int n = seqs.get_length();
 
-  printf("Timing the mask sequences on CPU...\n"); 
+  printf("Timing the mask sequences on CPU...\n");
   Timer total;
   total.start();
 
@@ -377,7 +412,7 @@ void mask_seqs(Sequence_set &seqs, const Masking &masking, bool hard_mask)
 
 #endif
 
-  message_stream << "Total time (maskSequences) on the CPU = " << 
+  message_stream << "Total time (maskSequences) on the CPU = " <<
     total.getElapsedTimeInMicroSec() / 1e6 << " s" << std::endl;
 
   // on the device
@@ -388,15 +423,15 @@ void mask_seqs(Sequence_set &seqs, const Masking &masking, bool hard_mask)
   int error = 0;
   for (int i = 0; i < n; i++) {
     if (0 != strncmp((const char*)p, seqs.ptr(i), seqs.length(i))) {
-      printf("error at i=%d  length=%zu\n", i, seqs.length(i)); 
+      printf("error at i=%d  length=%zu\n", i, seqs.length(i));
       printf("host=");
       char* s = seqs.ptr(i);
       for (int j = 0; j < seqs.length(i); j++) {
-        printf("%02d", s[j]); 
+        printf("%02d", s[j]);
       }
       printf("\ndevice=");
       for (int j = 0; j < seqs.length(i); j++)
-        printf("%02d", *(seqs_device+i*33+j)); 
+        printf("%02d", *(seqs_device+i*33+j));
       printf("\n");
       error++;
     }
