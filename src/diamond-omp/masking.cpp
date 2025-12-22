@@ -29,7 +29,7 @@ inline double firstRepeatOffsetProb(const double probMult, const int maxRepeatOf
 
 void maskProbableLetters(const int size,
     unsigned char *seqBeg,
-    const float *probabilities, 
+    const float *probabilities,
     const unsigned char *maskTable) {
 
   const double minMaskProb = 0.5;
@@ -39,8 +39,8 @@ void maskProbableLetters(const int size,
 }
 
 int calcRepeatProbs(float *letterProbs,
-    const unsigned char *seqBeg, 
-    const int size, 
+    const unsigned char *seqBeg,
+    const int size,
     const int maxRepeatOffset,
     const double *likelihoodRatioMatrix, // 64 by 64 matrix,
     const double b2b,
@@ -50,7 +50,7 @@ int calcRepeatProbs(float *letterProbs,
     const double *pow_lkp,
     double *foregroundProbs,
     const int scaleStepSize,
-    double *scaleFactors)		      	
+    double *scaleFactors)
 {
 
   double backgroundProb = 1.0;
@@ -73,8 +73,8 @@ int calcRepeatProbs(float *letterProbs,
 
       const int v1 = seqBeg[idx3];
       accu += foregroundProbs[idx1];
-      foregroundProbs[idx1] = ( (f2f0 * foregroundProbs[idx1]) +  
-          (backgroundProb * pow_lkp[idx2]) ) * 
+      foregroundProbs[idx1] = ( (f2f0 * foregroundProbs[idx1]) +
+          (backgroundProb * pow_lkp[idx2]) ) *
         likelihoodRatioMatrix[v0*size+v1];
     }
 
@@ -106,8 +106,8 @@ int calcRepeatProbs(float *letterProbs,
   for (int k=(size-1) ; k >= 0 ; k--){
 
 
-    double nonRepeatProb = letterProbs[k] * backgroundProb * fTot_inv;
-    letterProbs[k] = 1 - (float)(nonRepeatProb);
+    float nonRepeatProb = letterProbs[k] * backgroundProb * fTot_inv;
+    letterProbs[k] = 1.f - nonRepeatProb;
 
     //const int k_cap  = std::min(k, maxRepeatOffset);
     const int k_cap = k < maxRepeatOffset ? k : maxRepeatOffset;
@@ -204,7 +204,7 @@ unsigned char* Masking::call_opt(Sequence_set &seqs) const
 
   int len = 33;
 
-  printf("Timing the mask sequences on device...\n"); 
+  printf("Timing the mask sequences on device...\n");
   Timer t;
   t.start();
 
@@ -215,12 +215,12 @@ unsigned char* Masking::call_opt(Sequence_set &seqs) const
 
   const int size = len;
   const int maxRepeatOffset = 50;
-  const double repeatProb = 0.005; 
+  const double repeatProb = 0.005;
   const double repeatEndProb = 0.05;
   const double repeatOffsetProbDecay = 0.9;
-  const double firstGapProb = 0; 
+  const double firstGapProb = 0;
   const double otherGapProb = 0;
-  const double minMaskProb = 0.5; 
+  const double minMaskProb = 0.5;
   const int seqs_len = n;
 
   #pragma omp target data map(tofrom: s[0:total]) \
@@ -260,7 +260,7 @@ unsigned char* Masking::call_opt(Sequence_set &seqs) const
         foregroundProbs[i] = 0;
       };
 
-      const int err  = calcRepeatProbs(probabilities,seqBeg, size, 
+      const int err  = calcRepeatProbs(probabilities,seqBeg, size,
           maxRepeatOffset, likelihoodRatioMatrix,
           b2b, f2f0, f2b,
           b2fLast_inv,ar_1,foregroundProbs,scaleStepSize, scaleFactors);
@@ -271,7 +271,7 @@ unsigned char* Masking::call_opt(Sequence_set &seqs) const
     }
   }
 
-  message_stream << "Total time (maskSequences) on the device = " << 
+  message_stream << "Total time (maskSequences) on the device = " <<
     t.getElapsedTimeInMicroSec() / 1e6 << " s" << std::endl;
 
   free(probMat_device);
@@ -322,9 +322,9 @@ void Masking::remove_bit_mask(Letter *seq, size_t len) const
 void mask_worker(Atomic<size_t> *next, Sequence_set *seqs, const Masking *masking, bool hard_mask)
 {
   size_t i;
-  int cnt = 0;
+  //int cnt = 0;
 
-  while ((i = (*next)++) < seqs->get_length()) 
+  while ((i = (*next)++) < seqs->get_length())
   {
     if (hard_mask)
       //masking->operator()(seqs->ptr(i), seqs->length(i));
@@ -342,7 +342,7 @@ void mask_seqs(Sequence_set &seqs, const Masking &masking, bool hard_mask)
   assert(hard_mask==true);
   const int n = seqs.get_length();
 
-  printf("Timing the mask sequences on CPU...\n"); 
+  printf("Timing the mask sequences on CPU...\n");
   Timer total;
   total.start();
 
@@ -362,7 +362,7 @@ void mask_seqs(Sequence_set &seqs, const Masking &masking, bool hard_mask)
 
 #endif
 
-  message_stream << "Total time (maskSequences) on the CPU = " << 
+  message_stream << "Total time (maskSequences) on the CPU = " <<
     total.getElapsedTimeInMicroSec() / 1e6 << " s" << std::endl;
 
   // on the device
@@ -373,15 +373,15 @@ void mask_seqs(Sequence_set &seqs, const Masking &masking, bool hard_mask)
   int error = 0;
   for (int i = 0; i < n; i++) {
     if (0 != strncmp((const char*)p, seqs.ptr(i), seqs.length(i))) {
-      printf("error at i=%d  length=%zu\n", i, seqs.length(i)); 
+      printf("error at i=%d  length=%zu\n", i, seqs.length(i));
       printf("host=");
       char* s = seqs.ptr(i);
       for (int j = 0; j < seqs.length(i); j++) {
-        printf("%02d", s[j]); 
+        printf("%02d", s[j]);
       }
       printf("\ndevice=");
       for (int j = 0; j < seqs.length(i); j++)
-        printf("%02d", *(seqs_device+i*33+j)); 
+        printf("%02d", *(seqs_device+i*33+j));
       printf("\n");
       error++;
     }
