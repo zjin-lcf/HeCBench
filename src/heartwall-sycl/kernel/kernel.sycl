@@ -1313,7 +1313,7 @@ if(frame_no != 0){
     if(temp2 < 0){
       temp2 = 0;
     }
-    in2_sqr_sub2[ei_new] = sqrt(temp2);
+    in2_sqr_sub2[ei_new] = sycl::sqrt(temp2);
 
 
     // go for second round
@@ -1519,10 +1519,10 @@ if(frame_no != 0){
     mean_sqr = mean * mean;
     // variance  = (in_sqr_final_sum / common.in_elem) - mean_sqr;              // gets variance of ROI
     variance  = (in_sqr_final_sum[0] / common.in_elem) - mean_sqr;              // gets variance of ROI
-    deviation = sqrt(variance);                                // gets standard deviation of ROI
+    deviation = sycl::sqrt(variance);                                // gets standard deviation of ROI
 
     // denomT = sqrt((float)(common.in_elem-1))*deviation;
-    denomT[0] = sqrt((float)(common.in_elem-1))*deviation;
+    denomT[0] = sycl::sqrt((float)(common.in_elem-1))*deviation;
 
   }
 
@@ -1829,7 +1829,7 @@ if(frame_no != 0){
 
     for(i=0; i<common.mask_conv_cols; i++){
       largest_coordinate_current = ei_new*common.mask_conv_rows+i;
-      largest_value_current = fabs(mask_conv[largest_coordinate_current]);
+      largest_value_current = sycl::fabs(mask_conv[largest_coordinate_current]);
       if(largest_value_current > largest_value){
         largest_coordinate = largest_coordinate_current;
         largest_value = largest_value_current;
