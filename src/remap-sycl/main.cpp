@@ -9,8 +9,8 @@
 
 #define NUM_THREADS 256
 
-void remap_kernel(dpct::device_pointer<const int> second_order,
-                  dpct::device_pointer<const int> first_order,
+void remap_kernel(const dpct::device_pointer<int> second_order,
+                  const dpct::device_pointer<int> first_order,
                   int *output,
                   const int N, const int K,
                   sycl::nd_item<1> &item)
