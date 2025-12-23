@@ -18,6 +18,7 @@ THE SOFTWARE.
 */
 
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <hip/hip_runtime.h>
