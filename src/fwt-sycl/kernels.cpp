@@ -166,7 +166,7 @@ void fwtBatchGPU(sycl::queue &q, float *data, int M, int log2N)
         sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         fwtBatch1Kernel( data,
                          data,
-                         lmem.get_pointer(),
+                         lmem.get_multi_ptr<sycl::access::decorated::no>().get(),
                          log2N, item);
       });
     });
