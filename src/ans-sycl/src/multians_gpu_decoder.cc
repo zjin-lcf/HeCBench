@@ -11,32 +11,17 @@
 #include "cuhd_gpu_decoder.h"
 
 inline void decode_subsequence(
-    std::uint32_t subsequence_size,
-    std::uint32_t current_subsequence,
-    std::uint32_t subsequences_processed,
-    UNIT_TYPE mask,
-    std::uint32_t shift,
-    std::uint32_t start_bit,
-    std::uint32_t &in_pos,
-    UNIT_TYPE* in_ptr,
-    UNIT_TYPE &window,
-    UNIT_TYPE &next,
-    STATE_TYPE &state,
-    std::uint32_t &last_word_unit,
-    std::uint32_t &last_word_bit,
-    std::uint32_t &num_symbols,
-    std::uint32_t &out_pos,
-    SYMBOL_TYPE* out_ptr,
-    std::uint32_t &next_out_pos,
-    const uint* __restrict__ table,
-    const std::uint32_t bits_in_unit,
-    const std::uint32_t number_of_states,
-    std::uint32_t &last_at,
-    STATE_TYPE &last_state,
-    bool overflow,
-    bool write_output) {
-
-      // current unit in this subsequence
+    std::uint32_t subsequence_size, std::uint32_t current_subsequence,
+    std::uint32_t subsequences_processed, UNIT_TYPE mask, std::uint32_t shift,
+    std::uint32_t start_bit, std::uint32_t &in_pos, UNIT_TYPE *in_ptr,
+    UNIT_TYPE &window, UNIT_TYPE &next, STATE_TYPE &state,
+    std::uint32_t &last_word_unit, std::uint32_t &last_word_bit,
+    std::uint32_t &num_symbols, std::uint32_t &out_pos, SYMBOL_TYPE *out_ptr,
+    std::uint32_t &next_out_pos, const uint *__restrict__ table,
+    const std::uint32_t bits_in_unit, const std::uint32_t number_of_states,
+    std::uint32_t &last_at, STATE_TYPE &last_state, bool overflow,
+    bool write_output)
+{
       std::uint32_t current_unit = 0;
 
       // current bit position in unit
@@ -190,15 +175,10 @@ inline void decode_subsequence(
     }
 
 void phase1_decode_subseq(
-    std::uint32_t subsequence_size,
-    std::uint32_t total_num_subsequences,
-    std::uint32_t table_size,
-    UNIT_TYPE* in_ptr,
-    const uint* __restrict__ table,
-    sycl::uint4* sync_points,
-    const std::uint32_t bits_in_unit,
-    const std::uint32_t number_of_states,
-    const STATE_TYPE initial_state,
+    std::uint32_t subsequence_size, std::uint32_t total_num_subsequences,
+    std::uint32_t table_size, UNIT_TYPE *in_ptr, const uint *__restrict__ table,
+    sycl::uint4 *sync_points, const std::uint32_t bits_in_unit,
+    const std::uint32_t number_of_states, const STATE_TYPE initial_state,
     const std::uint32_t initial_bit,
     sycl::nd_item<1> &item) 
 {
@@ -242,7 +222,8 @@ void phase1_decode_subseq(
     std::uint32_t subsequences_processed = 0;
     bool synchronised_flag = false;
 
-    std::uint32_t last_subsequence = item.get_local_range(0) * (item.get_group(0) + 1) * 4;
+    std::uint32_t last_subsequence =
+        item.get_local_range(0) * (item.get_group(0) + 1) * 4;
     if(last_subsequence > total_num_subsequences)
       last_subsequence = total_num_subsequences;
 
@@ -250,9 +231,8 @@ void phase1_decode_subseq(
       if(subsequences_processed >= 4) {
         sycl::uint4 sync_point = sync_points[current_subsequence + i];
 
-        if(sync_point.x() == last_word_unit
-            && sync_point.y() == last_word_bit
-            && sync_point.w() == last_state) {
+        if (sync_point.x() == last_word_unit &&
+            sync_point.y() == last_word_bit && sync_point.w() == last_state) {
           synchronised_flag = true;
         }
       }
@@ -264,7 +244,7 @@ void phase1_decode_subseq(
     bool wrt2 = false;
     bool wrt3 = false;
 
-    while(subsequences_processed < item.get_local_range(0) * 4) {
+    while (subsequences_processed < item.get_local_range(2) * 4) {
 
       if(!synchronised_flag
           && current_subsequence < last_subsequence) {
@@ -359,17 +339,11 @@ void phase1_decode_subseq(
 }
 
 void phase2_synchronise_blocks(
-    std::uint32_t subsequence_size,
-    std::uint32_t total_num_subsequences,
-    std::uint32_t table_size,
-    std::uint32_t num_blocks,
-    UNIT_TYPE* in_ptr,
-    const uint* __restrict__ table,
-    sycl::uint4* sync_points,
-    SYMBOL_TYPE* block_synchronised,
-    const std::uint32_t bits_in_unit,
-    const std::uint32_t number_of_states,
-    const STATE_TYPE initial_state,
+    std::uint32_t subsequence_size, std::uint32_t total_num_subsequences,
+    std::uint32_t table_size, std::uint32_t num_blocks, UNIT_TYPE *in_ptr,
+    const uint *__restrict__ table, sycl::uint4 *sync_points,
+    SYMBOL_TYPE *block_synchronised, const std::uint32_t bits_in_unit,
+    const std::uint32_t number_of_states, const STATE_TYPE initial_state,
     sycl::nd_item<1> &item) 
 {
   const std::uint32_t gid = item.get_group(0);
@@ -388,7 +362,7 @@ void phase2_synchronise_blocks(
     std::uint8_t* out_ptr = 0;
 
     // jump to first sequence of the block
-    std::uint32_t current_subsequence = (gid + 1) * item.get_local_range(0);
+    std::uint32_t current_subsequence = (gid + 1) * item.get_local_range(2);
 
     // search for synchronised sequences at the end of previous block
     sycl::uint4 sync_point = sync_points[current_subsequence - 1];
@@ -420,7 +394,7 @@ void phase2_synchronise_blocks(
     std::uint32_t subsequences_processed = 0;
     bool synchronised_flag = false;
 
-    while(subsequences_processed < item.get_local_range(0)) {
+    while (subsequences_processed < item.get_local_range(2)) {
 
       if(!synchronised_flag) {
         decode_subsequence(subsequence_size, current_subsequence,
@@ -434,9 +408,8 @@ void phase2_synchronise_blocks(
         sync_point = sync_points[current_subsequence];
 
         // if sync point detected
-        if(sync_point.x() == last_word_unit
-            && sync_point.y() == last_word_bit
-            && sync_point.w() == last_state) {
+        if (sync_point.x() == last_word_unit &&
+            sync_point.y() == last_word_bit && sync_point.w() == last_state) {
           sync_point.z() = num_symbols;
 
           block_synchronised[gid + 1] = 1;
@@ -466,9 +439,9 @@ void phase2_synchronise_blocks(
 
 void phase3_copy_num_symbols_from_sync_points_to_aux(
     std::uint32_t total_num_subsequences,
-    const sycl::uint4* __restrict__ sync_points,
-    std::uint32_t* subsequence_output_sizes,
-    sycl::nd_item<1> &item) 
+    const sycl::uint4 *__restrict__ sync_points,
+    std::uint32_t *subsequence_output_sizes,
+    sycl::nd_item<1> &item)
 {
   const std::uint32_t gid = item.get_global_id(0);
 
@@ -478,10 +451,9 @@ void phase3_copy_num_symbols_from_sync_points_to_aux(
 }
 
 void phase3_copy_num_symbols_from_aux_to_sync_points(
-    std::uint32_t total_num_subsequences,
-    sycl::uint4* sync_points,
-    const std::uint32_t* __restrict__ subsequence_output_sizes,
-    sycl::nd_item<1> &item) 
+    std::uint32_t total_num_subsequences, sycl::uint4 *sync_points,
+    const std::uint32_t *__restrict__ subsequence_output_sizes,
+    sycl::nd_item<1> &item)
 {
   const std::uint32_t gid = item.get_global_id(0);
 
@@ -491,19 +463,13 @@ void phase3_copy_num_symbols_from_aux_to_sync_points(
 }
 
 void phase4_decode_write_output(
-    std::uint32_t subsequence_size,
-    std::uint32_t total_num_subsequences,
-    std::uint32_t table_size,
-    UNIT_TYPE* in_ptr,
-    SYMBOL_TYPE* out_ptr,
-    std::uint32_t output_size,
-    const uint* __restrict__ table,
-    const sycl::uint4* __restrict__ sync_points,
-    const std::uint32_t bits_in_unit,
-    const std::uint32_t number_of_states,
-    const STATE_TYPE initial_state,
-    const std::uint32_t initial_bit,
-    sycl::nd_item<1> &item) 
+    std::uint32_t subsequence_size, std::uint32_t total_num_subsequences,
+    std::uint32_t table_size, UNIT_TYPE *in_ptr, SYMBOL_TYPE *out_ptr,
+    std::uint32_t output_size, const uint *__restrict__ table,
+    const sycl::uint4 *__restrict__ sync_points,
+    const std::uint32_t bits_in_unit, const std::uint32_t number_of_states,
+    const STATE_TYPE initial_state, const std::uint32_t initial_bit,
+    sycl::nd_item<1> &item)
 {
   const std::uint32_t gid = item.get_global_id(0);
 
@@ -540,8 +506,8 @@ void phase4_decode_write_output(
     sycl::uint4 next_sync_point = sync_points[current_subsequence + 1];
 
     std::uint32_t out_pos = sync_point.z();
-    std::uint32_t next_out_pos = gid == total_num_subsequences - 1 ?
-      output_size : next_sync_point.z();
+    std::uint32_t next_out_pos =
+        gid == total_num_subsequences - 1 ? output_size : next_sync_point.z();
 
     if(gid > 0) {
       sync_point = sync_points[current_subsequence - 1];
@@ -576,50 +542,27 @@ void phase4_decode_write_output(
 
 void cuhd::CUHDGPUDecoder::decode(
     sycl::queue &q,
-    sycl::buffer<UNIT_TYPE, 1> &d_input_buffer,
-    size_t input_size,
-    sycl::buffer<SYMBOL_TYPE, 1> &d_output_buffer,
-    size_t output_size,
-    sycl::buffer<std::uint32_t, 1> &d_table,
-    sycl::buffer<sycl::uint4, 1> &d_sync_info,
-    sycl::buffer<std::uint32_t, 1> &d_output_sizes,
-    sycl::buffer<std::uint8_t, 1> &d_sequence_synced,
-    std::uint8_t* h_sequence_synced,
-    STATE_TYPE initial_state,
-    std::uint32_t initial_bit,
-    std::uint32_t number_of_states,
-    size_t max_codeword_length,
-    size_t preferred_subsequence_size,
-    size_t threads_per_block) 
+    UNIT_TYPE *d_input_buffer, size_t input_size, SYMBOL_TYPE *d_output_buffer,
+    size_t output_size, std::uint32_t *d_table, sycl::uint4 *d_sync_info,
+    std::uint32_t *d_output_sizes, std::uint8_t *d_sequence_synced,
+    std::uint8_t *h_sequence_synced, STATE_TYPE initial_state,
+    std::uint32_t initial_bit, std::uint32_t number_of_states,
+    size_t max_codeword_length, size_t preferred_subsequence_size,
+    size_t threads_per_block)
 {
-
   size_t num_subseq = SDIV(input_size, preferred_subsequence_size);
   size_t num_sequences = SDIV(num_subseq, threads_per_block);
-  //printf("#subseq=%lu #seq=%lu\n", num_subseq, num_sequences);
 
   const std::uint32_t bits_in_unit = sizeof(UNIT_TYPE) * 8;
 
   // launch phase 1 (intra-sequence synchronisation)
   sycl::range<1> p1_gws(num_sequences * threads_per_block);
   sycl::range<1> p1_lws(threads_per_block);
-  q.submit([&] (sycl::handler& cgh) {
-    auto input_buffer = d_input_buffer.get_access<sycl::access::mode::read>(cgh);
-    auto table = d_table.get_access<sycl::access::mode::read>(cgh);
-    auto sync_info = d_sync_info.get_access<sycl::access::mode::discard_write>(cgh);
-    cgh.parallel_for<class p1>(sycl::nd_range<1>(p1_gws, p1_lws), [=] (sycl::nd_item<1> item) {
-      phase1_decode_subseq(
-      preferred_subsequence_size,
-      num_subseq,
-      max_codeword_length,
-      input_buffer.get_pointer(),
-      table.get_pointer(),
-      sync_info.get_pointer(),
-      bits_in_unit,
-      number_of_states,
-      initial_state,
-      initial_bit,
-      item);
-    });
+  q.parallel_for(sycl::nd_range<1>(p1_gws, p1_lws), [=](sycl::nd_item<1> item) {
+    phase1_decode_subseq(preferred_subsequence_size, num_subseq,
+                         max_codeword_length, d_input_buffer, d_table,
+                         d_sync_info, bits_in_unit, number_of_states,
+                         initial_state, initial_bit, item);
   });
 
   // launch phase 2 (inter-sequence synchronisation)
@@ -628,33 +571,15 @@ void cuhd::CUHDGPUDecoder::decode(
   do {
     sycl::range<1> p2_gws(num_sequences * threads_per_block);
     sycl::range<1> p2_lws(threads_per_block);
-    q.submit([&] (sycl::handler& cgh) {
-      auto input_buffer = d_input_buffer.get_access<sycl::access::mode::read>(cgh);
-      auto table = d_table.get_access<sycl::access::mode::read>(cgh);
-      auto sync_info = d_sync_info.get_access<sycl::access::mode::read_write>(cgh);
-      auto sequence_synced = d_sequence_synced.get_access<sycl::access::mode::discard_write>(cgh);
-      cgh.parallel_for<class p2>(sycl::nd_range<1>(p2_gws, p2_lws), [=] (sycl::nd_item<1> item) {
+    q.parallel_for(sycl::nd_range<1>(p2_gws, p2_lws), [=](sycl::nd_item<1> item) {
       phase2_synchronise_blocks(
-          preferred_subsequence_size,
-          num_subseq,
-          max_codeword_length,
-          num_sequences,
-          input_buffer.get_pointer(),
-          table.get_pointer(),
-          sync_info.get_pointer(),
-          sequence_synced.get_pointer(),
-          bits_in_unit,
-          number_of_states,
-          initial_state,
-          item);
-      });
+          preferred_subsequence_size, num_subseq, max_codeword_length,
+          num_sequences, d_input_buffer, d_table, d_sync_info,
+          d_sequence_synced, bits_in_unit, number_of_states, initial_state, item);
     });
 
-    // aux->retrieve_sync_data();
-    q.submit([&] (sycl::handler& cgh) {
-      auto acc = d_sequence_synced.get_access<sycl::access::mode::read>(cgh);
-      cgh.copy(acc, h_sequence_synced);
-    }).wait();
+    q.memcpy(h_sequence_synced, d_sequence_synced,
+                num_sequences * sizeof(std::uint8_t)).wait();
 
     bool zero_found = false;
 
@@ -679,16 +604,9 @@ void cuhd::CUHDGPUDecoder::decode(
 
   sycl::range<1> p3_gws(num_subseq * threads_per_block);
   sycl::range<1> p3_lws(threads_per_block);
-  q.submit([&] (sycl::handler& cgh) {
-    auto output_sizes = d_output_sizes.get_access<sycl::access::mode::discard_write>(cgh);
-    auto sync_info = d_sync_info.get_access<sycl::access::mode::read>(cgh);
-    cgh.parallel_for<class p3>(sycl::nd_range<1>(p3_gws, p3_lws), [=] (sycl::nd_item<1> item) {
-      phase3_copy_num_symbols_from_sync_points_to_aux(
-        num_subseq, 
-        sync_info.get_pointer(),
-        output_sizes.get_pointer(),
-        item);
-    });
+  q.parallel_for(sycl::nd_range<1>(p3_gws, p3_lws), [=](sycl::nd_item<1> item) {
+    phase3_copy_num_symbols_from_sync_points_to_aux(num_subseq, d_sync_info,
+                                                    d_output_sizes, item);
   });
 
   //thrust::device_ptr<std::uint32_t> thrust_sync_points(d_output_sizes);
@@ -697,58 +615,29 @@ void cuhd::CUHDGPUDecoder::decode(
 
   std::uint32_t *h_output_sizes = (std::uint32_t*) malloc ((num_subseq + 1) * sizeof(std::uint32_t));
   h_output_sizes[0] = 0;
-  q.submit([&] (sycl::handler& cgh) {
-    auto acc = d_output_sizes.get_access<sycl::access::mode::read>(cgh);
-    cgh.copy(acc, h_output_sizes+1);
-  }).wait();
+  q.memcpy(h_output_sizes + 1, d_output_sizes,
+              num_subseq * sizeof(std::uint32_t)).wait();
 
   for (int i = 1; i < num_subseq; i++) {
     h_output_sizes[i] += h_output_sizes[i-1];
   }
+  q.memcpy(d_output_sizes, h_output_sizes,
+              num_subseq * sizeof(std::uint32_t)).wait();
+  free(h_output_sizes);
 
-  q.submit([&] (sycl::handler& cgh) {
-    auto acc = d_output_sizes.get_access<sycl::access::mode::discard_write>(cgh);
-    cgh.copy(h_output_sizes, acc);
+  q.parallel_for(sycl::nd_range<1>(p3_gws, p3_lws), [=](sycl::nd_item<1> item) {
+    phase3_copy_num_symbols_from_aux_to_sync_points(num_subseq, d_sync_info,
+                                                    d_output_sizes, item);
   });
 
-  q.submit([&] (sycl::handler& cgh) {
-    auto output_sizes = d_output_sizes.get_access<sycl::access::mode::read>(cgh);
-    auto sync_info = d_sync_info.get_access<sycl::access::mode::write>(cgh);
-    cgh.parallel_for<class p3_2>(sycl::nd_range<1>(p3_gws, p3_lws), [=] (sycl::nd_item<1> item) {
-      phase3_copy_num_symbols_from_aux_to_sync_points(
-        num_subseq, 
-        sync_info.get_pointer(),
-        output_sizes.get_pointer(),
-        item);
-    });
-  });
-
-  // launch phase4 (final decoding)
-
+  // launch phase 4 (final decoding)
   sycl::range<1> p4_gws(num_sequences * threads_per_block);
   sycl::range<1> p4_lws(threads_per_block);
-  q.submit([&] (sycl::handler& cgh) {
-    auto input_buffer = d_input_buffer.get_access<sycl::access::mode::read>(cgh);
-    auto output_buffer = d_output_buffer.get_access<sycl::access::mode::write>(cgh);
-    auto table = d_table.get_access<sycl::access::mode::read>(cgh);
-    auto sync_info = d_sync_info.get_access<sycl::access::mode::read>(cgh);
-    cgh.parallel_for<class p4>(sycl::nd_range<1>(p4_gws, p4_lws), [=] (sycl::nd_item<1> item) {
-      phase4_decode_write_output(
-      preferred_subsequence_size,
-      num_subseq,
-      max_codeword_length,
-      input_buffer.get_pointer(),
-      output_buffer.get_pointer(),
-      output_size,
-      table.get_pointer(),
-      sync_info.get_pointer(),
-      bits_in_unit,
-      number_of_states,
-      initial_state,
-      initial_bit,
-      item);
-    });
+  q.parallel_for(sycl::nd_range<1>(p4_gws, p4_lws), [=](sycl::nd_item<1> item) {
+    phase4_decode_write_output(
+        preferred_subsequence_size, num_subseq, max_codeword_length,
+        d_input_buffer, d_output_buffer, output_size, d_table, d_sync_info,
+        bits_in_unit, number_of_states, initial_state, initial_bit, item);
   });
-
-  free(h_output_sizes);
 }
+
