@@ -1,6 +1,6 @@
-inline uint rgbToyuv(float3 rgba)
+inline uint rgbToyuv(sycl::float3 rgba)
 {
-  float3 yuv;
+  sycl::float3 yuv;
   yuv.x() = 0.299f*rgba.x() + 0.587f*rgba.y()+0.114f*rgba.z();
   yuv.y() = 0.713f*(rgba.x() - yuv.x()) + 0.5f;
   yuv.z() = 0.564f*(rgba.z() - yuv.x()) + 0.5f;
@@ -32,8 +32,8 @@ inline uint bitCount(uint v)
 }
 
 void check_connect(
-  nd_item<1> &item,
-  const float3 *__restrict rgba,
+  sycl::nd_item<1> &item,
+  const sycl::float3 *__restrict rgba,
           uint *__restrict connect,
   const int w, const int h)
 {
@@ -99,7 +99,7 @@ void check_connect(
 
 
 void eliminate_crosses(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const uint *__restrict id,
         uint *__restrict od,
   const int w, const int h)
