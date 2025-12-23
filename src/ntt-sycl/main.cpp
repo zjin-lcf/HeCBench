@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
       sycl::local_accessor<uint64, 1> sm (sycl::range<1>(512), cgh);
       cgh.parallel_for<class intt_modcrt>(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        intt_3_64k_modcrt(item, sm.get_pointer(), d_res, d_ntt);
+        intt_3_64k_modcrt(item, sm.get_multi_ptr<sycl::access::decorated::no>().get(), d_res, d_ntt);
       });
     });
   }
