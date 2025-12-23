@@ -39,8 +39,6 @@ Original author: Rodrigo de Barros Vimieiro
 #include <chrono>
 #include <sycl/sycl.hpp>
 
-using namespace sycl;
-
 // thread block size
 #define BLOCK_SIZE 256
 
@@ -49,7 +47,7 @@ using namespace sycl;
 #define integrateYcoord 0
 
 void pad_projections_kernel(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
     double* d_img,
     const int nDetXMap,
     const int nDetYMap,
@@ -62,7 +60,7 @@ void pad_projections_kernel(
 }
 
 void map_boudaries_kernel(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
     double* d_pBound,
     const int nElem,
     const double valueLeftBound,
@@ -75,7 +73,7 @@ void map_boudaries_kernel(
 }
 
 void rot_detector_kernel(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
           double* __restrict d_pRdetY,
           double* __restrict d_pRdetZ,
     const double* __restrict d_pYcoord,
@@ -96,7 +94,7 @@ void rot_detector_kernel(
 }
 
 void mapDet2Slice_kernel(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
            double* __restrict const pXmapp,
            double* __restrict const pYmapp,
     double tubeX,
@@ -127,7 +125,7 @@ void mapDet2Slice_kernel(
 }
 
 void img_integration_kernel(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
     double* d_img,
     const int nPixX,
     const int nPixY,
@@ -189,7 +187,7 @@ void img_integration_kernel(
 }
 
 void bilinear_interpolation_kernel(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
           double* __restrict d_sliceI,
     const double* __restrict d_pProj,
     const double* __restrict d_pObjX,
@@ -253,7 +251,7 @@ void bilinear_interpolation_kernel(
 }
 
 void differentiation_kernel(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
           double* __restrict d_pVolume,
     const double* __restrict d_sliceI,
     double tubeX,
@@ -338,7 +336,7 @@ void differentiation_kernel(
 }
 
 void division_kernel(
-    nd_item<3> &item,
+    sycl::nd_item<3> &item,
     double* d_img,
     const int nPixX,
     const int nPixY,
@@ -385,36 +383,36 @@ void backprojectionDDb(
   const int nPixYMap = nPixY + 1;
 
 #ifdef USE_GPU
-  queue q(gpu_selector_v, property::queue::in_order());
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  queue q(cpu_selector_v, property::queue::in_order());
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  double *d_pProj = malloc_device<double>(nDetXMap*nDetYMap*nProj, q);
-  double *d_sliceI = malloc_device<double>(nPixXMap*nPixYMap, q);
-  double *d_pVolume = malloc_device<double>(nPixX*nPixY*nSlices, q);
+  double *d_pProj = sycl::malloc_device<double>(nDetXMap*nDetYMap*nProj, q);
+  double *d_sliceI = sycl::malloc_device<double>(nPixXMap*nPixYMap, q);
+  double *d_pVolume = sycl::malloc_device<double>(nPixX*nPixY*nSlices, q);
 
   // device memory for projections coordinates
-  double *d_pDetX = malloc_device<double>( nDetXMap , q);
-  double *d_pDetY = malloc_device<double>( nDetYMap , q);
-  double *d_pDetZ = malloc_device<double>( nDetYMap , q);
-  double *d_pObjX = malloc_device<double>( nPixXMap , q);
-  double *d_pObjY = malloc_device<double>( nPixYMap , q);
-  double *d_pObjZ = malloc_device<double>( nSlices , q);
+  double *d_pDetX = sycl::malloc_device<double>( nDetXMap , q);
+  double *d_pDetY = sycl::malloc_device<double>( nDetYMap , q);
+  double *d_pDetZ = sycl::malloc_device<double>( nDetYMap , q);
+  double *d_pObjX = sycl::malloc_device<double>( nPixXMap , q);
+  double *d_pObjY = sycl::malloc_device<double>( nPixYMap , q);
+  double *d_pObjZ = sycl::malloc_device<double>( nSlices , q);
 
   // device memory for mapped coordinates
-  double *d_pDetmY = malloc_device<double>( nDetYMap , q);
-  double *d_pDetmX = malloc_device<double>( nDetYMap * nDetXMap , q);
+  double *d_pDetmY = sycl::malloc_device<double>( nDetYMap , q);
+  double *d_pDetmX = sycl::malloc_device<double>( nDetYMap * nDetXMap , q);
 
   // device memory for rotated detector coords
-  double *d_pRdetY = malloc_device<double>( nDetYMap , q);
-  double *d_pRdetZ = malloc_device<double>( nDetYMap , q);
+  double *d_pRdetY = sycl::malloc_device<double>( nDetYMap , q);
+  double *d_pRdetZ = sycl::malloc_device<double>( nDetYMap , q);
 
   auto start = std::chrono::steady_clock::now();
 
   // Will reuse grid configurations
-  range<3> gws (1,1,1);
-  range<3> lws (1,1,1);
+  sycl::range<3> gws (1,1,1);
+  sycl::range<3> lws (1,1,1);
 
   const int maxThreadsPerBlock = BLOCK_SIZE;
 
@@ -430,8 +428,8 @@ void backprojectionDDb(
   for (int np = 0; np < nProj; np++) {
 
     // Pad on X coord direction
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class pad>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class pad>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         pad_projections_kernel (item, d_pProj,
                                 nDetXMap, nDetYMap, nDetXMap, np);
       });
@@ -453,43 +451,42 @@ void backprojectionDDb(
   // Generate detector and object boudaries
 
   lws[2] = maxThreadsPerBlock;
-
   gws[2] = (nDetX / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class map_detX>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class map_detX>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       map_boudaries_kernel(item, d_pDetX, nDetXMap, (double)nDetX, -du, 0.0);
     });
   });
 
   gws[2] = (nDetY / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class map_detY>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class map_detY>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       map_boudaries_kernel(item, d_pDetY, nDetYMap, nDetY / 2.0, dv, 0.0);
     });
   });
 
   gws[2] = (nPixX / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class map_pixX>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class map_pixX>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       map_boudaries_kernel(item, d_pObjX, nPixXMap, (double)nPixX, -dx, 0.0);
     });
   });
 
   gws[2] = (nPixY / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class map_pixY>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class map_pixY>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       map_boudaries_kernel(item, d_pObjY, nPixYMap, nPixY / 2.0, dy, 0.0);
     });
   });
 
   gws[2] = (nSlices / maxThreadsPerBlock + 1) * maxThreadsPerBlock;
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class map_pixZ>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class map_pixZ>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       map_boudaries_kernel(item, d_pObjZ, nSlices, 0.0, dz, DAG + (dz / 2.0));
     });
   });
@@ -522,8 +519,8 @@ void backprojectionDDb(
   int Xk = (int)ceilf((float)nDetXMap / (8 - 1));
   for (int k = 0; k < Xk; k++) {
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class img_integralX>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class img_integralX>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         img_integration_kernel(item, d_pProj,
           nDetXMap, nDetYMap, integrateXcoord, 0, k * 9, nProj);
       });
@@ -542,8 +539,8 @@ void backprojectionDDb(
   int Yk = (int)ceilf((float)nDetYMap / (8 - 1));
   for (int k = 0; k < Yk; k++) {
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class img_integralY>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class img_integralY>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         img_integration_kernel(item, d_pProj,
             nDetXMap, nDetYMap, integrateYcoord, k * 9, 0, nProj);
       });
@@ -589,8 +586,8 @@ void backprojectionDDb(
     gws[1] = 1;
     gws[0] = 1;
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for<class rot_det>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class rot_det>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
         rot_detector_kernel(item, d_pRdetY, d_pRdetZ, d_pDetY, d_pDetZ,
                             isoY, isoZ, phi, nDetYMap);
       });
@@ -609,8 +606,8 @@ void backprojectionDDb(
       gws[1] = (nDetXMap / 16 + 1) * 16;
       gws[0] = 1;
 
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class mapDet2Slice>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class mapDet2Slice>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
           mapDet2Slice_kernel (
             item,
             d_pDetmX, d_pDetmY, tubeX, rtubeY, rtubeZ, 
@@ -624,8 +621,8 @@ void backprojectionDDb(
       gws[2] = (nPixYMap / 16 + 1) * 16;
       gws[1] = (nPixXMap / 16 + 1) * 16;
 
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class bilinear_interp>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class bilinear_interp>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
           bilinear_interpolation_kernel (item,
             d_sliceI, d_pProj,
             d_pObjX, d_pObjY, 
@@ -639,8 +636,8 @@ void backprojectionDDb(
       gws[2] = (nPixY / 16 + 1) * 16;
       gws[1] = (nPixX / 16 + 1) * 16;
 
-      q.submit([&] (handler &cgh) {
-        cgh.parallel_for<class diff>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class diff>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
           differentiation_kernel (
             item, d_pVolume, d_sliceI, 
             tubeX, rtubeY, rtubeZ,
@@ -663,8 +660,8 @@ void backprojectionDDb(
   gws[1] = (nPixX / 8 + 1) * 8;
   gws[0] = (nSlices / 4 + 1) * 4;
 
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for<class div>(nd_range<3>(gws, lws), [=] (nd_item<3> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class div>(sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
       division_kernel (item, d_pVolume, 
                        nPixX, nPixY, nSlices, nProj2Run);
     });
@@ -676,19 +673,19 @@ void backprojectionDDb(
 
   q.memcpy(h_pVolume, d_pVolume, nSlices* nPixX * nPixY * sizeof(double));
 
-  free(d_pProj, q);
-  free(d_sliceI, q);
-  free(d_pVolume, q);
-  free(d_pDetX, q);
-  free(d_pDetY, q);
-  free(d_pDetZ, q);
-  free(d_pObjX, q);
-  free(d_pObjY, q);
-  free(d_pObjZ, q);
-  free(d_pDetmY, q);
-  free(d_pDetmX, q);
-  free(d_pRdetY, q);
-  free(d_pRdetZ, q);
+  sycl::free(d_pProj, q);
+  sycl::free(d_sliceI, q);
+  sycl::free(d_pVolume, q);
+  sycl::free(d_pDetX, q);
+  sycl::free(d_pDetY, q);
+  sycl::free(d_pDetZ, q);
+  sycl::free(d_pObjX, q);
+  sycl::free(d_pObjY, q);
+  sycl::free(d_pObjZ, q);
+  sycl::free(d_pDetmY, q);
+  sycl::free(d_pDetmX, q);
+  sycl::free(d_pRdetY, q);
+  sycl::free(d_pRdetZ, q);
 }
 
 int main() 
