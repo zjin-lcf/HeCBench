@@ -347,90 +347,62 @@ void rank_gpu_kernel_7(
     k = partial_verify_vals[i];          
     if(0<k && k<=NUM_KEYS-1){
       int key_rank = key_buff_ptr[k-1];
-      int failed = 0;
       switch(CLASS){
         case 'S':
           if(i<=2){
-            if(key_rank != test_rank_array[i]+iteration)
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]+iteration)
               passed_verification++;
           }else{
-            if(key_rank != test_rank_array[i]-iteration)
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]-iteration)
               passed_verification++;
           }
           break;
         case 'W':
           if(i<2){
-            if(key_rank != test_rank_array[i]+(iteration-2))
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]+(iteration-2))
               passed_verification++;
           }else{
-            if(key_rank != test_rank_array[i]-iteration)
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]-iteration)
               passed_verification++;
           }
           break;
         case 'A':
           if(i<=2){
-            if(key_rank != test_rank_array[i]+(iteration-1))
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]+(iteration-1))
               passed_verification++;
           }else{
-            if(key_rank != test_rank_array[i]-(iteration-1))
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]-(iteration-1))
               passed_verification++;
           }
           break;
         case 'B':
           if(i==1 || i==2 || i==4){
-            if(key_rank != test_rank_array[i]+iteration)
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]+iteration)
               passed_verification++;
           }
           else{
-            if(key_rank != test_rank_array[i]-iteration)
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]-iteration)
               passed_verification++;
           }
           break;
         case 'C':
           if(i<=2){
-            if(key_rank != test_rank_array[i]+iteration)
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]+iteration)
               passed_verification++;
           }else{
-            if(key_rank != test_rank_array[i]-iteration)
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]-iteration)
               passed_verification++;
           }
           break;
         case 'D':
           if(i<2){
-            if(key_rank != test_rank_array[i]+iteration)
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]+iteration)
               passed_verification++;
           }else{
-            if(key_rank != test_rank_array[i]-iteration)
-              failed = 1;
-            else
+            if(key_rank == test_rank_array[i]-iteration)
               passed_verification++;
           }
           break;
-      }
-      if(failed==1){
-        printf("Failed partial verification: iteration %d, test key %d\n", iteration, (int)i);
       }
     }
   }

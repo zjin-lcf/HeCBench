@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
@@ -271,7 +272,7 @@ int main(int argc, char** argv){
         sycl::nd_range<1>(gws_rank_4, lws_rank_4), [=] (sycl::nd_item<1> item) {
         rank_gpu_kernel_4(
             item,
-            smem.get_pointer(),
+            smem.get_multi_ptr<sycl::access::decorated::no>().get(),
             key_buff1_device,
             key_buff1_device,
             sum_device,
@@ -286,7 +287,7 @@ int main(int argc, char** argv){
         sycl::nd_range<1>(gws_rank_5, lws_rank_5), [=] (sycl::nd_item<1> item) {
         rank_gpu_kernel_5 (
           item,
-          smem.get_pointer(),
+          smem.get_multi_ptr<sycl::access::decorated::no>().get(),
           sum_device,
           sum_device,
           blocks_per_grid_on_rank_5,
@@ -383,7 +384,7 @@ int main(int argc, char** argv){
       sycl::nd_range<1>(gws_verify_3, lws_verify_3), [=] (sycl::nd_item<1> item) {
       full_verify_gpu_kernel_3(
         item,
-        smem.get_pointer(),
+        smem.get_multi_ptr<sycl::access::decorated::no>().get(),
         key_array_device,
         memory_aux_device,
         blocks_per_grid_on_full_verify_3,
