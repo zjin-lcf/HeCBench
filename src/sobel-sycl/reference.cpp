@@ -1,3 +1,4 @@
+#include <cmath>
 #include <sycl/sycl.hpp>
 
 using uchar4 = sycl::uchar4;
