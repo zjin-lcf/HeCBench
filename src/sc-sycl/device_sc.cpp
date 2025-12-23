@@ -194,7 +194,9 @@ void call_StreamCompaction_kernel(sycl::queue &q, int blocks, int threads, int s
   q.submit([&](sycl::handler &cgh) {
     sycl::local_accessor<int, 1> sm (sycl::range<1>(l_mem_size/sizeof(int)), cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-      StreamCompaction(item, sm.get_pointer(), size, value, n_tasks, alpha, output, input, flags
+      StreamCompaction(item,
+                       sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                       size, value, n_tasks, alpha, output, input, flags
 #ifdef DYNAMIC_PARTITION
       , worklist
 #endif
