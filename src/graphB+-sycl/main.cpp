@@ -280,7 +280,7 @@ int main(int argc, char* argv[])
         auto border_level_nxt = border[level + 1];
 
         cgh.parallel_for<class treeLabel>(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) 
-           [[intel::reqd_sub_group_size(32)]] {
+           [[sycl::reqd_sub_group_size(32)]] {
           treelabel(g.nodes, d_g.nindex, d_g.nlist, d_einfo, d_inTree,
                     d_negCnt, d_parent, d_queue, d_label, level,
                     border_level_cur, border_level_nxt, item
