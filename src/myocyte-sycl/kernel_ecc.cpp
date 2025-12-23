@@ -825,22 +825,22 @@ void kernel_ecc(const fp timeinst, const fp *d_initvalu,
       (0.75 * d_initvalu_33 * sycl::exp(d_initvalu_39 * FoRT) - 0.75 * Nao) /
       (sycl::exp(d_initvalu_39 * FoRT) - 1);
   I_Ca_junc = (Fjunc_CaL * ibarca_j * d_initvalu_4 * d_initvalu_5 *
-               (1 - d_initvalu_6) * sycl::pow<double>(Q10CaL, Qpow)) *
+               (1 - d_initvalu_6) * sycl::pow(Q10CaL, Qpow)) *
               0.45;
   I_Ca_sl = (Fsl_CaL * ibarca_sl * d_initvalu_4 * d_initvalu_5 *
-             (1 - d_initvalu_7) * sycl::pow<double>(Q10CaL, Qpow)) *
+             (1 - d_initvalu_7) * sycl::pow(Q10CaL, Qpow)) *
             0.45;
   I_Ca = I_Ca_junc+I_Ca_sl;
   d_finavalu[offset_43]=-I_Ca*Cmem/(Vmyo*2*Frdy)*1e3;
   I_CaK = (ibark * d_initvalu_4 * d_initvalu_5 *
            (Fjunc_CaL * (1 - d_initvalu_6) + Fsl_CaL * (1 - d_initvalu_7)) *
-           sycl::pow<double>(Q10CaL, Qpow)) *
+           sycl::pow(Q10CaL, Qpow)) *
           0.45;
   I_CaNa_junc = (Fjunc_CaL * ibarna_j * d_initvalu_4 * d_initvalu_5 *
-                 (1 - d_initvalu_6) * sycl::pow<double>(Q10CaL, Qpow)) *
+                 (1 - d_initvalu_6) * sycl::pow(Q10CaL, Qpow)) *
                 0.45;
   I_CaNa_sl = (Fsl_CaL * ibarna_sl * d_initvalu_4 * d_initvalu_5 *
-               (1 - d_initvalu_7) * sycl::pow<double>(Q10CaL, Qpow)) *
+               (1 - d_initvalu_7) * sycl::pow(Q10CaL, Qpow)) *
               0.45;
   // I_CaNa = I_CaNa_junc+I_CaNa_sl;
   // I_Catot = I_Ca+I_CaK+I_CaNa;
@@ -872,22 +872,22 @@ void kernel_ecc(const fp timeinst, const fp *d_initvalu,
            sycl::pown(d_initvalu_33, 3) * Cao +
            sycl::pown(Nao, 3) * d_initvalu_37) *
           (1 + ksat * sycl::exp((nu - 1) * d_initvalu_39 * FoRT));
-  I_ncx_junc = Fjunc * IbarNCX * sycl::pow<double>(Q10NCX, Qpow) * Ka_junc *
+  I_ncx_junc = Fjunc * IbarNCX * sycl::pow(Q10NCX, Qpow) * Ka_junc *
                (s1_junc - s2_junc) / s3_junc;
-  I_ncx_sl = Fsl * IbarNCX * sycl::pow<double>(Q10NCX, Qpow) * Ka_sl *
+  I_ncx_sl = Fsl * IbarNCX * sycl::pow(Q10NCX, Qpow) * Ka_sl *
              (s1_sl - s2_sl) / s3_sl;
   I_ncx = I_ncx_junc+I_ncx_sl;
   d_finavalu[offset_45]=2*I_ncx*Cmem/(Vmyo*2*Frdy)*1e3;
 
   // I_pca: Sarcolemmal Ca Pump Current
-  I_pca_junc = Fjunc * sycl::pow<double>(Q10SLCaP, Qpow) * IbarSLCaP *
-               sycl::pow<double>(d_initvalu_36, fp(1.6)) /
-               (sycl::pow<double>(KmPCa, fp(1.6)) +
-                sycl::pow<double>(d_initvalu_36, fp(1.6)));
-  I_pca_sl = Fsl * sycl::pow<double>(Q10SLCaP, Qpow) * IbarSLCaP *
-             sycl::pow<double>(d_initvalu_37, fp(1.6)) /
-             (sycl::pow<double>(KmPCa, fp(1.6)) +
-              sycl::pow<double>(d_initvalu_37, fp(1.6)));
+  I_pca_junc = Fjunc * sycl::pow(Q10SLCaP, Qpow) * IbarSLCaP *
+               sycl::pow(d_initvalu_36, fp(1.6)) /
+               (sycl::pow(KmPCa, fp(1.6)) +
+                sycl::pow(d_initvalu_36, fp(1.6)));
+  I_pca_sl = Fsl * sycl::pow(Q10SLCaP, Qpow) * IbarSLCaP *
+             sycl::pow(d_initvalu_37, fp(1.6)) /
+             (sycl::pow(KmPCa, fp(1.6)) +
+              sycl::pow(d_initvalu_37, fp(1.6)));
   I_pca = I_pca_junc+I_pca_sl;
   d_finavalu[offset_44]=-I_pca*Cmem/(Vmyo*2*Frdy)*1e3;
 
@@ -901,7 +901,7 @@ void kernel_ecc(const fp timeinst, const fp *d_initvalu,
   MaxSR = 15; 
   MinSR = 1;
   kCaSR = MaxSR - (MaxSR - MinSR) /
-                      (1 + sycl::pow<double>(ec50SR / d_initvalu_31, fp(2.5)));
+                      (1 + sycl::pow(ec50SR / d_initvalu_31, fp(2.5)));
   koSRCa = koCa/kCaSR;
   kiSRCa = kiCa*kCaSR;
   RI = 1-d_initvalu_14-d_initvalu_15-d_initvalu_16;
@@ -917,11 +917,11 @@ void kernel_ecc(const fp timeinst, const fp *d_initvalu,
       (kiSRCa * d_initvalu_36 * d_initvalu_15 - kim * d_initvalu_16) -
       (kom * d_initvalu_16 - koSRCa * d_initvalu_36 * d_initvalu_36 * RI); // I
   J_SRCarel = ks*d_initvalu_15*(d_initvalu_31-d_initvalu_36);                          // [mM/ms]
-  J_serca = sycl::pow<double>(Q10SRCaP, Qpow) * Vmax_SRCaP *
-            (sycl::pow<double>((d_initvalu_38 / Kmf), hillSRCaP) -
-             sycl::pow<double>((d_initvalu_31 / Kmr), hillSRCaP)) /
-            (1 + sycl::pow<double>((d_initvalu_38 / Kmf), hillSRCaP) +
-             sycl::pow<double>((d_initvalu_31 / Kmr), hillSRCaP));
+  J_serca = sycl::pow(Q10SRCaP, Qpow) * Vmax_SRCaP *
+            (sycl::pow((d_initvalu_38 / Kmf), hillSRCaP) -
+             sycl::pow((d_initvalu_31 / Kmr), hillSRCaP)) /
+            (1 + sycl::pow((d_initvalu_38 / Kmf), hillSRCaP) +
+             sycl::pow((d_initvalu_31 / Kmr), hillSRCaP));
   J_SRleak = 5.348e-6*(d_initvalu_31-d_initvalu_36);                          //   [mM/ms]
 
   // Sodium and Calcium Buffering                            
