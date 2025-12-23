@@ -7,9 +7,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
+#include <sycl/sycl.hpp>
 #include <oneapi/mkl/rng/device.hpp>
 //#include "oneapi/mkl.hpp"
-#include "common.h"
 
 #define PI 3.14159265359f
 #define THREADS_PER_BLOCK 256
@@ -132,7 +132,7 @@ float rgamma(oneapi::mkl::rng::device::philox4x32x10<1> *state,
 /* 
    Initializes GPU random number generators 
  */
-void setup_kernel(nd_item<1> &item,
+void setup_kernel(sycl::nd_item<1> &item,
                   oneapi::mkl::rng::device::philox4x32x10<1> *state,
                   int num_sample, unsigned int seed)
 {
@@ -146,7 +146,7 @@ void setup_kernel(nd_item<1> &item,
 /*
    Sample each theta from the appropriate gamma distribution
  */
-void sample_theta(nd_item<1> &item,
+void sample_theta(sycl::nd_item<1> &item,
                   oneapi::mkl::rng::device::philox4x32x10<1> *__restrict state,
                   float *__restrict theta,
                   const int *__restrict y,
@@ -177,7 +177,7 @@ void sample_theta(nd_item<1> &item,
    THREADS_PER_BLOCK_ADD. The CPU will then sum the block
    sums (see main method);    
  */
-void sum_blocks(nd_item<1> &item, 
+void sum_blocks(sycl::nd_item<1> &item, 
                 float *__restrict flats,
                 float *__restrict logs,
                 const float *__restrict theta,
@@ -193,7 +193,7 @@ void sum_blocks(nd_item<1> &item,
   flats[lid] = (id < num_sample) ? theta[id] : 0.f;
   logs[lid] = (id < num_sample) ? sycl::log(theta[id]) : 0.f;
 
-  item.barrier(access::fence_space::local_space);
+  item.barrier(sycl::access::fence_space::local_space);
 
   int i = wgs / 2;
   while (i != 0) {
@@ -202,7 +202,7 @@ void sum_blocks(nd_item<1> &item,
       logs[lid] += logs[lid + i];
     }
     i /= 2;
-    item.barrier(access::fence_space::local_space);
+    item.barrier(sycl::access::fence_space::local_space);
   }
 
   if (lid == 0) {
@@ -214,11 +214,10 @@ void sum_blocks(nd_item<1> &item,
 int main(int argc, char *argv[]) {
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   const int seed = 123; // seed for random number generation
   srand(seed);
@@ -268,36 +267,36 @@ int main(int argc, char *argv[]) {
   float *dev_theta, *dev_fpsum, *dev_lpsum, *dev_n;
   int *dev_y;
 
-  dev_y = malloc_device<int>(N, q);
+  dev_y = sycl::malloc_device<int>(N, q);
   q.memcpy(dev_y, y, y_size);
 
-  dev_n = malloc_device<float>(N, q);
+  dev_n = sycl::malloc_device<float>(N, q);
   q.memcpy(dev_n, n, n_size);
 
   // Allocate memory for the partial flat and log sums
   int nSumBlocks = (N + (THREADS_PER_BLOCK_ADD - 1)) / THREADS_PER_BLOCK_ADD;
-  range<1> sum_gws (nSumBlocks * THREADS_PER_BLOCK_ADD);
-  range<1> sum_lws (THREADS_PER_BLOCK_ADD);
+  sycl::range<1> sum_gws (nSumBlocks * THREADS_PER_BLOCK_ADD);
+  sycl::range<1> sum_lws (THREADS_PER_BLOCK_ADD);
 
-  dev_fpsum = malloc_device<float>(nSumBlocks, q);
-  dev_lpsum = malloc_device<float>(nSumBlocks, q);
+  dev_fpsum = sycl::malloc_device<float>(nSumBlocks, q);
+  dev_lpsum = sycl::malloc_device<float>(nSumBlocks, q);
 
   /* Allocate space for theta on device and host */
-  dev_theta = malloc_device<float>(N, q);
+  dev_theta = sycl::malloc_device<float>(N, q);
 
   /* Allocate space for random states on device */
   oneapi::mkl::rng::device::philox4x32x10<1> *devStates;
-  devStates = malloc_device<oneapi::mkl::rng::device::philox4x32x10<1>>(N, q);
+  devStates = sycl::malloc_device<oneapi::mkl::rng::device::philox4x32x10<1>>(N, q);
 
   /*------ Setup RNG ---------------------------------------------*/
 
   int nBlocks = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-  range<1> rng_gws (nBlocks * THREADS_PER_BLOCK);
-  range<1> rng_lws (THREADS_PER_BLOCK);
+  sycl::range<1> rng_gws (nBlocks * THREADS_PER_BLOCK);
+  sycl::range<1> rng_lws (THREADS_PER_BLOCK);
 
   // Setup the rng machines (one for each thread)
-  q.submit([&] (handler &cgh) {
-    cgh.parallel_for(nd_range<1>(rng_gws, rng_lws), [=](nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<1>(rng_gws, rng_lws), [=](sycl::nd_item<1> item) {
       setup_kernel(item, devStates, N, seed);
     });
   });
@@ -311,20 +310,20 @@ int main(int argc, char *argv[]) {
   for(int i = 0; i < trials; i++) {
     auto start = std::chrono::steady_clock::now();
 
-    q.submit([&] (handler &cgh) {
-      cgh.parallel_for(nd_range<1>(rng_gws, rng_lws), [=](nd_item<1> item) {
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(rng_gws, rng_lws), [=](sycl::nd_item<1> item) {
         sample_theta(item, devStates, dev_theta, dev_y, dev_n, a, b, N);
       });
     });
 
     // Sum the flat and log values of theta
-    q.submit([&](handler &cgh) {
-      accessor<float, 1, access_mode::read_write, access::target::local>
-          flats_acc(range<1>(THREADS_PER_BLOCK_ADD), cgh);
-      accessor<float, 1, access_mode::read_write, access::target::local>
-          logs_acc(range<1>(THREADS_PER_BLOCK_ADD), cgh);
-      cgh.parallel_for(nd_range<1>(sum_gws, sum_lws), [=](nd_item<1> item) {
-        sum_blocks(item, flats_acc.get_pointer(), logs_acc.get_pointer(),
+    q.submit([&](sycl::handler &cgh) {
+      sycl::local_accessor<float, 1> flats_acc(sycl::range<1>(THREADS_PER_BLOCK_ADD), cgh);
+      sycl::local_accessor<float, 1> logs_acc(sycl::range<1>(THREADS_PER_BLOCK_ADD), cgh);
+      cgh.parallel_for(sycl::nd_range<1>(sum_gws, sum_lws), [=](sycl::nd_item<1> item) {
+        sum_blocks(item,
+                   flats_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                   logs_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
                    dev_theta, dev_fpsum, dev_lpsum, N);
       });
     });
@@ -359,12 +358,12 @@ int main(int argc, char *argv[]) {
   printf("a = %lf (avg), b = %lf (avg)\n", mean_a / trials, mean_b / trials);
 
   /*------ Free Memory -------------------------------------------*/
-  free(devStates, q);
-  free(dev_theta, q);
-  free(dev_fpsum, q);
-  free(dev_lpsum, q);
-  free(dev_y, q);
-  free(dev_n, q);
+  sycl::free(devStates, q);
+  sycl::free(dev_theta, q);
+  sycl::free(dev_fpsum, q);
+  sycl::free(dev_lpsum, q);
+  sycl::free(dev_y, q);
+  sycl::free(dev_n, q);
   free(host_fpsum);
   free(host_lpsum);
   free(y);
