@@ -2,7 +2,7 @@
 #include <new>
 #include <cmath>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define BLOCK_SIZE 16
 

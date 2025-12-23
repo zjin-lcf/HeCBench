@@ -32,7 +32,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I../hellinger-cuda \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../hellinger-cuda \
           -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
