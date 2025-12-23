@@ -1,4 +1,4 @@
-#define __syncwarp() sg.barrier()
+#define __syncwarp() sycl::group_barrier(sg)
 
 template<typename T>
 void spmm_test1(
