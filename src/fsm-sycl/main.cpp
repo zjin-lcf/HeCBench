@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
                   d_smax,
                   d_sbest,
                   d_oldmax,
-                  sm.get_pointer());
+                  sm.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
 
