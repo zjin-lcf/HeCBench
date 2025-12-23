@@ -18,6 +18,7 @@
 */
 
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <sycl/sycl.hpp>
@@ -110,7 +111,7 @@ int main(int argc, char* argv[]) {
         int value = item.get_local_id(0) & 0x7;
         auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0x7; mask *= 2)
-          value += sg.shuffle_xor(value, mask);
+          value += sycl::permute_group_by_xor(sg, value, mask);
         d_out[item.get_global_id(0)] = value;
       });
     });
@@ -126,7 +127,7 @@ int main(int argc, char* argv[]) {
         int value = item.get_local_id(0) & 0x7;
         auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0x7; mask *= 2)
-          value += sg.shuffle_xor(value, mask);
+          value += sycl::permute_group_by_xor(sg, value, mask);
         d_out[item.get_global_id(0)] = value;
       });
     });
@@ -152,7 +153,7 @@ int main(int argc, char* argv[]) {
         int value = item.get_local_id(0) & 0xf;
         auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0xf; mask *= 2)
-          value += sg.shuffle_xor(value, mask);
+          value += sycl::permute_group_by_xor(sg, value, mask);
         d_out[item.get_global_id(0)] = value;
       });
     });
@@ -177,7 +178,7 @@ int main(int argc, char* argv[]) {
         int value = item.get_local_id(0) & 0x1f;
         auto sg = item.get_sub_group();
         for (int mask = 1; mask < 0x1f; mask *= 2)
-          value += item.get_sub_group().shuffle_xor(value, mask);
+          value += sycl::permute_group_by_xor(sg, value, mask);
         d_out[item.get_global_id(0)] = value;
       });
     });
@@ -202,7 +203,7 @@ int main(int argc, char* argv[]) {
       cgh.parallel_for<class bc_shfl_sg8>(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int value = (item.get_local_id(0) & 0x7) == 0 ? PATTERN : 0;
-        int out_v = item.get_sub_group().shuffle(value, 0);
+        int out_v = sycl::select_from_group(item.get_sub_group(), value, 0);
         d_out[item.get_global_id(0)] = out_v;
       });
     });
@@ -226,7 +227,7 @@ int main(int argc, char* argv[]) {
       cgh.parallel_for<class bc_shfl_sg16>(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int value = (item.get_local_id(0) & 0xf) == 0 ? PATTERN : 0;
-        int out_v = item.get_sub_group().shuffle(value, 0);
+        int out_v = sycl::select_from_group(item.get_sub_group(), value, 0);
         d_out[item.get_global_id(0)] = out_v;
       });
     });
@@ -250,7 +251,7 @@ int main(int argc, char* argv[]) {
       cgh.parallel_for<class bc_shfl_sg32>(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         int value = (item.get_local_id(0) & 0x1f) == 0 ? PATTERN : 0;
-        int out_v = item.get_sub_group().shuffle(value, 0);
+        int out_v = sycl::select_from_group(item.get_sub_group(), value, 0);
         d_out[item.get_global_id(0)] = out_v;
       });
     });
@@ -297,7 +298,7 @@ int main(int argc, char* argv[]) {
         unsigned b_offs = b_start + item.get_local_id(0);
         unsigned s_offs = item.get_local_range(0) - item.get_local_id(0) - 1;
         float val = d_Matrix[b_offs];
-        d_TransposeMatrix[b_offs] = item.get_sub_group().shuffle(val, s_offs);
+        d_TransposeMatrix[b_offs] = sycl::select_from_group(item.get_sub_group(), val, s_offs);
       });
     });
   }
@@ -322,7 +323,7 @@ int main(int argc, char* argv[]) {
         unsigned b_offs = b_start + item.get_local_id(0);
         unsigned s_offs = item.get_local_range(0) - item.get_local_id(0) - 1;
         float val = d_Matrix[b_offs];
-        d_TransposeMatrix[b_offs] = item.get_sub_group().shuffle(val, s_offs);
+        d_TransposeMatrix[b_offs] = sycl::select_from_group(item.get_sub_group(), val, s_offs);
       });
     });
   }
@@ -348,7 +349,7 @@ int main(int argc, char* argv[]) {
         unsigned b_offs = b_start + item.get_local_id(0);
         unsigned s_offs = item.get_local_range(0) - item.get_local_id(0) - 1;
         float val = d_Matrix[b_offs];
-        d_TransposeMatrix[b_offs] = item.get_sub_group().shuffle(val, s_offs);
+        d_TransposeMatrix[b_offs] = sycl::select_from_group(item.get_sub_group(), val, s_offs);
       });
     });
   }
