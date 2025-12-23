@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <sys/time.h>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "utils.h"
 
 template <int WarpsPerBlock, int PinLimit>
@@ -10,20 +10,20 @@ void buildMST(const ID num,
               const ctype* const __restrict y,
               edge* const __restrict edges,
               ctype dist[PinLimit],
-              nd_item<1> &item)
+              sycl::nd_item<1> &item)
 {
   auto g = item.get_group();
 
-  multi_ptr<ID[WarpsPerBlock][PinLimit], access::address_space::local_space> 
-    t1 = ext::oneapi::group_local_memory_for_overwrite<ID[WarpsPerBlock][PinLimit]>(g);
+  sycl::multi_ptr<ID[WarpsPerBlock][PinLimit], sycl::access::address_space::local_space> 
+    t1 = sycl::ext::oneapi::group_local_memory_for_overwrite<ID[WarpsPerBlock][PinLimit]>(g);
   ID (*source)[PinLimit] = *t1;
 
-  multi_ptr<ID[WarpsPerBlock][PinLimit], access::address_space::local_space> 
-    t2 = ext::oneapi::group_local_memory_for_overwrite<ID[WarpsPerBlock][PinLimit]>(g);
+  sycl::multi_ptr<ID[WarpsPerBlock][PinLimit], sycl::access::address_space::local_space> 
+    t2 = sycl::ext::oneapi::group_local_memory_for_overwrite<ID[WarpsPerBlock][PinLimit]>(g);
   ID (*destin)[PinLimit] = *t2;
 
-  multi_ptr<ctype[WarpsPerBlock], access::address_space::local_space>
-    t3 = ext::oneapi::group_local_memory_for_overwrite<ctype[WarpsPerBlock]>(g);
+  sycl::multi_ptr<ctype[WarpsPerBlock], sycl::access::address_space::local_space>
+    t3 = sycl::ext::oneapi::group_local_memory_for_overwrite<ctype[WarpsPerBlock]>(g);
   ctype *mindj = *t3;
 
   const int lane = item.get_local_id(0) % WS;
@@ -55,10 +55,10 @@ void buildMST(const ID num,
         source[warp][j] = src;
       }
       const int upv = d * (MaxPins * 2) + j;  // tie breaker for determinism
-      auto ao = ext::oneapi::atomic_ref<ctype,
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::work_group,
-                access::address_space::local_space> (mindj[warp]);
+      auto ao = sycl::atomic_ref<ctype,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::work_group,
+                sycl::access::address_space::local_space> (mindj[warp]);
       ao.fetch_min(upv);
     }
 
@@ -84,16 +84,16 @@ bool insertSteinerPoints(ID& num,
                          ctype* const __restrict y,
                          const edge* const __restrict edges,
                          ctype dist[PinLimit],
-                         nd_item<1> &item)
+                         sycl::nd_item<1> &item)
 {
   auto g = item.get_group();
 
-  multi_ptr<ID[WarpsPerBlock][PinLimit][8], access::address_space::local_space> 
-    t1 = ext::oneapi::group_local_memory_for_overwrite<ID[WarpsPerBlock][PinLimit][8]>(g);
+  sycl::multi_ptr<ID[WarpsPerBlock][PinLimit][8], sycl::access::address_space::local_space> 
+    t1 = sycl::ext::oneapi::group_local_memory_for_overwrite<ID[WarpsPerBlock][PinLimit][8]>(g);
   ID (*adj)[PinLimit][8] = *t1;
 
-  multi_ptr<int[WarpsPerBlock][PinLimit], access::address_space::local_space> 
-    t2 = ext::oneapi::group_local_memory_for_overwrite<int[WarpsPerBlock][PinLimit]>(g);
+  sycl::multi_ptr<int[WarpsPerBlock][PinLimit], sycl::access::address_space::local_space> 
+    t2 = sycl::ext::oneapi::group_local_memory_for_overwrite<int[WarpsPerBlock][PinLimit]>(g);
   int (*cnt)[PinLimit] = *t2;
 
   const int lane = item.get_local_id(0) % WS;
@@ -113,19 +113,19 @@ bool insertSteinerPoints(ID& num,
     const ID d = edges[e].dst;
     if ((x[d] != x[s]) || (y[d] != y[s])) {
 
-      auto as = ext::oneapi::atomic_ref<int,
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::work_group,
-                access::address_space::local_space> (cnt[warp][s]);
+      auto as = sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::work_group,
+                sycl::access::address_space::local_space> (cnt[warp][s]);
 
       const int ps = as.fetch_add(1);
 
       adj[warp][s][ps] = e;
 
-      auto ad = ext::oneapi::atomic_ref<int,
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::work_group,
-                access::address_space::local_space> (cnt[warp][d]);
+      auto ad = sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::work_group,
+                sycl::access::address_space::local_space> (cnt[warp][d]);
 
       const int pd = ad.fetch_add(1);
 
@@ -156,17 +156,17 @@ bool insertSteinerPoints(ID& num,
             const ctype rd1 = rd * (MaxPins * 2) + e1;  // tie breaker
             const ctype rd2 = rd * (MaxPins * 2) + e2;  // tie breaker
 
-            auto a1 = ext::oneapi::atomic_ref<ctype,
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::work_group,
-                access::address_space::local_space> (dist[e1]);
+            auto a1 = sycl::atomic_ref<ctype,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::work_group,
+                sycl::access::address_space::local_space> (dist[e1]);
             a1.fetch_max(rd2);
 
 
-            auto a2 = ext::oneapi::atomic_ref<ctype,
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::work_group,
-                access::address_space::local_space> (dist[e2]);
+            auto a2 = sycl::atomic_ref<ctype,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::work_group,
+                sycl::access::address_space::local_space> (dist[e2]);
             a2.fetch_max(rd1);
           }
         }
@@ -208,7 +208,7 @@ bool insertSteinerPoints(ID& num,
     }
     const int bal = sycl::reduce_over_group(
         sg, insert ? (0x1 << sg.get_local_linear_id()) : 0,
-        sycl::ext::oneapi::plus<>());
+        sycl::plus<>());
     const int pos = sycl::popcount(bal & ~(-1 << lane)) + num;
     if (insert) {
       x[pos] = stx;
@@ -231,13 +231,13 @@ inline void processSmallNet(const int i,
                             ctype* const __restrict yout,
                              edge* const __restrict edges,
                               int* const __restrict wl,
-                              nd_item<1> &item,
+                              sycl::nd_item<1> &item,
                               int* const __restrict wlsize)
 {
   auto g = item.get_group();
 
-  multi_ptr<ctype[WarpsPerBlock][PinLimit], access::address_space::local_space> 
-    t1 = ext::oneapi::group_local_memory_for_overwrite<ctype[WarpsPerBlock][PinLimit]>(g);
+  sycl::multi_ptr<ctype[WarpsPerBlock][PinLimit], sycl::access::address_space::local_space> 
+    t1 = sycl::ext::oneapi::group_local_memory_for_overwrite<ctype[WarpsPerBlock][PinLimit]>(g);
   ctype (*dist)[PinLimit] = *t1;
 
   const int lane = item.get_local_id(0) % WS;
@@ -262,10 +262,10 @@ inline void processSmallNet(const int i,
       y0 = yout[pout + lane];
     }
     auto sg = item.get_sub_group();
-    const ctype x1 = select_from_group(sg, x0, 1);
-    const ctype y1 = select_from_group(sg, y0, 1);
-    const ctype x2 = select_from_group(sg, x0, 2);
-    const ctype y2 = select_from_group(sg, y0, 2);
+    const ctype x1 = sycl::select_from_group(sg, x0, 1);
+    const ctype y1 = sycl::select_from_group(sg, y0, 1);
+    const ctype x2 = sycl::select_from_group(sg, x0, 2);
+    const ctype y2 = sycl::select_from_group(sg, y0, 2);
     if (lane == 0) {
       xout[pout + 3] =
           sycl::max(sycl::min(x0, x1), sycl::min(sycl::max(x0, x1), x2));
@@ -282,10 +282,10 @@ inline void processSmallNet(const int i,
         cnt, &xout[pout], &yout[pout], &edges[pout], dist[warp], item));
   } else {
     if (lane == 0) {
-      auto ao = ext::oneapi::atomic_ref<int,
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::device,
-                access::address_space::global_space> (*wlsize);
+      auto ao = sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::device,
+                sycl::access::address_space::global_space> (*wlsize);
       wl[ao.fetch_add(1)] = i;
     }
   }
@@ -298,12 +298,12 @@ inline void processLargeNet(const int i,
                             ctype* const __restrict xout,
                             ctype* const __restrict yout,
                              edge* const __restrict edges,
-                             nd_item<1> &item)
+                             sycl::nd_item<1> &item)
 {
   auto g = item.get_group();
 
-  multi_ptr<ctype[WarpsPerBlock][PinLimit], access::address_space::local_space> 
-    t1 = ext::oneapi::group_local_memory_for_overwrite<ctype[WarpsPerBlock][PinLimit]>(g);
+  sycl::multi_ptr<ctype[WarpsPerBlock][PinLimit], sycl::access::address_space::local_space> 
+    t1 = sycl::ext::oneapi::group_local_memory_for_overwrite<ctype[WarpsPerBlock][PinLimit]>(g);
   ctype (*dist)[PinLimit] = *t1;
 
   const int warp = item.get_local_id(0) / WS;
@@ -332,7 +332,7 @@ void largeNetKernel(const int* const __restrict idxin,
                      edge* __restrict edges,
                     const int numnets,
                     int* const __restrict wl,
-                    nd_item<1> &item,
+                    sycl::nd_item<1> &item,
                     int *__restrict currpos1,
                     int *__restrict wlsize)
 {
@@ -343,13 +343,13 @@ void largeNetKernel(const int* const __restrict idxin,
   do {
     int i;
     if (lane == 0) {
-      auto ao = ext::oneapi::atomic_ref<int,
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::device,
-                access::address_space::global_space> (*currpos1);
+      auto ao = sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::device,
+                sycl::access::address_space::global_space> (*currpos1);
       i = ao.fetch_add(1);
     }
-    i = select_from_group(sg, i, 0);
+    i = sycl::select_from_group(sg, i, 0);
     if (i >= numnets) break;
     processSmallNet<WarpsPerBlock, PinLimit>(
         i, idxin, xin, yin, idxout, xout, yout, edges, wl, item, wlsize);
@@ -368,7 +368,7 @@ void smallNetKernel(const int* const __restrict idxin,
                     ctype* __restrict yout,
                      edge* __restrict edges,
                       int* const __restrict wl,
-                      nd_item<1> &item,
+                      sycl::nd_item<1> &item,
                       int* const __restrict currpos2,
                       int* const __restrict wlsize)
 {
@@ -379,20 +379,20 @@ void smallNetKernel(const int* const __restrict idxin,
   do {
     int i;
     if (lane == 0) {
-      auto ao = ext::oneapi::atomic_ref<int,
-                ext::oneapi::memory_order::relaxed,
-                ext::oneapi::memory_scope::device,
-                access::address_space::global_space> (*currpos2);
+      auto ao = sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::device,
+                sycl::access::address_space::global_space> (*currpos2);
       i = ao.fetch_add(1);
     }
 
-    i = select_from_group(sg, i, 0);
+    i = sycl::select_from_group(sg, i, 0);
     if (i >= *wlsize) break;
     processLargeNet<WarpsPerBlock, PinLimit>(wl[i], idxin, xout, yout, edges, item);
   } while (true);
 }
 
-static void computeRSMT(queue &q,
+static void computeRSMT(sycl::queue &q,
                         const int* const __restrict idxin,
                         const ctype* const __restrict xin,
                         const ctype* const __restrict yin,
@@ -403,7 +403,7 @@ static void computeRSMT(queue &q,
                         const int numnets)
 {
   // obtain GPU info
-  const int SMs = q.get_device().get_info<info::device::max_compute_units>();
+  const int SMs = q.get_device().get_info<sycl::info::device::max_compute_units>();
   const int blocks = SMs * 2;
   printf("launching %d thread blocks with %d threads per block\n", blocks, 24 * WS);
 
@@ -446,24 +446,24 @@ static void computeRSMT(queue &q,
   q.memset(d_yout, -1, 2 * size * sizeof(ctype));
   q.memset(d_edges, 0, 2 * size * sizeof(edge));
 
-  range<1> gws_l (24 * blocks * WS);
-  range<1> lws_l (24 * WS);
+  sycl::range<1> gws_l (24 * blocks * WS);
+  sycl::range<1> lws_l (24 * WS);
 
-  q.submit([&](handler &cgh) {
-    cgh.parallel_for(sycl::nd_range<1>(gws_l, lws_l), [=](nd_item<1> item)
-       [[intel::reqd_sub_group_size(32)]] {
+  q.submit([&](sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<1>(gws_l, lws_l), [=](sycl::nd_item<1> item)
+       [[sycl::reqd_sub_group_size(32)]] {
           largeNetKernel<24, 64>(
               d_idxin, d_xin, d_yin, d_idxout, d_xout, d_yout, d_edges, numnets,
               d_wl, item, d_currpos1, d_wlsize);
     });
   });
 
-  range<1> gws_s (3 * blocks * WS);
-  range<1> lws_s (3 * WS);
+  sycl::range<1> gws_s (3 * blocks * WS);
+  sycl::range<1> lws_s (3 * WS);
 
-  q.submit([&](handler &cgh) {
-    cgh.parallel_for(sycl::nd_range<1>(gws_s, lws_s), [=](nd_item<1> item)
-      [[intel::reqd_sub_group_size(32)]] {
+  q.submit([&](sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<1>(gws_s, lws_s), [=](sycl::nd_item<1> item)
+      [[sycl::reqd_sub_group_size(32)]] {
           smallNetKernel<3, 512>(d_idxin, d_xout, d_yout, d_edges, d_wl,
                                  item, d_currpos2, d_wlsize);
     });
@@ -484,17 +484,17 @@ static void computeRSMT(queue &q,
   q.wait();
 
   // clean up
-  free(d_currpos1, q);
-  free(d_currpos2, q);
-  free(d_wlsize, q);
-  free(d_wl, q);
-  free(d_edges, q);
-  free(d_yout, q);
-  free(d_xout, q);
-  free(d_idxout, q);
-  free(d_yin, q);
-  free(d_xin, q);
-  free(d_idxin, q);
+  sycl::free(d_currpos1, q);
+  sycl::free(d_currpos2, q);
+  sycl::free(d_wlsize, q);
+  sycl::free(d_wl, q);
+  sycl::free(d_edges, q);
+  sycl::free(d_yout, q);
+  sycl::free(d_xout, q);
+  sycl::free(d_idxout, q);
+  sycl::free(d_yin, q);
+  sycl::free(d_xin, q);
+  sycl::free(d_idxin, q);
 }
 
 int main(int argc, char* argv[])
@@ -514,14 +514,13 @@ int main(int argc, char* argv[])
   const int numnets = n.num_net;
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel, property::queue::in_order());
 
   int* idxin = NULL;
-  idxin = malloc_host<int>((numnets + 1), q);
+  idxin = sycl::malloc_host<int>((numnets + 1), q);
 
   // initialize idxin
   idxin[0] = 0;
@@ -555,8 +554,8 @@ int main(int argc, char* argv[])
   if (hipin > MaxPins) {printf("ERROR: hi_pin_count must be no more than %d\n", MaxPins); exit(-1);}
 
   // pin coordinates
-  ctype* xin = malloc_host<ctype>(idxin[numnets], q);
-  ctype* yin = malloc_host<ctype>(idxin[numnets], q);
+  ctype* xin = sycl::malloc_host<ctype>(idxin[numnets], q);
+  ctype* yin = sycl::malloc_host<ctype>(idxin[numnets], q);
 
   // initialize pin coordinates
   pos = 0;
@@ -569,13 +568,13 @@ int main(int argc, char* argv[])
 
   // result storage
   const int size = 2 * idxin[numnets];
-  int* idxout = malloc_host<int>((numnets + 1), q);
+  int* idxout = sycl::malloc_host<int>((numnets + 1), q);
 
-  ctype* xout = malloc_host<ctype>(size, q);
+  ctype* xout = sycl::malloc_host<ctype>(size, q);
 
-  ctype* yout = malloc_host<ctype>(size, q);
+  ctype* yout = sycl::malloc_host<ctype>(size, q);
 
-  edge* edges = malloc_host<edge>(size, q);
+  edge* edges = sycl::malloc_host<edge>(size, q);
 
   // compute Steiner points and edges
   computeRSMT(q, idxin, xin, yin, idxout, xout, yout, edges, numnets);
