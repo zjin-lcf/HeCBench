@@ -16,8 +16,9 @@
 
 // standard utilities and systems includes
 #include <stdio.h>
-#include "MT.h"
+#include <cmath>
 #include <sycl/sycl.hpp>
+#include "MT.h"
 
 // comment the below line if not doing Box-Muller transformation
 #define DO_BOXMULLER
