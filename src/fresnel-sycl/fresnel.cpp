@@ -12,9 +12,9 @@
 //                          sqrt(2/pi) sin(t^2) dt.                           //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <math.h>           // required for sycl::fabs(), cos(), cos()
+#include <math.h>           // required for fabs(), cos(), cos()
 #include <float.h>          // required for LDBL_EPSILON
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 //                         Externally Defined Routines                        //
 

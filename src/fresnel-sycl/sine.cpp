@@ -7,7 +7,7 @@
 
 #include <math.h>           // required for sycl::fabs()                      
 #include <float.h>          // required for DBL_EPSILON
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 //                         Externally Defined Routines                        //
 SYCL_EXTERNAL

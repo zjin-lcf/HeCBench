@@ -40,7 +40,7 @@
 //                                                                            //
 //     p = xChebyshev_Tn_Series(x, a, deg);                                   //
 ////////////////////////////////////////////////////////////////////////////////
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 SYCL_EXTERNAL
 extern "C"
