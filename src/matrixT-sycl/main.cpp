@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
+#include <cmath>
 #include <sycl/sycl.hpp>
 
 // Each block transposes/copies a tile of TILE_DIM x TILE_DIM elements
@@ -456,7 +457,7 @@ int main(int argc, char **argv)
               sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               copySharedMem(
                 item,
-                sm.get_pointer(),
+                sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                 d_odata,
                 d_idata,
                 size_x, size_y);
@@ -505,7 +506,7 @@ int main(int argc, char **argv)
               sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeCoalesced(
                 item,
-                sm.get_pointer(),
+                sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                 d_odata,
                 d_idata,
                 size_x, size_y);
@@ -531,7 +532,7 @@ int main(int argc, char **argv)
               sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeNoBankConflicts(
                 item,
-                sm.get_pointer(),
+                sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                 d_odata,
                 d_idata,
                 size_x, size_y);
@@ -557,7 +558,7 @@ int main(int argc, char **argv)
               sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeCoarseGrained(
                 item,
-                sm.get_pointer(),
+                sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                 d_odata,
                 d_idata,
                 size_x, size_y);
@@ -583,7 +584,7 @@ int main(int argc, char **argv)
               sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeFineGrained(
                 item,
-                sm.get_pointer(),
+                sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                 d_odata,
                 d_idata,
                 size_x, size_y);
@@ -609,7 +610,7 @@ int main(int argc, char **argv)
               sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
               transposeDiagonal(
                 item,
-                sm.get_pointer(),
+                sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                 d_odata,
                 d_idata,
                 size_x, size_y);
