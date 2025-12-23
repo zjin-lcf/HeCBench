@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 #define COL_P_X 0
 #define COL_P_Y 1
@@ -20,7 +20,7 @@ class k;
 // compute the xyz images using the inverse focal length invF
 template<typename T>
 void surfel_render(
-  nd_item<2> &item,
+  sycl::nd_item<2> &item,
   const T *__restrict s,
   int N,
   T f,
@@ -67,7 +67,7 @@ void surfel_render(
 }
 
 template <typename T>
-void surfelRenderTest(queue &q, int n, int w, int h, int repeat)
+void surfelRenderTest(sycl::queue &q, int n, int w, int h, int repeat)
 {
   const int src_size = n*7;
   const int dst_size = w*h;
@@ -81,24 +81,21 @@ void surfelRenderTest(queue &q, int n, int w, int h, int repeat)
 
   T inverseFocalLength[3] = {0.005, 0.02, 0.036};
 
-  buffer<T, 1> d_src (h_src, src_size);
-  buffer<T, 1> d_dst (dst_size);
+  T *d_dst = sycl::malloc_device<T>(dst_size, q);
+  T *d_src = sycl::malloc_device<T>(src_size, q);
+  q.memcpy(d_src, h_src, src_size * sizeof(T));
 
-  range<2> lws (16, 16);
-  range<2> gws ((h+15)/16*16, (w+15)/16*16);
+  sycl::range<2> lws (16, 16);
+  sycl::range<2> gws ((h+15)/16*16, (w+15)/16*16);
   for (int f = 0; f < 3; f++) {
     printf("\nf = %d\n", f);
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++)
-      q.submit([&] (handler &cgh) {
-        auto src = d_src.template get_access<sycl_read>(cgh);
-        auto dst = d_dst.template get_access<sycl_discard_write>(cgh);
-        cgh.parallel_for<class k<T>>(nd_range<2>(gws, lws), [=] (nd_item<2> item) {
-          surfel_render<T>(item, src.get_pointer(), n, 
-                           inverseFocalLength[f], w, h,
-                           dst.get_pointer());
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for<class k<T>>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
+          surfel_render<T>(item, d_src, n, inverseFocalLength[f], w, h, d_dst);
         });
       });
 
@@ -107,16 +104,15 @@ void surfelRenderTest(queue &q, int n, int w, int h, int repeat)
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     printf("Average kernel execution time: %f (ms)\n", (time * 1e-6f) / repeat);
 
-    q.submit([&] (handler &cgh) {
-      auto acc = d_dst.template get_access<sycl_read>(cgh);
-      cgh.copy(acc, h_dst);
-    }).wait();
+    q.memcpy(h_dst, d_dst, dst_size * sizeof(T)).wait();
 
     T *min = std::min_element( h_dst, h_dst + w*h );
     T *max = std::max_element( h_dst, h_dst + w*h );
     printf("value range [%e, %e]\n", *min, *max);
   }
 
+  sycl::free(d_dst, q);
+  sycl::free(d_src, q);
   free(h_dst);
   free(h_src);
 }
@@ -132,11 +128,10 @@ int main(int argc, char *argv[]) {
   int repeat = atoi(argv[4]);
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
   printf("-------------------------------------\n");
   printf(" surfelRenderTest with type float32  \n");
