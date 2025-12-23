@@ -16,7 +16,7 @@
   } while(0)
 
 //each thread is responsible for 1 BLOCKSIZE each time
-void kernel0_write(nd_item<1> &item, char* ptr, unsigned long size)
+void kernel0_write(sycl::nd_item<1> &item, char* ptr, unsigned long size)
 {
   int idx = item.get_global_id(0);
   unsigned long n = size/BLOCKSIZE;
@@ -51,7 +51,7 @@ void kernel0_write(nd_item<1> &item, char* ptr, unsigned long size)
 }
 
 void kernel0_read(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const char* ptr, unsigned long size,
     unsigned int* err_count,
     unsigned long* err_addr,
@@ -93,7 +93,7 @@ void kernel0_read(
   }
 }
 
-void kernel1_write(nd_item<1> &item, char* ptr, unsigned long size)
+void kernel1_write(sycl::nd_item<1> &item, char* ptr, unsigned long size)
 {
   int idx = item.get_global_id(0);
 
@@ -106,7 +106,7 @@ void kernel1_write(nd_item<1> &item, char* ptr, unsigned long size)
 }
 
 void kernel1_read(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const char* ptr, unsigned long size,
     unsigned int* err_count,
     unsigned long* err_addr,
@@ -125,7 +125,7 @@ void kernel1_read(
   }
 }
 
-void kernel_write(nd_item<1> &item, char* ptr, unsigned long size, TYPE p1)
+void kernel_write(sycl::nd_item<1> &item, char* ptr, unsigned long size, TYPE p1)
 {
   TYPE* buf = (TYPE*)ptr;
   int idx = item.get_global_id(0);
@@ -137,7 +137,7 @@ void kernel_write(nd_item<1> &item, char* ptr, unsigned long size, TYPE p1)
 }
 
 void kernel_read_write(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     char* ptr, unsigned long size, TYPE p1, TYPE p2,
     unsigned int* err_count,
     unsigned long* err_addr,
@@ -162,7 +162,7 @@ void kernel_read_write(
 }
 
 void kernel_read(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const char* ptr, unsigned long size, TYPE p1,
     unsigned int* err_count,
     unsigned long* err_addr,
@@ -182,7 +182,7 @@ void kernel_read(
   }
 }
 
-void kernel5_init(nd_item<1> &item, char* ptr, unsigned long size)
+void kernel5_init(sycl::nd_item<1> &item, char* ptr, unsigned long size)
 {
   unsigned int * buf = (unsigned int*)ptr;
   int idx = item.get_global_id(0);
@@ -213,7 +213,7 @@ void kernel5_init(nd_item<1> &item, char* ptr, unsigned long size)
   }
 }
 
-void kernel5_move(nd_item<1> &item, char* ptr, unsigned long size)
+void kernel5_move(sycl::nd_item<1> &item, char* ptr, unsigned long size)
 {
   int i, j;
   int idx = item.get_global_id(0);
@@ -235,7 +235,7 @@ void kernel5_move(nd_item<1> &item, char* ptr, unsigned long size)
 }
 
 void kernel5_check(
-    nd_item<1> &item,
+    sycl::nd_item<1> &item,
     const char* ptr, unsigned long size,
     unsigned int* err_count,
     unsigned long* err_addr,
