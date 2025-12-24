@@ -34,7 +34,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../blas-gemmEx-cuda \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../blas-gemmEx2-cuda \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
