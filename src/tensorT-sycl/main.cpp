@@ -34,7 +34,7 @@ void verify(double *input, double *output) {
   if (!error) printf("PASS\n");
 }
 
-int main(int argv, char **argc) {
+int main(int argc, char **argv) {
   if (argc != 2) {
     printf("Usage: %s <repeat>\n", argv[0]);
     return 1;
