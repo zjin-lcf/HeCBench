@@ -44,7 +44,7 @@ February 2020.
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
-#include "common.h"
+#include <sycl/sycl.hpp>
 #include "graph.h"
 
 // the maximum work-group size depends on the target device
@@ -97,7 +97,10 @@ void init(const int nodes,
       degv = end - beg;
       cond = (degv >= WS);
       if (cond) {
-        wl[sycl::atomic<int>(sycl::global_ptr<int>(wlsize)).fetch_add(1)] = v;
+        auto ao = sycl::atomic_ref<int, sycl::memory_order::relaxed, \
+                                   sycl::memory_scope::device,\
+                                   sycl::access::address_space::generic_space>(*wlsize);
+        wl[ao.fetch_add(1)] = v;
       } else {
         active = 0;
         pos = beg;
@@ -218,9 +221,10 @@ void runLarge(const int nodes,
                   wpcol &= ~((unsigned int)MSB >> neicol); //consolidated below
                 } else {
                   if ((wmincol <= neicol) && (neicol < wmaxcol) && ((posscol2[woffs + neicol / WS] << (neicol % WS)) < 0)) {
-                    sycl::atomic<int>(sycl::global_ptr<int>(
-                            (int *)&posscol2[woffs + neicol / WS]))
-                        .fetch_and(~((unsigned int)MSB >> (neicol % WS)));
+                     auto ao = sycl::atomic_ref<int, sycl::memory_order::relaxed, \
+                                                sycl::memory_scope::device,\
+                                                sycl::access::address_space::generic_space>(posscol2[woffs + neicol / WS]);
+                     ao.fetch_and(~((unsigned int)MSB >> (neicol % WS)));
                   }
                 }
               } else {
@@ -354,23 +358,25 @@ int main(int argc, char *argv[]) {
   int* const color = new int [nodes];
 
 #ifdef USE_GPU
-  gpu_selector dev_sel;
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-  cpu_selector dev_sel;
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
-  queue q(dev_sel);
 
-  buffer<int, 1> nidx_d (g.nindex, nodes + 1);
-  buffer<int, 1> nlist_d (g.nlist, edges);
-  buffer<int, 1> nlist2_d (edges);
-  buffer<int, 1> posscol_d (nodes);
-  buffer<int, 1> posscol2_d (g.edges / WS + 1);
-  buffer<int, 1> color_d (nodes);
-  buffer<int, 1> wl_d (nodes);
-  buffer<int, 1> wlsize_d (1);
+  int *nidx_d = sycl::malloc_device<int>(nodes + 1 ,q);
+  q.memcpy(nidx_d, g.nindex, sizeof(int) * (nodes + 1));
+  int *nlist_d = sycl::malloc_device<int>(edges ,q);
+  q.memcpy(nlist_d, g.nlist, sizeof(int) * edges);
 
-  const int SMs = q.get_device().get_info<info::device::max_compute_units>();
-  const int mTpSM = 2048;
+  int *nlist2_d = sycl::malloc_device<int>(edges ,q);
+  int *posscol_d = sycl::malloc_device<int>(nodes ,q);
+  int *posscol2_d = sycl::malloc_device<int>(g.edges / WS + 1 ,q);
+  int *color_d = sycl::malloc_device<int>(nodes ,q);
+  int *wl_d = sycl::malloc_device<int>(nodes ,q);
+  int *wlsize_d = sycl::malloc_device<int>(1 ,q);
+
+  const int SMs = q.get_device().get_info<sycl::info::device::max_compute_units>();
+  const int mTpSM = q.get_device().get_info<sycl::info::device::max_work_group_size>();
   const int blocks = SMs * mTpSM / ThreadsPerBlock;
   printf("Total number of compute units: %d\n", SMs);
   printf("Maximum resident threads per compute unit: %d\n", mTpSM);
@@ -381,32 +387,21 @@ int main(int argc, char *argv[]) {
 
   auto start = std::chrono::high_resolution_clock::now();
 
-  range<1> gws (blocks * ThreadsPerBlock);
-  range<1> lws (ThreadsPerBlock);
+  sycl::range<1> gws (blocks * ThreadsPerBlock);
+  sycl::range<1> lws (ThreadsPerBlock);
 
   for (int n = 0; n < repeat; n++) {
-    q.submit([&] (handler &cgh) {
-      auto wlsize = wlsize_d.get_access<sycl_write>(cgh);
-      cgh.fill(wlsize, 0);
-    });
+    q.memset(wlsize_d, 0, sizeof(int));
 
-    q.submit([&] (handler &cgh) {
+    q.submit([&] (sycl::handler &cgh) {
 #ifdef SYCL_STREAM
       stream out(64*1024, 256, cgh);
 #endif
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist_d.get_access<sycl_read>(cgh);
-      auto nlist2 = nlist2_d.get_access<sycl_write>(cgh);
-      auto posscol = posscol_d.get_access<sycl_write>(cgh);
-      auto posscol2 = posscol2_d.get_access<sycl_write>(cgh);
-      auto color = color_d.get_access<sycl_write>(cgh);
-      auto wl = wl_d.get_access<sycl_write>(cgh);
-      auto wlsize = wlsize_d.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class init_kernel>(nd_range<1>(gws, lws),
-        [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
-        init(nodes, edges, nidx.get_pointer(), nlist.get_pointer(), nlist2.get_pointer(),
-             posscol.get_pointer(), posscol2.get_pointer(), color.get_pointer(),
-             wl.get_pointer(), wlsize.get_pointer(), item
+      cgh.parallel_for<class init_kernel>(sycl::nd_range<1>(gws, lws),
+        [=] (sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
+        init(nodes, edges, nidx_d, nlist_d, nlist2_d,
+             posscol_d, posscol2_d, color_d,
+             wl_d, wlsize_d, item
 #ifdef SYCL_STREAM
              , out
 #endif
@@ -414,31 +409,20 @@ int main(int argc, char *argv[]) {
       });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist2 = nlist2_d.get_access<sycl_read>(cgh);
-      auto posscol = posscol_d.get_access<sycl_read_write>(cgh);
-      auto posscol2 = posscol2_d.get_access<sycl_read_write>(cgh);
-      auto color = color_d.get_access<sycl_read_write>(cgh);
-      auto wl = wl_d.get_access<sycl_read>(cgh);
-      auto wlsize = wlsize_d.get_access<sycl_read>(cgh);
-      cgh.parallel_for<class runLarge_kernel>(nd_range<1>(gws, lws),
-        [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
-        runLarge(nodes, nidx.get_pointer(), nlist2.get_pointer(),
-                 posscol.get_pointer(), posscol2.get_pointer(), color.get_pointer(),
-                 wl.get_pointer(), wlsize.get_pointer(), item);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class runLarge_kernel>(sycl::nd_range<1>(gws, lws),
+        [=] (sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
+        runLarge(nodes, nidx_d, nlist2_d,
+                 posscol_d, posscol2_d, color_d,
+                 wl_d, wlsize_d, item);
         });
     });
 
-    q.submit([&] (handler &cgh) {
-      auto nidx = nidx_d.get_access<sycl_read>(cgh);
-      auto nlist = nlist_d.get_access<sycl_read>(cgh);
-      auto posscol = posscol_d.get_access<sycl_read_write>(cgh);
-      auto color = color_d.get_access<sycl_read_write>(cgh);
-      cgh.parallel_for<class runSmall_kernel>(nd_range<1>(gws, lws), 
-        [=] (nd_item<1> item) [[intel::reqd_sub_group_size(32)]] {
-        runSmall(nodes, nidx.get_pointer(), nlist.get_pointer(), 
-                 posscol.get_pointer(), color.get_pointer(), item);
+    q.submit([&] (sycl::handler &cgh) {
+      cgh.parallel_for<class runSmall_kernel>(sycl::nd_range<1>(gws, lws), 
+        [=] (sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
+        runSmall(nodes, nidx_d, nlist_d, 
+                 posscol_d, color_d, item);
       });
     });
   }
@@ -453,10 +437,14 @@ int main(int argc, char *argv[]) {
   printf("throughput: %.6f Mnodes/s\n", g.nodes * 0.000001 / runtime);
   printf("throughput: %.6f Medges/s\n", g.edges * 0.000001 / runtime);
 
-  q.submit([&] (handler &cgh) {
-    auto acc = color_d.get_access<sycl_read>(cgh);
-    cgh.copy(acc, color);
-  }).wait();
+  q.memcpy(color, color_d, sizeof(int) * nodes).wait();
+
+  sycl::free(nlist2_d, q);
+  sycl::free(posscol_d, q);
+  sycl::free(posscol2_d, q);
+  sycl::free(color_d, q);
+  sycl::free(wl_d, q);
+  sycl::free(wlsize_d, q);
 
   bool ok = true;
   for (int v = 0; v < g.nodes; v++) {
