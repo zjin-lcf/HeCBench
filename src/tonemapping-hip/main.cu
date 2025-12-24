@@ -18,6 +18,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <chrono>
+#include <cmath>
 #include <hip/hip_runtime.h>
 #include "kernels.cu"
 
