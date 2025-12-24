@@ -524,7 +524,7 @@ void wsm (
             acrfac = 2.f*rslope3s[k]+2.f*diameter*rslope2s[k]
               +diameter*diameter*rslopes[k] ;
             psaci_reg = pi*qi_k*eacrs*n0s*n0sfac[k]
-              *sycl::abs(vt2s-vt2i)*acrfac*.25f ;
+              *sycl::fabs(vt2s-vt2i)*acrfac*.25f ;
           }
           //-------------------------------------------------------------
           // pidep: Deposition/Sublimation rate of ice [HDC 9]
@@ -541,7 +541,7 @@ void wsm (
             } else {
               pidep_reg = MIN(MIN(pidep_reg,satdt*.5f),supice) ;
             }
-            if(sycl::abs(prevp_reg+pidep_reg) >= sycl::abs(satdt)) ifsat = 1 ;
+            if(sycl::fabs(prevp_reg+pidep_reg) >= sycl::fabs(satdt)) ifsat = 1 ;
           }
           //-------------------------------------------------------------
           // psdep: deposition/sublimation rate of snow [HDC 14]
@@ -559,7 +559,7 @@ void wsm (
             } else {
               psdep_reg = MIN(MIN(psdep_reg,satdt*.5f),supice) ;
             }
-            if(sycl::abs(prevp_reg+pidep_reg+psdep_reg) >= sycl::abs(satdt))
+            if(sycl::fabs(prevp_reg+pidep_reg+psdep_reg) >= sycl::fabs(satdt))
               ifsat = 1 ;
           }
           //-------------------------------------------------------------
