@@ -68,18 +68,18 @@ void bond_wlcpowallvisc(
       r32 lmax = l0*r0[type];
       r32 rr = 1.0f/r0[type];
       r32 sr = (1.0f-rr)*(1.0f-rr);
-      r32 kph = sycl::pow<float>(l0, qp[type]) * temp[type] *
+      r32 kph = sycl::pow(l0, qp[type]) * temp[type] *
                 (0.25f / sr - 0.25f + rr);
       // mu is described in the papers
       r32 mu = 0.433f * ( // 0.25 * sqrt(3)
          temp[type] * (-0.25f / sr + 0.25f +
          0.5f * rr / (sr * (1.0f - rr))) /
          (lmax * rr) + kph * (qp[type] + 1.0f) /
-         sycl::pow<float>(l0, qp[type] + 1.0f));
+         sycl::pow(l0, qp[type] + 1.0f));
       r32 lambda = mu/mu_targ[type];
       kph = kph/lambda;
       rr = ra/lmax;
-      r32 rlogarg = sycl::pow<float>(ra, qp[type] + 1.0f);
+      r32 rlogarg = sycl::pow(ra, qp[type] + 1.0f);
       r32 vv = (delx*dvx + dely*dvy + delz*dvz)/ra;
 
       if (rr >= 0.99) rr = 0.99f;
@@ -273,7 +273,7 @@ int main(int argc, char *argv[]) {
                            dev_bond_r0, dev_temp, dev_bond_l0, dev_mu_targ,
                            dev_qp, dev_gamc, dev_gamt, dev_sigc, dev_sigt,
                            period, padding, n_type, n, item,
-                           sm.get_pointer());
+                           sm.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
   }
