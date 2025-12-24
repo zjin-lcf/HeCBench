@@ -108,7 +108,8 @@ void GPUHistogram(unsigned int *h_result, unsigned int *d_idata, int num, sycl::
     auto d_odata_p = d_odata;
     sycl::local_accessor<unsigned char, 1> s_Hist(sycl::range<1>(MEMPERBLOCK), cgh);
     cgh.parallel_for(sycl::nd_range<3>(grid * threads, threads), [=](sycl::nd_item<3> item) {
-      histoKernel(d_odata_p, d_idata, num >> 2, item, s_Hist.get_pointer());
+      histoKernel(d_odata_p, d_idata, num >> 2, item,
+                  s_Hist.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 
