@@ -138,7 +138,8 @@ void bscan (const int repeat)
       sycl::local_accessor<int, 1> sm (sycl::range<1>(80), cgh);
       cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item)
         [[sycl::reqd_sub_group_size(64)]] {
-        binary_scan(item, sm.get_pointer(), d_out, d_in);
+        binary_scan(item, sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                    d_out, d_in);
       });
     });
 
