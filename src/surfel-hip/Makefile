@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -fopenmp -Wall -I../surfel-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -45,11 +45,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu Makefile
+%.o: %.cu ../surfel-cuda/reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 1024 2960 1440 100
+	$(LAUNCHER) ./$(program) 1024 640 480 100
+	$(LAUNCHER) ./$(program) 30000 640 480 100
