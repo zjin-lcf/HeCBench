@@ -80,7 +80,7 @@ bool try_acquire_lock(uint32_t* nodeAddress, sycl::nd_item<1> &item) {
 }
 
 inline int __ffs(int x) {
-  return (x == 0) ? 0 : sycl::ext::intel::ctz(x) + 1;
+  return (x == 0) ? 0 : sycl::ctz(x) + 1;
 }
 
 void acquire_lock(uint32_t* nodeAddress, sycl::nd_item<1> &item) {
