@@ -18,6 +18,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <chrono>
+#include <cmath>
 #include <cuda.h>
 #include "kernels.cu"
 
