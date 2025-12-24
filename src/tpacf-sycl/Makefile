@@ -75,14 +75,14 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-args.o: ../tpacf-cuda/args.c ../tpacf-cuda/args.h
+args.o: args.cpp args.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 compute.o: compute.cpp model_io.cpp ACF_kernel.cpp histogram_kernel.cpp \
-           ../tpacf-cuda/kernel.h ../tpacf-cuda/args.h
+           ../tpacf-cuda/kernel.h args.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o: main.cpp ../tpacf-cuda/args.h ../tpacf-cuda/kernel.h 
+main.o: main.cpp args.h ../tpacf-cuda/kernel.h 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

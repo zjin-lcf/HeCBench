@@ -97,7 +97,9 @@ void tileComputeSymm(int type, int size, int njk, int *jkSizes, int nBins,
       auto d_odata1_p = d_odata1;
       auto d_binbs_p = d_binbs;
       cgh.parallel_for(sycl::nd_range<3>(grid * threads, threads), [=](sycl::nd_item<3> item) {
-        ACFKernelSymm(d_idata1_p, d_odata1_p, item, sm.get_pointer(), d_binbs_p);
+        ACFKernelSymm(d_idata1_p, d_odata1_p, item,
+                      sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                      d_binbs_p);
       });
     });
     index = 0;
@@ -132,7 +134,7 @@ void tileComputeSymm(int type, int size, int njk, int *jkSizes, int nBins,
         sycl::local_accessor<double3, 1> sm (sycl::range<1>(128), cgh);
         cgh.parallel_for(sycl::nd_range<3>(grid * threads, threads), [=](sycl::nd_item<3> item) {
           ACFKernel(d_idata1_p, d_idata2_p, d_odata1_p,
-                    item, sm.get_pointer(), d_binbs_p);
+                    item, sm.get_multi_ptr<sycl::access::decorated::no>().get(), d_binbs_p);
         });
       });
       index = 0;
@@ -180,7 +182,7 @@ void tileCompute(int dataSize, int randomSize, int njk, int *jkSizes, int nBins,
         sycl::local_accessor<double3, 1> sm (sycl::range<1>(128), cgh);
         cgh.parallel_for(sycl::nd_range<3>(grid * threads, threads), [=](sycl::nd_item<3> item) {
             ACFKernel(d_idata1_p, d_idata2_p, d_odata1_p,
-                      item, sm.get_pointer(), d_binbs_p);
+                      item, sm.get_multi_ptr<sycl::access::decorated::no>().get(), d_binbs_p);
         });
       });
       index = 0;
