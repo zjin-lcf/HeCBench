@@ -142,7 +142,6 @@ notice, this list of conditions and the disclaimer (as noted below)
 
   */
 
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
