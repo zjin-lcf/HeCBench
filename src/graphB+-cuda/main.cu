@@ -84,8 +84,11 @@ int main(int argc, char* argv[])
   cudaGetDeviceProperties(&deviceProp, Device);
   const int SMs = deviceProp.multiProcessorCount;
   const int mTpSM = deviceProp.maxThreadsPerMultiProcessor;
+  int clockRate, memoryClockRate;
+  cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, 0);
+  cudaDeviceGetAttribute(&memoryClockRate, cudaDevAttrMemoryClockRate, 0);
   printf("Device: %s with %d SMs and %d mTpSM (%.1f MHz and %.1f MHz)\n",
-         deviceProp.name, SMs, mTpSM, deviceProp.clockRate * 0.001, deviceProp.memoryClockRate * 0.001);
+         deviceProp.name, SMs, mTpSM, clockRate * 0.001, memoryClockRate * 0.001);
 
   Graph d_g = g;
   EdgeInfo* d_einfo;
