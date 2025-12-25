@@ -31,13 +31,13 @@ Domain::Domain(Int_t numRanks, Index_t colLoc,
    m_dvovmax(Real_t(0.1)),
    m_refdens(Real_t(1.0))
 {
-#ifdef USE_GPU
-    gpu_selector dev_sel;
-#else
-    cpu_selector dev_sel;
-#endif
     // move assignment
-   device_queue = cl::sycl::queue(dev_sel);
+#ifdef USE_GPU
+   device_queue = sycl::queue(sycl::gpu_selector_v);
+#else
+   device_queue = sycl::queue(sycl::cpu_selector_v);
+#endif
+
 
    Index_t edgeElems = nx ;
    Index_t edgeNodes = edgeElems+1 ;
