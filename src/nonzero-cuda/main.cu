@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <random>
 #include <cub/cub.cuh>
+#if defined(__CUDACC_VER_MAJOR__) && (__CUDACC_VER_MAJOR__ >= 13)
+#include <thrust/iterator/transform_iterator.h>
+#endif
 
 // Reference
 // https://pytorch.org/docs/stable/generated/torch.nonzero.html#torch.nonzero
@@ -89,7 +92,11 @@ void nonzero (int nrows, int ncols, int repeat) {
     NonZero<scalar_t> conversion_op;
 
     // Create an iterator wrapper
+#if defined(__CUDACC_VER_MAJOR__) && (__CUDACC_VER_MAJOR__ >= 13)
+    thrust::transform_iterator<NonZero<scalar_t>, scalar_t*> itr (d_in, conversion_op);
+#else
     cub::TransformInputIterator<bool, NonZero<scalar_t>, scalar_t*> itr (d_in, conversion_op);
+#endif
 
     // Determine temporary device storage requirements
     void     *d_temp_storage;
@@ -128,7 +135,11 @@ void nonzero (int nrows, int ncols, int repeat) {
       // Time the index operations on a device
       auto start = std::chrono::steady_clock::now();
 
+#if defined(__CUDACC_VER_MAJOR__) && (__CUDACC_VER_MAJOR__ >= 13)
+      thrust::counting_iterator<int64_t> counting_itr(0);
+#else
       cub::CountingInputIterator<int64_t> counting_itr(0);
+#endif
 
       cub::DeviceSelect::Flagged(nullptr, temp_storage_bytes, counting_itr, itr, d_out, d_nzeros, num_items);
 
