@@ -29,7 +29,7 @@ struct kurtosis_unary_op
 };
 
 struct kurtosis_binary_op
-: public thrust::binary_function<const kurtosisResult&, const kurtosisResult&, kurtosisResult>
+//: public thrust::binary_function<const kurtosisResult&, const kurtosisResult&, kurtosisResult>
 {
   HOST DEVICE
   kurtosisResult operator()(const kurtosisResult& x, const kurtosisResult& y) const {
