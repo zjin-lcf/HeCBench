@@ -62,3 +62,25 @@ static inline __host__ __device__ int8_t int32_to_int8(int32_t x) {
   return static_cast<int8_t>(dst);
 }
 
+struct Max
+{
+  template <typename T, typename U>
+  __device__  __forceinline__
+  typename std::common_type<T, U>::type
+    operator()(T &&t, U &&u) const
+  {
+    return ((t) > (u)) ? (t) : (u);
+  }
+};
+
+struct Min
+{
+  template <typename T, typename U>
+  __device__  __forceinline__
+  typename std::common_type<T, U>::type
+    operator()(T &&t, U &&u) const
+  {
+    return ((t) < (u)) ? (t) : (u);
+  }
+};
+
