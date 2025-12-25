@@ -2,6 +2,27 @@
 #include <cub/cub.cuh>
 #include <cub/util_type.cuh>
 
+struct Sum
+{
+  template <typename T, typename U>
+  __device__ __forceinline__ auto operator()(T &&t, U &&u) const
+    -> decltype(std::forward<T>(t) + std::forward<U>(u))
+  {
+    return std::forward<T>(t) + std::forward<U>(u);
+  }
+};
+
+struct Max
+{
+  template <typename T, typename U>
+  __device__  __forceinline__
+  typename std::common_type<T, U>::type
+    operator()(T &&t, U &&u) const
+  {
+    return ((t) > (u)) ? (t) : (u);
+  }
+};
+
 template <int TPB>
 __global__ void moeSoftmax(
     const float* __restrict__ input,
@@ -17,7 +38,6 @@ __global__ void moeSoftmax(
 
   const int thread_row_offset = blockIdx.x * num_cols;
 
-  cub::Sum sum;
   float threadData(-FLT_MAX);
 
   // Don't touch finished rows.
@@ -30,7 +50,7 @@ __global__ void moeSoftmax(
     threadData = fmaxf(static_cast<float>(input[idx]), threadData);
   }
 
-  const float maxElem = BlockReduce(tmpStorage).Reduce(threadData, cub::Max());
+  const float maxElem = BlockReduce(tmpStorage).Reduce(threadData, Max());
 
   if (threadIdx.x == 0) {
     float_max = maxElem;
@@ -44,7 +64,7 @@ __global__ void moeSoftmax(
     threadData += expf((static_cast<float>(input[idx]) - float_max));
   }
 
-  const auto Z = BlockReduce(tmpStorage).Reduce(threadData, sum);
+  const auto Z = BlockReduce(tmpStorage).Reduce(threadData, Sum());
 
   if (threadIdx.x == 0) {
     normalizing_factor = 1.f / Z;
