@@ -34,6 +34,12 @@ struct bitwiseNot {
     }
 };
 
+struct identity {
+    template <typename T>
+    __host__ __device__ T operator()(const T& x) const { return x; }
+};
+
+
 // debug functions
 __global__ void printMffcCut(int * vCutTable, int * vCutSizes, int * vConeSizes,
                              const int * pFanin0, const int * pFanin1, 
@@ -507,7 +513,7 @@ int insertMFFCs(uint64 * htDestKeys, uint32 * htDestValues, int htDestCapacity,
     );
     cudaDeviceSynchronize();
     pNewListEnd = thrust::remove_if(thrust::device, vResynIdSeq, vResynIdSeq + nResyn, 
-                                    vFinishedMark, thrust::identity<int>());
+                                    vFinishedMark, identity{});
     assert(pNewListEnd - vResynIdSeq <= nResyn);
     int nReplace = pNewListEnd - vResynIdSeq;
     printf("Number of subgraphs to be inserted: %d\n", nReplace);
@@ -533,7 +539,7 @@ int insertMFFCs(uint64 * htDestKeys, uint32 * htDestValues, int htDestCapacity,
 
         // shrink according to vFinishedMark
         pNewListEnd = thrust::remove_if(thrust::device, vResynIdSeq, vResynIdSeq + nReplace, 
-                                        vFinishedMark, thrust::identity<int>());
+                                        vFinishedMark, identity{});
         cudaDeviceSynchronize();
         assert(pNewListEnd - vResynIdSeq <= nReplace);
         nReplace = pNewListEnd - vResynIdSeq;
