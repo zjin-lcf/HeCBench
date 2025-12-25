@@ -348,8 +348,8 @@ void RandomBits(
             int current_bit = j * WORD_BYTES * 8;
 
             unsigned int word = 0xffffffff;
-            word &= 0xffffffff << CUB_MAX(0, begin_bit - current_bit);
-            word &= 0xffffffff >> CUB_MAX(0, (current_bit + (WORD_BYTES * 8)) - end_bit);
+            word &= 0xffffffff << max(0, begin_bit - current_bit);
+            word &= 0xffffffff >> max(0, (current_bit + (WORD_BYTES * 8)) - end_bit);
 
             for (int i = 0; i <= entropy_reduction; i++)
             {
