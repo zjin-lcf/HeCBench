@@ -3,13 +3,25 @@
 
 #include <cub/cub.cuh>
 
+// <cub/thread/thread_operators.cuh>
+struct Max
+{
+  template <typename T, typename U>
+  DEVICE __forceinline__
+  typename std::common_type<T, U>::type
+    operator()(T &&t, U &&u) const
+  {
+    return ((t) > (u)) ? (t) : (u);
+  }
+};
+
 template <typename T, int block_size>
-__device__ void BlockReduce(T &input1, T &input2) {
+DEVICE void BlockReduce(T &input1, T &input2) {
   using BlockReduce = cub::BlockReduce<T, block_size>;
   __shared__ typename BlockReduce::TempStorage temp_storage1;
   __shared__ typename BlockReduce::TempStorage temp_storage2;
-  input1 = BlockReduce(temp_storage1).Reduce(input1, cub::Max());
-  input2 = BlockReduce(temp_storage2).Reduce(input2, cub::Max());
+  input1 = BlockReduce(temp_storage1).Reduce(input1, Max());
+  input2 = BlockReduce(temp_storage2).Reduce(input2, Max());
 }
 
 static DEVICE __const__ uint8_t _bitmask = 15;
