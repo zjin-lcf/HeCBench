@@ -6,6 +6,17 @@
 #include <cub/cub.cuh>
 #include "reference.h"
 
+struct Max
+{
+  template <typename T, typename U>
+  __device__ __forceinline__
+  typename std::common_type<T, U>::type
+    operator()(T &&t, U &&u) const
+  {
+    return ((t) > (u)) ? (t) : (u);
+  }
+};
+
 __global__
 void mha (
    const float *__restrict__ q, 
@@ -77,7 +88,7 @@ void mha (
   float local_i = threadIdx.x < n_steps ? summ : -1e-20f;
   float local_o;
 
-  float max_val = BlockReduce(temp_storage).Reduce(local_i, cub::Max());
+  float max_val = BlockReduce(temp_storage).Reduce(local_i, Max());
 
   if(threadIdx.x == 0) {
     s_max_val = max_val;
