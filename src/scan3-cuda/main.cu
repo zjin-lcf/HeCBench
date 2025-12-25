@@ -5,6 +5,16 @@
 #include <cub/cub.cuh>
 #include "scan.h"
 
+// Binary sum operator, returns `t + u`
+struct Sum
+{
+  template <typename T, typename U>
+  __device__ __forceinline__ auto operator()(T &&t, U &&u) const
+    -> decltype(std::forward<T>(t) + std::forward<U>(u))
+  {
+    return std::forward<T>(t) + std::forward<U>(u);
+  }
+};
 /*
  * Scan for verification
  */
@@ -107,14 +117,14 @@ int main(int argc, char * argv[])
     size_t   temp_storage_bytes = 0;
     cub::DeviceScan::ExclusiveScan(
       d_temp_storage, temp_storage_bytes,
-      inputBuffer, outputBuffer, cub::Sum(), 0.f, length);
+      inputBuffer, outputBuffer, Sum(), 0.f, length);
     
     // Allocate temporary storage
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
     
     cub::DeviceScan::ExclusiveScan(
       d_temp_storage, temp_storage_bytes,
-      inputBuffer, outputBuffer, cub::Sum(), 0.f, length);
+      inputBuffer, outputBuffer, Sum(), 0.f, length);
 
     cudaFree(d_temp_storage);
   }
