@@ -12,6 +12,17 @@
 #include "common.h"
 #include "reference.h"
 
+struct Max
+{
+  template <typename T, typename U>
+  __device__ __forceinline__
+  typename std::common_type<T, U>::type
+    operator()(T &&t, U &&u) const
+  {
+    return ((t) > (u)) ? (t) : (u);
+  }
+};
+
 // online softmax paper: http://arxiv.org/abs/1805.02867
 // online softmax reduces loops from 3 to 2
 // which is done by calculating sumval and maxval in one loop
@@ -191,7 +202,7 @@ __global__ void softmax_forward_baseline_kernel(float* out, const float* inp, in
   for (int i = laneId; i < C; i += warpSize) {
     maxval = max(x[i], maxval);
   }
-  maxval = WarpReduce(temp[warpId]).Reduce(maxval, cub::Max());
+  maxval = WarpReduce(temp[warpId]).Reduce(maxval, Max());
 
   __syncwarp();
 
