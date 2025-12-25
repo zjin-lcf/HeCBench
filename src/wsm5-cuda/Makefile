@@ -24,7 +24,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -DMKX=4 -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+CFLAGS := -DMKX=4 -std=c++17 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 

@@ -28,7 +28,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -I$(MPI_ROOT)/include \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I$(MPI_ROOT)/include \
           -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags

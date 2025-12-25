@@ -25,7 +25,7 @@ obj = $(c_source:.c=.o) $(omp_source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -DINT -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -DINT -std=c++17 -Wall
 
 # Linker Flags
 LDFLAGS = 

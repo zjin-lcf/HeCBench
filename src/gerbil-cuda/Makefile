@@ -42,7 +42,7 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++11 -Wall -fpermissive -DGPU \
 	  -DBOOST_REGEX_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -DBOOST_THREAD_DYN_LINK \
 	  -I/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/cuda/include
 
-NVCCFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall
+NVCCFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall
 
 # Linker Flags
 LDFLAGS = -lboost_system -lboost_thread -lboost_regex -lboost_filesystem \

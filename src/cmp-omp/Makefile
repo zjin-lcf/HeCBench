@@ -30,7 +30,7 @@ obj = main.o reference.o su_cdp.o su_gather.o su_trace.o log.o parser.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../cmp-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../cmp-cuda
 
 # Linker Flags
 LDFLAGS = 

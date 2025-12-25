@@ -24,7 +24,7 @@ obj = main.o kernels.o utils.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../simpleSpmv-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../simpleSpmv-cuda
 
 # Linker Flags
 LDFLAGS = 

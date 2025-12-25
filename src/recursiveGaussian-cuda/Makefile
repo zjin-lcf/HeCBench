@@ -23,7 +23,7 @@ obj = main.o RecursiveGaussianHost.o shrUtils.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH) \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall -arch=$(ARCH) \
           -I../boxfilter-sycl
 
 # Linker Flags

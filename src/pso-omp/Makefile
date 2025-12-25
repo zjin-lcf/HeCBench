@@ -24,7 +24,7 @@ obj = main.o kernel_gpu.o kernel_cpu.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../pso-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../pso-cuda
 
 # Linker Flags
 LDFLAGS = 

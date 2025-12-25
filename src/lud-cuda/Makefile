@@ -22,7 +22,7 @@ source = lud.cu ./common/common.cpp
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -arch=$(ARCH) -I./common
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall -arch=$(ARCH) -I./common
 
 # Linker Flags
 LDFLAGS = 

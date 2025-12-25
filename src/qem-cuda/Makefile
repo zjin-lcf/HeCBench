@@ -25,7 +25,7 @@ obj = $(source:.cu=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) --default-stream per-thread \
-          -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+          -std=c++17 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 

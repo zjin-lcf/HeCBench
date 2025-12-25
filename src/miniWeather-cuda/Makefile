@@ -31,7 +31,7 @@ CFLAGS := -DNX=400 \
 	  -DSIM_TIME=600 \
 	  -DDATA_SPEC=DATA_SPEC_THERMAL \
           -I$(MPI_ROOT)/include \
-          -std=c++14 -Xcompiler -Wall -arch=$(ARCH)
+          -std=c++17 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = -L$(MPI_ROOT)/lib -lmpi

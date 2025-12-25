@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -DREFDATA_TWOJ=14 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -DREFDATA_TWOJ=14 
 
 # Linker Flags
 LDFLAGS = 
