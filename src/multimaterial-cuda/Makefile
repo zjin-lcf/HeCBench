@@ -13,7 +13,7 @@ LAUNCHER  =
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall 
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall 
 
 # Linker Flags
 LDFLAGS = 

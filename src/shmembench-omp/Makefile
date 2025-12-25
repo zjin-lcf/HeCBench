@@ -23,7 +23,7 @@ obj = main.o shmem_kernels.o
 # Sets Flags
 #===============================================================================
 
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
 
 # Linker Flags
 LDFLAGS = 

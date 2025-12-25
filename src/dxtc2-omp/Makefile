@@ -23,7 +23,7 @@ obj = main.o shrUtils.o block.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -DUSE_GPU -std=c++14 -Wall -I$(SPATH)
+CFLAGS := $(EXTRA_CFLAGS) -DUSE_GPU -std=c++17 -Wall -I$(SPATH)
 
 # Linker Flags
 LDFLAGS = 

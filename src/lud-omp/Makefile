@@ -20,7 +20,7 @@ program = main
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -I../lud-cuda/common -std=c++14 -Wall 
+CFLAGS := $(EXTRA_CFLAGS) -I../lud-cuda/common -std=c++17 -Wall 
 
 # Linker Flags
 LDFLAGS = 

@@ -2,7 +2,7 @@ ARCH = 60
 
 NVCC = nvcc
 NVCC_ARCH = -gencode arch=compute_$(ARCH),code=sm_$(ARCH)
-NVCC_FLAGS = --std=c++14 -O3 -arch=sm_$(ARCH) -Xcompiler="-pthread" 
+NVCC_FLAGS = --std=c++17 -O3 -arch=sm_$(ARCH) -Xcompiler="-pthread" 
 
 INC_DIR = include
 SRC_DIR = src

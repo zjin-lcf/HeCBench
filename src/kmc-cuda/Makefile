@@ -24,7 +24,7 @@ obj = main.o svm.o
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Xcompiler -Wall -Xcompiler -Wno-unused-result -arch=$(ARCH)
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall -Xcompiler -Wno-unused-result -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = -lcublas 

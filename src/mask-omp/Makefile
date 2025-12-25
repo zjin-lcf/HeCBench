@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../mask-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../mask-cuda
 
 # Linker Flags
 LDFLAGS = 
