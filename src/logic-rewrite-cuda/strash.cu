@@ -11,6 +11,11 @@
 #include "hash_table.h"
 #include "print.cuh"
 
+struct identity {
+    template <typename T>
+    __host__ __device__ T operator()(const T& x) const { return x; }
+};
+
 /**
  * Create a hashtable containing all the nodes given by pFanin0/1.
  * Assume that pFanin0/1 is already strashed, i.e., no duplicate node and topo order,
@@ -235,7 +240,7 @@ Aig::strash(const int * pFanin0, const int * pFanin1, const int * pOuts, int * p
     if (nDangling > 0) {
         pNewGlobalListEnd = thrust::remove_if(
             thrust::device, vRemainNodes, vRemainNodes + nNodes, 
-            vMarks, thrust::identity<int>()
+            vMarks, identity{}
         );
         nRemain = pNewGlobalListEnd - vRemainNodes;
         assert(nRemain + nDangling == nNodes);
@@ -252,13 +257,13 @@ Aig::strash(const int * pFanin0, const int * pFanin1, const int * pOuts, int * p
 
         pNewGlobalListEnd = thrust::copy_if(
             thrust::device, vRemainNodes, vRemainNodes + nRemain, 
-            vMarks, vReadyNodes, thrust::identity<int>()
+            vMarks, vReadyNodes, identity{}
         );
         nReady = pNewGlobalListEnd - vReadyNodes;
 
         pNewGlobalListEnd = thrust::remove_if(
             thrust::device, vRemainNodes, vRemainNodes + nRemain, 
-            vMarks, thrust::identity<int>()
+            vMarks, identity{}
         );
         assert((pNewGlobalListEnd - vRemainNodes) + nReady == nRemain);
         nRemain = pNewGlobalListEnd - vRemainNodes;
