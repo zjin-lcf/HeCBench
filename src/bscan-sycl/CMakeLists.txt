@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME bscan
     MODEL sycl
-    SOURCES main-wave64.cpp main.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

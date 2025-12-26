@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME ldpc
     MODEL sycl
-    SOURCES cpu.cpp kernel.cpp main.cpp
+    SOURCES cpu.cpp main.cpp
     CATEGORIES algorithms
 )

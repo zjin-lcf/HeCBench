@@ -63,6 +63,7 @@ cmake --build build/cuda-sm80 --parallel
 - `sycl-hip-gfx90a` - SYCL with HIP backend targeting MI210, MI250X
 - `sycl-hip-gfx942` - SYCL with HIP backend targeting MI300A/X
 - `sycl-cpu` - SYCL with CPU backend
+- `sycl-xpu` - SYCL with XPU backend (Intel GPUs)
 
 #### OpenMP
 - `openmp-intel` - Intel compiler with OpenMP offload
@@ -92,6 +93,10 @@ cmake --build build/cuda-sm80 --target jacobi-cuda
 # Build only HIP version of attention
 cmake --preset hip-gfx90a
 cmake --build build/hip-gfx90a --target attention-hip
+
+# Build only SYCL XPU version of attention
+cmake -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx --preset sycl-xpu
+cmake --build build/sycl-xpu --target attention-sycl
 ```
 
 ### Build by Category

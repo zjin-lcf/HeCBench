@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME reaction
     MODEL sycl
-    SOURCES kernels.cpp main.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

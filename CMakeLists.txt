@@ -20,6 +20,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# 3rd party
+find_package(Boost)
+
 # Build options - which programming models to enable
 option(HECBENCH_ENABLE_CUDA "Enable CUDA benchmarks" ON)
 option(HECBENCH_ENABLE_HIP "Enable HIP benchmarks" ON)

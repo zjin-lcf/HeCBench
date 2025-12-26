@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME pns
     MODEL sycl
-    SOURCES main.cpp petri_kernel.cpp rand_gen.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

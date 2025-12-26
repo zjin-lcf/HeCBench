@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES su3_nn_bench.cpp
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DMILC_COMPLEX
 )

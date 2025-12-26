@@ -4,5 +4,12 @@ add_hecbench_benchmark(
     NAME b+tree
     MODEL sycl
     SOURCES main.c
+            kernel/kernel_wrapper.c
+            kernel/kernel2_wrapper.c
+            util/timer/timer.c
+            util/num/num.c
+    INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/util/num
+                 ${CMAKE_CURRENT_SOURCE_DIR}/util/timer
+                 ${CMAKE_CURRENT_SOURCE_DIR}/kernel
     CATEGORIES algorithms
 )

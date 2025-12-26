@@ -9,6 +9,7 @@ add_hecbench_benchmark(
         src/score.cpp
         src/logan_functions.cpp
     INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
-    COMPILE_OPTIONS -DADAPTABLE
+    COMPILE_OPTIONS -fopenmp -DADAPTABLE
     CATEGORIES bioinformatics
+    LINK_LIBRARIES -fopenmp
 )

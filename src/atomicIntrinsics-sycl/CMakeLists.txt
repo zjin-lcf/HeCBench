@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME atomicIntrinsics
     MODEL sycl
-    SOURCES main-um.cpp main.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

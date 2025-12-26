@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME blockAccess
     MODEL sycl
-    SOURCES main.cpp main2.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

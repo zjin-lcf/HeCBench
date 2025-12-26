@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME streamCreateCopyDestroy
     MODEL sycl
-    SOURCES main-dpct.cpp main.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

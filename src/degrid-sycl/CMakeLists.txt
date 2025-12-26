@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME degrid
     MODEL sycl
-    SOURCES kernels.cpp main.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DPRECISION=double
 )
