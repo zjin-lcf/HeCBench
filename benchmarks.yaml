@@ -1049,11 +1049,6 @@ fpdc:
   models: [cuda, hip, omp, sycl]
   # No test metadata available
 
-frechet:
-  categories: [algorithms]
-  models: [cuda, hip, omp, sycl]
-  # No test metadata available
-
 fresnel:
   categories: [algorithms]
   models: [cuda, hip, omp, sycl]
