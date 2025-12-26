@@ -26,7 +26,7 @@
 #define GetCurrentDir _getcwd
 #endif
 
-#include "common.h"
+#include <sycl/sycl.hpp>
 
 // Some useful text replacements related to the analysis
 // The total number of genes involved for this particular kind of dataset // TODO: Revise the wording
@@ -110,9 +110,9 @@ double computePValue(
     const int setSize,
     const int signatureByRNGs,
     const double UCmax,
-    buffer<float,1> &device_randomIndexArray,
-    buffer<int,1> &device_refRegNum,
-    buffer<float,1> &device_arraysAdded);
+    float *device_randomIndexArray,
+    int *device_refRegNum,
+    float *device_arraysAdded);
 
 double computePValueHelper(const double nAboveThreshold, const int nRandomGenerations);
 
@@ -120,8 +120,8 @@ inline double computeUCMax(const int sigNGenes, const int nGenesTotal);
 
 double computeDotProduct(
     sycl::queue &q,
-    buffer<int,1> &device_v1,
-    buffer<int,1> &device_v2,
+    int *device_v1,
+    int *device_v2,
     const int vLength,
     const int blockSize,
     const int nThreads);

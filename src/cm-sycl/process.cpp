@@ -8,7 +8,7 @@
 /*
  * Process a given query
  */
-int processQuery(queue &q,
+int processQuery(sycl::queue &q,
                  const std::vector<std::string> &refFiles, 
                  const std::vector<std::string> &sigGeneNameList,
                  const std::vector<int> &sigRegValue,
@@ -45,17 +45,18 @@ int processQuery(queue &q,
   std::uniform_real_distribution<float> distribution(0.f, 1.f);
   float *randomValues = (float*) malloc(sizeof(float) * signatureByRNGs);
 
-  buffer<float, 1> device_randomValues (signatureByRNGs);
-  buffer<float, 1> device_arraysAdded (nRandomGenerations);
+  float *device_randomValues = sycl::malloc_device<float>(signatureByRNGs, q);
+  float *device_arraysAdded = sycl::malloc_device<float>(nRandomGenerations, q);
 
   // Preallocate a host array to read in the up/down regulation values (-1/1) for the file currently being read
   int refRegValues[nGenesTotal];
 
   // Preallocate device arrays
-  buffer<int, 1> device_refRegValues (nGenesTotal); // Main device array corresponding to refRegValues
+  int *device_refRegValues = sycl::malloc_device<int>(nGenesTotal, q); // Main device array corresponding to refRegValues
 
   // Device array to contain up/down regulation values for genes in the query, and zeros where the gene was not in the query
-  buffer<int, 1> device_queryRefRegValues (qIndex, nGenesTotal);
+  int *device_queryRefRegValues = sycl::malloc_device<int>(nGenesTotal, q);
+  q.memcpy(device_queryRefRegValues, qIndex, nGenesTotal * sizeof(int));
 
   // Initialize the set size to zero
   int setSize = 0;
@@ -90,10 +91,7 @@ int processQuery(queue &q,
     // Compute the set score for the signature, and normalize it to UCmax
     int blocksPerGrid = (int)ceil((float)nGenesTotal / (float)threadsPerBlock);
 
-    q.submit([&] (handler &cgh) {
-      auto acc = device_refRegValues.get_access<sycl_write>(cgh);
-      cgh.copy(refRegValues, acc);
-    });
+    q.memcpy(device_refRegValues, refRegValues, nGenesTotal * sizeof(int));
 
     double cumulativeSetScore = computeDotProduct(q, device_refRegValues, device_queryRefRegValues, 
                                 nGenesTotal, blocksPerGrid, threadsPerBlock) / UCmax;
@@ -103,10 +101,7 @@ int processQuery(queue &q,
 
     // generate random values
     for (int i = 0; i < signatureByRNGs; ++i) randomValues[i] = distribution(generator);
-    q.submit([&] (handler &cgh) {
-      auto acc = device_randomValues.get_access<sycl_write>(cgh);
-      cgh.copy(randomValues, acc);
-    });
+    q.memcpy(device_randomValues, randomValues, signatureByRNGs * sizeof(float));
 
     // Compute a p-value using the random numbers to create random gene signatures, and compare these to the reference profile
     double pValue = computePValue(q, nRandomGenerations, threadsPerBlock, averageSetScore, setSize, signatureByRNGs, UCmax,
@@ -126,6 +121,10 @@ int processQuery(queue &q,
   }
 
   // Free all the arrays made on the GPU
+  sycl::free(device_refRegValues, q);
+  sycl::free(device_randomValues, q);
+  sycl::free(device_arraysAdded, q);
+  sycl::free(device_queryRefRegValues, q);
   free(randomValues);
 
   return 0;
@@ -190,61 +189,56 @@ inline int getNDrugs(const int compoundChoice) {
  * Compute the p-value using connection scores from random gene lists
  */
 double computePValue(
-  queue &q,
+  sycl::queue &q,
   const int nRandomGenerations, 
   const int threadsPerBlock,
   const double averageSetScore,
   const int setSize,
   const int signatureByRNGs,
   const double UCmax,
-  buffer<float, 1> &device_randomIndexArray,
-  buffer<int, 1> &device_refRegNum,
-  buffer<float, 1> &device_arraysAdded) 
+  float *device_randomIndexArray,
+  int *device_refRegNum,
+  float *device_arraysAdded) 
 {
   // Figure out how many blocks are needed, given the threads per block
   const int blocksPerGrid = (int)ceil((float)nRandomGenerations / (float)threadsPerBlock);
    
-  range<1> gws (blocksPerGrid * threadsPerBlock);
-  range<1> lws (threadsPerBlock);
+  sycl::range<1> gws (blocksPerGrid * threadsPerBlock);
+  sycl::range<1> lws (threadsPerBlock);
 
   // Compute scores of random gene signatures
-  q.submit([&] (handler &cgh) {
-    auto ria = device_randomIndexArray.get_access<sycl_read>(cgh);
-    auto rrn = device_refRegNum.get_access<sycl_read>(cgh);
-    auto arr = device_arraysAdded.get_access<sycl_write>(cgh);
-    cgh.parallel_for<class compute_score>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for<class compute_score>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       computeRandomConnectionScores(item,
-        ria.get_pointer(), rrn.get_pointer(), arr.get_pointer(), 
+        device_randomIndexArray, device_refRegNum, device_arraysAdded,
         signatureByRNGs, UCmax, setSize, nRandomGenerations);
     });
   });
 
   // Start working out the P-value on the GPU by calculating the sum of the instances in which the random gene signature score was >= the query signature score
-  buffer<int, 1> device_aboveThresholdAccumulator (blocksPerGrid);
+  int *device_aboveThresholdAccumulator = sycl::malloc_device<int>(blocksPerGrid, q);
 
-  q.submit([&] (handler &cgh) {
-    auto aar = device_arraysAdded.get_access<sycl_read>(cgh);
-    auto ata = device_aboveThresholdAccumulator.get_access<sycl_write>(cgh);
-    accessor<int, 1, sycl_read_write, access::target::local> sm (threadsPerBlock, cgh);
-    cgh.parallel_for<class count>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
-      countAboveThresholdHelper(item, sm.get_pointer(),
-        aar.get_pointer(), averageSetScore, ata.get_pointer(), nRandomGenerations);
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<int, 1> sm (sycl::range<1>(threadsPerBlock), cgh);
+    cgh.parallel_for<class count>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      countAboveThresholdHelper(item, 
+        sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+        device_arraysAdded, averageSetScore, device_aboveThresholdAccumulator, nRandomGenerations);
     });
   });
 
   // Copy the array output from the GPU to the host, sum it and free the memory
   int *aboveThresholdAccumulator= new int[blocksPerGrid];
 
-  q.submit([&] (handler &cgh) {
-    auto acc = device_aboveThresholdAccumulator.get_access<sycl_read>(cgh);
-    cgh.copy(acc, aboveThresholdAccumulator);
-  }).wait();
+  q.memcpy(aboveThresholdAccumulator, device_aboveThresholdAccumulator,
+           blocksPerGrid * sizeof(int)).wait();
 
   int aboveThresholdSum = 0;
   for (int ii = 0; ii < blocksPerGrid; ii++)
     aboveThresholdSum += aboveThresholdAccumulator[ii];
 
   // Finally calculate the P-value based on the GPU results and how many random numbers were generated
+  sycl::free(device_aboveThresholdAccumulator, q);
   delete [] aboveThresholdAccumulator;
   return computePValueHelper(aboveThresholdSum, nRandomGenerations);
 }
@@ -292,34 +286,30 @@ inline double computeUCMax(const int sigNGenes, const int nGenesTotal) {
  * Compute the dot product of two vectors, using the GPU
  */
 double computeDotProduct(
-  queue &q,
-  buffer<int, 1> &device_v1,
-  buffer<int, 1> &device_v2,
+  sycl::queue &q,
+  int *device_v1,
+  int *device_v2,
   const int vLength, const int blockSize, const int nThreads)
 {
   // Compute dot product of device_qIndex and device_refRegNum using the GPU
-  buffer<int, 1> device_temp (blockSize);
+  int *device_temp = sycl::malloc_device<int>(blockSize, q);
 
-  range<1> gws (blockSize *nThreads);
-  range<1> lws (nThreads);
+  sycl::range<1> gws (blockSize *nThreads);
+  sycl::range<1> lws (nThreads);
 
-  q.submit([&] (handler &cgh) {
-    auto t = device_temp.get_access<sycl_write>(cgh);
-    auto v1 = device_v1.get_access<sycl_read>(cgh);
-    auto v2 = device_v2.get_access<sycl_read>(cgh);
-    accessor<int, 1, sycl_read_write, access::target::local> sm (nThreads, cgh);
-    cgh.parallel_for<class dotproduct>(nd_range<1>(gws, lws), [=] (nd_item<1> item) {
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::local_accessor<int, 1> sm (sycl::range<1>(nThreads), cgh);
+    cgh.parallel_for<class dotproduct>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       computeDotProductHelper (item,
-        sm.get_pointer(), t.get_pointer(), v1.get_pointer(), v2.get_pointer(), vLength);
+        sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+        device_temp, device_v1, device_v2, vLength);
     });
   });
 
   // Copy the initial results back to the CPU for final summation
   int *result= new int[blockSize * sizeof(int)];
-  q.submit([&] (handler &cgh) {
-    auto acc = device_temp.get_access<sycl_read>(cgh);
-    cgh.copy(acc, result);
-  }).wait();
+  q.memcpy(result, device_temp, blockSize * sizeof(int)).wait();
+  sycl::free(device_temp, q);
   
   double dot = 0.0;
   for (int z = 0; z < blockSize; z++) {
