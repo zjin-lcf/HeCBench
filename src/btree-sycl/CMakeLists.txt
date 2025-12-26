@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME btree
     MODEL sycl
-    SOURCES host.cpp main.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

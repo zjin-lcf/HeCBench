@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES attack.cpp main.cpp utils.cpp w_blocks.cpp
     CATEGORIES algorithms
+    COMPILE_OPTIONS -ffast-math
 )

@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME particles
     MODEL sycl
-    SOURCES bitonicSort.cpp bitonicSort_kernels.cpp main.cpp particles.cpp particles_kernels.cpp
+    SOURCES bitonicSort.cpp main.cpp particles.cpp
     CATEGORIES algorithms
 )

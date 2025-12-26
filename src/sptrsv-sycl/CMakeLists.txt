@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES main.cpp sptrsv_syncfree.cpp
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DWARP_PER_BLOCK=8 -DVALUE_TYPE=double -DBENCH_REPEAT=100 
 )

@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME black-scholes
     MODEL sycl
-    SOURCES blackScholesAnalyticEngine.cpp blackScholesAnalyticEngineKernels.cpp blackScholesAnalyticEngineKernelsCpu.cpp
+    SOURCES blackScholesAnalyticEngine.cpp
     CATEGORIES algorithms
 )

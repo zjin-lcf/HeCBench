@@ -158,7 +158,7 @@ set(HECBENCH_POC_BENCHMARKS
     fma
     fpc
     fpdc
-    frechet
+    #frechet
     fresnel
     frna
     fsm
@@ -380,7 +380,7 @@ set(HECBENCH_POC_BENCHMARKS
     simpleMultiDevice
     simpleSpmv
     slit
-    slu
+    #slu
     snake
     sobel
     sobol

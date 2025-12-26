@@ -5,6 +5,9 @@
 set_property(GLOBAL PROPERTY HECBENCH_ALL_BENCHMARKS "")
 set_property(GLOBAL PROPERTY HECBENCH_CATEGORIES "")
 
+# Global list for benchmarks that require Boost
+set(DEPEND_ON_BOOST "hbc" "ge-spmm" "mmcsf" "warpsort")
+
 # Path to test runner script
 set(HECBENCH_TEST_RUNNER "${CMAKE_SOURCE_DIR}/cmake/scripts/run_benchmark_test.py")
 
@@ -68,6 +71,16 @@ function(add_hecbench_benchmark)
     if(NOT MODEL_ENABLED)
         message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (model not enabled)")
         return()
+    endif()
+
+    if(${BENCH_NAME} IN_LIST DEPEND_ON_BOOST)
+        if(Boost_FOUND)
+            message(STATUS "Boost found: ${Boost_INCLUDE_DIRS}")
+            include_directories(${Boost_INCLUDE_DIRS})
+        else()
+            message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (Boost not found)")
+            return()
+        endif()
     endif()
 
     # Create target name

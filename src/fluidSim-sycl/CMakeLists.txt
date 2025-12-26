@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES kernels.cpp main.cpp
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DVERIFY
 )

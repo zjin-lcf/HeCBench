@@ -1,8 +1,12 @@
 # mriQ-sycl/CMakeLists.txt
 
+set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/../mriQ-cuda")
+
 add_hecbench_benchmark(
     NAME mriQ
     MODEL sycl
-    SOURCES computeQ.cpp main.cpp
+    SOURCES main.cpp ${INC_DIR}/file.cc
     CATEGORIES algorithms
+    INCLUDE_DIRS ${INC_DIR}
+    COMPILE_OPTIONS -ffast-math
 )

@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME bonds
     MODEL sycl
-    SOURCES bondsEngine.cpp bondsKernelsCpu.cpp bondsKernelsGpu.cpp
+    SOURCES bondsEngine.cpp
     CATEGORIES algorithms
 )

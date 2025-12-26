@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME convolution3D
     MODEL sycl
-    SOURCES conv3d_s4.cpp main.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

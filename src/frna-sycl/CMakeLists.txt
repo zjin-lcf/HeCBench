@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME frna
     MODEL sycl
-    SOURCES frna.cpp
+    SOURCES frna.cpp main.c fbase.c fparam.c util.c
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DINT -ffast-math
 )

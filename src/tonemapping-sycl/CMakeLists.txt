@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME tonemapping
     MODEL sycl
-    SOURCES kernels.cpp main.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

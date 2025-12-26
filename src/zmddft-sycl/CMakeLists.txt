@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES main.cpp
     CATEGORIES algorithms
+    COMPILE_OPTIONS -fbracket-depth=512 -std=c++20 -ffast-math
 )
