@@ -1,5 +1,7 @@
 #include "kernel.hpp"
 
+//#define INTEL_GPU
+
 inline short
 warpReduceMax_with_index(short val, short& myIndex, short& myIndex2,
                          int lengthSeqB, bool inverse, sycl::nd_item<1> &item)
@@ -21,19 +23,19 @@ warpReduceMax_with_index(short val, short& myIndex, short& myIndex2,
   for(int offset = rem/2; rem > 0; offset = sycl::max(1, rem/2))
   {
     rem -= offset;
-    short tempVal = sg.shuffle_down(val, offset);
-    newInd  = sg.shuffle_down(ind, offset);
-    newInd2 = sg.shuffle_down(ind2, offset);
+    short tempVal = sycl::shift_group_left(sg, val, offset);
+    newInd  = sycl::shift_group_left(sg, ind, offset);
+    newInd2 = sycl::shift_group_left(sg, ind2, offset);
 
     // all shuffles are done
-    sg.barrier();
+    sycl::group_barrier(sg);
     
     val = sycl::max(val, tempVal);
 
 #ifdef INTEL_GPU
     if(laneId + offset >= warpSize)
     {
-      val = 0
+      val = 0;
       newInd = 0;
       newInd2 = 0;
     }
@@ -90,7 +92,7 @@ short blockShuffleReduce_with_index(short myVal, short& myIndex, short& myIndex2
   if(laneId == 0)
     locInds2[warpId] = myInd2;
 
-  group_barrier(gp);
+  sycl::group_barrier(gp);
 
   // number of subgroups in a work-group
   int nblocks = sg.get_group_range().size();
@@ -107,7 +109,7 @@ short blockShuffleReduce_with_index(short myVal, short& myIndex, short& myIndex2
     myInd  = -1;
     myInd2 = -1;
   }
-  group_barrier(gp);
+  sycl::group_barrier(gp);
 
   if(warpId == 0)
   {
@@ -232,7 +234,7 @@ void sequence_aa_kernel(
   }
 
   // this is required here so that complete sequence has been copied to shared memory
-  group_barrier(gp);
+  sycl::group_barrier(gp);
 
   int   i            = 1;
   short thread_max   = 0; // to maintain the thread max score
@@ -256,7 +258,7 @@ void sequence_aa_kernel(
   }
 
   // to make sure all shmem allocations have been initialized
-  group_barrier(gp);
+  sycl::group_barrier(gp);
 
   for(int diag = 0; diag < lengthSeqA + lengthSeqB - 1; diag++)
   {  // iterate for the number of anti-diagonals
@@ -297,14 +299,14 @@ void sequence_aa_kernel(
     }
 
     // this is needed so that all the shmem writes are completed.
-    group_barrier(gp);
+    sycl::group_barrier(gp);
 
     if(is_valid[thread_Id] && thread_Id < minSize)
     {
       short fVal = _prev_F + extendGap;
       short hfVal = _prev_H + startGap;
-      short valeShfl = sg.shuffle(_prev_E, laneId- 1);
-      short valheShfl = sg.shuffle(_prev_H, laneId - 1);
+      short valeShfl = sycl::select_from_group(sg, _prev_E, laneId- 1);
+      short valheShfl = sycl::select_from_group(sg, _prev_H, laneId - 1);
 
       short eVal=0, heVal = 0;
 
@@ -327,7 +329,7 @@ void sequence_aa_kernel(
       _curr_F = (fVal > hfVal) ? fVal : hfVal;
       _curr_E = (eVal > heVal) ? eVal : heVal;
 
-      short testShufll = sg.shuffle(_prev_prev_H, laneId - 1);
+      short testShufll = sycl::select_from_group(sg, _prev_prev_H, laneId - 1);
       short final_prev_prev_H = 0;
       if(diag >= maxSize)
       {
@@ -360,12 +362,12 @@ void sequence_aa_kernel(
       i++;
     } else {
       // we need these dummy shuffle operations for NVIDIA GPUs
-      short valeShfl = sg.shuffle(_prev_E, laneId);
-      short valheShfl =  sg.shuffle(_prev_H, laneId);
-      short testShufll = sg.shuffle(_prev_prev_H, laneId);
+      short valeShfl = sycl::select_from_group(sg, _prev_E, laneId);
+      short valheShfl = sycl::select_from_group(sg, _prev_H, laneId);
+      short testShufll = sycl::select_from_group(sg, _prev_prev_H, laneId);
     }
 
-    group_barrier(gp);
+    sycl::group_barrier(gp);
   }
 
   thread_max = blockShuffleReduce_with_index(thread_max, thread_max_i, thread_max_j,
