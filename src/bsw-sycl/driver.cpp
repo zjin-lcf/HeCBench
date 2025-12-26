@@ -168,7 +168,7 @@ void kernel_driver_aa(std::string filename,
 
       cgh.parallel_for<class aa>(
         sycl::nd_range<1>(gws_aa, lws_aa), [=] (sycl::nd_item<1> item)
-        [[intel::reqd_sub_group_size(32)]]
+        [[sycl::reqd_sub_group_size(32)]]
         {
         sequence_aa_kernel(
            d_strA,
@@ -184,18 +184,18 @@ void kernel_driver_aa(std::string filename,
            extendGap,
            d_scoring_matrix,
            d_encoding_matrix,
-           is_valid_array.get_pointer(),
-           sh_prev_E.get_pointer(),
-           sh_prev_H.get_pointer(),
-           sh_prev_prev_H.get_pointer(),
-           sh_spill_prev_E.get_pointer(),
-           sh_spill_prev_H.get_pointer(),
-           sh_spill_prev_prev_H.get_pointer(),
-           sh_aa_encoding.get_pointer(),
-           sh_aa_scoring.get_pointer(),
-	   sh_locTots.get_pointer(),
-	   sh_locInds.get_pointer(),
-	   sh_locInds2.get_pointer(),
+           is_valid_array.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_prev_E.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_prev_H.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_prev_prev_H.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_spill_prev_E.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_spill_prev_H.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_spill_prev_prev_H.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_aa_encoding.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_aa_scoring.get_multi_ptr<sycl::access::decorated::no>().get(),
+	   sh_locTots.get_multi_ptr<sycl::access::decorated::no>().get(),
+	   sh_locInds.get_multi_ptr<sycl::access::decorated::no>().get(),
+	   sh_locInds2.get_multi_ptr<sycl::access::decorated::no>().get(),
            false,
            item
         );
@@ -203,8 +203,8 @@ void kernel_driver_aa(std::string filename,
     });
 
     // copy back end index so that we can find new min
-    q.memcpy(ref_end, d_ref_end, sizeof(short) * sequences_per_stream);
-    q.memcpy(query_end, d_query_end, sizeof(short) * sequences_per_stream);
+    q.memcpy(ref_end, d_ref_end, sizeof(short) * sequences_per_stream).wait();
+    q.memcpy(query_end, d_query_end, sizeof(short) * sequences_per_stream).wait();
     
     // find the new largest of smaller lengths
     int newMin = get_new_min_length(ref_end, query_end, blocksLaunched);
@@ -227,7 +227,7 @@ void kernel_driver_aa(std::string filename,
       sycl::local_accessor<short, 1> locInds2(32, cgh);
       cgh.parallel_for<class aa_r>(
         sycl::nd_range<1>(gws_aa_r, lws_aa_r), [=] (sycl::nd_item<1> item)
-        [[intel::reqd_sub_group_size(32)]]
+        [[sycl::reqd_sub_group_size(32)]]
         {
         sequence_aa_kernel(
            d_strA,
@@ -243,18 +243,18 @@ void kernel_driver_aa(std::string filename,
            extendGap,
            d_scoring_matrix,
            d_encoding_matrix,
-           is_valid_array.get_pointer(),
-           sh_prev_E.get_pointer(),
-           sh_prev_H.get_pointer(),
-           sh_prev_prev_H.get_pointer(),
-           local_spill_prev_E.get_pointer(),
-           local_spill_prev_H.get_pointer(),
-           local_spill_prev_prev_H.get_pointer(),
-           sh_aa_encoding.get_pointer(),
-           sh_aa_scoring.get_pointer(),
-	   locTots.get_pointer(),
-	   locInds.get_pointer(),
-	   locInds2.get_pointer(),
+           is_valid_array.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_prev_E.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_prev_H.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_prev_prev_H.get_multi_ptr<sycl::access::decorated::no>().get(),
+           local_spill_prev_E.get_multi_ptr<sycl::access::decorated::no>().get(),
+           local_spill_prev_H.get_multi_ptr<sycl::access::decorated::no>().get(),
+           local_spill_prev_prev_H.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_aa_encoding.get_multi_ptr<sycl::access::decorated::no>().get(),
+           sh_aa_scoring.get_multi_ptr<sycl::access::decorated::no>().get(),
+	   locTots.get_multi_ptr<sycl::access::decorated::no>().get(),
+	   locInds.get_multi_ptr<sycl::access::decorated::no>().get(),
+	   locInds2.get_multi_ptr<sycl::access::decorated::no>().get(),
            true,
            item);
       });
