@@ -1,11 +1,11 @@
-#define syncthreads() item.barrier(access::fence_space::local_space) 
+#define syncthreads() item.barrier(sycl::access::fence_space::local_space) 
 
 /*
  * Do most of a dot product computation using two input vectors, 
  * output an array that simply needs to be summed at the end.
  */
 void computeDotProductHelper(
-        nd_item<1> &item,
+        sycl::nd_item<1> &item,
         int *__restrict cache,
         int *__restrict result,
   const int *__restrict v1,
@@ -43,7 +43,7 @@ void computeDotProductHelper(
  * Count how many elements in a vector exceed some threshold, outputting an array that simply needs to be summed at the end to get the final result.
  */
 void countAboveThresholdHelper(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
           int *__restrict binomial, 
   const float *__restrict array, 
   const float threshold,
@@ -86,7 +86,7 @@ void countAboveThresholdHelper(
  * The same random number is then also used to select the gene, by rescaling its absolute value after subtracting 0.5 into an array index (effectively).
  */
 void computeRandomConnectionScores(
-  nd_item<1> &item,
+  sycl::nd_item<1> &item,
   const float *__restrict random,
   const int *__restrict reffile,
         float *__restrict output,
