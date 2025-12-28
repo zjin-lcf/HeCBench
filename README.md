@@ -22,7 +22,7 @@ Each benchmark falls into a single category. While such classification is not ac
     allreduce, cmembench, babelstream, ccl, memcpy, memtest, pingpong, randomAccess, shmembench, triad 
 
 ### Bioinformatics
-    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
+    all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, local-ht, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
 
 ### Computer vision and image processing
     affine, aobench, asmooth, background-subtract, bezier-surface, bilateral, bm3d, boxfilter, cbsfil, car, ced, colorwheel, convolution1D, convolution3D, convolutionDeformable, convolutionSeperable, dct8x8, debayer, depixel, degrid, doh, dpid, egs, face, flame, gabor, gamma-correction, hogbom, mandelbrot, marchCubes, match, medianfilter, morphology, mriQ, ne, opticalFlow, perlin, sobel, tonemapping, recursiveGaussian, resize, sad, seam-carving, spm, srad, ssim, stencil1d, stencil3d, surfel, tgvnn, voxelization, zoom
@@ -921,6 +921,9 @@ Early results are shown [here](results/README.md)
 
 ### linearprobing (cuda)
   A simple lock-free hash table (https://github.com/nosferalatu/SimpleGPUHashTable)
+
+### local-ht (cuda)
+  GPU local assembly in MetaHipMer2 Metagenome Assembler (https://github.com/leannmlindsey/gpu_local_ht)
 
 ### log2 (c)
   Approximate the log2 math function (https://adacenter.org/sites/default/files/milspec/Transcendentals.zip)
