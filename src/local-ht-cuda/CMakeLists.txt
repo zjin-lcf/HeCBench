@@ -7,5 +7,5 @@ add_hecbench_benchmark(
         src/main.cu
         src/kernel.cu
         src/helper.cu
-    CATEGORIES algorithms bioinformatics
+    CATEGORIES bioinformatics
 )
