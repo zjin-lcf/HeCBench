@@ -1,4 +1,3 @@
-#include <hip/hip_runtime.h>
 #include <unordered_map>
 #include <typeinfo>
 #include <random>
@@ -6,9 +5,10 @@
 #include <cstring>
 #include <fstream>
 #include <numeric>
+#include <memory>
+#include <hip/hip_runtime.h>
 #include "helper.hpp"
 #include "kernel.hpp"
-#include <memory>
 
 size_t get_device_mem(){
   size_t free_mem, total_mem;
@@ -121,6 +121,8 @@ int main (int argc, char* argv[]){
 
 void call_kernel(std::vector<CtgWithReads>& data_in, uint32_t max_ctg_size, uint32_t max_read_size, uint32_t max_r_count, uint32_t max_l_count, int mer_len, int max_reads_count, accum_data& sizes_vecs, std::ofstream& out_file_g)
 {
+  int WarpSize;
+  CUDA_CHECK(hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0));
 
   int max_mer_len = LASSM_MAX_KMER_LEN;//mer_len;
 
@@ -378,7 +380,7 @@ void call_kernel(std::vector<CtgWithReads>& data_in, uint32_t max_ctg_size, uint
     tim_temp.timer_end();
     data_mv_tim += tim_temp.get_total_time();
     //call kernel here, one thread per contig
-    unsigned total_threads = vec_size*WARP_SIZE;// we need one warp per extension, vec_size = extensions
+    unsigned total_threads = vec_size*WarpSize;// we need one warp per extension, vec_size = extensions
     unsigned thread_per_blk = 512;
     unsigned blocks = (total_threads + thread_per_blk)/thread_per_blk;
 
@@ -387,8 +389,11 @@ void call_kernel(std::vector<CtgWithReads>& data_in, uint32_t max_ctg_size, uint
     uint32_t qual_offset = 33;
 
     tim_temp.timer_start();
-    iterative_walks_kernel<<<blocks, thread_per_blk>>>(cid_d, ctg_seq_offsets_d, ctg_seqs_d, reads_right_d, quals_right_d, reads_r_offset_d, rds_r_cnt_offset_d, 
-        depth_d, d_ht, prefix_ht_size_d, d_ht_bool, mer_len, max_mer_len, term_counts_d, num_walks, max_walk_len, sum_ext, max_read_size, max_read_count, qual_offset, longest_walks_d, mer_walk_temp_d, final_walk_lens_d, vec_size);
+    if (WarpSize == 32)
+      iterative_walks_kernel<32><<<blocks, thread_per_blk>>>(cid_d, ctg_seq_offsets_d, ctg_seqs_d, reads_right_d, quals_right_d, reads_r_offset_d, rds_r_cnt_offset_d, depth_d, d_ht, prefix_ht_size_d, d_ht_bool, mer_len, max_mer_len, term_counts_d, num_walks, max_walk_len, sum_ext, max_read_size, max_read_count, qual_offset, longest_walks_d, mer_walk_temp_d, final_walk_lens_d, vec_size);
+    else
+      iterative_walks_kernel<64><<<blocks, thread_per_blk>>>(cid_d, ctg_seq_offsets_d, ctg_seqs_d, reads_right_d, quals_right_d, reads_r_offset_d, rds_r_cnt_offset_d, depth_d, d_ht, prefix_ht_size_d, d_ht_bool, mer_len, max_mer_len, term_counts_d, num_walks, max_walk_len, sum_ext, max_read_size, max_read_count, qual_offset, longest_walks_d, mer_walk_temp_d, final_walk_lens_d, vec_size);
+
     CUDA_CHECK(hipDeviceSynchronize());
     tim_temp.timer_end();
     kernel_tim += tim_temp.get_total_time();
@@ -434,8 +439,10 @@ void call_kernel(std::vector<CtgWithReads>& data_in, uint32_t max_ctg_size, uint
     data_mv_tim += tim_temp.get_total_time();
 
     tim_temp.timer_start();
-    iterative_walks_kernel<<<blocks, thread_per_blk>>>(cid_d, ctg_seq_offsets_d, ctg_seqs_d, reads_left_d, quals_left_d, reads_l_offset_d, rds_l_cnt_offset_d, 
-        depth_d, d_ht, prefix_ht_size_d, d_ht_bool, mer_len, max_mer_len, term_counts_d, num_walks, max_walk_len, sum_ext, max_read_size, max_read_count, qual_offset, longest_walks_d, mer_walk_temp_d, final_walk_lens_d, vec_size);
+    if (WarpSize == 32)
+      iterative_walks_kernel<32><<<blocks, thread_per_blk>>>(cid_d, ctg_seq_offsets_d, ctg_seqs_d, reads_left_d, quals_left_d, reads_l_offset_d, rds_l_cnt_offset_d, depth_d, d_ht, prefix_ht_size_d, d_ht_bool, mer_len, max_mer_len, term_counts_d, num_walks, max_walk_len, sum_ext, max_read_size, max_read_count, qual_offset, longest_walks_d, mer_walk_temp_d, final_walk_lens_d, vec_size);
+    else
+      iterative_walks_kernel<64><<<blocks, thread_per_blk>>>(cid_d, ctg_seq_offsets_d, ctg_seqs_d, reads_left_d, quals_left_d, reads_l_offset_d, rds_l_cnt_offset_d, depth_d, d_ht, prefix_ht_size_d, d_ht_bool, mer_len, max_mer_len, term_counts_d, num_walks, max_walk_len, sum_ext, max_read_size, max_read_count, qual_offset, longest_walks_d, mer_walk_temp_d, final_walk_lens_d, vec_size);
     CUDA_CHECK(hipDeviceSynchronize());
     tim_temp.timer_end();
     kernel_tim += tim_temp.get_total_time();
