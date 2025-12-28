@@ -12,9 +12,9 @@ kmer_size=${kmer_sizes[$i]}
 for curr_file in $file_21 $file_33 $file_55 $file_77
 do
     echo "running test for Kmer size: $kmer_size"
-    ./main ../locassm_data/$curr_file $kmer_size test-out.dat 1> ${kmer_size}_result.log
+    ./main ../../local-ht-cuda/locassm_data/$curr_file $kmer_size test-out.dat 1> ${kmer_size}_result.log
     sort test-out.dat >> sorted_new
-    sort ../locassm_data/"res_$curr_file" >> sorted_res
+    sort ../../local-ht-cuda/locassm_data/"res_$curr_file" >> sorted_res
     difference=$(diff sorted_new sorted_res)
 
     if [ -z "$difference" ];
