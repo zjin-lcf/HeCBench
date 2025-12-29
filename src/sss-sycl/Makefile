@@ -40,7 +40,7 @@ ifeq ($(VENDOR), AdaptiveCpp)
 endif
 
 # Linker Flags
-LDFLAGS = -L$(GSL)/lib -lgsl -lblas
+LDFLAGS = -L$(GSL)/lib -lgsl
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
