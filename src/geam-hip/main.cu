@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include <hipblas.h>
+#include <hipblas/hipblas.h>
 
 template <typename T>
 void transpose_f64(int nrow, int ncol, int repeat) {
