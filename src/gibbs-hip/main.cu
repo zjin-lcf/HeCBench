@@ -8,7 +8,7 @@
 #include <math.h>
 #include <chrono>
 #include <hip/hip_runtime.h>
-#include <hiprand_kernel.h>
+#include <hiprand/hiprand_kernel.h>
 
 #define CUDA_CALL(x) do { if((x) != hipSuccess) { \
   printf("Error at %s:%d\n",__FILE__,__LINE__); \
