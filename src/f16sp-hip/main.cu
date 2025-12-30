@@ -144,14 +144,14 @@ int main(int argc, char *argv[])
 
   // warmup
   for (int i = 0; i < 1000; i++) {
-    hipblasDotEx_v2(h, size*2, (half*)d_a, xType, 1, (half*)d_b,
+    hipblasDotEx_64(h, size*2, (half*)d_a, xType, 1, (half*)d_b,
                 yType, 1, d_r2, rType, eType);
   }
   hipDeviceSynchronize();
 
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
-    hipblasDotEx_v2(h, size*2, (half*)d_a, xType, 1, (half*)d_b,
+    hipblasDotEx_64(h, size*2, (half*)d_a, xType, 1, (half*)d_b,
                 yType, 1, d_r2, rType, eType);
   }
   hipDeviceSynchronize();
