@@ -114,17 +114,17 @@ int run_gels_batch_example(const int repeat) {
       status = hipblasDgelsBatched(h, HIPBLAS_OP_N, m, n, nrhs, ptrA_array_dev, lda,
                                    ptrB_array_dev, ldb, &info, info_dev, batch_size);
     else if constexpr (std::is_same_v<data_t, std::complex<float>>)
-      status = hipblasCgelsBatched_v2(h, HIPBLAS_OP_N, m, n, nrhs,
-                                      reinterpret_cast<hipComplex *const *>(ptrA_array_dev),
-                                      lda,
-                                      reinterpret_cast<hipComplex *const *>(ptrB_array_dev),
-                                      ldb, &info, info_dev, batch_size);
+      status = hipblasCgelsBatched(h, HIPBLAS_OP_N, m, n, nrhs,
+                                   reinterpret_cast<hipComplex *const *>(ptrA_array_dev),
+                                   lda,
+                                   reinterpret_cast<hipComplex *const *>(ptrB_array_dev),
+                                   ldb, &info, info_dev, batch_size);
     else if constexpr (std::is_same_v<data_t, std::complex<double>>)
-      status = hipblasZgelsBatched_v2(h, HIPBLAS_OP_N, m, n, nrhs,
-                                      reinterpret_cast<hipDoubleComplex *const *>(ptrA_array_dev),
-                                      lda,
-                                      reinterpret_cast<hipDoubleComplex *const *>(ptrB_array_dev),
-                                      ldb, &info, info_dev, batch_size);
+      status = hipblasZgelsBatched(h, HIPBLAS_OP_N, m, n, nrhs,
+                                   reinterpret_cast<hipDoubleComplex *const *>(ptrA_array_dev),
+                                   lda,
+                                   reinterpret_cast<hipDoubleComplex *const *>(ptrB_array_dev),
+                                   ldb, &info, info_dev, batch_size);
 
     hipDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
