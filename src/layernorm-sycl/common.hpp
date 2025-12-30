@@ -3,7 +3,6 @@
 
 #include <cfloat>
 #include <cmath>
-#include <cstdlib>
 #include <chrono>
 #include <sycl/sycl.hpp>
 
