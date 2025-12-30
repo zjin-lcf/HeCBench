@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
 
   start = std::chrono::high_resolution_clock::now();
 
-  cpu_chi_kernel(rows,cols,ncases,ncontrols,dataT,cpu_results);
+  cpu_kernel(rows,cols,ncases,ncontrols,dataT,cpu_results);
 
   end = std::chrono::high_resolution_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
