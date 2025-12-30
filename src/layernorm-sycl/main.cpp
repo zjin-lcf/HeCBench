@@ -5,7 +5,6 @@ Kernels for layernorm forward pass.
 #include <iostream>
 #include <stdlib.h>
 #include <cassert>
-#include <chrono>
 #include "common.hpp"
 #include "reference.h"
 
