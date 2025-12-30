@@ -1,7 +1,7 @@
 #include <chrono>
 #include <stdio.h>
 
-#include <hipsolver.h>
+#include <hipsolver/hipsolver.h>
 #include <hip/hip_runtime.h>
 
 #include <thrust/iterator/counting_iterator.h>
@@ -19,7 +19,7 @@ class strided_range
 
   typedef typename thrust::iterator_difference<Iterator>::type difference_type;
 
-  struct stride_functor : public thrust::unary_function<difference_type,difference_type>
+  struct stride_functor // : public thrust::unary_function<difference_type,difference_type>
   {
     difference_type stride;
 

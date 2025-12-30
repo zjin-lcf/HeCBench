@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I/opt/rocm/include/hipsolver
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I/opt/rocm/include
 
 # Linker Flags
 LDFLAGS = -lhipsolver
