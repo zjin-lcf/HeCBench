@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <chrono>
 #include <hip/hip_runtime.h>
 
