@@ -3,7 +3,7 @@
 #include <math.h>
 #include <chrono>
 #include <hip/hip_runtime.h>
-#include <hipblas.h>
+#include <hipblas/hipblas.h>
 
 int main (int argc, char* argv[]){
   if (argc != 2) {
@@ -40,7 +40,11 @@ int main (int argc, char* argv[]){
     a = (float *) malloc (size);
     if (!a) {
       printf ("host memory allocation failed");
-      if (d_a) hipFree(d_a);
+      if (d_a) {
+        hipStat = hipFree(d_a);
+        if (hipStat != hipSuccess)
+          printf ("device memory allocation failed");
+      }
       break;
     }
 
@@ -103,7 +107,10 @@ int main (int argc, char* argv[]){
   }
 
   free(result);
-  hipblasDestroy(handle);
+  hipblasStat = hipblasDestroy(handle);
+  if (hipblasStat != HIPBLAS_STATUS_SUCCESS) {
+    printf ("HIPBLAS destroy failed\n");
+  }
 
   if (ok) printf("PASS\n");
   return 0;
