@@ -40,7 +40,11 @@ int main (int argc, char* argv[]){
     a = (float *) malloc (size);
     if (!a) {
       printf ("host memory allocation failed");
-      if (d_a) cudaFree(d_a);
+      if (d_a) {
+        cudaStat = cudaFree(d_a);
+        if (cudaStat != cudaSuccess)
+          printf ("device memory allocation failed");
+      }
       break;
     }
 
@@ -103,7 +107,10 @@ int main (int argc, char* argv[]){
   }
 
   free(result);
-  cublasDestroy(handle);
+  cublasStat = cublasDestroy(handle);
+  if (cublasStat != CUBLAS_STATUS_SUCCESS) {
+    printf ("CUBLAS destroy failed\n");
+  }
 
   if (ok) printf("PASS\n");
   return 0;
