@@ -51,7 +51,7 @@
 #include <math.h>
 #include <chrono>
 #include <hip/hip_runtime_api.h>
-#include <hipsparse.h>
+#include <hipsparse/hipsparse.h>
 #include "utils.h"
 
 #define CHECK_HIP(func)                                                  \
@@ -178,14 +178,14 @@ int main(int argc, char *argv[])
   // Create dense vector y
   CHECK_HIPSPARSE( hipsparseCreateDnVec(&vecY, size, dY, HIP_R_32F) )
 
-  hipDeviceSynchronize();
+  CHECK_HIP(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
     // execute Axpby
     CHECK_HIPSPARSE( hipsparseAxpby(handle, &alpha, vecX, &beta, vecY) )
   }
-  hipDeviceSynchronize();
+  CHECK_HIP(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of SPAXPBY : %f (us)\n", (time * 1e-3f) / repeat);
