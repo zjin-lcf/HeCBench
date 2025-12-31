@@ -1,7 +1,7 @@
 #include <chrono>
 #include <iostream>
 #include <fstream>
-#include <hipblas.h>
+#include <hipblas/hipblas.h>
 #include <hip/hip_runtime.h>
 #include "device.h"
 
