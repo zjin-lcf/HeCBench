@@ -9,7 +9,7 @@
 template <class T>
 __device__ T clamp(T value, T lower, T upper) { return min(max(value, lower), upper); }
 
-template <class T, int BINS, int BLOCK_SIZE>
+template <class T, int BINS, int BLOCK_SIZE, int WARP_SIZE>
 __launch_bounds__(BLOCK_SIZE)
 __global__
 void findTopK(int*__restrict__ indices_, 
@@ -76,8 +76,6 @@ void findTopK(int*__restrict__ indices_,
   }
 
   __syncthreads();
-
-  constexpr int WARP_SIZE = warpSize; /* must be equal to warpSize */
 
   if (threadIdx.x < WARP_SIZE)
   {
@@ -208,6 +206,9 @@ int main(int argc, char* argv[])
   const int batch_size = 128;
   const int block_size = 256; 
   
+  int WarpSize;
+  hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
+
   dim3 grids (num_classes, batch_size);
   dim3 blocks (block_size, 1);
 
@@ -251,8 +252,12 @@ int main(int argc, char* argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    findTopK<float, 2048, block_size> <<<grids, blocks>>> (
-      d_indices, d_count, d_scores, threshold, classwise_topK, num_classes, num_priors);
+    if (WarpSize == 64)
+      findTopK<float, 2048, block_size, 64> <<<grids, blocks>>> (
+        d_indices, d_count, d_scores, threshold, classwise_topK, num_classes, num_priors);
+    else
+      findTopK<float, 2048, block_size, 32> <<<grids, blocks>>> (
+        d_indices, d_count, d_scores, threshold, classwise_topK, num_classes, num_priors);
   }
 
   hipDeviceSynchronize();
