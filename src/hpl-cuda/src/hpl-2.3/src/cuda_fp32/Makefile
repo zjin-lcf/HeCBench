@@ -88,13 +88,14 @@
 #  * ---------------------------------------------------------------------
 #  */ 
 
-all: libdgemm.so.1.0.1
+# FP32 VERSION FOR DGX SPARK GB10
+all: libdgemm_fp32.so
 
-OBJS = cuda_dgemm.o 
+OBJS = cuda_dgemm.o
 
 .PRECIOUS: $(OBJS)
 
-all : libdgemm.so.1.0.1 
+all : libdgemm_fp32.so 
 
 fermi_dgemm.o : fermi_dgemm.c fermi_dgemm.h 
 
@@ -108,12 +109,9 @@ DEFINES = -DMPI
 	mpicc -O3 -c -fPIC $(DEFINES) $*.cpp -o $*.o \
 	-I/usr/local/cuda/include
 
-libdgemm.so.1.0.1: $(OBJS)
-	mpicc -O3 -shared -Wl,-soname,libdgemm.so.1 -o libdgemm.so.1.0.1 $(OBJS) \
+libdgemm_fp32.so: $(OBJS)
+	mpicc -O3 -shared -Wl,-soname,libdgemm_fp32.so -o libdgemm_fp32.so $(OBJS) \
 	-L/usr/local/cuda/lib64 -lcudart -lcuda -lcublas
-	ln -sf libdgemm.so.1.0.1 libdgemm.so.1.0
-	ln -sf libdgemm.so.1.0 libdgemm.so.1
-	ln -sf libdgemm.so.1 libdgemm.so
 
 clean:
-	rm -f $(OBJS) $(CUBINS) libdgemm.so.1.0.1 libdgemm.so.1.0 libdgemm.so.1 libdgemm.so
+	rm -f $(OBJS) $(CUBINS) libdgemm_fp32.so
