@@ -48,6 +48,8 @@
  * Include files
  */
 #include "hpl.h"
+#include <stdlib.h>
+#include <string.h>
 /*
  * ---------------------------------------------------------------------
  * Static function prototypes
@@ -158,19 +160,37 @@ double HPL_dlamch
    if( first != 0 )
    {
       first = 0;
-      HPL_dlamc2( &beta, &it, &lrnd, &eps, &imin, &rmin, &imax, &rmax );
-      base  = (double)(beta);  t     = (double)(it);
-      if( lrnd != 0 )
-      { rnd = HPL_rone;  eps = HPL_dipow( base, 1 - it ) / HPL_rtwo; }
-      else
-      { rnd = HPL_rzero; eps = HPL_dipow( base, 1 - it );            }
-      prec  = eps * base;  emin  = (double)(imin); emax  = (double)(imax);
-      sfmin = rmin;        small = HPL_rone / rmax;
+
+      // Check environment variable for FP32 mode
+      char *use_fp32 = getenv("HPL_USE_FP32_EPSILON");
+      if (use_fp32 && strcmp(use_fp32, "1") == 0) {
+         // Use single precision epsilon for FP32 CUDA library
+         eps   = 1.19209290e-07; // FP32 machine epsilon (2^-23)
+         base  = 2.0;
+         t     = 24.0;           // FP32 mantissa bits
+         rnd   = HPL_rone;
+         prec  = eps * base;
+         emin  = -125.0;         // FP32 minimum exponent
+         emax  = 128.0;          // FP32 maximum exponent
+         sfmin = 1.17549435e-38; // FP32 minimum normalized value
+         rmin  = sfmin;
+         rmax  = 3.40282347e+38; // FP32 maximum value
+      } else {
+         // Normal FP64 computation
+         HPL_dlamc2( &beta, &it, &lrnd, &eps, &imin, &rmin, &imax, &rmax );
+         base  = (double)(beta);  t     = (double)(it);
+         if( lrnd != 0 )
+         { rnd = HPL_rone;  eps = HPL_dipow( base, 1 - it ) / HPL_rtwo; }
+         else
+         { rnd = HPL_rzero; eps = HPL_dipow( base, 1 - it );            }
+         prec  = eps * base;  emin  = (double)(imin); emax  = (double)(imax);
+         sfmin = rmin;        small = HPL_rone / rmax;
 /*
  * Use  SMALL  plus a bit,  to avoid the possibility of rounding causing
  * overflow when computing  1/sfmin.
  */
-      if( small >= sfmin ) sfmin = small * ( HPL_rone + eps );
+         if( small >= sfmin ) sfmin = small * ( HPL_rone + eps );
+      }
    }
 
    if( CMACH == HPL_MACH_EPS   ) return( eps   );

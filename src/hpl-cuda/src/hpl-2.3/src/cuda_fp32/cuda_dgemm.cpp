@@ -90,10 +90,11 @@
  * ---------------------------------------------------------------------
  */
 
+// FP32 VERSION - Uses single precision on GPU for DGX Spark GB10
 #define NUMBER_OF_STREAMS 4
 #define CHUNK_SIZE 512
-#define NN 32
-#define NM 32
+#define NN 128
+#define NM 128
 #define ERRCODE(e) (-(__LINE__ * 1000 + (e)))
 
 #define _GNU_SOURCE
@@ -147,26 +148,46 @@ void dpcpp_dgemm(const int ORDER, const int TRANSA, const int TRANSB,
   }
 
 #ifdef DEVICE_DEBUG
-  std::cout << "dgemm-Running on GPU" << std::endl;
+  std::cout << "dgemm-Running on GPU (FP32)" << std::endl;
 #endif
 
-  double *devPtrA, *devPtrB, *devPtrC;
-  int status;
+  float *devPtrA, *devPtrB, *devPtrC;
 
-  cudaMalloc((void **)&devPtrA, K * LDA * sizeof(double));
-  cudaMemcpy(devPtrA, &A[0], K * LDA * sizeof(double), cudaMemcpyHostToDevice);
+  // Allocate device memory for FP32
+  cudaMalloc((void **)&devPtrA, M * K * sizeof(float));
+  cudaMalloc((void **)&devPtrB, K * N * sizeof(float));
+  cudaMalloc((void **)&devPtrC, M * N * sizeof(float));
 
-  cudaMalloc((void **)&devPtrB, N * LDB * sizeof(double));
-  cudaMemcpy(devPtrB, &B[0], N * LDB * sizeof(double), cudaMemcpyHostToDevice);
+  // Convert and copy A (column-major: M x K stored in LDA x K)
+  float *hostA = new float[K * LDA];
+  for (int i = 0; i < K * LDA; i++) hostA[i] = (float)A[i];
+  cudaMemcpy(devPtrA, hostA, K * LDA * sizeof(float), cudaMemcpyHostToDevice);
+  delete[] hostA;
 
-  cudaMalloc((void **)&devPtrC, N * LDC * sizeof(double));
-  cudaMemcpy(devPtrC, &C[0], N * LDC * sizeof(double), cudaMemcpyHostToDevice);
+  // Convert and copy B (column-major: K x N stored in LDB x N)
+  float *hostB = new float[N * LDB];
+  for (int i = 0; i < N * LDB; i++) hostB[i] = (float)B[i];
+  cudaMemcpy(devPtrB, hostB, N * LDB * sizeof(float), cudaMemcpyHostToDevice);
+  delete[] hostB;
+
+  // Convert and copy C (column-major: M x N stored in LDC x N)
+  float *hostC = new float[N * LDC];
+  for (int i = 0; i < N * LDC; i++) hostC[i] = (float)C[i];
+  cudaMemcpy(devPtrC, hostC, N * LDC * sizeof(float), cudaMemcpyHostToDevice);
 
   cudaDeviceSynchronize();
-  cublasDgemm('N', 'N', M, N, K, ALPHA, devPtrA, LDA, devPtrB, LDB, BETA,
+  // Use single precision GEMM
+  float alpha_f = (float)ALPHA;
+  float beta_f = (float)BETA;
+  cublasSgemm('N', 'N', M, N, K, alpha_f, devPtrA, LDA, devPtrB, LDB, beta_f,
               devPtrC, LDC);
   cudaDeviceSynchronize();
-  cudaMemcpy(&C[0], devPtrC, N * LDC * sizeof(double), cudaMemcpyDeviceToHost);
+
+  // Copy result back and convert to double
+  cudaMemcpy(hostC, devPtrC, N * LDC * sizeof(float), cudaMemcpyDeviceToHost);
+  for (int i = 0; i < N * LDC; i++) C[i] = (double)hostC[i];
+  delete[] hostC;
+
   cudaDeviceSynchronize();
   cudaFree(devPtrA);
   cudaFree(devPtrB);
@@ -183,10 +204,7 @@ void dpcpp_dtrsm
     return;
   }
 
-  double *devPtrA, *devPtrB;
-  int status;
-
-  if ((M) < 128 || (N) < 128) {
+  if ((M) < 256 || (N) < 256) {
 #ifdef DEVICE_DEBUG
     std::cout << "dtrsm-Running on CPU" << std::endl;
 #endif
@@ -196,23 +214,30 @@ void dpcpp_dtrsm
   }
 
 #ifdef DEVICE_DEBUG
-  std::cout << "dtrsm-Running on GPU" << std::endl;
+  std::cout << "dtrsm-Running on GPU (FP32)" << std::endl;
 #endif
 
-  cudaMalloc((void **)&devPtrA, M * LDA * sizeof(double));
+  float *devPtrA, *devPtrB;
 
-  cudaMemcpy(devPtrA, A, M * LDA * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMalloc((void **)&devPtrA, M * LDA * sizeof(float));
+  float *hostA = new float[M * LDA];
+  for (int i = 0; i < M * LDA; i++) hostA[i] = (float)A[i];
+  cudaMemcpy(devPtrA, hostA, M * LDA * sizeof(float), cudaMemcpyHostToDevice);
+  delete[] hostA;
 
-  cudaMalloc((void **)&devPtrB, N * LDB * sizeof(double));
+  cudaMalloc((void **)&devPtrB, N * LDB * sizeof(float));
+  float *hostB = new float[N * LDB];
+  for (int i = 0; i < N * LDB; i++) hostB[i] = (float)B[i];
+  cudaMemcpy(devPtrB, hostB, N * LDB * sizeof(float), cudaMemcpyHostToDevice);
 
-  cudaMemcpy(devPtrB, B, N * LDB * sizeof(double), cudaMemcpyHostToDevice);
+  cudaDeviceSynchronize();
+  float alpha_f = (float)ALPHA;
+  cublasStrsm('L', 'L', 'N', 'U', M, N, alpha_f, devPtrA, LDA, devPtrB, LDB);
   cudaDeviceSynchronize();
 
-  cublasDtrsm('L', 'L', 'N', 'U', M, N, ALPHA, devPtrA, LDA, devPtrB, LDB);
-
-  cudaDeviceSynchronize();
-
-  cudaMemcpy(B, devPtrB, N * LDB * sizeof(double), cudaMemcpyDeviceToHost);
+  cudaMemcpy(hostB, devPtrB, N * LDB * sizeof(float), cudaMemcpyDeviceToHost);
+  for (int i = 0; i < N * LDB; i++) B[i] = (double)hostB[i];
+  delete[] hostB;
 
   cudaDeviceSynchronize();
   cudaFree(devPtrA);
