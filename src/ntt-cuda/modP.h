@@ -95,8 +95,8 @@ void _uint224_modP (uint32 *x) {
 
 ESS
 uint64 _ls_modP(uint64 x, int l) {
-  register uint64 tx = x;
-  register uint32 buff[7];
+  uint64 tx = x;
+  uint32 buff[7];
   switch(l){
     // 2 words
     case (0):
@@ -176,7 +176,7 @@ uint64 _ls_modP(uint64 x, int l) {
 
 ESS
 uint64 _add_modP(uint64 x, uint64 y) {
-  register uint64 ret;
+  uint64 ret;
   ret = x+y;
   if (ret < x) ret += uint32Max;
   if (ret >= valP) ret -= valP;
@@ -185,7 +185,7 @@ uint64 _add_modP(uint64 x, uint64 y) {
 
 ESS
 uint64 _sub_modP(uint64 x, uint64 y) {
-  register uint64 ret;
+   uint64 ret;
   ret = x-y;
   if (ret > x) ret -= uint32Max;
   return ret;
@@ -277,7 +277,7 @@ uint64 _mul_modP(uint64 x, uint64 y, uint64 m) {
 // 8-point NTT
 ESS
 void ntt8(uint64 *x) {
-  register uint64 s[8], temp;
+  uint64 s[8], temp;
   s[0] = _add_modP(x[0], x[4]);
   s[1] = _sub_modP(x[0], x[4]);
   s[2] = _add_modP(x[2], x[6]);
