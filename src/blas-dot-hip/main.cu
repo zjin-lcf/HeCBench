@@ -67,14 +67,14 @@ void dot (const size_t iNumElements, const int iNumIterations)
   auto start = std::chrono::steady_clock::now();
 
   for (i = 0; i < (size_t)iNumIterations; i++) {
-    hipblasDotEx_v2(h, iNumElements, d_srcA, xType, 1, d_srcB,
+    hipblasDotEx_64(h, iNumElements, d_srcA, xType, 1, d_srcB,
                     yType, 1, d_dst, rType, eType);
   }
 
   hipDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average hipblasDotEx_v2 execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
+  printf("Average hipblasDotEx execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
 
   hipMemcpy(&dst, d_dst, sizeof(T), hipMemcpyDeviceToHost);
   printf("Host: %lf  Device: %lf\n", sum, double(dst));
