@@ -31,7 +31,7 @@ bool hipblas_gemm_ex(
     int lda, int ldb, int ldc,
     const CT *alpha, const CT *beta, int algo, int compute32F_mode)
 {
-  hipblasDatatype_t AType, BType, CType;
+  hipDataType AType, BType, CType;
   hipblasComputeType_t ComputeType;
   if (std::is_same<T, double>::value) {
     AType = BType = CType = HIPBLAS_R_64F;
