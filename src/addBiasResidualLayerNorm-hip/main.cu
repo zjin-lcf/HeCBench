@@ -22,7 +22,7 @@
 #include <hip/hip_bf16.h>
 #include "kernels.h"
 
-template<typename T, int V>
+template<typename T, int V, int WarpSize>
 void invokeAddBiasResidualLayerNorm(
           T*     out,
     const T*     input,
@@ -37,20 +37,20 @@ void invokeAddBiasResidualLayerNorm(
   dim3 block(std::min(n, 256));
 
   if (V == 2) { // assume n % 8 == 0
-    addBiasResidualPostLayerNormV2<T><<<grid, n / 8>>>(out, input, bias, gamma, beta, layernorm_eps, n);
+    addBiasResidualPostLayerNormV2<T, WarpSize><<<grid, n / 8>>>(out, input, bias, gamma, beta, layernorm_eps, n);
   }
   else {
     int num_trips = (n + block.x - 1) / block.x;
     if (num_trips == 1) {
-      addBiasResidualPostLayerNorm<T, 1>
+      addBiasResidualPostLayerNorm<T, 1, WarpSize>
         <<<grid, block>>>(out, input, bias, gamma, beta, layernorm_eps, n);
     }
     else if (num_trips == 2) {
-      addBiasResidualPostLayerNorm<T, 2>
+      addBiasResidualPostLayerNorm<T, 2, WarpSize>
         <<<grid, block>>>(out, input, bias, gamma, beta, layernorm_eps, n);
     }
     else {
-      generalAddBiasResidualPostLayerNorm<T>
+      generalAddBiasResidualPostLayerNorm<T, WarpSize>
         <<<grid, block>>>(out, input, bias, gamma, beta, layernorm_eps, n);
     }
   }
@@ -110,11 +110,18 @@ void layer(int repeat) {
     hipMalloc((void**)&d_beta,  beta_size_bytes);
     hipMemcpy(d_beta, h_beta, beta_size_bytes, hipMemcpyHostToDevice);
 
+    int WarpSize;
+    hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
+
     hipDeviceSynchronize();
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-      invokeAddBiasResidualLayerNorm<T, V>
+      if (WarpSize == 64)
+        invokeAddBiasResidualLayerNorm<T, V, 64>
+          (d_output, d_input, d_bias, d_gamma, d_beta, layernorm_eps, m, n);
+      else
+        invokeAddBiasResidualLayerNorm<T, V, 32>
           (d_output, d_input, d_bias, d_gamma, d_beta, layernorm_eps, m, n);
     }
     hipDeviceSynchronize();
