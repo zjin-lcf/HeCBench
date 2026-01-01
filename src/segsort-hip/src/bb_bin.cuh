@@ -34,7 +34,7 @@ void exclusive_sum(const T * in, T * out, const int n)
     T data = (tid > 0 && tid < n) ? in[tid-1] : 0;
 
     for(int i = 1; i < 32; i *= 2) {
-        T other = __shfl_up_sync(0xFFFFFFFF, data, i);
+        T other = SHFL_UP(data, i);
         if(lane > i)
             data += other;
     }
@@ -55,7 +55,7 @@ void warp_exclusive_sum(const T * in, T * out, const int n)
     T data = (lane > 0 && lane < n) ? in[lane-1] : 0;
 
     for(int i = 1; i < 32; i *= 2) {
-        T other = __shfl_up_sync(0xFFFFFFFF, data, i);
+        T other = SHFL_UP(data, i);
         if(lane > i)
             data += other;
     }
