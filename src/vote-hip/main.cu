@@ -18,7 +18,9 @@ int main(int argc, char **argv) {
 
   int error_count[3] = {0, 0, 0};
 
-  const int warp_size = warpSize;
+  int warp_size;
+  hipDeviceGetAttribute(&warp_size, hipDeviceAttributeWarpSize, 0);
+
   h_input = (unsigned int *)malloc(VOTE_DATA_GROUP * warp_size *
                                    sizeof(unsigned int));
   h_result = (unsigned int *)malloc(VOTE_DATA_GROUP * warp_size *
