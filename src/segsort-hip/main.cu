@@ -21,12 +21,12 @@
 #include <vector>
 #include <algorithm>
 #include <random>
-
-#define  __shfl_xor_sync(a,b,c) __shfl_xor(b,c,32)
-#define  __shfl_up_sync(a,b,c)  __shfl_up(b,c,32)
-#define  __shfl_sync(a,b,c)     __shfl(b,c,32)
-
 #include <hip/hip_runtime.h>
+
+#define  SHFL_XOR(b,c) __shfl_xor(b,c,32)
+#define  SHFL_UP(b,c)  __shfl_up(b,c,32)
+#define  SHFL(b,c)     __shfl(b,c,32)
+
 #include "src/bb_segsort.cuh"
 #include "src/bb_segsort_keys.cuh"
 
