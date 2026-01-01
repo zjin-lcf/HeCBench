@@ -170,37 +170,37 @@ inline __device__ __hip_bfloat162 fma(__hip_bfloat162 a, __hip_bfloat162 b, __hi
 }
 
 // reduction 
-template<typename T>
+template<typename T, int WarpSize>
 __inline__ __device__ T warpReduceSum(T val)
 {
 #pragma unroll
-    for (int mask = warpSize/2; mask > 0; mask >>= 1)
-        val = add(val, __shfl_xor(val, mask, warpSize));
+    for (int mask = WarpSize/2; mask > 0; mask >>= 1)
+        val = add(val, __shfl_xor(val, mask, WarpSize));
     return val;
 }
 
 /* Calculate the sum of all elements in a block */
-template<typename T>
+template<typename T, int WarpSize>
 __inline__ __device__ T blockReduceSum(T val)
 {
-    static __shared__ T shared[1024/warpSize];
-    int lane = threadIdx.x % warpSize;
-    int wid = threadIdx.x / warpSize;
+    static __shared__ T shared[1024/WarpSize];
+    int lane = threadIdx.x % WarpSize;
+    int wid = threadIdx.x / WarpSize;
 
-    val = warpReduceSum<T>(val);
+    val = warpReduceSum<T, WarpSize>(val);
 
     if (lane == 0)
         shared[wid] = val;
 
     __syncthreads();
 
-    val = (threadIdx.x < (blockDim.x / warpSize)) ? shared[lane] : (T)(0.0f);
-    val = warpReduceSum<T>(val);
+    val = (threadIdx.x < (blockDim.x / WarpSize)) ? shared[lane] : (T)(0.0f);
+    val = warpReduceSum<T, WarpSize>(val);
 
     return val;
 }
 
-template<typename T>
+template<typename T, int WarpSize>
 __global__ void addBiasResidualPostLayerNormV2(
           T* out,
     const T* __restrict__ input,
@@ -240,7 +240,7 @@ __global__ void addBiasResidualPostLayerNormV2(
     sum                = add(sum, local_out_half2[i]);
   }
 
-  mean = blockReduceSum<float>(typeToFloat(__hadd(sum.x , sum.y)));
+  mean = blockReduceSum<float, WarpSize>(typeToFloat(__hadd(sum.x , sum.y)));
   if (threadIdx.x == 0) {
     s_mean = mean / n;
   }
@@ -257,7 +257,7 @@ __global__ void addBiasResidualPostLayerNormV2(
     var += v1 * v1 + v2 * v2;
   }
 
-  variance = blockReduceSum<float>(var);
+  variance = blockReduceSum<float, WarpSize>(var);
   if (tid == 0) {
     s_variance = rsqrtf(variance / n + layernorm_eps);
   }
@@ -273,7 +273,7 @@ __global__ void addBiasResidualPostLayerNormV2(
   }
 }
 
-template<typename T, int N>
+template<typename T, int N, int WarpSize>
 __global__ void addBiasResidualPostLayerNorm(
           T* out, 
     const T* __restrict__ input,
@@ -298,7 +298,7 @@ __global__ void addBiasResidualPostLayerNorm(
     idx += blockDim.x;
   }
 
-  mean = blockReduceSum<float>(mean);
+  mean = blockReduceSum<float, WarpSize>(mean);
   if (threadIdx.x == 0) {
     s_mean = mean / n;
   }
@@ -310,7 +310,7 @@ __global__ void addBiasResidualPostLayerNorm(
     variance += (local_out - s_mean) * (local_out - s_mean);
     idx += blockDim.x;
   }
-  variance = blockReduceSum<float>(variance);
+  variance = blockReduceSum<float, WarpSize>(variance);
   if (threadIdx.x == 0) {
     s_variance = variance / n + layernorm_eps;
   }
@@ -325,7 +325,7 @@ __global__ void addBiasResidualPostLayerNorm(
   }
 }
 
-template<typename T>
+template<typename T, int WarpSize>
 __global__ void generalAddBiasResidualPostLayerNorm(
           T* out, 
     const T* __restrict__ input,
@@ -358,7 +358,7 @@ __global__ void generalAddBiasResidualPostLayerNorm(
     out_ptr[id] = tmp;
   }
 
-  mean = blockReduceSum<float>(local_out);
+  mean = blockReduceSum<float, WarpSize>(local_out);
   if (threadIdx.x == 0) {
     s_mean = mean / n;
   }
@@ -371,7 +371,7 @@ __global__ void generalAddBiasResidualPostLayerNorm(
     variance += (local_out_fp2.y - s_mean) * (local_out_fp2.y - s_mean);
   }
 
-  variance = blockReduceSum<float>(variance);
+  variance = blockReduceSum<float, WarpSize>(variance);
   if (threadIdx.x == 0) {
     s_variance = rsqrtf(variance / n + layernorm_eps);
   }
