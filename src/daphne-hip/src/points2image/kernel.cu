@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <cstdint>
 #include <cstring>
 #include <hip/hip_runtime.h>
 #include "benchmark.h"

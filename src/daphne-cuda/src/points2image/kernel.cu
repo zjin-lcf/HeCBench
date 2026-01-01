@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <cstdint>
 #include <cstring>
 #include "benchmark.h"
 #include "datatypes.h"
