@@ -193,8 +193,11 @@ long vector_mv_csr_parallel(const int repeat,
 
   int nnz_per_row = nnz / num_rows;
   int threads_per_row = prevPowerOf2(nnz_per_row);
+
   // limit the number of threads per row to be no larger than the wavefront (warp) size
-  threads_per_row = threads_per_row > warpSize ? warpSize : threads_per_row;
+  int WarpSize;
+  hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
+  threads_per_row = threads_per_row > WarpSize ? WarpSize : threads_per_row;
   int rows_per_block = bs / threads_per_row;
   if (rows_per_block == 0) rows_per_block = 1;
   int num_blocks = (num_rows + rows_per_block - 1) / rows_per_block;
