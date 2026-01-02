@@ -313,7 +313,10 @@ int main(int argc, char* argv[])
   printf("Copyright 2020 Texas State University\n\n");
 
   if (argc != 3) {printf("USAGE: %s <input_file_name> <repeat>\n\n", argv[0]);  exit(-1);}
-  if (WS != warpSize) {printf("ERROR: warp size must be 32\n\n");  exit(-1);}
+
+  int WarpSize;
+  hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
+  if (WS != WarpSize) {printf("ERROR: warp size must be %d\n\n", WS);  exit(-1);}
   if (WS != sizeof(int) * 8) {printf("ERROR: bits per word must match warp size\n\n");  exit(-1);}
   if ((ThreadsPerBlock < WS) || ((ThreadsPerBlock % WS) != 0)) {
     printf("ERROR: threads per block must be a multiple of the warp size\n\n");
