@@ -6,12 +6,12 @@
 // 2016. 2. 4
 //
 
-#include <cstdio>
-#include <string>
+#include <cfloat>
 #include <cmath>
-#include <float.h>
-#include <vector>
+#include <cstdio>
+#include <cstring>
 #include <iostream>
+#include <vector>
 #include "kernel.h"
 #include "fim.h"
 
