@@ -132,11 +132,11 @@ void RunTest(string testName, OptionParser &op)
   real* gpu_molwt;
 
   // Malloc host memory
-  CUDA_SAFE_CALL(hipMallocHost((void**)&host_t,        n*sizeof(real)));
-  CUDA_SAFE_CALL(hipMallocHost((void**)&host_p,        n*sizeof(real)));
-  CUDA_SAFE_CALL(hipMallocHost((void**)&host_y, Y_SIZE*n*sizeof(real)));
-  CUDA_SAFE_CALL(hipMallocHost((void**)&host_wdot,WDOT_SIZE*n*sizeof(real)));
-  CUDA_SAFE_CALL(hipMallocHost((void**)&host_molwt,WDOT_SIZE*sizeof(real)));
+  CUDA_SAFE_CALL(hipHostMalloc((void**)&host_t,        n*sizeof(real)));
+  CUDA_SAFE_CALL(hipHostMalloc((void**)&host_p,        n*sizeof(real)));
+  CUDA_SAFE_CALL(hipHostMalloc((void**)&host_y, Y_SIZE*n*sizeof(real)));
+  CUDA_SAFE_CALL(hipHostMalloc((void**)&host_wdot,WDOT_SIZE*n*sizeof(real)));
+  CUDA_SAFE_CALL(hipHostMalloc((void**)&host_molwt,WDOT_SIZE*sizeof(real)));
 
   // Initialize Test Problem
 
