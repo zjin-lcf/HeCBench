@@ -45,11 +45,15 @@ void softMax (const int numSlice, const int sliceSize,
   }
 }
 
-template<unsigned int WarpSize>
 __global__
 void softMax2 (const int numSlice, const int sliceSize,
               const float* src, float* dest)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WarpSize 64
+#else
+  #define WarpSize 32
+#endif
   namespace cg = cooperative_groups;
   cg::thread_block block = cg::this_thread_block();
   cg::thread_block_tile<WarpSize> warp = cg::tiled_partition<WarpSize>(block);
@@ -104,20 +108,16 @@ int main(int argc, char* argv[]) {
   hipMemcpy(d_input, input, sizeof(float) * numElem, hipMemcpyHostToDevice);
 
   if (kernel == 1) {
-    int WarpSize;
-    hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
-
-    dim3 grids ((numSlice+BLOCK_SIZE/WarpSize-1)/(BLOCK_SIZE/WarpSize));
+    int warp_size;
+    hipDeviceGetAttribute(&warp_size, hipDeviceAttributeWarpSize, 0);
+    dim3 grids ((numSlice+BLOCK_SIZE/warp_size-1)/(BLOCK_SIZE/warp_size));
     dim3 blocks (BLOCK_SIZE);
 
     hipDeviceSynchronize();
     auto start = std::chrono::steady_clock::now();
 
     for (int n = 0; n < repeat; n++) {
-      if (WarpSize == 64)
-         softMax2<64><<<grids, blocks>>>(numSlice, sliceSize, d_input, d_output);
-      else
-         softMax2<32><<<grids, blocks>>>(numSlice, sliceSize, d_input, d_output);
+      softMax2<<<grids, blocks>>>(numSlice, sliceSize, d_input, d_output);
     }
 
     hipDeviceSynchronize();
