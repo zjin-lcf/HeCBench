@@ -26,6 +26,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 #define _GPU_COMPUTE_H_
 
 #include <hip/hip_runtime.h>
+#include <string.h>
 #include <sys/time.h>
 #include "kernel.h"
 #include "ACF_kernel.cu"

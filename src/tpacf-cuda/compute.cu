@@ -25,12 +25,13 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 #ifndef _GPU_COMPUTE_H_
 #define _GPU_COMPUTE_H_
 
+#include <string.h>
+#include <sys/time.h>
 #include "kernel.h"
 #include "ACF_kernel.cu"
 #include "histogram_kernel.cu"
 #include "model_io.cu"
 #include "args.h"
-#include <sys/time.h>
 
 #define TDIFF(ts, te) (te.tv_sec - ts.tv_sec + (te.tv_usec - ts.tv_usec) * 1e-6)
 

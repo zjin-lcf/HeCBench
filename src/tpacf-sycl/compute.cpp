@@ -25,6 +25,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 #ifndef _GPU_COMPUTE_H_
 #define _GPU_COMPUTE_H_
 
+#include <string.h>
 #include <sys/time.h>
 #include <sycl/sycl.hpp>
 using double3 = sycl::double3;
