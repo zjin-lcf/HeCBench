@@ -81,7 +81,6 @@ __device__ inline float warpReduceSum(cooperative_groups::thread_block_tile<Warp
     return val;
 }
 
-template <unsigned int WarpSize>
 __global__
 void attention_kernel1_warpReduce (
     const float*__restrict__ key,
@@ -91,6 +90,11 @@ void attention_kernel1_warpReduce (
     const int n,
     const int d)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WarpSize 64
+#else
+  #define WarpSize 32
+#endif
   namespace cg = cooperative_groups;
   cg::thread_block block = cg::this_thread_block();
   cg::thread_block_tile<WarpSize> warp = cg::tiled_partition<WarpSize>(block);
@@ -103,7 +107,7 @@ void attention_kernel1_warpReduce (
       sum += key[i * d + j] * query[j];
     }
     //sum = cg::reduce(warp, sum, cg::plus<float>{});
-    sum = warpReduceSum(warp, sum);
+    sum = warpReduceSum<WarpSize>(warp, sum);
     if (warp.thread_rank() == 0) {
       dot_product[i] = sum;
       atomicAdd(exp_sum, __expf(sum));
@@ -133,7 +137,6 @@ void attention_kernel2_blockReduce (
     output[j] = sum;
 }
 
-template <unsigned int WarpSize>
 __global__
 void attention_kernel2_warpReduce (
     const float*__restrict__ exp_sum,
@@ -143,6 +146,11 @@ void attention_kernel2_warpReduce (
     const int n,
     const int d)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WarpSize 64
+#else
+  #define WarpSize 32
+#endif
   namespace cg = cooperative_groups;
   cg::thread_block block = cg::this_thread_block();
   cg::thread_block_tile<WarpSize> warp = cg::tiled_partition<WarpSize>(block);
@@ -153,7 +161,7 @@ void attention_kernel2_warpReduce (
       float score = __expf(dot_product[i]) / exp_sum[0];
       sum += score * value[i * d + j];
     }
-    sum = warpReduceSum(warp, sum);
+    sum = warpReduceSum<WarpSize>(warp, sum);
     if (warp.thread_rank() == 0)
       output[j] = sum;
   }

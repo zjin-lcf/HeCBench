@@ -7,8 +7,8 @@
 #include "kernels.h"
 #include "reference.h"
 
-inline int grids(int p, int b, int WarpSize=64) {
-  int waves = b / WarpSize;
+inline int grids(int p, int b, int warp_size) {
+  int waves = b / warp_size;
   return (p + waves - 1) / waves;
 }
 
@@ -47,21 +47,20 @@ float* attention_device(const float* key, const float* value, const float* query
   float *d_output;
   hipMalloc((void**)&d_output, q_size_bytes);
 
-  int WarpSize;
-  hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
+  int warp_size;
+  hipDeviceGetAttribute(&warp_size, hipDeviceAttributeWarpSize, 0);
 
   hipDeviceSynchronize();
 
   if (impl_num == 3) {
 
+    int num_blocks = grids(n, 256, warp_size);
+
     auto start = std::chrono::steady_clock::now();
 
     for (int k = 0; k < repeat; k++) {
       hipMemset(d_exp_sum, 0, 4);
-      if (WarpSize == 64)
-        attention_kernel1_warpReduce<64><<<grids(n,256), 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
-      else
-        attention_kernel1_warpReduce<32><<<grids(n,256,32), 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      attention_kernel1_warpReduce<<<num_blocks, 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
       attention_kernel2_blockReduce<<<d, 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
@@ -73,17 +72,15 @@ float* attention_device(const float* key, const float* value, const float* query
 
   else if (impl_num == 2) {
 
+    int num_blocks = grids(n, 256, warp_size);
+    int num_blocks2 = grids(d, 256, warp_size);
+
     auto start = std::chrono::steady_clock::now();
 
     for (int k = 0; k < repeat; k++) {
       hipMemset(d_exp_sum, 0, 4);
-      if (WarpSize == 64) {
-        attention_kernel1_warpReduce<64><<<grids(n,256), 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
-        attention_kernel2_warpReduce<64><<<grids(d,256), 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
-      } else {
-        attention_kernel1_warpReduce<32><<<grids(n,256,32), 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
-        attention_kernel2_warpReduce<32><<<grids(d,256,32), 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
-      }
+      attention_kernel1_warpReduce<<<num_blocks, 256>>>(d_key, d_query, d_dot_product, d_exp_sum, n, d);
+      attention_kernel2_warpReduce<<<num_blocks2, 256>>>(d_exp_sum, d_dot_product, d_value, d_output, n, d);
     }
 
     hipDeviceSynchronize();
