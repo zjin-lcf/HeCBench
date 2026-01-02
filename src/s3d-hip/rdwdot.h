@@ -6,7 +6,7 @@
 #define ROP2(a)  (RKF(a) - RKR (a))
 
 // Contains GPU kernels for the rdwdot function, split up to reduce
-// register pressure
+// pressure
 template <class real>
 __global__ void
 LAUNCH_BOUNDS (RDWDOT_THRD, RDWDOT_BLK)
