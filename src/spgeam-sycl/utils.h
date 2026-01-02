@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <string.h>
+
 void init_matrix(float *matrix, int num_rows, int num_cols, int nnz)
 {
   int n = (int)num_rows * num_cols;

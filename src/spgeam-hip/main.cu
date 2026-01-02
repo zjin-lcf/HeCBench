@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
         HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_CSR2CSC_ALG1, &bufferSize) )
   CHECK_HIP(hipMalloc(&dBuffer, bufferSize))
 
-  hipDeviceSynchronize();
+  CHECK_HIP(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
         dB_values, dB_offsets, dB_rows, HIP_R_32F, HIPSPARSE_ACTION_NUMERIC,
         HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_CSR2CSC_ALG1, dBuffer))
   }
-  hipDeviceSynchronize();
+  CHECK_HIP(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of hipSparse csr2cscEx2 : %f (us)\n", (time * 1e-3f) / repeat);

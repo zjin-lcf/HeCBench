@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
         CUSPARSE_INDEX_BASE_ZERO, CUSPARSE_CSR2CSC_ALG1, &bufferSize) )
   CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize))
 
-  cudaDeviceSynchronize();
+  CHECK_CUDA(cudaDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
         dB_values, dB_offsets, dB_rows, CUDA_R_32F, CUSPARSE_ACTION_NUMERIC,
         CUSPARSE_INDEX_BASE_ZERO, CUSPARSE_CSR2CSC_ALG1, dBuffer))
   }
-  cudaDeviceSynchronize();
+  CHECK_CUDA(cudaDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of cuSparse csr2cscEx2 : %f (us)\n", (time * 1e-3f) / repeat);
