@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL hip
     SOURCES su3_nn_bench.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DMILC_COMPLEX
 )

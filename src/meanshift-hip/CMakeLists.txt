@@ -7,5 +7,6 @@ add_hecbench_benchmark(
     NAME meanshift
     MODEL hip
     SOURCES main.cu
+    COMPILE_OPTIONS -ffast-math
     CATEGORIES algorithms
 )

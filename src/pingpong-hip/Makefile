@@ -6,10 +6,10 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-#MPI_ROOT  = /usr/lib/x86_64-linux-gnu/openmpi
-#LAUNCHER  = /usr/bin/mpirun -n 2
-MPI_ROOT  = $(HOME)/ompi_for_gpu/ompi
-LAUNCHER  = $(HOME)/ompi_for_gpu/ompi/bin/mpirun -n 2
+MPI_ROOT  = /usr/lib/x86_64-linux-gnu/openmpi
+LAUNCHER  = /usr/bin/mpirun -n 2
+#MPI_ROOT  = $(HOME)/ompi_for_gpu/ompi
+#LAUNCHER  = $(HOME)/ompi_for_gpu/ompi/bin/mpirun -n 2
 
 #===============================================================================
 # Program name & source code list
@@ -32,7 +32,8 @@ nccl-obj = $(nccl-source:.cu=.o)
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I$(MPI_ROOT)/include -Wall
 
 # Linker Flags
-LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lrccl
+#LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lrccl
+LDFLAGS = -lmpi -lrccl
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

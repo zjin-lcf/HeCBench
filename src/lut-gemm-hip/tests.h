@@ -35,7 +35,7 @@ hipblasStatus_t cublas_gemm_ex(__half *A,  __half *B,  __half *C, int m, int n, 
     AType = BType = CType = HIP_R_16F;
     ComputeType = HIPBLAS_COMPUTE_16F;
     hipblasStatus_t status = 
-        hipblasGemmEx_v2(handle, HIPBLAS_OP_N, HIPBLAS_OP_N,
+        hipblasGemmEx(handle, HIPBLAS_OP_N, HIPBLAS_OP_N,
                      n, m, k, 
                      &alpha,
                      B, BType, n,

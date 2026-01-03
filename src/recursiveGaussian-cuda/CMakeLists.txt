@@ -6,6 +6,6 @@ add_hecbench_benchmark(
     NAME recursiveGaussian
     MODEL cuda
     SOURCES RecursiveGaussianHost.cpp main.cu ${INC_DIR}/shrUtils.cpp
-    CATEGORIES algorithms
     INCLUDE_DIRS ${INC_DIR}
+    CATEGORIES algorithms
 )

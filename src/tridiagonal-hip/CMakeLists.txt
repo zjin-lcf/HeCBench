@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME tridiagonal
     MODEL hip
-    SOURCES cmd_arg_reader.cu cyclic_kernels.cu main.cu pcr_kernels.cu shrUtils.cu sweep_kernels.cu
+    SOURCES cmd_arg_reader.cu main.cu shrUtils.cu
     CATEGORIES algorithms
 )

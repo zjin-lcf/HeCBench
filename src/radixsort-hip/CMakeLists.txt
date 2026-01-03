@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME radixsort
     MODEL hip
-    SOURCES RadixSort.cu RadixSort_kernels.cu Scan.cu Scan_kernels.cu main.cu
+    SOURCES RadixSort.cu Scan.cu main.cu
     CATEGORIES algorithms
 )

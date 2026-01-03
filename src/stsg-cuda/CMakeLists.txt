@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME stsg
     MODEL cuda
-    SOURCES Filter.cu main.cu
+    SOURCES main.cu Filter.cu 
     CATEGORIES algorithms
+    LINK_LIBRARIES gdal
 )

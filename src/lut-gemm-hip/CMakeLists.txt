@@ -5,4 +5,6 @@ add_hecbench_benchmark(
     MODEL hip
     SOURCES kernels.cu main.cu nQWeight_fp16.cu
     CATEGORIES math
+    COMPILE_OPTIONS -DHIPBLAS_V2
+    LINK_LIBRARIES hipblas
 )

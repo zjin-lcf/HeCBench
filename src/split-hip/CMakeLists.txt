@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME split
     MODEL hip
-    SOURCES main.cu verify.cu
+    SOURCES main.cu
     CATEGORIES algorithms
 )

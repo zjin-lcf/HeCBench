@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES collectives.cpp main.cpp timer.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES mpi
 )

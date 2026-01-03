@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME bscan
     MODEL hip
-    SOURCES main-wave64.cu main.cu
+    SOURCES main.cu
     CATEGORIES algorithms
 )

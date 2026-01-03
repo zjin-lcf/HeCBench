@@ -8,6 +8,15 @@ set_property(GLOBAL PROPERTY HECBENCH_CATEGORIES "")
 # Global list for benchmarks that require Boost
 set(DEPEND_ON_BOOST "hbc" "ge-spmm" "mmcsf" "warpsort")
 
+# Global list for benchmarks that require MPI
+set(DEPEND_ON_MPI "miniDGS" "miniWeather" "pingpong" "sparkler" "allreduce" "ccl" "halo-finder")
+
+# Global list for benchmarks that require GSL
+set(DEPEND_ON_GSL "sss" "xlqc")
+
+# Global list for benchmarks that require GDAL
+set(DEPEND_ON_GDAL "stsg")
+
 # Path to test runner script
 set(HECBENCH_TEST_RUNNER "${CMAKE_SOURCE_DIR}/cmake/scripts/run_benchmark_test.py")
 
@@ -79,6 +88,30 @@ function(add_hecbench_benchmark)
             include_directories(${Boost_INCLUDE_DIRS})
         else()
             message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (Boost not found)")
+            return()
+        endif()
+    endif()
+
+    if(${BENCH_NAME} IN_LIST DEPEND_ON_MPI)
+        if(MPI_FOUND)
+            message(STATUS "MPI found: ${MPI_C_INCLUDE_DIRS}")
+            include_directories(${MPI_C_INCLUDE_DIRS})
+        else()
+            message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (MPI not found)")
+            return()
+        endif()
+    endif()
+
+    if(${BENCH_NAME} IN_LIST DEPEND_ON_GSL)
+        if(NOT GSL_FOUND)
+            message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (GSL not found)")
+            return()
+        endif()
+    endif()
+
+    if(${BENCH_NAME} IN_LIST DEPEND_ON_GDAL)
+        if(NOT GDAL_FOUND)
+            message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (GDAL not found)")
             return()
         endif()
     endif()

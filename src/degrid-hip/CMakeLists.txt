@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME degrid
     MODEL hip
-    SOURCES kernels.cu main.cu
+    SOURCES main.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DPRECISION=double
 )

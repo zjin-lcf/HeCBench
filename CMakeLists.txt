@@ -22,6 +22,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # 3rd party
 find_package(Boost)
+find_package(MPI)
+find_package(GDAL CONFIG)
+find_package(GSL)
 
 # Build options - which programming models to enable
 option(HECBENCH_ENABLE_CUDA "Enable CUDA benchmarks" ON)

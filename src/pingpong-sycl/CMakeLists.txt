@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME pingpong
     MODEL sycl
-    SOURCES main-ccl.cpp main-mpi.cpp
+    SOURCES main-mpi.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES mpi
 )

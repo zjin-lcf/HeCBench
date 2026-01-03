@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME svd3x3
     MODEL hip
-    SOURCES kernels.cu main.cu
+    SOURCES main.cu
+    COMPILE_OPTIONS -ffast-math
     CATEGORIES algorithms
 )

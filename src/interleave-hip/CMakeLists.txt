@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME interleave
     MODEL hip
-    SOURCES main.cu util.cpp
+    SOURCES main.cu
     CATEGORIES algorithms
 )

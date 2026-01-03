@@ -64,6 +64,18 @@
       }
     },
     {
+      "name": "cuda-sm121",
+      "displayName": "NVIDIA Blackwell (sm_121) - GB10",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "ON",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "OFF",
+        "HECBENCH_ENABLE_OPENMP": "OFF",
+        "HECBENCH_CUDA_ARCH": "121"
+      }
+    },
+    {
       "name": "hip-gfx908",
       "displayName": "AMD MI100 (gfx908)",
       "inherits": "default",
@@ -99,6 +111,32 @@
         "HECBENCH_ENABLE_SYCL": "OFF",
         "HECBENCH_ENABLE_OPENMP": "OFF",
         "HECBENCH_HIP_ARCH": "gfx942",
+        "CMAKE_CXX_COMPILER": "hipcc"
+      }
+    },
+    {
+      "name": "hip-gfx1012",
+      "displayName": "AMD RDNA1.0 (gfx1012)",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "ON",
+        "HECBENCH_ENABLE_SYCL": "OFF",
+        "HECBENCH_ENABLE_OPENMP": "OFF",
+        "HECBENCH_HIP_ARCH": "gfx1012",
+        "CMAKE_CXX_COMPILER": "hipcc"
+      }
+    },
+    {
+      "name": "hip-gfx1030",
+      "displayName": "AMD RDNA2.0 (gfx1030)",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "ON",
+        "HECBENCH_ENABLE_SYCL": "OFF",
+        "HECBENCH_ENABLE_OPENMP": "OFF",
+        "HECBENCH_HIP_ARCH": "gfx1030",
         "CMAKE_CXX_COMPILER": "hipcc"
       }
     },
