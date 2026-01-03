@@ -10,7 +10,7 @@ Z. Jin and J. S. Vetter, "A Benchmark Suite for Improving Performance Portabilit
 [NVIDIA HPC SDK](https://developer.nvidia.com/hpc-sdk)
 
 # Dependencies
-  Certain SYCL benchmarks require [oneDPL](https://github.com/oneapi-src/oneDPL), [oneTBB](https://github.com/oneapi-src/oneTBB), [Syclomatic](https://github.com/oneapi-src/SYCLomatic), or [oneMKL interfaces](https://github.com/oneapi-src/oneMKL).
+Certain benchmarks require [Boost](https://www.boost.org/releases/latest/), [GSL](https://www.gnu.org/software/gsl), [GDAL](https://github.com/OSGeo/gdal) or GPU-aware Message Passing Interface).
 
 # Benchmark categories
 Each benchmark falls into a single category. While such classification is not accurate, the arrangement serves as a starting point for users of the benchmark suite. Please see the Reference for more information about each benchmark. 

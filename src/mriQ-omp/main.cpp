@@ -34,6 +34,11 @@
 #include "computeQ.cpp"
 
 int main (int argc, char *argv[]) {
+  if (argc != 3) {
+    printf("Usage: %s <input filename> <output filename>\n", argv[0]);
+    return 1;
+  }
+  
   char* inputFileName = argv[1];
   char* outputFileName = argv[2];
 
