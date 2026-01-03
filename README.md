@@ -83,17 +83,20 @@ Each benchmark falls into a single category. While such classification is not ac
       `make run`
       
       Navigate to a benchmark in SYCL (benchmark-sycl) and type   
-      `make CUDA=yes CUDA_ARCH=sm_70 run`       (targeting an NVIDIA GPU)
-      `make HIP=yes HIP_ARCH=gfx908 run`        (targeting an AMD GPU)
-      `make run` or `make CC=icpx run`          (targeting an Intel GPU)
+      `make CUDA=yes CUDA_ARCH=sm_70 run`         (targeting an NVIDIA GPU with clang++)
+      `make CUDA=yes CUDA_ARCH=sm_70 CC=icpx run` (targeting an NVIDIA GPU with icpx)
+      `make HIP=yes HIP_ARCH=gfx908 run`          (targeting an AMD GPU with clang++)
+      `make HIP=yes HIP_ARCH=gfx908 CC=icpx run`  (targeting an AMD GPU with icpx)
+      `make run` or `make CC=icpx run`            (targeting an Intel GPU with clang++ or icpx)
 
       NOTE: GCC_TOOLCHAIN may be set to select a specific version of GNU toolchain for the SYCL compiler
       `make CUDA=yes CUDA_ARCH=sm_70 GCC_TOOLCHAIN=/path/to/x86_64/gcc-9.1.0 run`
      
       Navigate to a benchmark in OpenMP (benchmark-omp) and type  
-      `make -f Makefile.nvc run`  (targeting NVIDIA GPUs)
-      `make -f Makefile.aomp run` (targeting AMD GPUs)
-      `make run`                  (targeting Intel GPUs) 
+      `make -f Makefile.nvc run`                (targeting NVIDIA GPUs with nvc++)
+      `make -f Makefile.aomp run`               (targeting AMD GPUs with clang++)
+      `make -f Makefile.aomp CC=amdclang++ run` (targeting AMD GPUs with amdclang++)
+      `make run`                                (targeting Intel GPUs with icpx)
       
       Users may need to set appropriate values (e.g., `sm_80`, `sm_90`, `gfx906`, `gfx1030`) for their target offloading devices  
       `make -f Makefile.nvc SM=cc80 run`
