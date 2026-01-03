@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL cuda
     SOURCES collectives.cu main.cu timer.cu
     CATEGORIES algorithms
+    LINK_LIBRARIES mpi
 )

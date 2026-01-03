@@ -5,5 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES main.cpp
     CATEGORIES algorithms
-    LINK_LIBRARIES -qmkl=parallel
+    LINK_LIBRARIES mpi -qmkl=parallel
 )

@@ -5,4 +5,6 @@ add_hecbench_benchmark(
     MODEL hip
     SOURCES main.cu
     CATEGORIES math
+    COMPILE_OPTIONS -DHIPBLAS_V2
+    LINK_LIBRARIES hipblas
 )

@@ -32,28 +32,35 @@ The simplest way to build is using a CMake preset:
 # List available presets
 cmake --list-presets
 
-# Configure for NVIDIA A100 (sm_80)
-cmake --preset cuda-sm80
+# Configure for NVIDIA H100 with NVIDIA HPC SDK (e.g. version 25.7)
+cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+      -DMPI_C_COMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/comm_libs/mpi/bin/mpicc \
+      -DMPI_CXX_COMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/comm_libs/mpi/bin/mpicxx \
+      -DCUDAToolkit_ROOT=/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/cuda/12.9/ \
+      --preset cuda-sm90
 
 # Build all configured benchmarks
-cmake --build build/cuda-sm80
+cmake --build build/cuda-sm90
 
 # Or build with Ninja in parallel
-cmake --build build/cuda-sm80 --parallel
+cmake --build build/cuda-sm90 --parallel
 ```
 
 ### Available Presets
 
 #### NVIDIA GPUs (CUDA)
-- `cuda-sm60` - Pascal (GTX 1080, P100)
-- `cuda-sm70` - Volta (V100)
-- `cuda-sm80` - Ampere (A100)
-- `cuda-sm90` - Hopper (H100, H200)
+- `cuda-sm60`  - Pascal (GTX 1080, P100)
+- `cuda-sm70`  - Volta (V100)
+- `cuda-sm80`  - Ampere (A100)
+- `cuda-sm90`  - Hopper (H100, H200)
+- `cuda-sm121` - Blackwell (GB10)
 
 #### AMD GPUs (HIP)
-- `hip-gfx908` - MI100
-- `hip-gfx90a` - MI210, MI250X
-- `hip-gfx942` - MI300A/X
+- `hip-gfx908`  - MI100
+- `hip-gfx90a`  - MI210, MI250X
+- `hip-gfx942`  - MI300A/X
+- `hip-gfx1012` - Radeon RX 5500
+- `hip-gfx1030` - Radeon RX 6900
 
 #### SYCL
 - `sycl-cuda-sm70` - SYCL with CUDA backend targeting Volta
@@ -218,7 +225,6 @@ The following 11 benchmarks (28 implementations) have complex dependencies that 
 |-----------|----------|--------|
 | `convolutionDeformable` | cuda, hip, sycl | Python/PyTorch extension (setup.py build) |
 | `dwconv1d` | cuda, hip, sycl | Python/PyTorch extension (run.py build) |
-| `diamond` | sycl | Complex source structure (90+ files) |
 | `gerbil` | cuda, hip | Requires Boost libraries |
 | `halo-finder` | cuda, hip, sycl | MPI dependency + complex archive build |
 | `hpl` | cuda, hip, sycl | HPL benchmark with external dependencies |

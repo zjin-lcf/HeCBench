@@ -5,4 +5,6 @@ add_hecbench_benchmark(
     MODEL hip
     SOURCES main.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -fopenmp 
+    LINK_LIBRARIES hipblas -fopenmp
 )

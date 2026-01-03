@@ -1,8 +1,11 @@
 # mriQ-hip/CMakeLists.txt
 
+set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/../mriQ-cuda")
+
 add_hecbench_benchmark(
     NAME mriQ
     MODEL hip
-    SOURCES computeQ.cu main.cu
+    SOURCES main.cu ${INC_DIR}/file.cc
     CATEGORIES algorithms
+    COMPILE_OPTIONS -ffast-math
 )

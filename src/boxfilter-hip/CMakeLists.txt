@@ -1,8 +1,11 @@
 # boxfilter-hip/CMakeLists.txt
 
+set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/../boxfilter-sycl")
+
 add_hecbench_benchmark(
     NAME boxfilter
     MODEL hip
-    SOURCES main.cu
+    SOURCES main.cu ${INC_DIR}/shrUtils.cpp ${INC_DIR}/reference.cpp ${INC_DIR}/cmd_arg_reader.cpp
     CATEGORIES algorithms
+    INCLUDE_DIRS ${INC_DIR}
 )

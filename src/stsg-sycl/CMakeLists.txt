@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES Filter.cpp main.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES gdal
 )

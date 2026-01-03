@@ -1,8 +1,10 @@
 # pad-hip/CMakeLists.txt
 
+set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/../pad-cuda")
+
 add_hecbench_benchmark(
     NAME pad
     MODEL hip
-    SOURCES kernel.cu main.cu
+    SOURCES main.cu kernel.cu ${INC_DIR}/host_task.cpp
     CATEGORIES algorithms
 )

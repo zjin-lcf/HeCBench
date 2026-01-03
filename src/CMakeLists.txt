@@ -267,7 +267,7 @@ set(HECBENCH_POC_BENCHMARKS
     michalewicz
     minibude
     minisweep
-    #miniWeather
+    miniWeather
     minmax
     mis
     mmcsf
@@ -312,7 +312,7 @@ set(HECBENCH_POC_BENCHMARKS
     permutate
     permute
     phmm
-    #pingpong
+    pingpong
     pitch
     pnpoly
     pns
@@ -387,7 +387,7 @@ set(HECBENCH_POC_BENCHMARKS
     sort
     sortKV
     sosfil
-    #sparkler
+    sparkler
     spaxpby
     spd2s
     spgeam
@@ -404,7 +404,7 @@ set(HECBENCH_POC_BENCHMARKS
     sptrsv
     ss
     ssim
-    #sss
+    sss
     stddev
     stencil1d
     stencil3d
@@ -412,7 +412,7 @@ set(HECBENCH_POC_BENCHMARKS
     streamOrderedAllocation
     streamPriority
     streamUM
-    #stsg
+    stsg
     surfel
     svd3x3
     sw4ck
@@ -446,7 +446,7 @@ set(HECBENCH_POC_BENCHMARKS
     wordcount
     wsm5
     wyllie
-    #xlqc
+    xlqc
     zerocopy
     zeropoint
     zmddft
@@ -454,7 +454,7 @@ set(HECBENCH_POC_BENCHMARKS
     # Final batch: remaining benchmarks (63 benchmarks)
     addBiasQKV
     addBiasResidualLayerNorm
-    #allreduce
+    allreduce
     atomicAggregate
     atomicCAS
     atomicSystemWide
@@ -487,7 +487,7 @@ set(HECBENCH_POC_BENCHMARKS
     car
     cbsfil
     cc
-    #ccl
+    ccl
     ccs
     ccsd-trpdrv
     ced
@@ -512,6 +512,9 @@ set(HECBENCH_POC_BENCHMARKS
     coordinates
     cross
     crossEntropy
+    daphne
+    gerbil
+    halo-finder
     softmax-fused
     softmax-online
     tridiagonal

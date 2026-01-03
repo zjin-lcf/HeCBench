@@ -1,8 +1,11 @@
 # fluidSim-hip/CMakeLists.txt
 
+set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/../fluidSim-cuda")
+
 add_hecbench_benchmark(
     NAME fluidSim
     MODEL hip
-    SOURCES kernels.cu
+    SOURCES kernels.cu ${INC_DIR}/main.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DVERIFY
 )

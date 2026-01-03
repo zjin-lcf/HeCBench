@@ -1,8 +1,10 @@
 # tpacf-hip/CMakeLists.txt
 
+set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/../tpacf-cuda")
+
 add_hecbench_benchmark(
     NAME tpacf
     MODEL hip
-    SOURCES ACF_kernel.cu compute.cu histogram_kernel.cu
+    SOURCES ${INC_DIR}/main.cu ${INC_DIR}/args.cu compute.cu
     CATEGORIES algorithms
 )
