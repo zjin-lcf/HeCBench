@@ -52,6 +52,11 @@ cleanupMemoryGPU(int num, int size, float *& dev_ptr, float * host_ptr)
 }
 
 int main (int argc, char *argv[]) {
+  if (argc != 3) {
+    printf("Usage: %s <input filename> <output filename>\n", argv[0]);
+    return 1;
+  }
+  
   char* inputFileName = argv[1];
   char* outputFileName = argv[2];
 
@@ -87,18 +92,22 @@ int main (int argc, char *argv[]) {
   CUDA_ERRCK;
 
   cudaDeviceSynchronize();
+  CUDA_ERRCK;
   auto start = std::chrono::steady_clock::now();
 
   computePhiMag_GPU(numK, phiR_d, phiI_d, phiMag_d);
 
   cudaDeviceSynchronize();
+  CUDA_ERRCK;
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("computePhiMag time: %f s\n", time * 1e-9);
 
   cleanupMemoryGPU(numK, sizeof(float), phiMag_d, phiMag);
   cudaFree(phiR_d);
+  CUDA_ERRCK;
   cudaFree(phiI_d);
+  CUDA_ERRCK;
 
   kVals = (struct kValues*)calloc(numK, sizeof (struct kValues));
   for (int k = 0; k < numK; k++) {
@@ -118,23 +127,30 @@ int main (int argc, char *argv[]) {
   cudaMalloc((void **)&Qr_d, numX * sizeof(float));
   CUDA_ERRCK;
   cudaMemset((void *)Qr_d, 0, numX * sizeof(float));
+  CUDA_ERRCK;
   cudaMalloc((void **)&Qi_d, numX * sizeof(float));
   CUDA_ERRCK;
   cudaMemset((void *)Qi_d, 0, numX * sizeof(float));
+  CUDA_ERRCK;
 
   cudaDeviceSynchronize();
+  CUDA_ERRCK;
   start = std::chrono::steady_clock::now();
 
   computeQ_GPU(numK, numX, x_d, y_d, z_d, kVals, Qr_d, Qi_d);
 
   cudaDeviceSynchronize();
+  CUDA_ERRCK;
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("computeQ time: %f s\n", time * 1e-9);
 
   cudaFree(x_d);
+  CUDA_ERRCK;
   cudaFree(y_d);
+  CUDA_ERRCK;
   cudaFree(z_d);
+  CUDA_ERRCK;
   cleanupMemoryGPU(numX, sizeof(float), Qr_d, Qr);
   cleanupMemoryGPU(numX, sizeof(float), Qi_d, Qi);
   

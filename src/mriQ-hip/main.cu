@@ -52,6 +52,11 @@ cleanupMemoryGPU(int num, int size, float *& dev_ptr, float * host_ptr)
 }
 
 int main (int argc, char *argv[]) {
+  if (argc != 3) {
+    printf("Usage: %s <input filename> <output filename>\n", argv[0]);
+    return 1;
+  }
+  
   char* inputFileName = argv[1];
   char* outputFileName = argv[2];
 
@@ -87,18 +92,22 @@ int main (int argc, char *argv[]) {
   HIP_ERRCK;
 
   hipDeviceSynchronize();
+  HIP_ERRCK;
   auto start = std::chrono::steady_clock::now();
 
   computePhiMag_GPU(numK, phiR_d, phiI_d, phiMag_d);
 
   hipDeviceSynchronize();
+  HIP_ERRCK;
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("computePhiMag time: %f s\n", time * 1e-9);
 
   cleanupMemoryGPU(numK, sizeof(float), phiMag_d, phiMag);
   hipFree(phiR_d);
+  HIP_ERRCK;
   hipFree(phiI_d);
+  HIP_ERRCK;
 
   kVals = (struct kValues*)calloc(numK, sizeof (struct kValues));
   for (int k = 0; k < numK; k++) {
@@ -118,23 +127,30 @@ int main (int argc, char *argv[]) {
   hipMalloc((void **)&Qr_d, numX * sizeof(float));
   HIP_ERRCK;
   hipMemset((void *)Qr_d, 0, numX * sizeof(float));
+  HIP_ERRCK;
   hipMalloc((void **)&Qi_d, numX * sizeof(float));
   HIP_ERRCK;
   hipMemset((void *)Qi_d, 0, numX * sizeof(float));
+  HIP_ERRCK;
 
   hipDeviceSynchronize();
+  HIP_ERRCK;
   start = std::chrono::steady_clock::now();
 
   computeQ_GPU(numK, numX, x_d, y_d, z_d, kVals, Qr_d, Qi_d);
 
   hipDeviceSynchronize();
+  HIP_ERRCK;
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("computeQ time: %f s\n", time * 1e-9);
 
   hipFree(x_d);
+  HIP_ERRCK;
   hipFree(y_d);
+  HIP_ERRCK;
   hipFree(z_d);
+  HIP_ERRCK;
   cleanupMemoryGPU(numX, sizeof(float), Qr_d, Qr);
   cleanupMemoryGPU(numX, sizeof(float), Qi_d, Qi);
   
