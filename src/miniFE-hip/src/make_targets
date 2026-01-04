@@ -38,7 +38,7 @@ verify:all
 	$(CC) $(CFLAGS) -c $<
 
 run: miniFE.x
-        ./miniFE.x -nx 128 -ny 128 -nz 128
+	./miniFE.x -nx 128 -ny 128 -nz 128
 
 clean:
 	rm -f *.o *.a *.x *.linkinfo miniFE_info.hpp
