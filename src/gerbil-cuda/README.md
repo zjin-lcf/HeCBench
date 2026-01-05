@@ -43,6 +43,9 @@ Gerbil is developed and tested at Linux operating systems. Migrating it to other
         Edit the Makefile to specify the paths to CUDA
         make
 
+4. Download input dataset (https://ena-docs.readthedocs.io/en/latest/retrieval/file-download.html)
+        wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/ERR164/ERR164407/ERR164407.fastq.gz
+
 ## Usage
 
         gerbil [option|flag]* <input-file> <temp-directory> <output-file>
