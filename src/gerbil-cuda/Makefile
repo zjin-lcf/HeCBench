@@ -104,4 +104,4 @@ clean:
 	rm -rf $(program) $(obj) out
 
 run: $(program)
-	$(LAUNCHER) CUDA_VISIBLE_DEVICES=1 ./$(program) -i -g ERR164407.fastq.gz tmp out
+	$(LAUNCHER) CUDA_VISIBLE_DEVICES=0 ./$(program) -i -g ERR164407.fastq.gz tmp out
