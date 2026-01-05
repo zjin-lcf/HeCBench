@@ -1,7 +1,7 @@
 # daphne-sycl/CMakeLists.txt
 
 set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/src/include")
-set(SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/../daphne-cuda/src")
+set(SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/../daphne-cuda/src/points2image")
 
 add_hecbench_benchmark(
     NAME daphne
