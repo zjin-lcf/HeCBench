@@ -12,7 +12,7 @@
 std::chrono::high_resolution_clock::time_point start,end;
 std::chrono::duration<double> elapsed;
 std::chrono::high_resolution_clock timer;
-bool pause = false;
+bool is_paused = false;
 
 // how many testcases should be executed in sequence (before checking for correctness)
 int pipelined = 1;
@@ -23,12 +23,12 @@ void pause_timer()
 {
   end = timer.now();
   elapsed += (end-start);
-  pause = true;
+  is_paused = true;
 }  
 
 void unpause_timer() 
 {
-  pause = false;
+  is_paused = false;
   start = timer.now();
 }
 
@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
   myKernelBenchmark.run(q, pipelined);
 
   // measure the runtime of the kernel
-  if (!pause) 
+  if (!is_paused) 
   {
     end = timer.now();
     elapsed += end-start;
