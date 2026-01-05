@@ -515,6 +515,7 @@ set(HECBENCH_POC_BENCHMARKS
     daphne
     gerbil
     halo-finder
+    miniFE
     softmax-fused
     softmax-online
     tridiagonal
