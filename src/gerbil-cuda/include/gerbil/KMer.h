@@ -62,7 +62,8 @@ namespace gerbil {
 	struct KMer<K, B, 8, C> {
 		uint64_t data[C];
 		static constexpr uint64_t _c_offset = 64 - (2 * (K % 32));
-		static constexpr uint64_t _c_mask = 0xffffffffffffffff << _c_offset;
+		static constexpr uint64_t _c_mask = (_c_offset >= 64) ? 0 :
+                                                    (0xffffffffffffffff << _c_offset);
 	public:
 		/*
 		 * clears this KMer
