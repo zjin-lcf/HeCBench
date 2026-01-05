@@ -16,8 +16,6 @@
 #define BLKYSIZE 4
 #define BLKZSIZE 4
 
-using namespace std;
-
 double Laplacian(const double c[][DATAYSIZE][DATAXSIZE],
                  double dx, double dy, double dz, int x, int y, int z)
 {
@@ -220,14 +218,14 @@ int main(int argc, char *argv[])
   const double gamma = 0.5;
   const double D = 1.0;
 
-  string name_c = "./out/integral_c.txt";
-  ofstream ofile_c (name_c);
+  std::string name_c = "./out/integral_c.txt";
+  std::ofstream ofile_c (name_c);
 
-  string name_mu = "./out/integral_mu.txt";
-  ofstream ofile_mu (name_mu);
+  std::string name_mu = "./out/integral_mu.txt";
+  std::ofstream ofile_mu (name_mu);
 
-  string name_f = "./out/integral_f.txt";
-  ofstream ofile_f (name_f);
+  std::string name_f = "./out/integral_f.txt";
+  std::ofstream ofile_f (name_f);
 
   typedef double nRarray[DATAYSIZE][DATAXSIZE];
 
