@@ -1,8 +1,8 @@
 // Reference https://www.xyzzhangfan.tech/blog/2025/
 __device__
 uint8_t FP32_FP8_E5M2(float value) {
-    if (std::isnan(value)) return 0xFF; // NaN is 0xFF, 0xFE, 0xFD
-    if (std::isinf(value)) return (value > 0) ? 0x7C : 0xFC; // inf is 0xFC and 0x7C
+    if (isnan(value)) return 0xFF; // NaN is 0xFF, 0xFE, 0xFD
+    if (isinf(value)) return (value > 0) ? 0x7C : 0xFC; // inf is 0xFC and 0x7C
     // Handle zero case
     if (value == 0) return 0x00;
     // Extract the sign, exponent, and mantissa of the FP32
