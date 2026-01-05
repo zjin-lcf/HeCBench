@@ -10,10 +10,10 @@ Z. Jin and J. S. Vetter, "A Benchmark Suite for Improving Performance Portabilit
 [NVIDIA HPC SDK](https://developer.nvidia.com/hpc-sdk)
 
 # Dependencies
-Certain benchmarks require [Boost](https://www.boost.org/releases/latest/), [GSL](https://www.gnu.org/software/gsl), [GDAL](https://github.com/OSGeo/gdal) or GPU-aware Message Passing Interface(MPI).
-BOOST: hbc, ge-spmm, mmcsf, warpsort 
-MPI:   miniDGS, miniWeather, pingpong, sparkler, allreduce, ccl, halo-finder 
-GSL:   sss, xlqc 
+Certain benchmarks require [Boost](https://www.boost.org/releases/latest/), [GSL](https://www.gnu.org/software/gsl), [GDAL](https://github.com/OSGeo/gdal) or GPU-aware Message Passing Interface(MPI).<br>
+Boost: hbc, ge-spmm, mmcsf, warpsort<br>
+MPI:   miniDGS, miniWeather, pingpong, sparkler, allreduce, ccl, halo-finder<br>
+GSL:   sss, xlqc<br>
 GDAL:  stsg
 
 # Benchmark categories
