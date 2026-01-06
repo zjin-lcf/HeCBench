@@ -574,55 +574,11 @@ void RCBForceTree<TDPTS>::printStats(double buildTime)
   }
 }
 
-void cm( ID_T count,
-    const POSVEL_T *xx, 
-    const POSVEL_T *yy,
-    const POSVEL_T *zz,
-    const POSVEL_T *mass,
-    POSVEL_T *xmin,
-    POSVEL_T *xmax,
-    POSVEL_T *xc)
-{
-  // xmin/xmax are currently set to the whole bounding box, but this is too conservative, so we'll
-  // set them based on the actual particle content.
+extern void cm(ID_T count, const POSVEL_T* __restrict  xx, const POSVEL_T* __restrict  yy,
+               const POSVEL_T* __restrict  zz, const POSVEL_T* __restrict  mass,
+               POSVEL_T* __restrict  xmin, POSVEL_T* __restrict  xmax, POSVEL_T* __restrict  xc);
 
-  double x = 0, y = 0, z = 0, m = 0;
-
-  for (ID_T i = 0; i < count; ++i) {
-    if (i == 0) {
-      xmin[0] = xmax[0] = xx[0];
-      xmin[1] = xmax[1] = yy[0];
-      xmin[2] = xmax[2] = zz[0];
-    } else {
-      xmin[0] = fminf(xmin[0], xx[i]);
-      xmax[0] = fmaxf(xmax[0], xx[i]);
-      xmin[1] = fminf(xmin[1], yy[i]);
-      xmax[1] = fmaxf(xmax[1], yy[i]);
-      xmin[2] = fminf(xmin[2], zz[i]);
-      xmax[2] = fmaxf(xmax[2], zz[i]);
-    }
-
-    POSVEL_T w = mass[i];
-    x += w*xx[i];
-    y += w*yy[i];
-    z += w*zz[i];
-    m += w;
-  }
-
-  xc[0] = (POSVEL_T) (x/m);
-  xc[1] = (POSVEL_T) (y/m);
-  xc[2] = (POSVEL_T) (z/m);
-}
-
-static inline POSVEL_T pptdr(const POSVEL_T*  xmin, const POSVEL_T*  xmax, const POSVEL_T*  xc)
-{
-  return std::min(
-      xmax[0] - xc[0],
-      std::min(xmax[1] - xc[1],
-               std::min(xmax[2] - xc[2],
-                        std::min(xc[0] - xmin[0],
-                                 std::min(xc[1] - xmin[1], xc[2] - xmin[2])))));
-}
+extern POSVEL_T pptdr(const POSVEL_T* __restrict xmin, const POSVEL_T* __restrict xmax, const POSVEL_T* __restrict xc);
 
 template <int TDPTS>
 static inline void pppts(POSVEL_T tdr, const POSVEL_T*  xc,

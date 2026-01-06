@@ -450,9 +450,9 @@ void RCOForceTree<TDPTS>::printStats()
   printf("\t\tmean ppn: %.2f (max ppn: %lu)\n", leafParts/((double) nonzeroLeafNodes), maxPPN);
 }
 
-static inline void cm(ID_T count, const POSVEL_T* __restrict xx, const POSVEL_T* __restrict yy,
-                      const POSVEL_T* __restrict zz, const POSVEL_T* __restrict mass,
-                      POSVEL_T* __restrict xmin, POSVEL_T* __restrict xmax, POSVEL_T* __restrict xc)
+void cm(ID_T count, const POSVEL_T* __restrict xx, const POSVEL_T* __restrict yy,
+        const POSVEL_T* __restrict zz, const POSVEL_T* __restrict mass,
+        POSVEL_T* __restrict xmin, POSVEL_T* __restrict xmax, POSVEL_T* __restrict xc)
 {
   // xmin/xmax are currently set to the whole bounding box, but this is too conservative, so we'll
   // set them based on the actual particle content.
@@ -485,7 +485,7 @@ static inline void cm(ID_T count, const POSVEL_T* __restrict xx, const POSVEL_T*
   xc[2] = (POSVEL_T) (z/m);
 }
 
-static inline POSVEL_T pptdr(const POSVEL_T* __restrict xmin, const POSVEL_T* __restrict xmax, const POSVEL_T* __restrict xc)
+POSVEL_T pptdr(const POSVEL_T* __restrict xmin, const POSVEL_T* __restrict xmax, const POSVEL_T* __restrict xc)
 {
   return std::min(xmax[0] - xc[0], std::min(xmax[1] - xc[1], std::min(xmax[2] - xc[2], std::min(xc[0] - xmin[0],
                  std::min(xc[1] - xmin[1], xc[2] - xmin[2])))));
