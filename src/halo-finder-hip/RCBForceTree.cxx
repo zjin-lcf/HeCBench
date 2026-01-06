@@ -607,15 +607,11 @@ void RCBForceTree<TDPTS>::printStats(double buildTime)
 }
 
 
-extern "C" void cm(ID_T count, const POSVEL_T*  xx, const POSVEL_T*  yy,
-                      const POSVEL_T*  zz, const POSVEL_T*  mass,
-                      POSVEL_T*  xmin, POSVEL_T*  xmax, POSVEL_T*  xc);
+extern void cm(ID_T count, const POSVEL_T* __restrict  xx, const POSVEL_T* __restrict  yy,
+               const POSVEL_T* __restrict  zz, const POSVEL_T* __restrict  mass,
+               POSVEL_T* __restrict  xmin, POSVEL_T* __restrict  xmax, POSVEL_T* __restrict  xc);
 
-static inline POSVEL_T pptdr(const POSVEL_T*  xmin, const POSVEL_T*  xmax, const POSVEL_T*  xc)
-{
-  return std::min(xmax[0] - xc[0], std::min(xmax[1] - xc[1], std::min(xmax[2] - xc[2], std::min(xc[0] - xmin[0],
-                 std::min(xc[1] - xmin[1], xc[2] - xmin[2])))));
-}
+extern POSVEL_T pptdr(const POSVEL_T* __restrict xmin, const POSVEL_T* __restrict xmax, const POSVEL_T* __restrict xc);
 
 template <int TDPTS>
 static inline void pppts(POSVEL_T tdr, const POSVEL_T*  xc,
