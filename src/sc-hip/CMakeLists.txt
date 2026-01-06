@@ -7,4 +7,5 @@ add_hecbench_benchmark(
     MODEL hip
     SOURCES device_sc.cu main.cu ${INC_DIR}/host_sc.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES pthread
 )

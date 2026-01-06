@@ -23,5 +23,5 @@ add_hecbench_benchmark(
     COMPILE_OPTIONS -DGPU -fpermissive
 	            -DBOOST_ALL_NO_LIB -DBOOST_ATOMIC_DYN_LINK -DBOOST_FILESYSTEM_DYN_LINK
 	            -DBOOST_REGEX_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -DBOOST_THREAD_DYN_LINK
-    LINK_LIBRARIES mpi z bz2 boost_system boost_thread boost_regex boost_filesystem
+    LINK_LIBRARIES z bz2 boost_system boost_thread boost_regex boost_filesystem
 )

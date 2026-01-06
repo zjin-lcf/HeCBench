@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES host_task.cpp kernel.cpp main.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES pthread
 )

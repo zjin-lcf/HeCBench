@@ -6,5 +6,4 @@ add_hecbench_benchmark(
     SOURCES main.cu
     CATEGORIES math
     LINK_LIBRARIES cublas
-    LINK_LIBRARIES hipblasLt
 )

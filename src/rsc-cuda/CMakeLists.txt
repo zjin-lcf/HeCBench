@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL cuda
     SOURCES main.cu model_eval.cu model_fitting.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES pthread
 )

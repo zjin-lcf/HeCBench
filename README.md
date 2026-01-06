@@ -11,7 +11,7 @@ Z. Jin and J. S. Vetter, "A Benchmark Suite for Improving Performance Portabilit
 
 # Dependencies
 Certain benchmarks require [Boost](https://www.boost.org/releases/latest/), [GSL](https://www.gnu.org/software/gsl), [GDAL](https://github.com/OSGeo/gdal) or GPU-aware Message Passing Interface(MPI).<br>
-Boost: hbc, ge-spmm, mmcsf, warpsort<br>
+Boost: hbc, ge-spmm, mmcsf, warpsort, gerbil<br>
 MPI:   miniDGS, miniWeather, pingpong, sparkler, allreduce, ccl, halo-finder<br>
 GSL:   sss, xlqc<br>
 GDAL:  stsg

@@ -1,4 +1,5 @@
 # dp-hip/CMakeLists.txt
+#--hipstdpar-path=/opt/rocm/include/thrust/system/hip/hipstdpar
 
 add_hecbench_benchmark(
     NAME dp
@@ -6,7 +7,6 @@ add_hecbench_benchmark(
     SOURCES main.cu shrUtils.cu
     CATEGORIES algorithms
     COMPILE_OPTIONS --hipstdpar 
-                    --hipstdpar-path=/opt/rocm/include/thrust/system/hip/hipstdpar
                     -munsafe-fp-atomics
     LINK_LIBRARIES hipblas
 )

@@ -5,5 +5,4 @@ add_hecbench_benchmark(
     MODEL hip
     SOURCES main-mpi.cu
     CATEGORIES algorithms
-    LINK_LIBRARIES mpi
 )

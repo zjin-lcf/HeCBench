@@ -32,7 +32,7 @@ The simplest way to build is using a CMake preset:
 # List available presets
 cmake --list-presets
 
-# Configure for NVIDIA H100 with NVIDIA HPC SDK (e.g. version 25.7)
+# Configure for NVIDIA Hopper GPUs with NVIDIA HPC SDK (version 25.7)
 cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
       -DMPI_C_COMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/comm_libs/mpi/bin/mpicc \
       -DMPI_CXX_COMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/comm_libs/mpi/bin/mpicxx \
@@ -53,6 +53,7 @@ cmake --build build/cuda-sm90 --parallel
 - `cuda-sm70`  - Volta (V100)
 - `cuda-sm80`  - Ampere (A100)
 - `cuda-sm90`  - Hopper (H100, H200)
+- `cuda-sm120` - Blackwell
 - `cuda-sm121` - Blackwell (GB10)
 
 #### AMD GPUs (HIP)

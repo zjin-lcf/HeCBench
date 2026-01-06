@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL hip
     SOURCES cbow.cu word2vec.cu
     CATEGORIES algorithms
+    LINK_LIBRARIES pthread
 )

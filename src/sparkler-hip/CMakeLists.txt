@@ -5,5 +5,5 @@ add_hecbench_benchmark(
     MODEL hip
     SOURCES main.cu
     CATEGORIES algorithms
-    LINK_LIBRARIES hipblas mpi
+    LINK_LIBRARIES hipblas
 )

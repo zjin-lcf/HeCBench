@@ -64,6 +64,18 @@
       }
     },
     {
+      "name": "cuda-sm120",
+      "displayName": "NVIDIA Blackwell (sm_120)",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "ON",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "OFF",
+        "HECBENCH_ENABLE_OPENMP": "OFF",
+        "HECBENCH_CUDA_ARCH": "120"
+      }
+    },
+    {
       "name": "cuda-sm121",
       "displayName": "NVIDIA Blackwell (sm_121) - GB10",
       "inherits": "default",

@@ -6,4 +6,5 @@ add_hecbench_benchmark(
     SOURCES kernels.cpp main.cpp mttkrp_cpu.cpp
     CATEGORIES algorithms
     INCLUDE_DIRS ${Boost_INCLUDE_DIRS}
+    LINK_LIBRARIES pthread
 )

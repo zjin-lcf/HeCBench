@@ -8,4 +8,5 @@ add_hecbench_benchmark(
     SOURCES kernels.cu main.cu ${INC_DIR}/mttkrp_cpu.cu
     CATEGORIES algorithms
     INCLUDE_DIRS ${Boost_INCLUDE_DIRS}
+    LINK_LIBRARIES pthread
 )

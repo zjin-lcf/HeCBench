@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES cbow.cpp word2vec.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES pthread
 )
