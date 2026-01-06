@@ -8,4 +8,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES kernel_reference.cpp main.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES pthread
 )

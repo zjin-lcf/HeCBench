@@ -7,4 +7,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES device_sc.cpp ${INC_DIR}/host_sc.cpp main.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES pthread
 )

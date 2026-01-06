@@ -6,7 +6,7 @@ set_property(GLOBAL PROPERTY HECBENCH_ALL_BENCHMARKS "")
 set_property(GLOBAL PROPERTY HECBENCH_CATEGORIES "")
 
 # Global list for benchmarks that require Boost
-set(DEPEND_ON_BOOST "hbc" "ge-spmm" "mmcsf" "warpsort")
+set(DEPEND_ON_BOOST "hbc" "ge-spmm" "mmcsf" "warpsort" "gerbil")
 
 # Global list for benchmarks that require MPI
 set(DEPEND_ON_MPI "miniDGS" "miniWeather" "pingpong" "sparkler" "allreduce" "ccl" "halo-finder")
@@ -16,6 +16,9 @@ set(DEPEND_ON_GSL "sss" "xlqc")
 
 # Global list for benchmarks that require GDAL
 set(DEPEND_ON_GDAL "stsg")
+
+# Global list for SYCL benchmarks that require C++20
+set(DEPEND_ON_CXX20 "adamw-sycl" "zmddft-sycl")
 
 # Path to test runner script
 set(HECBENCH_TEST_RUNNER "${CMAKE_SOURCE_DIR}/cmake/scripts/run_benchmark_test.py")
@@ -93,10 +96,7 @@ function(add_hecbench_benchmark)
     endif()
 
     if(${BENCH_NAME} IN_LIST DEPEND_ON_MPI)
-        if(MPI_FOUND)
-            message(STATUS "MPI found: ${MPI_C_INCLUDE_DIRS}")
-            include_directories(${MPI_C_INCLUDE_DIRS})
-        else()
+        if(NOT MPI_FOUND)
             message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (MPI not found)")
             return()
         endif()
@@ -182,10 +182,20 @@ function(add_hecbench_benchmark)
             -fsycl
             ${SYCL_FLAGS}
         )
+        # Override the default CXX standard
+        if(${TARGET_NAME} IN_LIST DEPEND_ON_CXX20)
+            set_target_properties(${TARGET_NAME} PROPERTIES
+                                  CXX_STANDARD 20 CXX_STANDARD_REQUIRED YES)
+        endif()
 
     elseif(BENCH_MODEL_LOWER STREQUAL "omp" OR BENCH_MODEL_LOWER STREQUAL "openmp")
         # OpenMP configuration
         target_link_libraries(${TARGET_NAME} PRIVATE OpenMP::OpenMP_CXX)
+    endif()
+
+    if(${BENCH_NAME} IN_LIST DEPEND_ON_MPI)
+        # automatically handles the necessary include paths, compiler flags, and libraries
+        target_link_libraries(${TARGET_NAME} PRIVATE MPI::MPI_CXX)
     endif()
 
     # Add user-specified compile options

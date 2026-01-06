@@ -1,5 +1,5 @@
-C_COMPILER   = clang
-CXX_COMPILER = clang++
+C_COMPILER   = icpx #clang
+CXX_COMPILER = icpx #clang++
 GPU          = yes
 CUDA         = no
 CUDA_ARCH    = sm_70

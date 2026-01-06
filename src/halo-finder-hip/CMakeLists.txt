@@ -18,11 +18,10 @@ add_hecbench_benchmark(
             bigchunk.c
             dims-local.c
             BGQStep16.c
-            BGQCM.c
+            #BGQCM.c
     CATEGORIES algorithms
     INCLUDE_DIRS dfft
     COMPILE_OPTIONS -DRCB_UNTHREADED_BUILD -DUSE_SERIAL_COSMO -DID_64 -DPOSVEL_32 -DGRID_32 -DLONG_INTEGER
-    LINK_LIBRARIES mpi
 )
 set_source_files_properties(
             ForceTreeTest.cxx

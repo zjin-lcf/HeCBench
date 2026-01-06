@@ -7,4 +7,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES main.cpp model_eval.cpp ${INC_DIR}/model_fitting.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES pthread
 )

@@ -7,4 +7,5 @@ add_hecbench_benchmark(
     MODEL hip
     SOURCES main.cu model_eval.cu ${INC_DIR}/model_fitting.cpp
     CATEGORIES algorithms
+    LINK_LIBRARIES pthread
 )

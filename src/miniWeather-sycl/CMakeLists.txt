@@ -6,5 +6,4 @@ add_hecbench_benchmark(
     SOURCES main.cpp
     CATEGORIES algorithms
     COMPILE_OPTIONS -DNX=400 -DNZ=200 -DSIM_TIME=600 -DDATA_SPEC=DATA_SPEC_THERMAL
-    LINK_LIBRARIES mpi
 )

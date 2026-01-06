@@ -5,5 +5,5 @@ add_hecbench_benchmark(
     MODEL cuda
     SOURCES main.cu
     CATEGORIES algorithms
-    LINK_LIBRARIES mpi nccl
+    LINK_LIBRARIES nccl
 )

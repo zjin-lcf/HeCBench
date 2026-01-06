@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL hip
     SOURCES blockmatching.cu dct8x8.cu filtering.cu main.cu
     CATEGORIES algorithms
+    LINK_LIBRARIES pthread
 )
