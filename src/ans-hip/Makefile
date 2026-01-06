@@ -2,7 +2,7 @@ ARCH = gfx908
 
 NVCC = hipcc
 NVCC_ARCH =
-NVCC_FLAGS = --std=c++17 -O3 -pthread
+NVCC_FLAGS = --std=c++17 -O3
 
 INC_DIR = include
 SRC_DIR = src
