@@ -293,15 +293,15 @@ int main(int argc, char *argv[])
 
       integral_c = integral(cnew,nx,ny,nz);
 
-      ofile_c << t << "," << integral_c << endl;
+      ofile_c << t << "," << integral_c << "\n";
 
       integral_mu = integral(muold,nx,ny,nz);
 
-      ofile_mu << t << "," << integral_mu << endl;
+      ofile_mu << t << "," << integral_mu << "\n";
 
       integral_f = integral(fold,nx,ny,nz);
 
-      ofile_f << t << "," << integral_f << endl;
+      ofile_f << t << "," << integral_f << "\n";
     }
 
     Swap(cnew, cold);

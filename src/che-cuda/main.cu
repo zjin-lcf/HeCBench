@@ -126,15 +126,15 @@ int main(int argc, char *argv[])
 
       integral_c = integral(c_host,nx,ny,nz);
 
-      ofile_c << t << "," << integral_c << endl;
+      ofile_c << t << "," << integral_c << "\n";
 
       integral_mu = integral(mu_host,nx,ny,nz);
 
-      ofile_mu << t << "," << integral_mu << endl;
+      ofile_mu << t << "," << integral_mu << "\n";
 
       integral_f = integral(f_host,nx,ny,nz);
 
-      ofile_f << t << "," << integral_f << endl;
+      ofile_f << t << "," << integral_f << "\n";
     }
 
     Swap<<<gridSize, blockSize>>>(d_cnew, d_cold);

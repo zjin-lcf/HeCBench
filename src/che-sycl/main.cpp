@@ -318,15 +318,15 @@ int main(int argc, char *argv[])
       q.wait();
       integral_c = integral(c_host,nx,ny,nz);
 
-      ofile_c << t << "," << integral_c << std::endl;
+      ofile_c << t << "," << integral_c << "\n";
 
       integral_mu = integral(mu_host,nx,ny,nz);
 
-      ofile_mu << t << "," << integral_mu << std::endl;
+      ofile_mu << t << "," << integral_mu << "\n";
 
       integral_f = integral(f_host,nx,ny,nz);
 
-      ofile_f << t << "," << integral_f << std::endl;
+      ofile_f << t << "," << integral_f << "\n";
     }
 
     q.submit([&] (sycl::handler &cgh) {
