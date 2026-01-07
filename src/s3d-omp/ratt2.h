@@ -7,7 +7,7 @@
     const real PATM = (real)1.01325e6;
     const real PFAC = DIV (PATM, (RU*(TEMP)));
 
-    register real rtemp_inv;
+    real rtemp_inv;
 
     rtemp_inv = DIV ((EG(2)*EG(4)), (EG(3)*EG(5)));
     RB(1) = RF(1) * MIN(rtemp_inv, SMALL_INV);

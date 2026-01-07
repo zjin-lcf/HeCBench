@@ -1,8 +1,8 @@
     const real TEMP = T[i]*tconv;
     //const real ALOGT = LOG((TEMP));
     real CTOT = (real)0.0;
-    register real PR, PCOR, PRLOG, FCENT, FCLOG, XN;
-    register real CPRLOG, FLOG, FC, SQR;
+    real PR, PCOR, PRLOG, FCENT, FCLOG, XN;
+    real CPRLOG, FLOG, FC, SQR;
     const real SMALL = FLT_MIN;
 
     #pragma unroll 22
