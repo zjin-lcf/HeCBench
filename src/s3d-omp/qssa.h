@@ -1,4 +1,4 @@
-    register real DEN;
+    real DEN;
 
     RF(57)  = (real)0.0;
     RF(58)  = (real)0.0;
