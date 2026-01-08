@@ -1,0 +1,1 @@
+  -L"/usr/local/cuda/targets/sbsa-linux/lib/stubs"  -L"/usr/local/cuda/targets/sbsa-linux/lib"  "_deps/fmt-build/libfmt.a" -lcublas -lcudadevrt -lcudart_static -lrt -lpthread -ldl 

@@ -24,7 +24,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "types.h"
 #include <atomic>
-#include <xmmintrin.h>
+// #include <xmmintrin.h>  // x86 SSE header - not actually used, commented out for ARM64 compatibility
 #include <algorithm>
 
 namespace gerbil {

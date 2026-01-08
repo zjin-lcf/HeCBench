@@ -47,6 +47,12 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
+bitmap_image.hpp:
+	@if [ ! -f bitmap_image.hpp ]; then \
+		echo "Extracting bitmap image headers and test data..."; \
+		tar -xzf data.tar.gz; \
+	fi
+
 %.o: %.cu bitmap_image.hpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 

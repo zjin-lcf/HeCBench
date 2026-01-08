@@ -4,8 +4,8 @@
 
 # Compiler can be set below, or via environment variable
 
-# Specify NVHPC's mpicc
-CC        = mpic++
+# Use nvc++ directly with MPI flags
+CC        = nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -32,10 +32,12 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall \
        	-DNZ=200 \
 	-DSIM_TIME=600 \
 	-DDATA_SPEC=DATA_SPEC_THERMAL \
-        -I../miniWeather-cuda/
+        -I../miniWeather-cuda/ \
+	-I/usr/lib/aarch64-linux-gnu/openmpi/include \
+	-I/usr/lib/aarch64-linux-gnu/openmpi/include/openmpi
 
 # Linker Flags
-LDFLAGS =
+LDFLAGS = -L/usr/lib/aarch64-linux-gnu/openmpi/lib -lmpi_cxx -lmpi
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

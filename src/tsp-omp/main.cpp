@@ -345,11 +345,14 @@ int main(int argc, char *argv[])
         } while (j > 1);
 
         if (lid == 0) {
-          int t;
-          #pragma omp atomic capture
-          {
-            t = best[0];
-            best[0] = (term < best[0]) ? term : best[0];
+          // Simplified atomic min without conditional in capture
+          int old_best;
+          #pragma omp atomic read
+          old_best = best[0];
+
+          if (term < old_best) {
+            #pragma omp atomic write
+            best[0] = term;
           }
         }
       }

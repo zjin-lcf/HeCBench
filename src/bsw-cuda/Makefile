@@ -54,7 +54,13 @@ $(program): $(obj)
 clean:
 	rm -rf $(program) $(obj)
 
-run: $(program)
+test-data:
+	@if [ ! -d ./test-data ]; then \
+		echo "Extracting protein sequence test data..."; \
+		tar -xzf test-data.tar.gz; \
+	fi
+
+run: $(program) test-data
 	$(LAUNCHER) ./$(program) \
                 ./test-data/protein-reference.fasta \
                 ./test-data/protein-query.fasta test_regression_protein_out 

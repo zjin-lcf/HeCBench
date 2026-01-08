@@ -7,13 +7,13 @@ VPATH   = ./
 HDRDIR  = ./include
 
 # adjust this for your system
-CUDADIR=/auto/software/nvidia/x86_64/cuda-11.0
-OPENMPI_BINDIR=/usr/lib64/openmpi3/bin
+CUDADIR=/usr/local/cuda
+OPENMPI_BINDIR=/usr/bin
 
 # set options for this machine
 # specify which compilers to use for c, fortran and linking
 CC	= $(OPENMPI_BINDIR)/mpicc
-LD	= $(OPENMPI_BINDIR)/mpicc
+LD	= $(OPENMPI_BINDIR)/mpicxx
 NVCC	= $(CUDADIR)/bin/nvcc
 #DEBUG   = -g -G -DDEBUG
 FAST    = -O3 --use_fast_math 

@@ -10,14 +10,16 @@
 srcdir = .
 VPATH = .
 
-DEFS = -DHAVE_CONFIG_H -DANSI_C
+CC = cc
+
+DEFS = -DHAVE_CONFIG_H
 LIBS =  -lm 
 RANLIB = ranlib
 
 
 # CFLAGS = -O -g
 # CFLAGS = -pg -g
-CFLAGS = -O3 --x cu
+CFLAGS = -O
 
 
 .c.o:

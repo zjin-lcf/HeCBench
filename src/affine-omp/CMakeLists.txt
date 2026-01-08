@@ -1,8 +1,8 @@
-# affine-omp/CMakeLists.txt
+# affine-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME affine
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

@@ -1,8 +1,8 @@
-# bilateral-omp/CMakeLists.txt
+# bilateral-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME bilateral
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

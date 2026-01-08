@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = /opt/nvidia/hpc_sdk/Linux_aarch64/25.11/compilers/bin/nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 LAUNCHER  =
@@ -18,7 +18,7 @@ program = vj-cpu vj-gpu
 # Sets Flags
 #===============================================================================
 
-OMP_TARGET_FLAGS += -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+OMP_TARGET_FLAGS += -mp=gpu
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -Wall -I../face-sycl

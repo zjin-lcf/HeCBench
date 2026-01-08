@@ -28,5 +28,11 @@ lsqt_gpu: $(OBJ)
 clean:
 	rm -f $(ODIR)/*.o lsqt_gpu
 
-run: lsqt_gpu
+examples/input.txt:
+	@if [ ! -d examples ]; then \
+		echo "Extracting quantum transport examples..."; \
+		tar -xzf examples.tar.gz; \
+	fi
+
+run: lsqt_gpu examples/input.txt
 	./lsqt_gpu examples/input.txt

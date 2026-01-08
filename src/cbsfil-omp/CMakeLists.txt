@@ -1,8 +1,8 @@
-# cbsfil-omp/CMakeLists.txt
+# cbsfil-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME cbsfil
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

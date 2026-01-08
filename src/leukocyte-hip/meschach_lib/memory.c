@@ -31,14 +31,6 @@
 
 static	char	rcsid[] = "$Id: memory.c,v 1.13 1994/04/05 02:10:37 des Exp $";
 
-int wrapped_m_free(void* p) { return m_free((MAT*)p); }
-int wrapped_px_free(void* p) { return px_free((PERM*)p); }
-int wrapped_bd_free(void* p) { return bd_free((BAND*)p); }
-int wrapped_v_free(void* p) { return v_free((VEC*)p); }
-int wrapped_iv_free(void* p) { return iv_free((IVEC*)p); }
-
-
-
 /* m_get -- gets an mxn matrix (in MAT form) by dynamic memory allocation
 	-- normally ALL matrices should be obtained this way
 	-- if either m or n is negative this will raise an error
@@ -173,7 +165,6 @@ VEC	*v_get(int size)
    return (vector);
 }
 
-
 /* m_free -- returns MAT & asoociated memory back to memory heap */
 #ifndef ANSI_C
 int	m_free(mat)
@@ -258,6 +249,7 @@ int	px_free(PERM *px)
 }
 
 
+
 /* v_free -- returns VEC & asoociated memory back to memory heap */
 #ifndef ANSI_C
 int	v_free(vec)
@@ -327,8 +319,8 @@ MAT	*m_resize(MAT *A,int new_m, int new_n)
       if ( ! A->me )
 	error(E_MEM,"m_resize");
    }
-   new_max_m = macro_max(new_m,A->max_m);
-   new_max_n = macro_max(new_n,A->max_n);
+   new_max_m = max(new_m,A->max_m);
+   new_max_n = max(new_n,A->max_n);
    
 #ifndef SEGMENTED
    new_size = new_max_m*new_max_n;
@@ -352,14 +344,14 @@ MAT	*m_resize(MAT *A,int new_m, int new_n)
    /* now shift data in matrix */
    if ( old_n > new_n )
    {
-      for ( i = 1; i < macro_min(old_m,new_m); i++ )
+      for ( i = 1; i < min(old_m,new_m); i++ )
 	MEM_COPY((char *)&(A->base[i*old_n]),
 		 (char *)&(A->base[i*new_n]),
 		 sizeof(Real)*new_n);
    }
    else if ( old_n < new_n )
    {
-      for ( i = (int)(macro_min(old_m,new_m))-1; i > 0; i-- )
+      for ( i = (int)(min(old_m,new_m))-1; i > 0; i-- )
       {   /* copy & then zero extra space */
 	 MEM_COPY((char *)&(A->base[i*old_n]),
 		  (char *)&(A->base[i*new_n]),
@@ -1043,6 +1035,7 @@ int m_free_vars(va_alist) va_dcl
    va_end(ap);
    return i;
 }
+
 
 
 #endif /* VARARGS */

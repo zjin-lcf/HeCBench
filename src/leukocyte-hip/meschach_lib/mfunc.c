@@ -189,7 +189,7 @@ MAT *_m_exp(MAT *A, double eps, MAT *out, int *q_out, int *j_out)
    }
    else {
       j2max = floor(1+log(inf_norm)/log(2.0));
-      j2max = macro_max(0, j2max);
+      j2max = max(0, j2max);
    }
    
    power2 = 1.0;

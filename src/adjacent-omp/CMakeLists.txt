@@ -1,8 +1,8 @@
-# adjacent-omp/CMakeLists.txt
+# adjacent-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME adjacent
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

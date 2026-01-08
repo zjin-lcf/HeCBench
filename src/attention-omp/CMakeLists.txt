@@ -1,8 +1,8 @@
-# attention-omp/CMakeLists.txt
+# attention-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME attention
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES ml
 )

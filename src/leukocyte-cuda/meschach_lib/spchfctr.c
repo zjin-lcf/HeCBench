@@ -57,8 +57,8 @@ static double	sprow_ip(const SPROW *row1, const SPROW *row2, int lim)
 #endif
 {
 	int			idx1, idx2, len1, len2, tmp;
-	 row_elt	*elts1, *elts2;
-	 Real		sum;
+	register row_elt	*elts1, *elts2;
+	register Real		sum;
 
 	elts1 = row1->elt;	elts2 = row2->elt;
 	len1 = row1->len;	len2 = row2->len;
@@ -132,9 +132,9 @@ int	lim;
 static double	sprow_sqr(const SPROW *row, int lim)
 #endif
 {
-		row_elt	*elts;
+	register	row_elt	*elts;
 	int		idx, len;
-		Real	sum, tmp;
+	register	Real	sum, tmp;
 
 	sum = 0.0;
 	elts = row->elt;	len = row->len;
@@ -197,7 +197,7 @@ SPMAT	*A;
 SPMAT	*spCHfactor(SPMAT *A)
 #endif
 {
-	 	int	i;
+	register 	int	i;
 	int	idx, k, m, minim, n, num_scan, diag_idx, tmp1;
 	Real	pivot, tmp2;
 	SPROW	*r_piv, *r_op;
@@ -472,7 +472,7 @@ SPMAT	*A;
 SPMAT	*spCHsymb(SPMAT *A)
 #endif
 {
-	 	int	i;
+	register 	int	i;
 	int	idx, k, m, minim, n, num_scan, diag_idx, tmp1;
 	SPROW	*r_piv, *r_op;
 	row_elt	*elt_piv, *elt_op, *old_elt;

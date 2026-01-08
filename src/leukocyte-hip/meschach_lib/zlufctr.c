@@ -42,7 +42,9 @@ static	char	rcsid[] = "$Id: zlufctr.c,v 1.3 1996/08/20 20:07:09 stewart Exp $";
 
 /* zLUfactor -- Gaussian elimination with scaled partial pivoting
 		-- Note: returns LU matrix which is A */
-ZMAT	*zLUfactor( ZMAT	*A, PERM	*pivot)
+ZMAT	*zLUfactor(A,pivot)
+ZMAT	*A;
+PERM	*pivot;
 {
 	unsigned int	i, j, m, n;
 	int	i_max, k, k_max;
@@ -70,13 +72,13 @@ ZMAT	*zLUfactor( ZMAT	*A, PERM	*pivot)
 		for ( j=0; j<n; j++ )
 		{
 			dtemp = zabs(A_v[i][j]);
-			max1 = macro_max(max1,dtemp);
+			max1 = max(max1,dtemp);
 		}
 		scale->ve[i] = max1;
 	}
 
 	/* main loop */
-	k_max = macro_min(m,n)-1;
+	k_max = min(m,n)-1;
 	for ( k=0; k<k_max; k++ )
 	{
 	    /* find best pivot row */
@@ -132,10 +134,10 @@ ZMAT	*zLUfactor( ZMAT	*A, PERM	*pivot)
 
 
 /* zLUsolve -- given an LU factorisation in A, solve Ax=b */
-ZVEC	*zLUsolve( ZMAT	*A,
-PERM	*pivot,
-ZVEC	*b,
-ZVEC    *x)
+ZVEC	*zLUsolve(A,pivot,b,x)
+ZMAT	*A;
+PERM	*pivot;
+ZVEC	*b,*x;
 {
 	if ( A==ZMNULL || b==ZVNULL || pivot==PNULL )
 		error(E_NULL,"zLUsolve");
@@ -150,11 +152,10 @@ ZVEC    *x)
 }
 
 /* zLUAsolve -- given an LU factorisation in A, solve A^*.x=b */
-ZVEC	*zLUAsolve(
-ZMAT	*LU,
-PERM	*pivot,
-ZVEC	*b,
-ZVEC    *x)
+ZVEC	*zLUAsolve(LU,pivot,b,x)
+ZMAT	*LU;
+PERM	*pivot;
+ZVEC	*b,*x;
 {
 	if ( ! LU || ! b || ! pivot )
 		error(E_NULL,"zLUAsolve");
@@ -171,8 +172,8 @@ ZVEC    *x)
 
 /* zm_inverse -- returns inverse of A, provided A is not too rank deficient
 	-- uses LU factorisation */
-ZMAT	*zm_inverse(
-ZMAT	*A, ZMAT *out)
+ZMAT	*zm_inverse(A,out)
+ZMAT	*A, *out;
 {
 	int	i;
 	STATIC ZVEC	*tmp=ZVNULL, *tmp2=ZVNULL;
@@ -215,9 +216,9 @@ ZMAT	*A, ZMAT *out)
 
 /* zLUcondest -- returns an estimate of the condition number of LU given the
 	LU factorisation in compact form */
-double	zLUcondest(
-ZMAT	*LU,
-PERM	*pivot)
+double	zLUcondest(LU,pivot)
+ZMAT	*LU;
+PERM	*pivot;
 {
     STATIC	ZVEC	*y = ZVNULL, *z = ZVNULL;
     Real	cond_est, L_norm, U_norm, norm, sn_inv;

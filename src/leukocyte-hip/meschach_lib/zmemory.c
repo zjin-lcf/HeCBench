@@ -209,7 +209,6 @@ int	zm_free(ZMAT *mat)
    return (0);
 }
 
-int wrapped_zm_free(void* p) { return zm_free((ZMAT*)p); }
 
 /* zv_free -- returns ZVEC & asoociated memory back to memory heap */
 #ifndef ANSI_C
@@ -245,7 +244,6 @@ int	zv_free(ZVEC *vec)
    return (0);
 }
 
-int wrapped_zv_free(void* p) { return zv_free((ZVEC*)p); }
 
 /* zm_resize -- returns the matrix A of size new_m x new_n; A is zeroed
    -- if A == NULL on entry then the effect is equivalent to m_get() */
@@ -280,8 +278,8 @@ ZMAT	*zm_resize(ZMAT *A, int new_m, int new_n)
       if ( ! A->me )
 	error(E_MEM,"zm_resize");
    }
-   new_max_m = macro_max(new_m,A->max_m);
-   new_max_n = macro_max(new_n,A->max_n);
+   new_max_m = max(new_m,A->max_m);
+   new_max_n = max(new_n,A->max_n);
    
 #ifndef SEGMENTED
    new_size = new_max_m*new_max_n;
@@ -305,14 +303,14 @@ ZMAT	*zm_resize(ZMAT *A, int new_m, int new_n)
    /* now shift data in matrix */
    if ( old_n > new_n )
    {
-      for ( i = 1; i < macro_min(old_m,new_m); i++ )
+      for ( i = 1; i < min(old_m,new_m); i++ )
 	MEM_COPY((char *)&(A->base[i*old_n]),
 		 (char *)&(A->base[i*new_n]),
 		 sizeof(complex)*new_n);
    }
    else if ( old_n < new_n )
    {
-      for ( i = macro_min(old_m,new_m)-1; i > 0; i-- )
+      for ( i = min(old_m,new_m)-1; i > 0; i-- )
       {   /* copy & then zero extra space */
 	 MEM_COPY((char *)&(A->base[i*old_n]),
 		  (char *)&(A->base[i*new_n]),

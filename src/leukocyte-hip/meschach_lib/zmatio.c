@@ -76,6 +76,22 @@ complex	z_finput(FILE *fp)
     return z;
 }
 
+#ifndef ANSI_C
+ZMAT	*zm_finput(fp,a)
+FILE    *fp;
+ZMAT	*a;
+#else
+ZMAT	*zm_finput(FILE *fp,ZMAT *a)
+#endif
+{
+     ZMAT        *izm_finput(),*bzm_finput();
+     
+     if ( isatty(fileno(fp)) )
+	  return izm_finput(fp,a);
+     else
+	  return bzm_finput(fp,a);
+}
+
 /* izm_finput -- interactive input of matrix */
 #ifndef ANSI_C
 ZMAT     *izm_finput(fp,mat)
@@ -189,22 +205,20 @@ ZMAT     *bzm_finput(FILE *fp,ZMAT *mat)
 }
 
 #ifndef ANSI_C
-ZMAT	*zm_finput(fp,a)
+ZVEC     *zv_finput(fp,x)
 FILE    *fp;
-ZMAT	*a;
+ZVEC     *x;
 #else
-ZMAT	*zm_finput(FILE *fp,ZMAT *a)
+ZVEC     *zv_finput(FILE *fp,ZVEC *x)
 #endif
 {
-     //ZMAT        *izm_finput(),*bzm_finput();
+     ZVEC        *izv_finput(),*bzv_finput();
      
      if ( isatty(fileno(fp)) )
-	  return izm_finput(fp,a);
+	  return izv_finput(fp,x);
      else
-	  return bzm_finput(fp,a);
+	  return bzv_finput(fp,x);
 }
-
-
 
 /* izv_finput -- interactive input of vector */
 #ifndef ANSI_C
@@ -295,21 +309,6 @@ ZVEC     *bzv_finput(FILE *fp, ZVEC *vec)
      return (vec);
 }
 
-#ifndef ANSI_C
-ZVEC     *zv_finput(fp,x)
-FILE    *fp;
-ZVEC     *x;
-#else
-ZVEC     *zv_finput(FILE *fp,ZVEC *x)
-#endif
-{
-     //ZVEC        *izv_finput(),*bzv_finput();
-     
-     if ( isatty(fileno(fp)) )
-	  return izv_finput(fp,x);
-     else
-	  return bzv_finput(fp,x);
-}
 /**************************************************************************
   Output routines
   **************************************************************************/

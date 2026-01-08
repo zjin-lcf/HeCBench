@@ -1,8 +1,8 @@
-# channelSum-omp/CMakeLists.txt
+# channelSum-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME channelSum
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

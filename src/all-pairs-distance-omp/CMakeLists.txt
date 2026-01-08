@@ -1,8 +1,8 @@
-# all-pairs-distance-omp/CMakeLists.txt
+# all-pairs-distance-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME all-pairs-distance
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

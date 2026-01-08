@@ -1,4 +1,4 @@
-CC        = icpx
+CC        = /opt/nvidia/hpc_sdk/Linux_aarch64/25.11/compilers/bin/nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -19,10 +19,13 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -Wall
+# Add CUDA include path for cuBLAS headers
+CUDA_MATH_INCLUDE = /opt/nvidia/hpc_sdk/Linux_aarch64/25.11/math_libs/13.0/targets/sbsa-linux/include
+CFLAGS := $(EXTRA_CFLAGS) -Wall -I$(CUDA_MATH_INCLUDE)
 
 # Linker Flags
-LDFLAGS = 
+# Using cuBLAS instead of Intel MKL for NVIDIA GPU
+LDFLAGS = -cudalib=cublas 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -36,9 +39,9 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qmkl=parallel -fiopenmp -fopenmp-targets=spir64 -fopenmp-version=51
+  CFLAGS +=-mp=gpu
 else
-  CFLAGS +=-qmkl=parallel
+  CFLAGS +=-mp=multicore
 endif
 
 #===============================================================================

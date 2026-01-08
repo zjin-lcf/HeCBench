@@ -3,37 +3,60 @@
 #include <stdio.h>
 #include <cuda.h>
 
-texture<float4, 1, cudaReadModeElementType> t_LIFT;
-texture<float4, 1, cudaReadModeElementType> t_DrDsDt;
-texture<float, 1, cudaReadModeElementType> t_Dr;
-texture<float, 1, cudaReadModeElementType> t_Ds;
-texture<float, 1, cudaReadModeElementType> t_Dt;
-texture<float, 1, cudaReadModeElementType> t_vgeo;
-texture<float4, 1, cudaReadModeElementType> t_vgeo4;
-texture<float, 1, cudaReadModeElementType> t_Q;
-texture<float, 1, cudaReadModeElementType> t_partQ;
-texture<float, 1, cudaReadModeElementType> t_surfinfo;
+// Modern texture objects (replacing deprecated texture references)
+static cudaTextureObject_t texObj_LIFT = 0;
+static cudaTextureObject_t texObj_DrDsDt = 0;
+static cudaTextureObject_t texObj_vgeo = 0;
+static cudaTextureObject_t texObj_Q = 0;
+static cudaTextureObject_t texObj_partQ = 0;
+static cudaTextureObject_t texObj_surfinfo = 0;
 
 static float *c_LIFT;
 static float *c_DrDsDt;
 static float *c_surfinfo;
 static float *c_vgeo;
-static float *c_Q; 
-static float *c_partQ; 
-static float *c_rhsQ; 
-static float *c_resQ; 
+static float *c_Q;
+static float *c_partQ;
+static float *c_rhsQ;
+static float *c_resQ;
 static float *c_tmp;
 
 #ifdef DEBUG
 #define checkError(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
 {
-  if (code != cudaSuccess) 
+  if (code != cudaSuccess)
    fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
 }
 #else
   #define checkError(ans) ans
 #endif
+
+// Helper function to create 1D linear texture object
+cudaTextureObject_t createTexture1D(const void* devPtr, size_t sizeBytes, bool isFloat4) {
+    cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeLinear;
+    resDesc.res.linear.devPtr = (void*)devPtr;
+    resDesc.res.linear.sizeInBytes = sizeBytes;
+
+    if (isFloat4) {
+        resDesc.res.linear.desc = cudaCreateChannelDesc<float4>();
+    } else {
+        resDesc.res.linear.desc = cudaCreateChannelDesc<float>();
+    }
+
+    cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.readMode = cudaReadModeElementType;
+
+    cudaTextureObject_t texObj = 0;
+    cudaError_t err = cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Failed to create texture object: %s\n", cudaGetErrorString(err));
+    }
+    return texObj;
+}
 
 extern "C"
 {
@@ -43,7 +66,7 @@ extern "C"
 double InitGPU3d(Mesh *mesh, int Nfields){
 
   /* Q  */
-  int sz = mesh->K*(BSIZE)*p_Nfields*sizeof(float); 
+  int sz = mesh->K*(BSIZE)*p_Nfields*sizeof(float);
 
   float *f_Q = (float*) calloc(mesh->K*BSIZE*p_Nfields, sizeof(float));
   cudaMalloc  ((void**) &c_Q, sz);
@@ -55,11 +78,14 @@ double InitGPU3d(Mesh *mesh, int Nfields){
   cudaMemcpy( c_resQ, f_Q, sz, cudaMemcpyHostToDevice);
   cudaMemcpy( c_tmp,  f_Q, sz, cudaMemcpyHostToDevice);
 
-  checkError(cudaBindTexture(0,  t_Q, c_Q, sz));
+  // Create texture object for Q
+  texObj_Q = createTexture1D(c_Q, sz, false);
 
   sz = mesh->parNtotalout*sizeof(float);
   cudaMalloc((void**) &c_partQ, sz);
-  checkError(cudaBindTexture(0,  t_partQ, c_partQ, sz));
+
+  // Create texture object for partQ
+  texObj_partQ = createTexture1D(c_partQ, sz, false);
 
   /*  LIFT  */
    sz = p_Np*(p_Nfp)*p_Nfaces*sizeof(float);
@@ -84,9 +110,9 @@ double InitGPU3d(Mesh *mesh, int Nfields){
 #endif
    cudaMalloc  ((void**) &c_LIFT, sz);
    cudaMemcpy( c_LIFT, f_LIFT, sz, cudaMemcpyHostToDevice);
-   
-   /* Bind the array to the texture */
-   checkError(cudaBindTexture(0,  t_LIFT, c_LIFT, sz));
+
+   // Create texture object for LIFT (float4)
+   texObj_LIFT = createTexture1D(c_LIFT, sz, true);
 
    /* DrDsDt */
    sz = BSIZE*BSIZE*4*sizeof(float);
@@ -101,12 +127,12 @@ double InitGPU3d(Mesh *mesh, int Nfields){
        h_DrDsDt[4*(m+n*BSIZE)+2] = mesh->Dt[0][n+m*p_Np];
      }
    }
-	   
+
    cudaMalloc  ((void**) &c_DrDsDt, sz);
    cudaMemcpy( c_DrDsDt, h_DrDsDt, sz, cudaMemcpyHostToDevice);
-   
-   /* Bind the array to the texture */
-   checkError(cudaBindTexture(0,  t_DrDsDt, c_DrDsDt, sz));
+
+   // Create texture object for DrDsDt (float4)
+   texObj_DrDsDt = createTexture1D(c_DrDsDt, sz, true);
 
    free(h_DrDsDt);
 
@@ -117,7 +143,7 @@ double InitGPU3d(Mesh *mesh, int Nfields){
    float *vgeo = (float*) calloc(12*mesh->K, sizeof(float));
 
    for(int k=0;k<mesh->K;++k){
-     GeometricFactors3d(mesh, k, 
+     GeometricFactors3d(mesh, k,
 			&drdx, &dsdx, &dtdx,
 			&drdy, &dsdy, &dtdy,
 			&drdz, &dsdz, &dtdz, &J);
@@ -131,12 +157,14 @@ double InitGPU3d(Mesh *mesh, int Nfields){
    sz = mesh->K*12*sizeof(float);
    cudaMalloc  ((void**) &c_vgeo, sz);
    cudaMemcpy( c_vgeo, vgeo, sz, cudaMemcpyHostToDevice);
-   checkError(cudaBindTexture(0,  t_vgeo, c_vgeo, sz));
-   
+
+   // Create texture object for vgeo
+   texObj_vgeo = createTexture1D(c_vgeo, sz, false);
+
    /* surfinfo (vmapM, vmapP, Fscale, Bscale, nx, ny, nz, 0) */
-   sz = mesh->K*p_Nfp*p_Nfaces*7*sizeof(float); 
-   float* h_surfinfo = (float*) malloc(sz); 
-   
+   sz = mesh->K*p_Nfp*p_Nfaces*7*sizeof(float);
+   float* h_surfinfo = (float*) malloc(sz);
+
    /* local-local info */
    sk = 0;
    int skP = -1;
@@ -149,33 +177,33 @@ double InitGPU3d(Mesh *mesh, int Nfields){
 
    for(int k=0;k<mesh->K;++k){
 
-     GeometricFactors3d(mesh, k, 
+     GeometricFactors3d(mesh, k,
 			&drdx, &dsdx, &dtdx,
 			&drdy, &dsdy, &dtdy,
 			&drdz, &dsdz, &dtdz, &J);
 
      Normals3d(mesh, k, nxk, nyk, nzk, sJk);
-     
+
      for(int f=0;f<mesh->Nfaces;++f){
 
 	     dt = min(dt, J/sJk[f]);
-       
+
        for(int m=0;m<p_Nfp;++m){
 	 int n = m + f*p_Nfp + p_Nfp*p_Nfaces*k;
 	 int idM = mesh->vmapM[n];
 	 int idP = mesh->vmapP[n];
-	 int  nM = idM%p_Np; 
-	 int  nP = idP%p_Np; 
+	 int  nM = idM%p_Np;
+	 int  nP = idP%p_Np;
 	 int  kM = (idM-nM)/p_Np;
 	 int  kP = (idP-nP)/p_Np;
 	 idM = nM + Nfields*BSIZE*kM;
 	 idP = nP + Nfields*BSIZE*kP;
-	 
+
 	 /* stub resolve some other way */
 	 if(mesh->vmapP[n]<0){
 	   idP = mesh->vmapP[n]; /* -ve numbers */
 	 }
- 
+
 	 sk = 7*p_Nfp*p_Nfaces*k+m+f*p_Nfp;
 	 h_surfinfo[sk + 0*p_Nfp*p_Nfaces] = idM;
 	 h_surfinfo[sk + 1*p_Nfp*p_Nfaces] = idP;
@@ -187,11 +215,12 @@ double InitGPU3d(Mesh *mesh, int Nfields){
        }
      }
    }
-	   
+
    cudaMalloc  ((void**) &c_surfinfo, sz);
    cudaMemcpy( c_surfinfo, h_surfinfo, sz, cudaMemcpyHostToDevice);
 
-   checkError(cudaBindTexture(0,  t_surfinfo, c_surfinfo, sz));
+   // Create texture object for surfinfo
+   texObj_surfinfo = createTexture1D(c_surfinfo, sz, false);
 
    free(h_surfinfo);
 
@@ -204,7 +233,10 @@ double InitGPU3d(Mesh *mesh, int Nfields){
 
 
 
-__global__ void MaxwellsGPU_VOL_Kernel3D(float *g_rhsQ){
+__global__ void MaxwellsGPU_VOL_Kernel3D(float *g_rhsQ,
+                                          cudaTextureObject_t t_Q,
+                                          cudaTextureObject_t t_DrDsDt,
+                                          cudaTextureObject_t t_vgeo){
 
   /* fastest */
   __shared__ float s_Q[p_Nfields*BSIZE];
@@ -212,22 +244,22 @@ __global__ void MaxwellsGPU_VOL_Kernel3D(float *g_rhsQ){
 
   const int n = threadIdx.x;
   const int k = blockIdx.x;
-  
+
   /* "coalesced"  */
   int m = n+k*p_Nfields*BSIZE;
   int id = n;
-  s_Q[id] = tex1Dfetch(t_Q, m); m+=BSIZE; id+=BSIZE;
-  s_Q[id] = tex1Dfetch(t_Q, m); m+=BSIZE; id+=BSIZE;
-  s_Q[id] = tex1Dfetch(t_Q, m); m+=BSIZE; id+=BSIZE;
-  s_Q[id] = tex1Dfetch(t_Q, m); m+=BSIZE; id+=BSIZE;
-  s_Q[id] = tex1Dfetch(t_Q, m); m+=BSIZE; id+=BSIZE;
-  s_Q[id] = tex1Dfetch(t_Q, m); 
+  s_Q[id] = tex1Dfetch<float>(t_Q, m); m+=BSIZE; id+=BSIZE;
+  s_Q[id] = tex1Dfetch<float>(t_Q, m); m+=BSIZE; id+=BSIZE;
+  s_Q[id] = tex1Dfetch<float>(t_Q, m); m+=BSIZE; id+=BSIZE;
+  s_Q[id] = tex1Dfetch<float>(t_Q, m); m+=BSIZE; id+=BSIZE;
+  s_Q[id] = tex1Dfetch<float>(t_Q, m); m+=BSIZE; id+=BSIZE;
+  s_Q[id] = tex1Dfetch<float>(t_Q, m);
 
   if(p_Np<12 && n==0)
     for(m=0;m<12;++m)
-      s_facs[m] = tex1Dfetch(t_vgeo, 12*k+m);
+      s_facs[m] = tex1Dfetch<float>(t_vgeo, 12*k+m);
   else if(n<12 && p_Np>=12)
-    s_facs[n] = tex1Dfetch(t_vgeo, 12*k+n);
+    s_facs[n] = tex1Dfetch<float>(t_vgeo, 12*k+n);
 
   __syncthreads();
 
@@ -240,7 +272,7 @@ __global__ void MaxwellsGPU_VOL_Kernel3D(float *g_rhsQ){
   float Q;
 
   for(m=0;p_Np-m;){
-    float4 D = tex1Dfetch(t_DrDsDt, n+m*BSIZE);
+    float4 D = tex1Dfetch<float4>(t_DrDsDt, n+m*BSIZE);
 
     id = m;
     Q = s_Q[id]; dHxdr += D.x*Q; dHxds += D.y*Q; dHxdt += D.z*Q; id += BSIZE;
@@ -248,11 +280,11 @@ __global__ void MaxwellsGPU_VOL_Kernel3D(float *g_rhsQ){
     Q = s_Q[id]; dHzdr += D.x*Q; dHzds += D.y*Q; dHzdt += D.z*Q; id += BSIZE;
     Q = s_Q[id]; dExdr += D.x*Q; dExds += D.y*Q; dExdt += D.z*Q; id += BSIZE;
     Q = s_Q[id]; dEydr += D.x*Q; dEyds += D.y*Q; dEydt += D.z*Q; id += BSIZE;
-    Q = s_Q[id]; dEzdr += D.x*Q; dEzds += D.y*Q; dEzdt += D.z*Q; 
+    Q = s_Q[id]; dEzdr += D.x*Q; dEzds += D.y*Q; dEzdt += D.z*Q;
 
     ++m;
 #if ( (p_Np) % 2 )==0
-    D = tex1Dfetch(t_DrDsDt, n+m*BSIZE);
+    D = tex1Dfetch<float4>(t_DrDsDt, n+m*BSIZE);
 
     id = m;
     Q = s_Q[id]; dHxdr += D.x*Q; dHxds += D.y*Q; dHxdt += D.z*Q; id += BSIZE;
@@ -260,12 +292,12 @@ __global__ void MaxwellsGPU_VOL_Kernel3D(float *g_rhsQ){
     Q = s_Q[id]; dHzdr += D.x*Q; dHzds += D.y*Q; dHzdt += D.z*Q; id += BSIZE;
     Q = s_Q[id]; dExdr += D.x*Q; dExds += D.y*Q; dExdt += D.z*Q; id += BSIZE;
     Q = s_Q[id]; dEydr += D.x*Q; dEyds += D.y*Q; dEydt += D.z*Q; id += BSIZE;
-    Q = s_Q[id]; dEzdr += D.x*Q; dEzds += D.y*Q; dEzdt += D.z*Q; 
+    Q = s_Q[id]; dEzdr += D.x*Q; dEzds += D.y*Q; dEzdt += D.z*Q;
 
     ++m;
 
 #if ( (p_Np)%3 )==0
-    D = tex1Dfetch(t_DrDsDt, n+m*BSIZE);
+    D = tex1Dfetch<float4>(t_DrDsDt, n+m*BSIZE);
 
     id = m;
     Q = s_Q[id]; dHxdr += D.x*Q; dHxds += D.y*Q; dHxdt += D.z*Q; id += BSIZE;
@@ -273,13 +305,13 @@ __global__ void MaxwellsGPU_VOL_Kernel3D(float *g_rhsQ){
     Q = s_Q[id]; dHzdr += D.x*Q; dHzds += D.y*Q; dHzdt += D.z*Q; id += BSIZE;
     Q = s_Q[id]; dExdr += D.x*Q; dExds += D.y*Q; dExdt += D.z*Q; id += BSIZE;
     Q = s_Q[id]; dEydr += D.x*Q; dEyds += D.y*Q; dEydt += D.z*Q; id += BSIZE;
-    Q = s_Q[id]; dEzdr += D.x*Q; dEzds += D.y*Q; dEzdt += D.z*Q; 
+    Q = s_Q[id]; dEzdr += D.x*Q; dEzds += D.y*Q; dEzdt += D.z*Q;
 
     ++m;
 #endif
 #endif
   }
-  
+
   const float drdx= s_facs[0];
   const float drdy= s_facs[1];
   const float drdz= s_facs[2];
@@ -289,7 +321,7 @@ __global__ void MaxwellsGPU_VOL_Kernel3D(float *g_rhsQ){
   const float dtdx= s_facs[8];
   const float dtdy= s_facs[9];
   const float dtdz= s_facs[10];
-  
+
   m = n+p_Nfields*BSIZE*k;
 
   g_rhsQ[m] = -(drdy*dEzdr+dsdy*dEzds+dtdy*dEzdt - drdz*dEydr-dsdz*dEyds-dtdz*dEydt); m += BSIZE;
@@ -297,10 +329,14 @@ __global__ void MaxwellsGPU_VOL_Kernel3D(float *g_rhsQ){
   g_rhsQ[m] = -(drdx*dEydr+dsdx*dEyds+dtdx*dEydt - drdy*dExdr-dsdy*dExds-dtdy*dExdt); m += BSIZE;
   g_rhsQ[m] =  (drdy*dHzdr+dsdy*dHzds+dtdy*dHzdt - drdz*dHydr-dsdz*dHyds-dtdz*dHydt); m += BSIZE;
   g_rhsQ[m] =  (drdz*dHxdr+dsdz*dHxds+dtdz*dHxdt - drdx*dHzdr-dsdx*dHzds-dtdx*dHzdt); m += BSIZE;
-  g_rhsQ[m] =  (drdx*dHydr+dsdx*dHyds+dtdx*dHydt - drdy*dHxdr-dsdy*dHxds-dtdy*dHxdt); 
+  g_rhsQ[m] =  (drdx*dHydr+dsdx*dHyds+dtdx*dHydt - drdy*dHxdr-dsdy*dHxds-dtdy*dHxdt);
 }
 
-__global__ void MaxwellsGPU_SURF_Kernel3D(float *g_rhsQ)
+__global__ void MaxwellsGPU_SURF_Kernel3D(float *g_rhsQ,
+                                           cudaTextureObject_t t_Q,
+                                           cudaTextureObject_t t_partQ,
+                                           cudaTextureObject_t t_LIFT,
+                                           cudaTextureObject_t t_surfinfo)
 {
 
   __shared__ float s_fluxQ[p_Nfields*p_Nfp*p_Nfaces];
@@ -313,35 +349,35 @@ __global__ void MaxwellsGPU_SURF_Kernel3D(float *g_rhsQ)
   if(n< (p_Nfp*p_Nfaces) ){
     /* coalesced reads (maybe) */
     m = 7*(k*p_Nfp*p_Nfaces)+n;
-    const  int idM   = tex1Dfetch(t_surfinfo, m); m += p_Nfp*p_Nfaces;
-           int idP   = tex1Dfetch(t_surfinfo, m); m += p_Nfp*p_Nfaces;
-    const  float Fsc = tex1Dfetch(t_surfinfo, m); m += p_Nfp*p_Nfaces;
-    const  float Bsc = tex1Dfetch(t_surfinfo, m); m += p_Nfp*p_Nfaces;
-    const  float nx  = tex1Dfetch(t_surfinfo, m); m += p_Nfp*p_Nfaces;
-    const  float ny  = tex1Dfetch(t_surfinfo, m); m += p_Nfp*p_Nfaces;
-    const  float nz  = tex1Dfetch(t_surfinfo, m);
+    const  int idM   = tex1Dfetch<float>(t_surfinfo, m); m += p_Nfp*p_Nfaces;
+           int idP   = tex1Dfetch<float>(t_surfinfo, m); m += p_Nfp*p_Nfaces;
+    const  float Fsc = tex1Dfetch<float>(t_surfinfo, m); m += p_Nfp*p_Nfaces;
+    const  float Bsc = tex1Dfetch<float>(t_surfinfo, m); m += p_Nfp*p_Nfaces;
+    const  float nx  = tex1Dfetch<float>(t_surfinfo, m); m += p_Nfp*p_Nfaces;
+    const  float ny  = tex1Dfetch<float>(t_surfinfo, m); m += p_Nfp*p_Nfaces;
+    const  float nz  = tex1Dfetch<float>(t_surfinfo, m);
 
     /* check if idP<0  */
     double dHx, dHy, dHz, dEx, dEy, dEz;
     if(idP<0){
       idP = p_Nfields*(-1-idP);
-      
-      dHx = Fsc*(tex1Dfetch(t_partQ, idP+0) - tex1Dfetch(t_Q, idM+0*BSIZE));
-      dHy = Fsc*(tex1Dfetch(t_partQ, idP+1) - tex1Dfetch(t_Q, idM+1*BSIZE));
-      dHz = Fsc*(tex1Dfetch(t_partQ, idP+2) - tex1Dfetch(t_Q, idM+2*BSIZE));
-      
-      dEx = Fsc*(tex1Dfetch(t_partQ, idP+3) - tex1Dfetch(t_Q, idM+3*BSIZE));
-      dEy = Fsc*(tex1Dfetch(t_partQ, idP+4) - tex1Dfetch(t_Q, idM+4*BSIZE));
-      dEz = Fsc*(tex1Dfetch(t_partQ, idP+5) - tex1Dfetch(t_Q, idM+5*BSIZE));
+
+      dHx = Fsc*(tex1Dfetch<float>(t_partQ, idP+0) - tex1Dfetch<float>(t_Q, idM+0*BSIZE));
+      dHy = Fsc*(tex1Dfetch<float>(t_partQ, idP+1) - tex1Dfetch<float>(t_Q, idM+1*BSIZE));
+      dHz = Fsc*(tex1Dfetch<float>(t_partQ, idP+2) - tex1Dfetch<float>(t_Q, idM+2*BSIZE));
+
+      dEx = Fsc*(tex1Dfetch<float>(t_partQ, idP+3) - tex1Dfetch<float>(t_Q, idM+3*BSIZE));
+      dEy = Fsc*(tex1Dfetch<float>(t_partQ, idP+4) - tex1Dfetch<float>(t_Q, idM+4*BSIZE));
+      dEz = Fsc*(tex1Dfetch<float>(t_partQ, idP+5) - tex1Dfetch<float>(t_Q, idM+5*BSIZE));
     }
     else{
-      dHx = Fsc*(tex1Dfetch(t_Q, idP+0*BSIZE) - tex1Dfetch(t_Q, idM+0*BSIZE));
-      dHy = Fsc*(tex1Dfetch(t_Q, idP+1*BSIZE) - tex1Dfetch(t_Q, idM+1*BSIZE));
-      dHz = Fsc*(tex1Dfetch(t_Q, idP+2*BSIZE) - tex1Dfetch(t_Q, idM+2*BSIZE));
-      
-      dEx = Fsc*(Bsc*tex1Dfetch(t_Q, idP+3*BSIZE) - tex1Dfetch(t_Q, idM+3*BSIZE));
-      dEy = Fsc*(Bsc*tex1Dfetch(t_Q, idP+4*BSIZE) - tex1Dfetch(t_Q, idM+4*BSIZE));
-      dEz = Fsc*(Bsc*tex1Dfetch(t_Q, idP+5*BSIZE) - tex1Dfetch(t_Q, idM+5*BSIZE));
+      dHx = Fsc*(tex1Dfetch<float>(t_Q, idP+0*BSIZE) - tex1Dfetch<float>(t_Q, idM+0*BSIZE));
+      dHy = Fsc*(tex1Dfetch<float>(t_Q, idP+1*BSIZE) - tex1Dfetch<float>(t_Q, idM+1*BSIZE));
+      dHz = Fsc*(tex1Dfetch<float>(t_Q, idP+2*BSIZE) - tex1Dfetch<float>(t_Q, idM+2*BSIZE));
+
+      dEx = Fsc*(Bsc*tex1Dfetch<float>(t_Q, idP+3*BSIZE) - tex1Dfetch<float>(t_Q, idM+3*BSIZE));
+      dEy = Fsc*(Bsc*tex1Dfetch<float>(t_Q, idP+4*BSIZE) - tex1Dfetch<float>(t_Q, idM+4*BSIZE));
+      dEz = Fsc*(Bsc*tex1Dfetch<float>(t_Q, idP+5*BSIZE) - tex1Dfetch<float>(t_Q, idM+5*BSIZE));
     }
 
     const double ndotdH = nx*dHx + ny*dHy + nz*dHz;
@@ -354,7 +390,7 @@ __global__ void MaxwellsGPU_SURF_Kernel3D(float *g_rhsQ)
 
     s_fluxQ[m] =  ny*dHz - nz*dHy + dEx - ndotdE*nx; m += p_Nfp*p_Nfaces;
     s_fluxQ[m] =  nz*dHx - nx*dHz + dEy - ndotdE*ny; m += p_Nfp*p_Nfaces;
-    s_fluxQ[m] =  nx*dHy - ny*dHx + dEz - ndotdE*nz; 
+    s_fluxQ[m] =  nx*dHy - ny*dHx + dEz - ndotdE*nz;
   }
 
   /* make sure all element data points are cached */
@@ -364,11 +400,11 @@ __global__ void MaxwellsGPU_SURF_Kernel3D(float *g_rhsQ)
   {
     float rhsHx = 0, rhsHy = 0, rhsHz = 0;
     float rhsEx = 0, rhsEy = 0, rhsEz = 0;
-    
+
     int sk = n;
     /* can manually unroll to 4 because there are 4 faces */
     for(m=0;p_Nfaces*p_Nfp-m;){
-      const float4 L = tex1Dfetch(t_LIFT, sk); sk+=p_Np;
+      const float4 L = tex1Dfetch<float4>(t_LIFT, sk); sk+=p_Np;
 
       /* broadcast */
       int sk1 = m;
@@ -411,7 +447,7 @@ __global__ void MaxwellsGPU_SURF_Kernel3D(float *g_rhsQ)
       ++m;
 
     }
-    
+
     m = n+p_Nfields*k*BSIZE;
     g_rhsQ[m] += rhsHx; m += BSIZE;
     g_rhsQ[m] += rhsHy; m += BSIZE;
@@ -430,19 +466,19 @@ __global__ void MaxwellsGPU_RK_Kernel3D(
   const float *__restrict__ g_rhsQ,
         float *__restrict__ g_Q,
   float fa, float fb, float fdt){
-  
+
   int n = blockIdx.x * blockDim.x + threadIdx.x;
-    
+
   if(n<Ntotal){
     float rhs = g_rhsQ[n];
     float res = g_resQ[n];
     res = fa*res + fdt*rhs;
-    
+
     g_resQ[n] = res;
     g_Q[n]    += fb*res;
   }
 
-} 
+}
 
 
 /* assumes data resides on device */
@@ -450,14 +486,14 @@ void MaxwellsKernel3d(Mesh *mesh, float frka, float frkb, float fdt){
 
   /* grab data from device and initiate sends */
   MaxwellsMPISend3d(mesh);
-   
-  int ThreadsPerBlock, BlocksPerGrid;	
 
-  BlocksPerGrid    = mesh->K; 
+  int ThreadsPerBlock, BlocksPerGrid;
+
+  BlocksPerGrid    = mesh->K;
   ThreadsPerBlock = p_Np;
 
   /* evaluate volume derivatives */
-  MaxwellsGPU_VOL_Kernel3D <<< BlocksPerGrid, ThreadsPerBlock >>>  (c_rhsQ);
+  MaxwellsGPU_VOL_Kernel3D <<< BlocksPerGrid, ThreadsPerBlock >>>  (c_rhsQ, texObj_Q, texObj_DrDsDt, texObj_vgeo);
 
   /* finalize sends and recvs, and transfer to device */
   MaxwellsMPIRecv3d(mesh, c_partQ);
@@ -470,15 +506,15 @@ void MaxwellsKernel3d(Mesh *mesh, float frka, float frkb, float fdt){
     ThreadsPerBlock = p_Np;
 
   /* evaluate surface contributions */
-  MaxwellsGPU_SURF_Kernel3D <<< BlocksPerGrid, ThreadsPerBlock >>> (c_rhsQ);
+  MaxwellsGPU_SURF_Kernel3D <<< BlocksPerGrid, ThreadsPerBlock >>> (c_rhsQ, texObj_Q, texObj_partQ, texObj_LIFT, texObj_surfinfo);
 
   int Ntotal = mesh->K*BSIZE*p_Nfields;
-  
+
   ThreadsPerBlock = 256;
   BlocksPerGrid = (Ntotal+ThreadsPerBlock-1)/ThreadsPerBlock;
 
   /* update RK Step */
-  MaxwellsGPU_RK_Kernel3D<<< BlocksPerGrid, ThreadsPerBlock >>> 
+  MaxwellsGPU_RK_Kernel3D<<< BlocksPerGrid, ThreadsPerBlock >>>
 	  (Ntotal, c_resQ, c_rhsQ, c_Q, frka, frkb, fdt);
 }
 
@@ -487,9 +523,9 @@ void gpu_set_data3d(int K,
 		  double *d_Ex, double *d_Ey, double *d_Ez)
 {
   float *f_Q = (float*) calloc(K*p_Nfields*BSIZE,sizeof(float));
-  
+
   /* also load into usual data matrices */
-  
+
   for(int k=0;k<K;++k){
     int gk = k;
     for(int n=0;n<p_Np;++n)
@@ -505,65 +541,74 @@ void gpu_set_data3d(int K,
     for(int n=0;n<p_Np;++n)
       f_Q[n+5*BSIZE+k*BSIZE*p_Nfields] = d_Ez[n+gk*p_Np];
   }
-  
+
   cudaMemcpy(c_Q, f_Q, BSIZE*K*p_Nfields*sizeof(float), cudaMemcpyHostToDevice);
-  
+
   free(f_Q);
 }
-  
+
 void gpu_get_data3d(int K,
 		  double *d_Hx, double *d_Hy, double *d_Hz,
 		  double *d_Ex, double *d_Ey, double *d_Ez){
 
   float *f_Q = (float*) calloc(K*p_Nfields*BSIZE,sizeof(float));
-  
+
   cudaMemcpy(f_Q, c_Q, K*BSIZE*p_Nfields*sizeof(float), cudaMemcpyDeviceToHost);
 
   /* also load into usual data matrices */
-  
+
   for(int k=0;k<K;++k) {
     int gk = k;
     for(int n=0;n<p_Np;++n)
       d_Hx[n+gk*p_Np] = f_Q[n        +k*BSIZE*p_Nfields];
-    for(int n=0;n<p_Np;++n) 
+    for(int n=0;n<p_Np;++n)
       d_Hy[n+gk*p_Np] = f_Q[n  +BSIZE+k*BSIZE*p_Nfields];
     for(int n=0;n<p_Np;++n)
       d_Hz[n+gk*p_Np] = f_Q[n+2*BSIZE+k*BSIZE*p_Nfields];
     for(int n=0;n<p_Np;++n)
       d_Ex[n+gk*p_Np] = f_Q[n+3*BSIZE+k*BSIZE*p_Nfields];
-    for(int n=0;n<p_Np;++n) 
+    for(int n=0;n<p_Np;++n)
       d_Ey[n+gk*p_Np] = f_Q[n+4*BSIZE+k*BSIZE*p_Nfields];
     for(int n=0;n<p_Np;++n)
       d_Ez[n+gk*p_Np] = f_Q[n+5*BSIZE+k*BSIZE*p_Nfields];
   }
 
   free(f_Q);
+
+  // Destroy texture objects
+  if (texObj_LIFT) cudaDestroyTextureObject(texObj_LIFT);
+  if (texObj_DrDsDt) cudaDestroyTextureObject(texObj_DrDsDt);
+  if (texObj_vgeo) cudaDestroyTextureObject(texObj_vgeo);
+  if (texObj_Q) cudaDestroyTextureObject(texObj_Q);
+  if (texObj_partQ) cudaDestroyTextureObject(texObj_partQ);
+  if (texObj_surfinfo) cudaDestroyTextureObject(texObj_surfinfo);
+
   cudaFree(c_LIFT);
   cudaFree(c_DrDsDt);
   cudaFree(c_surfinfo);
   cudaFree(c_vgeo);
-  cudaFree(c_Q); 
-  cudaFree(c_partQ); 
-  cudaFree(c_rhsQ); 
-  cudaFree(c_resQ); 
+  cudaFree(c_Q);
+  cudaFree(c_partQ);
+  cudaFree(c_rhsQ);
+  cudaFree(c_resQ);
   cudaFree(c_tmp);
 }
 
-__global__ void partial_get_kernel3d(int Ntotal, int *g_index, float *g_partQ){
-  
+__global__ void partial_get_kernel3d(int Ntotal, int *g_index, float *g_partQ, cudaTextureObject_t t_Q){
+
   int n = blockIdx.x * blockDim.x + threadIdx.x;
-    
+
   if(n<Ntotal)
-    g_partQ[n] = tex1Dfetch(t_Q, g_index[n]);
-  
-} 
+    g_partQ[n] = tex1Dfetch<float>(t_Q, g_index[n]);
+
+}
 
 void get_partial_gpu_data3d(int Ntotal, int *g_index, float *h_partQ){
 
   int ThreadsPerBlock = 256;
   int BlocksPerGrid = (Ntotal+ThreadsPerBlock-1)/ThreadsPerBlock;
 
-  partial_get_kernel3d <<< BlocksPerGrid, ThreadsPerBlock >>> (Ntotal, g_index, c_tmp);
+  partial_get_kernel3d <<< BlocksPerGrid, ThreadsPerBlock >>> (Ntotal, g_index, c_tmp, texObj_Q);
 
   cudaMemcpy(h_partQ, c_tmp, Ntotal*sizeof(float), cudaMemcpyDeviceToHost);
 }

@@ -83,9 +83,9 @@ int	col;
 int	sprow_idx(const SPROW *r, int col)
 #endif
 {
-   int		lo, hi, mid;
+   register int		lo, hi, mid;
    int			tmp;
-   row_elt	*r_elt;
+   register row_elt	*r_elt;
    
    /*******************************************
      if ( r == (SPROW *)NULL )
@@ -199,7 +199,7 @@ SPROW	*sprow_xpd(SPROW *r, int n, int type)
       return r;
    }
    if ( n <= r->len )
-     newlen = macro_max(2*r->len + 1,MINROWLEN);
+     newlen = max(2*r->len + 1,MINROWLEN);
    else
      newlen = n;
    if ( newlen <= r->maxlen )
@@ -301,7 +301,6 @@ int sprow_free(SPROW *r)
    return 0;
 }
 
-int wrapped_sprow_free(void* p) { return sprow_free((SPROW*)p); }
 
 /* sprow_merge -- merges r1 and r2 into r_out
    -- cannot be done in-situ
@@ -743,7 +742,7 @@ double  sprow_set_val(SPROW *r, int j, double val)
       if ( r->len >= r->maxlen )
       {
          r->len = r->maxlen;
-         new_len = macro_max(2*r->maxlen+1,5);
+         new_len = max(2*r->maxlen+1,5);
          if (mem_info_is_on()) {
             mem_bytes(TYPE_SPROW,r->maxlen*sizeof(row_elt),
                         new_len*sizeof(row_elt)); 

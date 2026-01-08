@@ -48,11 +48,9 @@ static	char	rcsid[] = "$Id: ";
 
 /* zgivens -- returns c,s parameters for Givens rotation to
 		eliminate y in the **column** vector [ x y ] */
-void	zgivens(//x,y,c,s)
-complex	x,
-	complex y,
-Real	*c,
-	complex *s)
+void	zgivens(x,y,c,s)
+complex	x,y,*s;
+Real	*c;
 {
 	Real	inv_norm, norm;
 	complex	tmp;
@@ -77,11 +75,11 @@ Real	*c,
 }
 
 /* rot_zvec -- apply Givens rotation to x's i & k components */
-ZVEC	*rot_zvec(//x,i,k,c,s,out)
-ZVEC	*x,
-int	i,int k,
-double	c,
-complex	s,ZVEC *out)
+ZVEC	*rot_zvec(x,i,k,c,s,out)
+ZVEC	*x,*out;
+int	i,k;
+double	c;
+complex	s;
 {
 
 	complex	temp1, temp2;
@@ -112,12 +110,11 @@ complex	s,ZVEC *out)
 }
 
 /* zrot_rows -- premultiply mat by givens rotation described by c,s */
-ZMAT	*zrot_rows(//mat,i,k,c,s,out)
-ZMAT	*mat,
-int	i, int k,
-double	c,
-complex	s,
-	ZMAT *out)
+ZMAT	*zrot_rows(mat,i,k,c,s,out)
+ZMAT	*mat,*out;
+int	i,k;
+double	c;
+complex	s;
 {
 	unsigned int	j;
 	complex	temp1, temp2;
@@ -153,12 +150,11 @@ complex	s,
 }
 
 /* zrot_cols -- postmultiply mat by adjoint Givens rotation described by c,s */
-ZMAT	*zrot_cols(//mat,i,k,c,s,out)
-ZMAT	*mat,
-int	i, int k,
-double	c,
-complex	s,
-	ZMAT *out)
+ZMAT	*zrot_cols(mat,i,k,c,s,out)
+ZMAT	*mat,*out;
+int	i,k;
+double	c;
+complex	s;
 {
 	unsigned int	j;
 	complex	x, y;

@@ -122,7 +122,7 @@ void CompressionKernel(
         diff = cbufd[i] - prev;
         code = (diff >> 60) & 8;
         if (code != 0) {
-          diff = -diff;
+          diff = 0ULL - diff;  // use subtraction instead of unary negation (UKNEG not supported)
         }
 
         // count leading zeros in positive delta

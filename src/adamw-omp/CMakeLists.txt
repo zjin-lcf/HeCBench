@@ -1,8 +1,8 @@
-# adamw-omp/CMakeLists.txt
+# adamw-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME adamw
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES ml
 )

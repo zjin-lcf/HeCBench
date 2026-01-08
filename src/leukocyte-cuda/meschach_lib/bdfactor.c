@@ -67,8 +67,8 @@ BAND *bd_get(int lb, int ub, int n)
       mem_numvar(TYPE_BAND,1);
    }
 
-   lb = A->lb = macro_min(n-1,lb);
-   ub = A->ub = macro_min(n-1,ub);
+   lb = A->lb = min(n-1,lb);
+   ub = A->ub = min(n-1,ub);
    A->mat = m_get(lb+ub+1,n);
    return A;
 }
@@ -122,7 +122,7 @@ BAND *bd_resize(BAND *A, int new_lb, int new_ub, int new_n)
    lb = A->lb;
    ub = A->ub;
    Av = A->mat->me;
-   umin = macro_min(ub,new_ub);
+   umin = min(ub,new_ub);
 
     /* ensure that unused triangles at edges are zero'd */
 
@@ -133,8 +133,8 @@ BAND *bd_resize(BAND *A, int new_lb, int new_ub, int new_n)
       for ( j = 0; j < l; j++ )
 	Av[i][j] = 0.0; 
 
-   new_lb = A->lb = macro_min(new_lb,new_n-1);
-   new_ub = A->ub = macro_min(new_ub,new_n-1);
+   new_lb = A->lb = min(new_lb,new_n-1);
+   new_ub = A->ub = min(new_ub,new_n-1);
    A->mat = m_resize(A->mat,new_lb+new_ub+1,new_n);
    Av = A->mat->me;
 
@@ -227,7 +227,7 @@ MAT *band2mat(const BAND *bA, MAT *A)
    m_zero(A);
 
    for (j=0; j < n; j++)
-     for (i=macro_min(n1,j+lb),l=lb+j-i; i >= macro_max(0,j-ub); i--,l++)
+     for (i=min(n1,j+lb),l=lb+j-i; i >= max(0,j-ub); i--,l++)
        A->me[i][j] = bmat[l][j];
 
    return A;
@@ -255,13 +255,13 @@ BAND *mat2band(const MAT *A, int lb, int ub,BAND *bA)
      error(E_INSITU,"mat2band");
 
    n1 = A->n-1;
-   lb = macro_min(n1,lb);
-   ub = macro_min(n1,ub);
+   lb = min(n1,lb);
+   ub = min(n1,ub);
    bA = bd_resize(bA,lb,ub,n1+1);
    bmat = bA->mat->me;
 
    for (j=0; j <= n1; j++)
-     for (i=macro_min(n1,j+lb),l=lb+j-i; i >= macro_max(0,j-ub); i--,l++)
+     for (i=min(n1,j+lb),l=lb+j-i; i >= max(0,j-ub); i--,l++)
        bmat[l][j] = A->me[i][j];
 
    return bA;
@@ -309,8 +309,8 @@ BAND *bd_transp(const BAND *in, BAND *out)
 
       out_v = out->mat->me;
       for (i=0, l=lub, k=lb-i; i <= lub; i++,l--,k--) {
-	 sh_in = macro_max(-k,0);
-	 sh_out = macro_max(k,0);
+	 sh_in = max(-k,0);
+	 sh_out = max(k,0);
 	 MEM_COPY(&(in_v[i][sh_in]),&(out_v[l][sh_out]),
 		  (n-sh_in-sh_out)*sizeof(Real));
 	 /**********************************
@@ -336,18 +336,18 @@ BAND *bd_transp(const BAND *in, BAND *out)
       
       for (i=0, l=lub; i < (lub+1)/2; i++,l--) {
 	 lbi = lb-i;
-	 for (j=l-lb, jj=0, p=macro_max(-lbi,0), pp = macro_max(l-ub,0); j <= n1; 
+	 for (j=l-lb, jj=0, p=max(-lbi,0), pp = max(l-ub,0); j <= n1; 
 	      j++,jj++,p++,pp++) {
 	    in_v[l][pp] = in_v[i][p];
 	    in_v[i][jj] = in_v[l][j];
 	 }
-	 for (  ; p <= n1-macro_max(lbi,0); p++,pp++)
+	 for (  ; p <= n1-max(lbi,0); p++,pp++)
 	   in_v[l][pp] = in_v[i][p];
       }
       
       if (lub%2 == 0) { /* shift only */
 	 i = lub/2;
-	 for (j=macro_max(i-lb,0), jj=0; jj <= n1-ub+i; j++,jj++) 
+	 for (j=max(i-lb,0), jj=0; jj <= n1-ub+i; j++,jj++) 
 	   in_v[i][jj] = in_v[i][j];
       }
    }
@@ -356,18 +356,18 @@ BAND *bd_transp(const BAND *in, BAND *out)
 
       for (i=0, l=lub; i < (lub+1)/2; i++,l--) {
 	 ubi = i-ub;
-	 for (j=n1-macro_max(lb-l,0), jj=n1-macro_max(-ubi,0), p=n1-lb+i, pp=n1;
+	 for (j=n1-max(lb-l,0), jj=n1-max(-ubi,0), p=n1-lb+i, pp=n1;
 	      p >= 0; j--, jj--, pp--, p--) {
 	    in_v[i][jj] = in_v[l][j];
 	    in_v[l][pp] = in_v[i][p];
 	 }
-	 for (  ; jj >= macro_max(ubi,0); j--, jj--)
+	 for (  ; jj >= max(ubi,0); j--, jj--)
 	   in_v[i][jj] = in_v[l][j];
       }
 
       if (lub%2 == 0) {  /* shift only */
 	 i = lub/2;
-	 for (j=n1-lb+i, jj=n1-macro_max(ub-i,0); j >= 0; j--, jj--) 
+	 for (j=n1-lb+i, jj=n1-max(ub-i,0); j >= 0; j--, jj--) 
 	    in_v[i][jj] = in_v[i][j];
       }
    }
@@ -401,7 +401,7 @@ VEC	*bdv_mltadd(const VEC *x, const VEC *y, const BAND *bA,
   out = v_copy(x,out);
 
   for ( j = 0; j < x->dim; j++ )
-    for ( i = macro_max(j-bA->ub,0); i <= j+bA->lb && i < x->dim; i++ )
+    for ( i = max(j-bA->ub,0); i <= j+bA->lb && i < x->dim; i++ )
       out->ve[i] += s*bd_get_val(bA,i,j)*y->ve[j];
 
   return out;
@@ -433,7 +433,7 @@ VEC	*vbd_mltadd(const VEC *x, const VEC *y, const BAND *bA,
   out = v_copy(x,out);
 
   for ( j = 0; j < x->dim; j++ )
-    for ( i = macro_max(j-bA->ub,0); i <= j+bA->lb && i < x->dim; i++ )
+    for ( i = max(j-bA->ub,0); i <= j+bA->lb && i < x->dim; i++ )
       out->ve[j] += s*bd_get_val(bA,i,j)*y->ve[i];
 
   return out;
@@ -476,7 +476,7 @@ BAND	*bds_mltadd(const BAND *A, const BAND *B, double alpha, BAND *OUT)
     error(E_INSITU,"bds_mltadd");
 
   OUT = bd_copy(A,OUT);
-  OUT = bd_resize(OUT,macro_max(A->lb,B->lb),macro_max(A->ub,B->ub),A->mat->n);
+  OUT = bd_resize(OUT,max(A->lb,B->lb),max(A->ub,B->ub),A->mat->n);
   for ( i = 0; i <= B->lb + B->ub; i++ )
     __mltadd__(OUT->mat->me[i+OUT->lb-B->lb],B->mat->me[i],alpha,B->mat->n);
   
@@ -505,7 +505,7 @@ BAND	*sbd_mlt(Real s, const BAND *A, BAND *OUT)
       The jth column of A is stored in the jth column of 
       band A (bA) as follows:
       bA->mat->me[lb+j-i][j] = A->me[i][j] for 
-      macro_max(0,j-lb) <= i <= macro_min(A->n-1,j+ub);
+      max(0,j-lb) <= i <= min(A->n-1,j+ub);
    -- on exit: U is stored as an upper triangular matrix
       with lb+ub superdiagonals in rows lb to 2*lb+ub, 
       and the matrix L is stored in rows 0 to lb-1.
@@ -545,7 +545,7 @@ BAND	*bdLUfactor(BAND *bA, PERM *pivot)
 
    /* extend band matrix */
    /* extended part is filled with zeros */
-   bA = bd_resize(bA,lb,macro_min(n1,lub),n);
+   bA = bd_resize(bA,lb,min(n1,lub),n);
    bA_v = bA->mat->me;
 
 
@@ -553,8 +553,8 @@ BAND	*bdLUfactor(BAND *bA, PERM *pivot)
 
    for ( k=0; k < n1; k++ )
    {
-      k_end = macro_max(0,lb+k-n1);
-      k_lub = macro_min(k+lub,n1);
+      k_end = max(0,lb+k-n1);
+      k_lub = min(k+lub,n1);
 
       /* find the best pivot row */
       
@@ -634,7 +634,7 @@ VEC	*bdLUsolve(const BAND *bA, PERM *pivot, const VEC *b, VEC *x)
    for (j=0; j < n; j++) {
       jmin = j+1;
       c = x->ve[j];
-      maxj = macro_max(0,j+lb-n1);
+      maxj = max(0,j+lb-n1);
       for (i=jmin,l=lb-1; l >= maxj; i++,l--) {
 	 if ( (pi = pivot->pe[i]) < jmin) 
 	   pi = pivot->pe[i] = pivot->pe[pi];
@@ -647,7 +647,7 @@ VEC	*bdLUsolve(const BAND *bA, PERM *pivot, const VEC *b, VEC *x)
    x->ve[n1] /= bA_v[lb][n1];
    for (i=n-2; i >= 0; i--) {
       c = x->ve[i];
-      for (j=macro_min(n1,i+ub), l=lb+j-i; j > i; j--,l--)
+      for (j=min(n1,i+ub), l=lb+j-i; j > i; j--,l--)
 	c -= bA_v[l][j]*x->ve[j];
       x->ve[i] = c/bA_v[lb][i];
    }
@@ -687,7 +687,7 @@ BAND *bdLDLfactor(BAND *A)
 
       /* matrix D */
       c = Av[lb][k];
-      for (j=macro_max(0,-lbkm), jk=lbkm+j; j < k; j++, jk++) {
+      for (j=max(0,-lbkm), jk=lbkm+j; j < k; j++, jk++) {
 	 cc = Av[jk][j];
 	 c -= Av[lb][j]*cc*cc;
       }
@@ -697,9 +697,9 @@ BAND *bdLDLfactor(BAND *A)
 
       /* matrix L */
       
-      for (i=macro_min(n1,lbkp), ki=lbkp-i; i > k; i--,ki++) {
+      for (i=min(n1,lbkp), ki=lbkp-i; i > k; i--,ki++) {
 	 c = Av[ki][k];
-	 for (j=macro_max(0,i-lb), ji=lb+j-i, jk=lbkm+j; j < k;
+	 for (j=max(0,i-lb), ji=lb+j-i, jk=lbkm+j; j < k;
 	      j++, ji++, jk++)
 	   c -= Av[lb][j]*Av[ji][j]*Av[jk][j];
 	 Av[ki][k] = c/Av[lb][k];
@@ -740,7 +740,7 @@ VEC    *bdLDLsolve(const BAND *A, const VEC *b, VEC *x)
    for (i=1; i < n; i++) {
       ilb = i-lb;
       c = b->ve[i];
-      for (j=macro_max(0,ilb), l=j-ilb; j < i; j++,l++)
+      for (j=max(0,ilb), l=j-ilb; j < i; j++,l++)
 	c -= Av[l][j]*x->ve[j];
       x->ve[i] = c;
    }
@@ -753,7 +753,7 @@ VEC    *bdLDLsolve(const BAND *A, const VEC *b, VEC *x)
    for (i=n-2; i >= 0; i--) {
       ilb = i+lb;
       c = x->ve[i];
-      for (j=macro_min(n1,ilb), l=ilb-j; j > i; j--,l++)
+      for (j=min(n1,ilb), l=ilb-j; j > i; j--,l++)
 	c -= Av[l][i]*x->ve[j];
       x->ve[i] = c;
    }
@@ -774,9 +774,9 @@ VEC    *bdLDLsolve(const BAND *A, const VEC *b, VEC *x)
  *   may not work in situ (x != out)
  */
 
-VEC *bd_mv_mlt(BAND *A, VEC* x, VEC* out)
-//BAND *A;
-//VEC *x, *out;
+VEC *bd_mv_mlt(A, x, out)
+BAND *A;
+VEC *x, *out;
 {
   int i, j, j_end, k;
   int start_idx, end_idx;
@@ -802,9 +802,9 @@ VEC *bd_mv_mlt(BAND *A, VEC* x, VEC* out)
   start_idx = lb;
   end_idx = m + n-1 - ub;
   for (i=0; i<n; i++, start_idx--, end_idx--) {
-    j = macro_max(0, start_idx);
-    k = macro_max(0, -start_idx);
-    j_end = macro_min(m, end_idx);
+    j = max(0, start_idx);
+    k = max(0, -start_idx);
+    j_end = min(m, end_idx);
     x_ve = x->ve + k;
     sum = 0.0;	     
     for (; j < j_end; j++, k++)

@@ -33,7 +33,6 @@ static	char	rcsid[] = "$Id: err.c,v 1.6 1995/01/30 14:49:14 des Exp $";
 #include	<stdio.h>
 #include	<setjmp.h>
 #include	<ctype.h>
-#include	<unistd.h>
 #include        "err.h"
 
 
@@ -58,7 +57,7 @@ static	char	rcsid[] = "$Id: err.c,v 1.6 1995/01/30 14:49:14 des Exp $";
 /* The only error caught in this file! */
 #define	E_SIGNAL	16
 
-static char *err_mesg[] =
+static	char	*err_mesg[] =
 {	  "unknown error",			    /* 0 */
 	  "sizes of objects don't match",	    /* 1 */
 	  "index out of bounds",		    /* 2 */

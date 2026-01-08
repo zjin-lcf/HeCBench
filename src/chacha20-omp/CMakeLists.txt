@@ -1,8 +1,8 @@
-# chacha20-omp/CMakeLists.txt
+# chacha20-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME chacha20
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

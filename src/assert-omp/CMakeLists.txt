@@ -1,8 +1,8 @@
-# assert-omp/CMakeLists.txt
+# assert-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME assert
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

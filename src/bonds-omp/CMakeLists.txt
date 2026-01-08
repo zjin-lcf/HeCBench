@@ -1,8 +1,8 @@
-# bonds-omp/CMakeLists.txt
+# bonds-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME bonds
-    MODEL omp
-    SOURCES bondsEngine.cpp bondsKernelsGpu.cpp
+    MODEL cuda
+    SOURCES bondsEngine.cu
     CATEGORIES algorithms
 )

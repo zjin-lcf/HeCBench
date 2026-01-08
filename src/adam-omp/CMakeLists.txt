@@ -1,8 +1,8 @@
-# adam-omp/CMakeLists.txt
+# adam-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME adam
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES ml
 )

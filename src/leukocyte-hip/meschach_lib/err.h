@@ -126,7 +126,7 @@ extern  int err_list_free(int list_num);   /* freeing a list of errors */
 /* error catching macros */
 
 /* execute err_part if error errnum is raised while executing ok_part */
-#define	err_catch(errnum,ok_part,err_part)	\
+#define	catch(errnum,ok_part,err_part)	\
 	{	jmp_buf _save;	int _err_num, _old_flag; \
 		_old_flag = set_err_flag(EF_SILENT); \
 		MEM_COPY(restart,_save,sizeof(jmp_buf)); \

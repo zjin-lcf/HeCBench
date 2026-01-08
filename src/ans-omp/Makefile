@@ -1,5 +1,5 @@
-NVCC = icpx
-NVCC_FLAGS = --std=c++17 -O3 -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+NVCC = /opt/nvidia/hpc_sdk/Linux_aarch64/25.11/compilers/bin/nvc++
+NVCC_FLAGS = -std=c++17 -O3 -mp=gpu
 
 INC_DIR = include
 SRC_DIR = src

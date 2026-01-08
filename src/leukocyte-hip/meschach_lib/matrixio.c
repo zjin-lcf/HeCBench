@@ -73,6 +73,27 @@ int	skipjunk(FILE *fp)
      return 0;
 }
 
+/* m_finput -- input matrix
+	-- input from a terminal is handled interactively
+	-- batch/file input has the same format as produced by m_foutput
+	except that whitespace and comments ("#..\n") are skipped
+	-- returns a, which is created if a == NULL on entry */
+#ifndef ANSI_C
+MAT     *m_finput(fp,a)
+FILE    *fp;
+MAT     *a;
+#else
+MAT	*m_finput(FILE *fp, MAT *a)
+#endif
+{
+     MAT        *im_finput(),*bm_finput();
+     
+     if ( isatty(fileno(fp)) )
+	  return im_finput(fp,a);
+     else
+	  return bm_finput(fp,a);
+}
+
 /* im_finput -- interactive input of matrix */
 #ifndef ANSI_C
 MAT     *im_finput(fp,mat)
@@ -139,7 +160,6 @@ MAT     *im_finput(FILE *fp,MAT *mat)
      return (mat);
 }
 
-
 /* bm_finput -- batch-file input of matrix */
 #ifndef ANSI_C
 MAT     *bm_finput(fp,mat)
@@ -180,27 +200,27 @@ MAT     *bm_finput(FILE *fp,MAT *mat)
      return (mat);
 }
 
-
-/* m_finput -- input matrix
+/* px_finput -- inputs permutation from file/stream fp
 	-- input from a terminal is handled interactively
-	-- batch/file input has the same format as produced by m_foutput
+	-- batch/file input has the same format as produced by px_foutput
 	except that whitespace and comments ("#..\n") are skipped
-	-- returns a, which is created if a == NULL on entry */
+	-- returns px, which is created if px == NULL on entry */
 #ifndef ANSI_C
-MAT     *m_finput(fp,a)
+PERM    *px_finput(fp,px)
 FILE    *fp;
-MAT     *a;
+PERM    *px;
 #else
-MAT	*m_finput(FILE *fp, MAT *a)
+PERM    *px_finput(FILE *fp,PERM *px)
 #endif
 {
-     //MAT        *im_finput(),*bm_finput();
+     PERM       *ipx_finput(),*bpx_finput();
      
      if ( isatty(fileno(fp)) )
-	  return im_finput(fp,a);
+	  return ipx_finput(fp,px);
      else
-	  return bm_finput(fp,a);
+	  return bpx_finput(fp,px);
 }
+
 
 /* ipx_finput -- interactive input of permutation */
 #ifndef ANSI_C
@@ -260,8 +280,6 @@ PERM    *ipx_finput(FILE *fp,PERM *px)
      return (px);
 }
 
-
-
 /* bpx_finput -- batch-file input of permutation */
 #ifndef ANSI_C
 PERM    *bpx_finput(fp,px)
@@ -308,25 +326,25 @@ PERM    *bpx_finput(FILE *fp,PERM *px)
      return (px);
 }
 
-/* px_finput -- inputs permutation from file/stream fp
+/* v_finput -- inputs vector from file/stream fp
 	-- input from a terminal is handled interactively
 	-- batch/file input has the same format as produced by px_foutput
 	except that whitespace and comments ("#..\n") are skipped
-	-- returns px, which is created if px == NULL on entry */
+	-- returns x, which is created if x == NULL on entry */
 #ifndef ANSI_C
-PERM    *px_finput(fp,px)
+VEC     *v_finput(fp,x)
 FILE    *fp;
-PERM    *px;
+VEC     *x;
 #else
-PERM    *px_finput(FILE *fp,PERM *px)
+VEC     *v_finput(FILE *fp,VEC *x)
 #endif
 {
-     //PERM       *ipx_finput(),*bpx_finput();
+     VEC        *ifin_vec(),*bfin_vec();
      
      if ( isatty(fileno(fp)) )
-	  return ipx_finput(fp,px);
+	  return ifin_vec(fp,x);
      else
-	  return bpx_finput(fp,px);
+	  return bfin_vec(fp,x);
 }
 
 /* ifin_vec -- interactive input of vector */
@@ -378,7 +396,6 @@ VEC     *ifin_vec(FILE *fp,VEC *vec)
      return (vec);
 }
 
-
 /* bfin_vec -- batch-file input of vector */
 #ifndef ANSI_C
 VEC     *bfin_vec(fp,vec)
@@ -414,26 +431,6 @@ VEC     *bfin_vec(FILE *fp,VEC *vec)
      return (vec);
 }
 
-/* v_finput -- inputs vector from file/stream fp
-	-- input from a terminal is handled interactively
-	-- batch/file input has the same format as produced by px_foutput
-	except that whitespace and comments ("#..\n") are skipped
-	-- returns x, which is created if x == NULL on entry */
-#ifndef ANSI_C
-VEC     *v_finput(fp,x)
-FILE    *fp;
-VEC     *x;
-#else
-VEC     *v_finput(FILE *fp,VEC *x)
-#endif
-{
-     //VEC        *ifin_vec(),*bfin_vec();
-     
-     if ( isatty(fileno(fp)) )
-	  return ifin_vec(fp,x);
-     else
-	  return bfin_vec(fp,x);
-}
 /**************************************************************************
   Output routines
   **************************************************************************/
@@ -646,6 +643,27 @@ void	iv_foutput(FILE *fp, const IVEC *iv)
 }
 
 
+/* iv_finput -- input integer vector from stream fp
+	-- input from a terminal is handled interactively
+	-- batch/file input has the same format as produced by
+	iv_foutput except that whitespace and comments ("#...\n") 
+	are skipped */
+#ifndef ANSI_C
+IVEC	*iv_finput(fp,x)
+FILE	*fp;
+IVEC	*x;
+#else
+IVEC	*iv_finput(FILE *fp, IVEC *x)
+#endif
+{
+   IVEC	*iiv_finput(),*biv_finput();
+   
+   if ( isatty(fileno(fp)) )
+     return iiv_finput(fp,x);
+   else
+     return biv_finput(fp,x);
+}
+
 /* iiv_finput -- interactive input of IVEC iv */
 #ifndef ANSI_C
 IVEC	*iiv_finput(fp,iv)
@@ -720,28 +738,6 @@ IVEC	*biv_finput(FILE *fp, IVEC *iv)
        error(io_code==EOF ? 7 : 6,"biv_finput");
    
    return (iv);
-}
-
-
-/* iv_finput -- input integer vector from stream fp
-	-- input from a terminal is handled interactively
-	-- batch/file input has the same format as produced by
-	iv_foutput except that whitespace and comments ("#...\n") 
-	are skipped */
-#ifndef ANSI_C
-IVEC	*iv_finput(fp,x)
-FILE	*fp;
-IVEC	*x;
-#else
-IVEC	*iv_finput(FILE *fp, IVEC *x)
-#endif
-{
-   //IVEC	*iiv_finput(),*biv_finput();
-   
-   if ( isatty(fileno(fp)) )
-     return iiv_finput(fp,x);
-   else
-     return biv_finput(fp,x);
 }
 
 /* iv_dump -- dumps all the contents of IVEC iv onto stream fp */

@@ -1,8 +1,8 @@
-# backprop-omp/CMakeLists.txt
+# backprop-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME backprop
-    MODEL omp
-    SOURCES backprop.cpp facetrain.cpp imagenet.cpp main.cpp
+    MODEL cuda
+    SOURCES backprop.cu facetrain.cu imagenet.cu main.cu
     CATEGORIES ml
 )

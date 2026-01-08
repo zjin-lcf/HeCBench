@@ -74,7 +74,7 @@ MAT	*QRfactor(MAT *A, VEC *diag)
     
     if ( ! A || ! diag )
 	error(E_NULL,"QRfactor");
-    limit = macro_min(A->m,A->n);
+    limit = min(A->m,A->n);
     if ( diag->dim < limit )
 	error(E_SIZES,"QRfactor");
     
@@ -121,7 +121,7 @@ MAT	*QRCPfactor(MAT *A, VEC *diag, PERM *px)
     
     if ( ! A || ! diag || ! px )
 	error(E_NULL,"QRCPfactor");
-    limit = macro_min(A->m,A->n);
+    limit = min(A->m,A->n);
     if ( diag->dim < limit || px->size != A->n )
 	error(E_SIZES,"QRCPfactor");
     
@@ -211,7 +211,7 @@ VEC	*_Qsolve(const MAT *QR, const VEC *diag, const VEC *b,
     int		k, limit;
     Real	beta, r_ii, tmp_val;
     
-    limit = macro_min(QR->m,QR->n);
+    limit = min(QR->m,QR->n);
     dynamic = FALSE;
     if ( ! QR || ! diag || ! b )
 	error(E_NULL,"_Qsolve");
@@ -256,7 +256,7 @@ MAT	*makeQ(const MAT *QR,const VEC *diag, MAT *Qout)
     Real	beta, r_ii, tmp_val;
     int	j;
     
-    limit = macro_min(QR->m,QR->n);
+    limit = min(QR->m,QR->n);
     if ( ! QR || ! diag )
 	error(E_NULL,"makeQ");
     if ( diag->dim < limit )
@@ -336,7 +336,7 @@ VEC	*QRsolve(const MAT *QR, const VEC *diag, const VEC *b, VEC *x)
     
     if ( ! QR || ! diag || ! b )
 	error(E_NULL,"QRsolve");
-    limit = macro_min(QR->m,QR->n);
+    limit = min(QR->m,QR->n);
     if ( diag->dim < limit || b->dim != QR->m )
 	error(E_SIZES,"QRsolve");
     tmp = v_resize(tmp,limit);
@@ -399,7 +399,7 @@ static	VEC	*Umlt(const MAT *U, const VEC *x, VEC *out)
 
     if ( U == MNULL || x == VNULL )
 	error(E_NULL,"Umlt");
-    limit = macro_min(U->m,U->n);
+    limit = min(U->m,U->n);
     if ( limit != x->dim )
 	error(E_SIZES,"Umlt");
     if ( out == VNULL || out->dim < limit )
@@ -424,7 +424,7 @@ static	VEC	*UTmlt(const MAT *U, const VEC *x, VEC *out)
 
     if ( U == MNULL || x == VNULL )
 	error(E_NULL,"UTmlt");
-    limit = macro_min(U->m,U->n);
+    limit = min(U->m,U->n);
     if ( out == VNULL || out->dim < limit )
 	out = v_resize(out,limit);
 
@@ -455,7 +455,7 @@ VEC *QRTsolve(const MAT *A, const VEC *diag, const VEC *c, VEC *sc)
 
     if ( ! A || ! diag || ! c )
 	error(E_NULL,"QRTsolve");
-    if ( diag->dim < macro_min(A->m,A->n) )
+    if ( diag->dim < min(A->m,A->n) )
 	error(E_SIZES,"QRTsolve");
     sc = v_resize(sc,A->m);
     n = sc->dim;
@@ -519,7 +519,7 @@ double	QRcondest(const MAT *QR)
     if ( QR == MNULL )
 	error(E_NULL,"QRcondest");
 
-    limit = macro_min(QR->m,QR->n);
+    limit = min(QR->m,QR->n);
     for ( i = 0; i < limit; i++ )
 	if ( QR->me[i][i] == 0.0 )
 	    return HUGE_VAL;

@@ -205,7 +205,7 @@ char	*argv[];
 
     /* testing catch() etc */
     notice("error handling routines");
-    err_catch(E_NULL,
+    catch(E_NULL,
 	  catchall(v_add(VNULL,VNULL,VNULL);
 		     errmesg("tracecatch() failure"),
 		     printf("# tracecatch() caught error\n");

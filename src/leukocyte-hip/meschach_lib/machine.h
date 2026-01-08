@@ -188,6 +188,6 @@
 
 
 #ifdef ANSI_C
-//extern	int	isatty(int);     // Needed to comment this out to get rid of compiler error (MWB)
+extern	int	isatty(int);
 #endif
 

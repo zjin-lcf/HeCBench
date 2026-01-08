@@ -15,7 +15,7 @@ template <typename T>
 DEVICE T WARP_SHFL_DOWN(T value, unsigned int delta, int width = warpSize, unsigned int mask = 0xffffffff)
 {
 #if defined(__HIPCC__)
-  return __shfl_down(value, delta, width);
+  return __shfl_down_sync(0xffffffff, value, delta, width);
 #else
   return __shfl_down_sync(mask, value, delta, width);
 #endif

@@ -30,7 +30,6 @@ static	char	rcsid[] = "$Id: copy.c,v 1.2 1994/01/13 05:37:14 des Exp $";
 
 
 
-
 /* _m_copy -- copies matrix into new area
 	-- out(i0:m,j0:n) <- in(i0:m,j0:n) */
 #ifndef ANSI_C
@@ -141,7 +140,7 @@ MAT	*m_move(const MAT *in, int i0,int j0, int m0,int n0,
     if ( ! out )
 	out = m_resize(out,i1+m0,j1+n0);
     else if ( i1+m0 > out->m || j1+n0 > out->n )
-	out = m_resize(out,macro_max(out->m,i1+m0),macro_max(out->n,j1+n0));
+	out = m_resize(out,max(out->m,i1+m0),max(out->n,j1+n0));
 
     for ( i = 0; i < m0; i++ )
 	MEM_COPY(&(in->me[i0+i][j0]),&(out->me[i1+i][j1]),
@@ -237,7 +236,7 @@ MAT	*vm_move(const VEC *in, int i0,
     if ( ! out )
 	out = m_resize(out,i1+m1,j1+n1);
     else
-	out = m_resize(out,macro_max(i1+m1,out->m),macro_max(j1+n1,out->n));
+	out = m_resize(out,max(i1+m1,out->m),max(j1+n1,out->n));
 
     dim0 = m1*n1;
     for ( i = 0; i < m1; i++ )

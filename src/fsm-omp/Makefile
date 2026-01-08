@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = /opt/nvidia/hpc_sdk/Linux_aarch64/25.11/compilers/bin/nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -37,14 +37,15 @@ endif
 
 
 # Optimization Flags
+# Note: Using -O0 to work around compiler errors with complex control flow
 ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3
+  CFLAGS += -O0
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-mp=gpu
 else
-  CFLAGS +=-qopenmp
+  CFLAGS +=-mp=multicore
 endif
 #===============================================================================
 # Targets to Build

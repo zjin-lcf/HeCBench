@@ -1,8 +1,8 @@
-# bn-omp/CMakeLists.txt
+# bn-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME bn
-    MODEL omp
-    SOURCES kernels.cpp main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

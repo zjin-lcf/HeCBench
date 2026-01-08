@@ -58,7 +58,7 @@ typedef struct outer_wall {
 // Warning: these constants aren't actually used in the GPU computation, which
 //          are unrolled for performance reason, so modifying this array won't
 //          impact the actual computation.
-static const char dirs[] = {
+static const signed char dirs[] = {
   0, 0, 0,  //  0
   -1, 0, 0, //  1
   0,-1, 0,  //  2

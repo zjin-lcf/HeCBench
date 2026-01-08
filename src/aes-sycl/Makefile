@@ -42,8 +42,17 @@ endif
 LDFLAGS = 
 
 ifeq ($(CUDA), yes)
-  CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
-            -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
+  ifneq ($(VENDOR), AdaptiveCpp)
+    CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
+              -Xsycl-target-backend --cuda-gpu-arch=$(CUDA_ARCH)
+  endif
+endif
+
+# AdaptiveCpp generic target (JIT compilation at runtime)
+ifeq ($(VENDOR), AdaptiveCpp)
+  ifeq ($(GPU), yes)
+    CFLAGS += --acpp-targets=generic
+  endif
 endif
 
 ifeq ($(HIP), yes)

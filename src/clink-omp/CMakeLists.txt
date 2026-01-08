@@ -1,8 +1,8 @@
-# clink-omp/CMakeLists.txt
+# clink-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME clink
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

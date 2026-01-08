@@ -40,7 +40,7 @@ obj = AddKernel.o        \
 CFLAGS := $(EXTRA_CFLAGS) -std=c++11 -Wall -fpermissive -DGPU \
 	  -DBOOST_ALL_NO_LIB -DBOOST_ATOMIC_DYN_LINK -DBOOST_FILESYSTEM_DYN_LINK \
 	  -DBOOST_REGEX_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -DBOOST_THREAD_DYN_LINK \
-	  -I/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/cuda/include
+	  -I/usr/local/cuda/include
 
 NVCCFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall
 

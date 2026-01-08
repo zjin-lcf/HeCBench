@@ -47,7 +47,7 @@ complex	_zin_prod(const ZVEC *a, const ZVEC *b,
 
 	if ( a==ZVNULL || b==ZVNULL )
 		error(E_NULL,"_zin_prod");
-	limit = macro_min(a->dim,b->dim);
+	limit = min(a->dim,b->dim);
 	if ( i0 > limit )
 		error(E_BOUNDS,"_zin_prod");
 

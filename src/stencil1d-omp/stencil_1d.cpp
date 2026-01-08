@@ -34,8 +34,8 @@ int main(int argc, char* argv[]) {
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    #pragma omp target teams distribute map(to: a[0:pad_size]) map(from:b[0:size]) 
-    for (int i = 0; i < length; i = i + BLOCK_SIZE) {
+    #pragma omp target teams distribute map(to: a[0:pad_size]) map(from:b[0:size])
+    for (int i = 0; i < length; i += BLOCK_SIZE) {
       int temp[BLOCK_SIZE + 2 * RADIUS];
       #pragma omp parallel for schedule(static,1)
       for (int j = 0; j < BLOCK_SIZE; j++) {

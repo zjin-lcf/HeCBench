@@ -42,6 +42,8 @@
 #include	"sparse.h"
 
 
+/* basic structure for iterative methods */
+
 /* type Fun_Ax for functions to get y = A*x */
 #ifdef ANSI_C
 typedef VEC  *(*Fun_Ax)(void *,VEC *,VEC *);
@@ -78,16 +80,21 @@ typedef struct Iter_data {
 
 #ifdef ANSI_C
 
-   void (*info)(const struct Iter_data *, double, VEC *,VEC *);
+#ifdef PROTOTYPES_IN_STRUCT
+   void (*info)(struct Iter_data *, double, VEC *,VEC *);
             /* function giving some information for a user;
 	       nres - a norm of a residual res */
    
-   int (*stop_crit)(const struct Iter_data *, double, VEC *,VEC *);
+   int (*stop_crit)(struct Iter_data *, double, VEC *,VEC *);
            /* stopping criterion:
 	      nres - a norm of res;
 	      res - residual;
 	    if returned value == TRUE then stop;
 	    if returned value == FALSE then continue; */
+#else
+   void (*info)();
+   int  (*stop_crit)();
+#endif /* PROTOTYPES_IN_STRUCT */
 
 #else
 
@@ -110,7 +117,7 @@ typedef struct Iter_data {
 
 /* type Fun_info */
 #ifdef ANSI_C
-typedef void (*Fun_info)(const ITER *, double, VEC *,VEC *);
+typedef void (*Fun_info)(ITER *, double, VEC *,VEC *);
 #else
 typedef void (*Fun_info)();
 #endif
@@ -158,7 +165,6 @@ int iter_std_stop_crit(const ITER *ip, double nres, VEC *res,VEC *Bres);
 ITER *iter_get(int lenb, int lenx);
 ITER *iter_resize(ITER *ip,int lenb,int lenx);
 int iter_free(ITER *ip);
-int	wrapped_iter_free(void*);
 
 void iter_dump(FILE *fp,ITER *ip);
 

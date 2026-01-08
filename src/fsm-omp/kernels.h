@@ -15,6 +15,9 @@ void LCG_random_init(unsigned int * seed) {
 }
 #pragma omp end declare target
 
+// Maximum iterations to replace do-while loop
+#define MAX_ITERATIONS 10000
+
 void FSMKernel(
   const int length,
   const unsigned short *__restrict data,
@@ -29,21 +32,22 @@ void FSMKernel(
   #pragma omp target teams num_teams(POPCNT) thread_limit(POPSIZE)
   {
     unsigned char next[FSMSIZE * 2 * POPSIZE];
+    int bid = omp_get_team_num();
+
     #pragma omp parallel
     {
       int i, d, pc, s, bit, id, misses, rnd;
-      unsigned long long myresult, current;
       unsigned char *fsm, state[TABSIZE];
 
       int lid = omp_get_thread_num();
-      int bid = omp_get_team_num();
       fsm = &next[lid * (FSMSIZE * 2)];
 
+      // Initialize shared state (only first thread in team)
       if (lid == 0) {
         oldmax[bid] = 0;
         same[bid] = 0;
       }
-      #pragma omp barrier
+      // Removed flush - atomics provide memory ordering
 
       id = lid + bid * POPSIZE;
       rndstate[id] = SEED ^ id;
@@ -54,23 +58,20 @@ void FSMKernel(
         fsm[i] = LCG_random(rndstate+id) & (FSMSIZE - 1);
       }
 
-      // run generations until cutoff times no improvement
-      do {
+      // Replace do-while with for loop with max iterations
+      for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        // Check convergence condition
+        int local_same;
+        #pragma omp atomic read
+        local_same = same[bid];
+        if (local_same >= CUTOFF) break;
+
         // reset miss counter and initial state
         for (i = 0; i < TABSIZE; i++) state[i] = 0;
         misses = 0;
 
         // evaluate FSM
-        #pragma unroll
         for (i = 0; i < length; i++) {
-          d = (int)data[i];
-          pc = (d >> 1) & (TABSIZE - 1);
-          bit = d & 1;
-          s = (int)state[pc];
-          misses += bit ^ (s & 1);
-          state[pc] = fsm[s + s + bit];
-        }
-        for (; i < length; i++) {
           d = (int)data[i];
           pc = (d >> 1) & (TABSIZE - 1);
           bit = d & 1;
@@ -86,65 +87,94 @@ void FSMKernel(
           smax[bid] = 0;
           sbest[bid] = 0;
         }
-        #pragma omp barrier
-        
-        #pragma omp critical
-        {
-         if (smax[bid] < length - misses) smax[bid] = length - misses;
-        }
-        //#pragma omp barrier
 
-        if (length - misses == smax[bid]) {
-          #pragma omp critical
-          {
-            if (sbest[bid] < lid) sbest[bid] = lid;
+        // Replace critical with atomic operations
+        int temp_score = length - misses;
+        int old_max;
+        #pragma omp atomic read
+        old_max = smax[bid];
+        if (temp_score > old_max) {
+          #pragma omp atomic write
+          smax[bid] = temp_score;
+        }
+
+        // Update best thread ID
+        #pragma omp atomic read
+        temp_score = smax[bid];
+        if (length - misses == temp_score) {
+          int old_best;
+          #pragma omp atomic read
+          old_best = sbest[bid];
+          if (lid > old_best) {
+            #pragma omp atomic write
+            sbest[bid] = lid;
           }
         }
-        #pragma omp barrier
+
         bit = 0;
-        if (sbest[bid] == lid) {
+        int local_sbest;
+        #pragma omp atomic read
+        local_sbest = sbest[bid];
+
+        if (local_sbest == lid) {
           // check if there was an improvement
+          int local_oldmax, local_smax;
+          #pragma omp atomic read
+          local_oldmax = oldmax[bid];
+          #pragma omp atomic read
+          local_smax = smax[bid];
+
+          #pragma omp atomic update
           same[bid]++;
-          if (oldmax[bid] < smax[bid]) {
-            oldmax[bid] = smax[bid];
+
+          if (local_oldmax < local_smax) {
+            #pragma omp atomic write
+            oldmax[bid] = local_smax;
+            #pragma omp atomic write
             same[bid] = 0;
           }
         } else {
-          // select 1/8 of threads for mutation (best FSM does crossover)
+          // select 1/8 of threads for mutation
           if ((LCG_random(rndstate+id) & 7) == 0) bit = 1;
         }
-        #pragma omp barrier
 
         if (bit) {
-          // mutate best FSM by flipping random bits with 1/4th probability
+          // mutate best FSM
           for (i = 0; i < FSMSIZE * 2; i++) {
             rnd = LCG_random(rndstate+id) & LCG_random(rndstate+id);
-            fsm[i] = (next[i + sbest[bid] * FSMSIZE * 2] ^ rnd) & (FSMSIZE - 1);
+            fsm[i] = (next[i + local_sbest * FSMSIZE * 2] ^ rnd) & (FSMSIZE - 1);
           }
         } else {
-          // crossover best FSM with random FSMs using 3/4 of bits from best FSM
+          // crossover
           for (i = 0; i < FSMSIZE * 2; i++) {
             rnd = LCG_random(rndstate+id) & LCG_random(rndstate+id);
-            fsm[i] = (fsm[i] & rnd) | (next[i + sbest[bid] * FSMSIZE * 2] & ~rnd);
+            fsm[i] = (fsm[i] & rnd) | (next[i + local_sbest * FSMSIZE * 2] & ~rnd);
           }
         }
-      } while (same[bid] < CUTOFF);  // end of loop over generations
+      }
 
       // record best result of this block
-      if (sbest[bid] == lid) {
+      int local_sbest_final;
+      #pragma omp atomic read
+      local_sbest_final = sbest[bid];
+
+      if (local_sbest_final == lid) {
         id = bid;
-        myresult = length - misses;
-        myresult = (myresult << 32) + id;
-        current = *((unsigned long long *)best);
-        while (myresult > current) {
-          //atomicCAS((unsigned long long *)best, current, myresult);
-          #pragma omp critical
-          {
-            unsigned long long old = *((unsigned long long *)best);
-            *((unsigned long long *)best) = (old == current) ? myresult : old;
-          }
-          current = *((unsigned long long *)best);
+        int score = length - misses;
+
+        // Update best score
+        int old_best;
+        #pragma omp atomic read
+        old_best = best[0];
+
+        if (score > old_best) {
+          #pragma omp atomic write
+          best[0] = score;
+          #pragma omp atomic write
+          best[1] = bid;
         }
+
+        // Copy FSM
         for (i = 0; i < FSMSIZE * 2; i++) {
           bfsm[id * (FSMSIZE*2) + i] = fsm[i];
         }
@@ -154,15 +184,13 @@ void FSMKernel(
 }
 
 void MaxKernel(
-  int *__restrict best, 
+  int *__restrict best,
   const unsigned char *__restrict bfsm)
 {
   // copy best FSM state assignment over
-  #pragma omp target 
-  {
-    int id = best[0];
-    for (int i = 0; i < FSMSIZE * 2; i++) {
-      best[i + 3] = bfsm[id * (FSMSIZE*2) + i];
-    }
+  int block_id = best[1];
+
+  for (int i = 0; i < FSMSIZE * 2; i++) {
+    best[i + 3] = bfsm[block_id * (FSMSIZE * 2) + i];
   }
 }

@@ -41,10 +41,10 @@ static char rcsid[] = "$Id: zmatlab.c,v 1.2 1995/02/14 20:13:27 des Exp $";
 
 /* zm_save -- save matrix in ".mat" file for MATLAB
    -- returns matrix to be saved */
-ZMAT    *zm_save(
-FILE    *fp,
-ZMAT    *A,
-char    *name)
+ZMAT    *zm_save(fp,A,name)
+FILE    *fp;
+ZMAT    *A;
+char    *name;
 {
     int     i, j;
     matlab  mat;
@@ -89,10 +89,10 @@ char    *name)
 /* zv_save -- save vector in ".mat" file for MATLAB
    -- saves it as a row vector
    -- returns vector to be saved */
-ZVEC    *zv_save(
-FILE    *fp,
-ZVEC    *x,
-char    *name)
+ZVEC    *zv_save(fp,x,name)
+FILE    *fp;
+ZVEC    *x;
+char    *name;
 {
     int	i, j;
     matlab  mat;
@@ -124,10 +124,10 @@ char    *name)
 
 /* z_save -- saves complex number in ".mat" file for MATLAB
 	-- returns complex number to be saved */
-complex	z_save(
-FILE	*fp,
-complex	z,
-char	*name)
+complex	z_save(fp,z,name)
+FILE	*fp;
+complex	z;
+char	*name;
 {
     matlab  mat;
     
@@ -154,9 +154,9 @@ char	*name)
 
 /* zm_load -- loads in a ".mat" file variable as produced by MATLAB
    -- matrix returned; imaginary parts ignored */
-ZMAT    *zm_load(
-FILE    *fp,
-char    **name)
+ZMAT    *zm_load(fp,name)
+FILE    *fp;
+char    **name;
 {
     ZMAT     *A;
     int     i;

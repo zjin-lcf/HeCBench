@@ -1,8 +1,8 @@
-# aligned-types-omp/CMakeLists.txt
+# aligned-types-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME aligned-types
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

@@ -1,8 +1,8 @@
-# burger-omp/CMakeLists.txt
+# burger-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME burger
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

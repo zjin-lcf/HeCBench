@@ -1,0 +1,202 @@
+#pragma omp declare target
+unsigned int LCG_random(unsigned int * seed) {
+  const unsigned int m = 2147483648;
+  const unsigned int a = 26757677;
+  const unsigned int c = 1;
+  *seed = (a * (*seed) + c) % m;
+  return *seed;
+}
+
+void LCG_random_init(unsigned int * seed) {
+  const unsigned int m = 2147483648;
+  const unsigned int a = 26757677;
+  const unsigned int c = 1;
+  *seed = (a * (*seed) + c) % m;
+}
+#pragma omp end declare target
+
+// Maximum iterations to replace do-while loop
+#define MAX_ITERATIONS 10000
+
+void FSMKernel(
+  const int length,
+  const unsigned short *__restrict data,
+  int *__restrict best,
+  unsigned int *__restrict rndstate,
+  unsigned char *__restrict bfsm,
+  unsigned char *__restrict same,
+  int *__restrict smax,
+  int *__restrict sbest,
+  int *__restrict oldmax,
+  unsigned char *__restrict next)
+{
+  // Flatten the nested parallel structure by using a single parallel region
+  // Total threads = POPCNT * POPSIZE
+  const int total_threads = POPCNT * POPSIZE;
+
+  #pragma omp target teams distribute parallel for num_teams(POPCNT) thread_limit(POPSIZE)
+  for (int global_id = 0; global_id < total_threads; global_id++)
+  {
+    int bid = global_id / POPSIZE;
+    int lid = global_id % POPSIZE;
+
+    int i, d, pc, s, bit, id, misses, rnd;
+    unsigned char *fsm, state[TABSIZE];
+
+    fsm = &next[bid * (FSMSIZE * 2 * POPSIZE) + lid * (FSMSIZE * 2)];
+
+    // Initialize shared state (only first thread in team)
+    if (lid == 0) {
+      oldmax[bid] = 0;
+      same[bid] = 0;
+    }
+
+    // No barrier needed - use atomic operations instead
+
+    id = global_id;
+    rndstate[id] = SEED ^ id;
+    LCG_random_init(&rndstate[id]);
+
+    // initial population
+    for (i = 0; i < FSMSIZE * 2; i++) {
+      fsm[i] = LCG_random(rndstate+id) & (FSMSIZE - 1);
+    }
+
+    // Replace do-while with for loop with max iterations
+    for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+      // Check convergence condition
+      int local_same;
+      #pragma omp atomic read
+      local_same = same[bid];
+
+      if (local_same >= CUTOFF) break;
+
+      // reset miss counter and initial state
+      for (i = 0; i < TABSIZE; i++) state[i] = 0;
+      misses = 0;
+
+      // evaluate FSM
+      for (i = 0; i < length; i++) {
+        d = (int)data[i];
+        pc = (d >> 1) & (TABSIZE - 1);
+        bit = d & 1;
+        s = (int)state[pc];
+        misses += bit ^ (s & 1);
+        state[pc] = fsm[s + s + bit];
+      }
+
+      // determine best FSM using atomics
+      if (lid == 0) {
+        #pragma omp atomic update
+        best[2]++;  // increment generation count
+        smax[bid] = 0;
+        sbest[bid] = 0;
+      }
+
+      // Update max score with atomics
+      int temp_max = length - misses;
+      int old_max;
+      #pragma omp atomic read
+      old_max = smax[bid];
+      if (old_max < temp_max) {
+        #pragma omp atomic write
+        smax[bid] = temp_max;
+      }
+
+      // Update best thread ID
+      #pragma omp atomic read
+      temp_max = smax[bid];
+      if (length - misses == temp_max) {
+        int old_best;
+        #pragma omp atomic read
+        old_best = sbest[bid];
+        if (old_best < lid) {
+          #pragma omp atomic write
+          sbest[bid] = lid;
+        }
+      }
+
+      bit = 0;
+      int local_sbest;
+      #pragma omp atomic read
+      local_sbest = sbest[bid];
+
+      if (local_sbest == lid) {
+        // check if there was an improvement
+        int local_oldmax, local_smax;
+        #pragma omp atomic read
+        local_oldmax = oldmax[bid];
+        #pragma omp atomic read
+        local_smax = smax[bid];
+
+        #pragma omp atomic update
+        same[bid]++;
+
+        if (local_oldmax < local_smax) {
+          #pragma omp atomic write
+          oldmax[bid] = local_smax;
+          #pragma omp atomic write
+          same[bid] = 0;
+        }
+      } else {
+        // select 1/8 of threads for mutation
+        if ((LCG_random(rndstate+id) & 7) == 0) bit = 1;
+      }
+
+      // Genetic operations
+      int best_offset = bid * (FSMSIZE * 2 * POPSIZE) + local_sbest * (FSMSIZE * 2);
+      if (bit) {
+        // mutate best FSM
+        for (i = 0; i < FSMSIZE * 2; i++) {
+          rnd = LCG_random(rndstate+id) & LCG_random(rndstate+id);
+          fsm[i] = (next[best_offset + i] ^ rnd) & (FSMSIZE - 1);
+        }
+      } else {
+        // crossover
+        for (i = 0; i < FSMSIZE * 2; i++) {
+          rnd = LCG_random(rndstate+id) & LCG_random(rndstate+id);
+          fsm[i] = (fsm[i] & rnd) | (next[best_offset + i] & ~rnd);
+        }
+      }
+    }
+
+    // record best result of this block
+    int local_sbest;
+    #pragma omp atomic read
+    local_sbest = sbest[bid];
+
+    if (local_sbest == lid) {
+      id = bid;
+      // Copy FSM to global memory
+      for (i = 0; i < FSMSIZE * 2; i++) {
+        bfsm[id * (FSMSIZE*2) + i] = fsm[i];
+      }
+
+      // Update best score using atomic max
+      int score = length - misses;
+      int old_best;
+      #pragma omp atomic read
+      old_best = best[0];
+
+      if (score > old_best) {
+        #pragma omp atomic write
+        best[0] = score;
+        #pragma omp atomic write
+        best[1] = bid;
+      }
+    }
+  }
+}
+
+void MaxKernel(
+  int *__restrict best,
+  const unsigned char *__restrict bfsm)
+{
+  // copy best FSM state assignment over
+  // best[0] is the score, best[1] is the block ID
+  int block_id = best[1];
+
+  for (int i = 0; i < FSMSIZE * 2; i++) {
+    best[i + 3] = bfsm[block_id * (FSMSIZE * 2) + i];
+  }
+}

@@ -1,8 +1,8 @@
-# compute-score-omp/CMakeLists.txt
+# compute-score-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME compute-score
-    MODEL omp
-    SOURCES main.cpp options.cpp
+    MODEL cuda
+    SOURCES main.cu options.cu
     CATEGORIES algorithms
 )

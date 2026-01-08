@@ -299,8 +299,8 @@ void    iter_splanczos(SPMAT *A, int m, VEC *x0,
 #ifndef ANSI_C
 extern	double	frexp(), ldexp();
 #else
-extern	double	frexp(double num, int *exponent);
-extern  double ldexp(double num, int exponent);
+extern	double	frexp(double num, int *exponent),
+  ldexp(double num, int exponent);
 #endif
 
 /* product -- returns the product of a long list of numbers
@@ -401,13 +401,12 @@ static	double	product2(VEC *a, int k, int *expt)
 static	int	dbl_cmp(x,y)
 Real	*x, *y;
 #else
-//static	int	dbl_cmp(Real *x, Real *y)
-static	int	dbl_cmp(const void *x, const void *y)
+static	int	dbl_cmp(Real *x, Real *y)
 #endif
 {
    Real	tmp;
    
-   tmp = *(Real*)x - *(Real*)y;
+   tmp = *x - *y;
    return (tmp > 0 ? 1 : tmp < 0 ? -1: 0);
 }
 
@@ -467,8 +466,7 @@ VEC	*iter_lanczos2(ITER *ip, VEC *evals, VEC *err_est)
    trieig(a,b,MNULL);
    
    /* sort evals as a courtesy */
-   //qsort((void *)(a->ve),(int)(a->dim),sizeof(Real),(int (*)())dbl_cmp);
-   qsort((void *)(a->ve),(int)(a->dim),sizeof(Real),dbl_cmp);
+   qsort((void *)(a->ve),(int)(a->dim),sizeof(Real),(int (*)())dbl_cmp);
    
    /* error estimates */
    if ( err_est )

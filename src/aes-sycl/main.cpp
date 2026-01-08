@@ -4,8 +4,9 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 
-using uchar4 = sycl::uchar4;
-using uchar = sycl::uchar;
+// Use standard types for AdaptiveCpp compatibility
+using uchar = uint8_t;
+using uchar4 = sycl::vec<uint8_t, 4>;
 
 #include "SDKBitMap.h"
 #include "aes.h"

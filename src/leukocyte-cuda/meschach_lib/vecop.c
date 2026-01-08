@@ -48,7 +48,7 @@ double	_in_prod(const VEC *a, const VEC *b, unsigned int i0)
 
 	if ( a==(VEC *)NULL || b==(VEC *)NULL )
 		error(E_NULL,"_in_prod");
-	limit = macro_min(a->dim,b->dim);
+	limit = min(a->dim,b->dim);
 	if ( i0 > limit )
 		error(E_BOUNDS,"_in_prod");
 
@@ -209,7 +209,7 @@ VEC	*x, *out;
 #ifdef PROTOTYPES_IN_STRUCT
 VEC	*v_map(double (*f)(double), const VEC *x, VEC *out)
 #else
-VEC	*v_map(double (*f)(Real), const VEC *x, VEC *out)
+VEC	*v_map(double (*f)(), const VEC *x, VEC *out)
 #endif
 #endif
 {
@@ -238,7 +238,7 @@ VEC	*x, *out;
 #ifdef PROTOTYPES_IN_STRUCT
 VEC	*_v_map(double (*f)(void *,double), void *params, const VEC *x, VEC *out)
 #else
-VEC	*_v_map(double (*f)(void*,Real), void *params, const VEC *x, VEC *out)
+VEC	*_v_map(double (*f)(), void *params, const VEC *x, VEC *out)
 #endif
 #endif
 {

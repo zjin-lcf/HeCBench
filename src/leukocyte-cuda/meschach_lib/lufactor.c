@@ -78,13 +78,13 @@ MAT	*LUfactor(MAT *A, PERM *pivot)
 		for ( j=0; j<n; j++ )
 		{
 			temp = fabs(A_v[i][j]);
-			max1 = macro_max(max1,temp);
+			max1 = max(max1,temp);
 		}
 		scale->ve[i] = max1;
 	}
 
 	/* main loop */
-	k_max = macro_min(m,n)-1;
+	k_max = min(m,n)-1;
 	for ( k=0; k<k_max; k++ )
 	{
 	    /* find best pivot row */
@@ -276,7 +276,7 @@ double	LUcondest(const MAT *LU, PERM *pivot)
 	y->ve[i] = sum / LU->me[i][i];
     }
 
-    err_catch(E_SING,
+    catch(E_SING,
 	  LTsolve(LU,y,y,1.0);
 	  LUsolve(LU,pivot,y,z);
 	  ,

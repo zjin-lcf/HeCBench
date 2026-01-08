@@ -1,8 +1,8 @@
-# complex-omp/CMakeLists.txt
+# complex-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME complex
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

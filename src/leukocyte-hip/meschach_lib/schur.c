@@ -127,7 +127,7 @@ static	void	hhldr3rows(MAT *A, int k, int i0, double beta,
 	if ( k < 0 || k+3 > A->n )
 		error(E_BOUNDS,"hhldr3rows");
 	A_me = A->me;		m = A->m;
-	i0 = macro_min(i0,m-1);
+	i0 = min(i0,m-1);
 
 	for ( i = 0; i <= i0; i++ )
 	{
@@ -370,8 +370,8 @@ MAT	*schur(MAT *A, MAT *Q)
 		if ( k < k_max - 1 )
 		{
 		    hhldr3(x,y,z,&nu1,&beta2,&dummy);
-		    tracecatch(hhldr3cols(A,k,macro_max(k-1,0),  beta2,nu1,y,z),"schur");
-		    tracecatch(hhldr3rows(A,k,macro_min(n-1,k+3),beta2,nu1,y,z),"schur");
+		    tracecatch(hhldr3cols(A,k,max(k-1,0),  beta2,nu1,y,z),"schur");
+		    tracecatch(hhldr3rows(A,k,min(n-1,k+3),beta2,nu1,y,z),"schur");
 		    if ( Q != MNULL )
 			hhldr3rows(Q,k,n-1,beta2,nu1,y,z);
 		}

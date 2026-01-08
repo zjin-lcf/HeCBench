@@ -1,8 +1,8 @@
-# bwt-omp/CMakeLists.txt
+# bwt-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME bwt
-    MODEL omp
-    SOURCES bwt.cpp
+    MODEL cuda
+    SOURCES bwt.cu main.cpp
     CATEGORIES algorithms
 )

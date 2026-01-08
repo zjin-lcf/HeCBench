@@ -57,7 +57,11 @@ main.o : main.cpp ../axhelm-cuda/axhelmReference.cpp
 meshBasis.o : meshBasis.cpp meshBasis.hpp meshNodesTet3D.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-BlasLapack/libBlasLapack.a: 
+BlasLapack/libBlasLapack.a:
+	@if [ ! -d BlasLapack ]; then \
+		echo "Extracting BlasLapack..."; \
+		tar -xzf BlasLapack.tar.gz; \
+	fi
 	cd BlasLapack && make -j8 && cd ..
 
 clean:

@@ -79,13 +79,27 @@ int main(int argc, char *argv[])
   printf("%d\t#threads\n", POPSIZE);
   printf("%d\t#cutoff\n", CUTOFF);
 
+  printf("DEBUG: Allocating host arrays...\n");
+
   unsigned int *rndstate = (unsigned int*) malloc (POPCNT * POPSIZE * sizeof(unsigned int));
   unsigned char *bfsm = (unsigned char*) malloc (POPCNT * FSMSIZE * 2 * sizeof(unsigned char));
   unsigned char *same = (unsigned char*) malloc (POPCNT * sizeof(unsigned char));
   int *smax = (int*) malloc (POPCNT * sizeof(int));
   int *sbest = (int*) malloc (POPCNT * sizeof(int));
   int *oldmax = (int*) malloc (POPCNT * sizeof(int));
+  // Allocate state arrays in global memory instead of per-thread stack
+  // Use long long to avoid overflow: 1024 * 256 * 32768 = 8GB
+  long long state_size = (long long)POPCNT * (long long)POPSIZE * (long long)TABSIZE;
+  printf("DEBUG: Allocating %lld bytes (%lld MB) for global_state...\n",
+         state_size, state_size/(1024*1024));
+  unsigned char *global_state = (unsigned char*) malloc (state_size * sizeof(unsigned char));
+  if (!global_state) {
+    fprintf(stderr, "Failed to allocate %lld bytes for global_state\n", state_size);
+    exit(-1);
+  }
+  printf("DEBUG: Allocation successful\n");
 
+  printf("DEBUG: Entering target data region...\n");
   #pragma omp target data map (to: data[0:length]) \
                           map (from: best[0:FSMSIZE * 2 + 3]) \
                           map (alloc: rndstate[0:POPCNT * POPSIZE],\
@@ -93,15 +107,22 @@ int main(int argc, char *argv[])
                                       same[0:POPCNT],\
                                       smax[0:POPCNT],\
                                       sbest[0:POPCNT],\
-                                      oldmax[0:POPCNT])
+                                      oldmax[0:POPCNT],\
+                                      global_state[0:state_size])
   {
+    printf("DEBUG: Inside target data region\n");
     gettimeofday(&starttime, NULL);
 
+    printf("DEBUG: Starting kernel execution loop\n");
     for (int i = 0; i < REPEAT; i++) {
+      printf("DEBUG: Iteration %d - Initializing best array...\n", i);
       #pragma omp target teams distribute parallel for
       for (int i = 0; i < FSMSIZE * 2 + 3; i++) best[i] = 0;
-      FSMKernel(length, data, best, rndstate, bfsm, same, smax, sbest, oldmax);
+      printf("DEBUG: Iteration %d - Calling FSMKernel...\n", i);
+      FSMKernel(length, data, best, rndstate, bfsm, same, smax, sbest, oldmax, global_state);
+      printf("DEBUG: Iteration %d - Calling MaxKernel...\n", i);
       MaxKernel(best, bfsm);
+      printf("DEBUG: Iteration %d - Complete\n", i);
     }
 
     gettimeofday(&endtime, NULL);
@@ -178,5 +199,6 @@ int main(int argc, char *argv[])
   free(smax);
   free(sbest);
   free(oldmax);
+  free(global_state);
   return 0;
 }

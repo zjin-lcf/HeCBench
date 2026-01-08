@@ -75,20 +75,20 @@ static MEM_ARRAY   mem_info_sum[MEM_NUM_STD_TYPES];
 
 
 /* for freeing various types */
-static int (*mem_free_funcs[MEM_NUM_STD_TYPES])(void*) = {
-   wrapped_m_free,
-   wrapped_bd_free,
-   wrapped_px_free,    
-   wrapped_v_free,	
-   wrapped_iv_free
+static int (*mem_free_funcs[MEM_NUM_STD_TYPES])() = {
+   m_free,
+   bd_free,
+   px_free,    
+   v_free,	
+   iv_free
 #ifdef SPARSE
-     ,wrapped_iter_free,	
-     wrapped_sprow_free, 
-     wrapped_sp_free
+     ,iter_free,	
+     sprow_free, 
+     sp_free
 #endif
 #ifdef COMPLEX
-       ,wrapped_zv_free,	
-       wrapped_zm_free
+       ,zv_free,	
+       zm_free
 #endif
       };
 

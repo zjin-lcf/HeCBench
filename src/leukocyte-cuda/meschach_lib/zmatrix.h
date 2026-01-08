@@ -166,9 +166,7 @@ extern ZVEC	*zv_star(const ZVEC *x1, const ZVEC *x2, ZVEC *out);
 extern ZVEC	*zv_slash(const ZVEC *x1, const ZVEC *x2, ZVEC *out);
 extern complex	zv_sum(const ZVEC *x);
 extern int	zm_free(ZMAT *mat);
-extern int	wrapped_zm_free(void*);
 extern int	zv_free(ZVEC *vec);
-extern int	wrapped_zv_free(void*);
 
 extern ZVEC	*zv_rand(ZVEC *x);
 extern ZMAT	*zm_rand(ZMAT *A);

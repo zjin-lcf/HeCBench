@@ -3,7 +3,7 @@
 #===============================================================================
 
 #intel
-CC          = icpc 
+CC        = /opt/nvidia/hpc_sdk/Linux_aarch64/25.11/compilers/bin/nvc++ 
 OPTIMIZE    = yes
 DEBUG       = no
 DEVICE      = gpu
@@ -104,14 +104,15 @@ endif
 
 
 # Optimization Flags
+# Note: Using -O1 instead of -O3 to speed up compilation of large codebase
 ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3
+  CFLAGS += -O1
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS += -mp=gpu
 else
-  CFLAGS +=-qopenmp
+  CFLAGS +=-mp=multicore
 endif
 
 #===============================================================================
@@ -122,7 +123,7 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(EXTRA_CFLAGS) -std=c++17 -Wall -O1 -c $< -o $@
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@

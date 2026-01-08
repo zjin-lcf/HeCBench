@@ -99,7 +99,7 @@ MAT	*_set_col(MAT *mat, unsigned int col, const VEC *vec, unsigned int i0)
      error(E_NULL,"_set_col");
    if ( col >= mat->n )
      error(E_RANGE,"_set_col");
-   lim = macro_min(mat->m,vec->dim);
+   lim = min(mat->m,vec->dim);
    for ( i=i0; i<lim; i++ )
      mat->me[i][col] = vec->ve[i];
    
@@ -122,7 +122,7 @@ MAT	*_set_row(MAT *mat, unsigned int row, const VEC *vec, unsigned int j0)
      error(E_NULL,"_set_row");
    if ( row >= mat->m )
      error(E_RANGE,"_set_row");
-   lim = macro_min(mat->n,vec->dim);
+   lim = min(mat->n,vec->dim);
    for ( j=j0; j<lim; j++ )
      mat->me[row][j] = vec->ve[j];
    
@@ -135,10 +135,13 @@ MAT	*_set_row(MAT *mat, unsigned int row, const VEC *vec, unsigned int j0)
    matrix will alter the "old" matrix */
 #ifndef ANSI_C
 MAT	*sub_mat(old,row1,col1,row2,col2,new)
-MAT	*old,*new_output;
+MAT	*old,*new;
 unsigned int	row1,col1,row2,col2;
 #else
-MAT	*sub_mat(const MAT *old, unsigned int row1, unsigned int col1, unsigned int row2, unsigned int col2, MAT *new_output)
+MAT	*sub_mat(const MAT *old, 
+		 unsigned int row1, unsigned int col1,
+		 unsigned int row2, unsigned int col2,
+		 MAT *new)
 #endif
 {
    unsigned int	i;
@@ -147,11 +150,11 @@ MAT	*sub_mat(const MAT *old, unsigned int row1, unsigned int col1, unsigned int 
      error(E_NULL,"sub_mat");
    if ( row1 > row2 || col1 > col2 || row2 >= old->m || col2 >= old->n )
      error(E_RANGE,"sub_mat");
-   if ( new_output==(MAT *)NULL || new_output->m < row2-row1+1 )
+   if ( new==(MAT *)NULL || new->m < row2-row1+1 )
    {
-      new_output = NEW(MAT);
-      new_output->me = NEW_A(row2-row1+1,Real *);
-      if ( new_output==(MAT *)NULL || new_output->me==(Real **)NULL )
+      new = NEW(MAT);
+      new->me = NEW_A(row2-row1+1,Real *);
+      if ( new==(MAT *)NULL || new->me==(Real **)NULL )
 	error(E_MEM,"sub_mat");
       else if (mem_info_is_on()) {
 	 mem_bytes(TYPE_MAT,0,sizeof(MAT)+
@@ -159,27 +162,27 @@ MAT	*sub_mat(const MAT *old, unsigned int row1, unsigned int col1, unsigned int 
       }
       
    }
-   new_output->m = row2-row1+1;
+   new->m = row2-row1+1;
    
-   new_output->n = col2-col1+1;
+   new->n = col2-col1+1;
    
-   new_output->base = (Real *)NULL;
+   new->base = (Real *)NULL;
    
-   for ( i=0; i < new_output->m; i++ )
-     new_output->me[i] = (old->me[i+row1]) + col1;
+   for ( i=0; i < new->m; i++ )
+     new->me[i] = (old->me[i+row1]) + col1;
    
-   return (new_output);
+   return (new);
 }
 
 
 /* sub_vec -- returns sub-vector which is formed by the elements i1 to i2
    -- as for sub_mat, storage is shared */
 #ifndef ANSI_C
-VEC	*sub_vec(old,i1,i2,new_output)
-VEC	*old, *new_output;
+VEC	*sub_vec(old,i1,i2,new)
+VEC	*old, *new;
 int	i1, i2;
 #else
-VEC	*sub_vec(const VEC *old, int i1, int i2, VEC *new_output)
+VEC	*sub_vec(const VEC *old, int i1, int i2, VEC *new)
 #endif
 {
    if ( old == (VEC *)NULL )
@@ -187,17 +190,17 @@ VEC	*sub_vec(const VEC *old, int i1, int i2, VEC *new_output)
    if ( i1 > i2 || old->dim < i2 )
      error(E_RANGE,"sub_vec");
    
-   if ( new_output == (VEC *)NULL )
-     new_output = NEW(VEC);
-   if ( new_output == (VEC *)NULL )
+   if ( new == (VEC *)NULL )
+     new = NEW(VEC);
+   if ( new == (VEC *)NULL )
      error(E_MEM,"sub_vec");
    else if (mem_info_is_on()) {
       mem_bytes(TYPE_VEC,0,sizeof(VEC));
    }
    
    
-   new_output->dim = i2 - i1 + 1;
-   new_output->ve = &(old->ve[i1]);
+   new->dim = i2 - i1 + 1;
+   new->ve = &(old->ve[i1]);
    
-   return new_output;
+   return new;
 }

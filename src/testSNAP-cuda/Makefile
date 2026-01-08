@@ -27,6 +27,9 @@ obj = $(source:.cu=.o)
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall -I. -I../testSNAP-omp \
           -DREFDATA_TWOJ=14  -arch=$(ARCH)
 
+# Reference data files
+REFDATA_FILES = refdata_2J14_W.h refdata_2J8_W.h refdata_2J4_W.h refdata_2J2_W.h
+
 # Linker Flags
 LDFLAGS = 
 
@@ -48,7 +51,13 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu snap.h utils.cu
+$(REFDATA_FILES):
+	@if [ ! -f refdata_2J14_W.h ]; then \
+		echo "Extracting SNAP reference data..."; \
+		tar -xzf ../testSNAP-omp/refdata.tar.gz; \
+	fi
+
+%.o: %.cu snap.h utils.cu $(REFDATA_FILES)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

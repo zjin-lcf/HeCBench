@@ -1,9 +1,8 @@
 #===============================================================================
 # User Options
 #===============================================================================
-MPI_ROOT=/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/comm_libs/mpi
-CUBLAS_ROOT=/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/math_libs/11.2
-CUDART_ROOT=/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2
+MPI_ROOT  = /usr/lib/aarch64-linux-gnu/openmpi
+CUDA_ROOT=/usr/local/cuda
 
 # Compiler can be set below, or via environment variable
 CC        = nvcc
@@ -31,8 +30,7 @@ obj = $(source:.cu=.o)
 CFLAGS := $(EXTRA_CFLAGS) -I$(MPI_ROOT)/include -std=c++11 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
-LDFLAGS = -L$(CUBLAS_ROOT)/targets/x86_64-linux/lib/ -lcublas \
-	  -L$(CUDART_ROOT)/targets/x86_64-linux/lib/ -lcudart
+LDFLAGS = -L$(CUDA_ROOT)/lib64 -lcublas -lcudart
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

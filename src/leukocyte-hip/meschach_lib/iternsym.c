@@ -952,7 +952,7 @@ static void test_mgcr(ITER *ip, int i, MAT *Q, MAT *R)
    sm = 0.0;
    for (j = 1; j <= i; j++) {
       vt.ve = Q->me[j];
-      sm = macro_max(sm,in_prod(&vt,rr));
+      sm = max(sm,in_prod(&vt,rr));
    }
 #ifndef MEX
    if (sm >= MACHEPS*ip->b->dim)

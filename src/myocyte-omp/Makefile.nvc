@@ -33,11 +33,11 @@ endif
 ./myocyte.out:	./main.o \
 	./kernel/kernel_wrapper.o \
 	./util/file/file.o \
-	./util/num/num.o \
+	./util/num/num.o
 	$(CC) $(CFLAGS) ./main.o \
 		./kernel/kernel_wrapper.o \
 		./util/file/file.o \
-		./util/num/num.o
+		./util/num/num.o \
 		$(LDFLAGS) \
 		-o myocyte.out
 

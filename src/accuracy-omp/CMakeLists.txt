@@ -1,8 +1,8 @@
-# accuracy-omp/CMakeLists.txt
+# accuracy-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME accuracy
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

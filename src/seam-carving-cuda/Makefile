@@ -46,7 +46,13 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu stb*.h kernels.h kernels_wrapper.h utils.h Makefile
+stb_image.h:
+	@if [ ! -f stb_image.h ]; then \
+		echo "Extracting STB image headers and test data..."; \
+		tar -xzf image.tar.gz; \
+	fi
+
+%.o: %.cu stb_image.h kernels.h kernels_wrapper.h utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

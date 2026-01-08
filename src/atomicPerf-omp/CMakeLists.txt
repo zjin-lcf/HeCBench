@@ -1,8 +1,8 @@
-# atomicPerf-omp/CMakeLists.txt
+# atomicPerf-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME atomicPerf
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

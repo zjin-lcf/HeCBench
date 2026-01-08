@@ -125,8 +125,8 @@ void reduceForceIAndFShiftXYZ(
     {
       if constexpr (c_clSize == 4)
       {
-        fShiftBuf += __shfl_down(fShiftBuf, 1);
-        fShiftBuf += __shfl_down(fShiftBuf, 2);
+        fShiftBuf += __shfl_down_sync(0xffffffff, fShiftBuf, 1);
+        fShiftBuf += __shfl_down_sync(0xffffffff, fShiftBuf, 2);
         if (tidxi == 0)
         {
           atomicAdd(&a_fShift[shift][tidxj], fShiftBuf);
@@ -148,16 +148,16 @@ void reduceForceJShuffle(
     Float3 *a_f)
 {
   static_assert(c_clSize == 8 || c_clSize == 4);
-  f[0] += __shfl_down(f[0], 1);
-  f[1] += __shfl_up(f[1], 1);
-  f[2] += __shfl_down(f[2], 1);
+  f[0] += __shfl_down_sync(0xffffffff, f[0], 1);
+  f[1] += __shfl_up_sync(0xffffffff, f[1], 1);
+  f[2] += __shfl_down_sync(0xffffffff, f[2], 1);
   if (tidxi & 1)
   {
     f[0] = f[1];
   }
 
-  f[0] += __shfl_down(f[0], 2);
-  f[2] += __shfl_up(f[2], 2);
+  f[0] += __shfl_down_sync(0xffffffff, f[0], 2);
+  f[2] += __shfl_up_sync(0xffffffff, f[2], 2);
   if (tidxi & 2)
   {
     f[0] = f[2];
@@ -165,7 +165,7 @@ void reduceForceJShuffle(
 
   if constexpr (c_clSize == 8)
   {
-    f[0] += __shfl_down(f[0], 4);
+    f[0] += __shfl_down_sync(0xffffffff, f[0], 4);
   }
 
   if (tidxi < 3)

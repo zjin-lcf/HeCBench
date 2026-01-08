@@ -12,7 +12,7 @@ typedef unsigned long long tUnit;
 
 struct Event {
     tUnit t;
-    char v;
+    signed char v;
 
 #ifdef DEBUG_LIB
 	bool operator== (const Event& e) {

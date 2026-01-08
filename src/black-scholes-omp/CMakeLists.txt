@@ -1,8 +1,8 @@
-# black-scholes-omp/CMakeLists.txt
+# black-scholes-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME black-scholes
-    MODEL omp
-    SOURCES blackScholesAnalyticEngine.cpp blackScholesAnalyticEngineKernels.cpp blackScholesAnalyticEngineKernelsCpu.cpp
+    MODEL cuda
+    SOURCES blackScholesAnalyticEngine.cu
     CATEGORIES algorithms
 )

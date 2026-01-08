@@ -1,8 +1,9 @@
-# aobench-omp/CMakeLists.txt
+# aobench-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME aobench
-    MODEL omp
-    SOURCES ao.cpp
+    MODEL cuda
+    SOURCES ao.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS -use_fast_math
 )

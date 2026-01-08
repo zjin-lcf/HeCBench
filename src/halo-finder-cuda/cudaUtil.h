@@ -13,11 +13,11 @@
 __device__  __forceinline__
 void atomicWarpReduceAndUpdate(POSVEL_T *out, POSVEL_T val) {
   //perform shfl reduction
-  val+=__shfl_down(val, 16); 
-  val+=__shfl_down(val, 8); 
-  val+=__shfl_down(val, 4);
-  val+=__shfl_down(val, 2); 
-  val+=__shfl_down(val, 1);
+  val+=__shfl_down_sync(0xffffffff, val, 16);
+  val+=__shfl_down_sync(0xffffffff, val, 8);
+  val+=__shfl_down_sync(0xffffffff, val, 4);
+  val+=__shfl_down_sync(0xffffffff, val, 2);
+  val+=__shfl_down_sync(0xffffffff, val, 1);
 
   if(threadIdx.x%32==0)
     atomicAdd(out,val);  //atomics are unecessary but they are faster than non-atomics due to a single bus transaction

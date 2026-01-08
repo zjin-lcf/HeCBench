@@ -324,7 +324,7 @@ MAT	*bifactor(MAT *A, MAT *U, MAT *V)
 		error(E_SIZES,"bifactor");
 	tmp1 = v_resize(tmp1,A->m);
 	tmp2 = v_resize(tmp2,A->n);
-	w    = v_resize(w,   macro_max(A->m,A->n));
+	w    = v_resize(w,   max(A->m,A->n));
 	MEM_STAT_REG(tmp1,TYPE_VEC);
 	MEM_STAT_REG(tmp2,TYPE_VEC);
 	MEM_STAT_REG(w,   TYPE_VEC);
@@ -396,7 +396,7 @@ VEC	*svd(MAT *A, MAT *U, MAT *V, VEC *d)
 	    m_ident(U);
 	if ( V != MNULL )
 	    m_ident(V);
-	limit = macro_min(A_tmp->m,A_tmp->n);
+	limit = min(A_tmp->m,A_tmp->n);
 	d = v_resize(d,limit);
 	f = v_resize(f,limit-1);
 	MEM_STAT_REG(f,TYPE_VEC);

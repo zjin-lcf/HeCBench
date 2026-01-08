@@ -1,8 +1,8 @@
-# asmooth-omp/CMakeLists.txt
+# asmooth-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME asmooth
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

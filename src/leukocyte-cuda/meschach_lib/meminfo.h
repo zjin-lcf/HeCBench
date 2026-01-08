@@ -152,7 +152,7 @@ int mem_stat_reg_vars();
 
 typedef struct {
    char **type_names;        /* array of names of types (strings) */
-   int  (**free_funcs)(void*);    /* array of functions for releasing types */
+   int  (**free_funcs)();    /* array of functions for releasing types */
    unsigned ntypes;          /* max number of types */
    MEM_ARRAY *info_sum;      /* local array for keeping track of memory */
 } MEM_CONNECT;

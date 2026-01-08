@@ -588,11 +588,10 @@ int	chk_col_access(const SPMAT *A)
 static int	col_cmp(e1,e2)
 row_elt	*e1, *e2;
 #else
-//static int	col_cmp(const row_elt *e1, const row_elt *e2)
-static int	col_cmp(const void *e1, const void *e2)
+static int	col_cmp(const row_elt *e1, const row_elt *e2)
 #endif
 {
-    return ((row_elt*)e1)->col - ((row_elt*)e2)->col;
+    return e1->col - e2->col;
 }
 
 /* spBKPfactor -- sparse Bunch-Kaufman-Parlett factorisation of A in-situ
@@ -1289,8 +1288,7 @@ SPMAT	*spBKPfactor(SPMAT *A, PERM *pivot, PERM *blocks, double tol)
 
     /* now sort the rows arrays */
     for ( i = 0; i < A->m; i++ )
-	qsort(A->row[i].elt,A->row[i].len,sizeof(row_elt),col_cmp);
-	//qsort(A->row[i].elt,A->row[i].len,sizeof(row_elt),(int(*)())col_cmp);
+	qsort(A->row[i].elt,A->row[i].len,sizeof(row_elt),(int(*)())col_cmp);
     A->flag_col = A->flag_diag = FALSE;
 
 #ifdef	THREADSAFE

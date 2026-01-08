@@ -45,12 +45,11 @@ static	char	rcsid[] = "$Id: zhsehldr.c,v 1.2 1994/04/07 01:43:47 des Exp $";
 
 /* zhhvec -- calulates Householder vector to eliminate all entries after the
 	i0 entry of the vector vec. It is returned as out. May be in-situ */
-ZVEC	*zhhvec(//vec,i0,beta,out,newval)
-ZVEC	*vec,
-int	i0,
-Real	*beta,
-ZVEC	*out,
-complex	*newval)
+ZVEC	*zhhvec(vec,i0,beta,out,newval)
+ZVEC	*vec,*out;
+int	i0;
+Real	*beta;
+complex	*newval;
 {
 	complex	tmp;
 	Real	norm, abs_val;
@@ -86,12 +85,10 @@ complex	*newval)
 }
 
 /* zhhtrvec -- apply Householder transformation to vector -- may be in-situ */
-ZVEC	*zhhtrvec(//hh,beta,i0,in,out)
-ZVEC	*hh,
-double	beta,
-int	i0,
-ZVEC	*in,
-ZVEC	*out)
+ZVEC	*zhhtrvec(hh,beta,i0,in,out)
+ZVEC	*hh,*in,*out;	/* hh = Householder vector */
+int	i0;
+double	beta;
 {
 	complex	scale, tmp;
 	/* unsigned int	i; */
@@ -121,12 +118,11 @@ ZVEC	*out)
 	starting at row i0 from column j0 
 	-- in-situ
 	-- that is, M(i0:m,j0:n) <- M(i0:m,j0:n)(I-beta.hh(j0:n).hh(j0:n)^T) */
-ZMAT	*zhhtrrows(//M,i0,j0,hh,beta)
-ZMAT	*M,
-int	i0, 
-int     j0,
-ZVEC	*hh,
-double	beta)
+ZMAT	*zhhtrrows(M,i0,j0,hh,beta)
+ZMAT	*M;
+int	i0, j0;
+ZVEC	*hh;
+double	beta;
 {
 	complex	ip, scale;
 	int	i /*, j */;
@@ -176,12 +172,11 @@ double	beta)
 	-- Meschach internal routines should call _zhhtrcols() to
 	avoid excessive memory allocation/de-allocation
 */
-ZMAT	*zhhtrcols(//M,i0,j0,hh,beta)
-ZMAT	*M,
-int	i0, 
-int     j0,
-ZVEC	*hh,
-double	beta)
+ZMAT	*zhhtrcols(M,i0,j0,hh,beta)
+ZMAT	*M;
+int	i0, j0;
+ZVEC	*hh;
+double	beta;
 {
 	/* Real	ip, scale; */
 	complex	scale;
@@ -216,13 +211,12 @@ double	beta)
 	-- in-situ
 	-- scratch vector w passed as argument
 	-- raises error if w == NULL */
-ZMAT	*_zhhtrcols(//M,i0,j0,hh,beta,w)
-ZMAT	*M,
-int	i0, 
-int     j0,
-ZVEC	*hh,
-double	beta,
-ZVEC	*w)
+ZMAT	*_zhhtrcols(M,i0,j0,hh,beta,w)
+ZMAT	*M;
+int	i0, j0;
+ZVEC	*hh;
+double	beta;
+ZVEC	*w;
 {
 	/* Real	ip, scale; */
 	complex	scale;

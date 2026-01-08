@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = /opt/nvidia/hpc_sdk/Linux_aarch64/25.11/compilers/bin/nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -23,7 +23,7 @@ obj = main.o force_kernel.o
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I../mcmd-cuda \
-          -D_MWAITXINTRIN_H_INCLUDED -D_FORCE_INLINES -D__STRICT_ANSI__ \
+          -D_MWAITXINTRIN_H_INCLUDED -D_FORCE_INLINES \
           -DGPU
 
 # Linker Flags
@@ -41,9 +41,9 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-mp=gpu
 else
-  CFLAGS +=-qopenmp
+  CFLAGS +=-mp=multicore
 endif
 
 #===============================================================================

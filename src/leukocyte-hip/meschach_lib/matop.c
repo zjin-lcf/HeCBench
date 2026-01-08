@@ -378,8 +378,8 @@ MAT	*swap_rows(MAT *A, int i, int j, int lo, int hi)
 		error(E_NULL,"swap_rows");
 	if ( i < 0 || j < 0 || i >= A->m || j >= A->m )
 		error(E_SIZES,"swap_rows");
-	lo = macro_max(0,lo);
-	hi = macro_min(hi,A->n-1);
+	lo = max(0,lo);
+	hi = min(hi,A->n-1);
 	A_me = A->me;
 
 	for ( k = lo; k <= hi; k++ )
@@ -407,8 +407,8 @@ MAT	*swap_cols(MAT *A, int i, int j, int lo, int hi)
 		error(E_NULL,"swap_cols");
 	if ( i < 0 || j < 0 || i >= A->n || j >= A->n )
 		error(E_SIZES,"swap_cols");
-	lo = macro_max(0,lo);
-	hi = macro_min(hi,A->m-1);
+	lo = max(0,lo);
+	hi = min(hi,A->m-1);
 	A_me = A->me;
 
 	for ( k = lo; k <= hi; k++ )

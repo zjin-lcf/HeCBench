@@ -1,4 +1,4 @@
-CC        = icpx
+CC        = /opt/nvidia/hpc_sdk/Linux_aarch64/25.11/compilers/bin/nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -6,9 +6,9 @@ DEVICE    = gpu
 CFLAGS +=-O3 -DDEBUG -Wall -Minfo -mp=gpu -gpu=$(SM),fastmath
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-O3 -DDEBUG -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-O3 -DDEBUG -mp=gpu
 else
-  CFLAGS +=-O3 -DDEBUG -qopenmp
+  CFLAGS +=-O3 -DDEBUG -mp=multicore
 endif
 
 

@@ -41,9 +41,9 @@ static	char	rcsid[] = "$Id: zhessen.c,v 1.2 1995/03/27 15:47:50 des Exp $";
 /* zHfactor -- compute Hessenberg factorisation in compact form.
 	-- factorisation performed in situ
 	-- for details of the compact form see zQRfactor.c and zmatrix2.doc */
-ZMAT	*zHfactor(//A, diag)
-ZMAT	*A,
-ZVEC	*diag)
+ZMAT	*zHfactor(A, diag)
+ZMAT	*A;
+ZVEC	*diag;
 {
 	STATIC	ZVEC	*tmp1 = ZVNULL, *w = ZVNULL;
 	Real	beta;
@@ -88,11 +88,9 @@ ZVEC	*diag)
 	-- it can be in situ with HQ == H
 	-- returns HQ
 */
-ZMAT	*zHQunpack(//HQ,diag,Q,H)
-ZMAT	*HQ, 
-ZVEC	*diag,
-	ZMAT*Q, 
-	ZMAT*H)
+ZMAT	*zHQunpack(HQ,diag,Q,H)
+ZMAT	*HQ, *Q, *H;
+ZVEC	*diag;
 {
 	int	i, j, limit;
 	Real	beta, r_ii, tmp_val;

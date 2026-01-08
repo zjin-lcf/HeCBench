@@ -1,6 +1,6 @@
-# generated automatically by aclocal 1.16.1 -*- Autoconf -*-
+# generated automatically by aclocal 1.16.5 -*- Autoconf -*-
 
-# Copyright (C) 1996-2018 Free Software Foundation, Inc.
+# Copyright (C) 1996-2021 Free Software Foundation, Inc.
 
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -14,185 +14,13 @@
 m4_ifndef([AC_CONFIG_MACRO_DIRS], [m4_defun([_AM_CONFIG_MACRO_DIRS], [])m4_defun([AC_CONFIG_MACRO_DIRS], [_AM_CONFIG_MACRO_DIRS($@)])])
 m4_ifndef([AC_AUTOCONF_VERSION],
   [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
-m4_if(m4_defn([AC_AUTOCONF_VERSION]), [2.69],,
-[m4_warning([this file was generated for autoconf 2.69.
+m4_if(m4_defn([AC_AUTOCONF_VERSION]), [2.71],,
+[m4_warning([this file was generated for autoconf 2.71.
 You have another version of autoconf.  It may work, but is not guaranteed to.
 If you have problems, you may need to regenerate the build system entirely.
 To do so, use the procedure documented by the package, typically 'autoreconf'.])])
 
-# ===========================================================================
-#      https://www.gnu.org/software/autoconf-archive/ax_prog_cc_mpi.html
-# ===========================================================================
-#
-# SYNOPSIS
-#
-#   AX_PROG_CC_MPI([MPI-WANTED-TEST[, ACTION-IF-FOUND[, ACTION-IF-NOT-FOUND]]])
-#
-# DESCRIPTION
-#
-#   This macro tries to find out how to compile C programs that use MPI
-#   (Message Passing Interface), a standard API for parallel process
-#   communication (see http://www-unix.mcs.anl.gov/mpi/). The macro has to
-#   be used instead of the standard macro AC_PROG_CC and will replace the
-#   standard variable CC with the found compiler.
-#
-#   MPI-WANTED-TEST is used to test whether MPI is actually wanted by the
-#   user. If MPI-WANTED_TEST is omitted or if it succeeds, the macro will
-#   try to find out how to use MPI, if it fails, the macro will call
-#   AC_PROG_CC to find a standard C compiler instead.
-#
-#   When MPI is found, ACTION-IF-FOUND will be executed, if MPI is not found
-#   (or MPI-WANTED-TEST fails) ACTION-IF-NOT-FOUND is executed. If
-#   ACTION-IF-FOUND is not set, the macro will define HAVE_MPI.
-#
-#   The following example demonstrates usage of the macro:
-#
-#     # If --with-mpi=auto is used, try to find MPI, but use standard C compiler if it is not found.
-#     # If --with-mpi=yes is used, try to find MPI and fail if it isn't found.
-#     # If --with-mpi=no is used, use a standard C compiler instead.
-#     AC_ARG_WITH(mpi, [AS_HELP_STRING([--with-mpi],
-#         [compile with MPI (parallelization) support. If none is found,
-#         MPI is not used. Default: auto])
-#     ],,[with_mpi=auto])
-#     #
-#     AX_PROG_CC_MPI([test x"$with_mpi" != xno],[use_mpi=yes],[
-#       use_mpi=no
-#       if test x"$with_mpi" = xyes; then
-#         AC_MSG_FAILURE([MPI compiler requested, but couldn't use MPI.])
-#       else
-#         AC_MSG_WARN([No MPI compiler found, won't use MPI.])
-#       fi
-#     ])
-#
-# LICENSE
-#
-#   Copyright (c) 2010,2011 Olaf Lenz <olenz@icp.uni-stuttgart.de>
-#
-#   This program is free software: you can redistribute it and/or modify it
-#   under the terms of the GNU General Public License as published by the
-#   Free Software Foundation, either version 3 of the License, or (at your
-#   option) any later version.
-#
-#   This program is distributed in the hope that it will be useful, but
-#   WITHOUT ANY WARRANTY; without even the implied warranty of
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
-#   Public License for more details.
-#
-#   You should have received a copy of the GNU General Public License along
-#   with this program. If not, see <https://www.gnu.org/licenses/>.
-#
-#   As a special exception, the respective Autoconf Macro's copyright owner
-#   gives unlimited permission to copy, distribute and modify the configure
-#   scripts that are the output of Autoconf when processing the Macro. You
-#   need not follow the terms of the GNU General Public License when using
-#   or distributing such scripts, even though portions of the text of the
-#   Macro appear in them. The GNU General Public License (GPL) does govern
-#   all other use of the material that constitutes the Autoconf Macro.
-#
-#   This special exception to the GPL applies to versions of the Autoconf
-#   Macro released by the Autoconf Archive. When you make and distribute a
-#   modified version of the Autoconf Macro, you may extend this special
-#   exception to the GPL to apply to your modified version as well.
-
-#serial 2
-
-AC_DEFUN([AX_PROG_CC_MPI], [
-AC_PREREQ(2.50)
-
-# Check for compiler
-# Needs to be split off into an extra macro to ensure right expansion
-# order.
-AC_REQUIRE([_AX_PROG_CC_MPI],[_AX_PROG_CC_MPI([$1])])
-
-AS_IF([test x"$_ax_prog_cc_mpi_mpi_wanted" = xno],
-  [ _ax_prog_cc_mpi_mpi_found=no ],
-  [
-    AC_LANG_PUSH([C])
-    # test whether MPI_Init is available
-    # We do not use AC_SEARCH_LIBS here, as it caches its outcome and
-    # thus disallows corresponding calls in the other AX_PROG_*_MPI
-    # macros.
-    for lib in NONE mpi mpich; do
-      save_LIBS=$LIBS
-      if test x"$lib" = xNONE; then
-        AC_MSG_CHECKING([for function MPI_Init])
-      else
-        AC_MSG_CHECKING([for function MPI_Init in -l$lib])
-        LIBS="-l$lib $LIBS"
-      fi
-      AC_LINK_IFELSE([AC_LANG_CALL([],[MPI_Init])],
-        [ _ax_prog_cc_mpi_mpi_found=yes ],
-        [ _ax_prog_cc_mpi_mpi_found=no ])
-      AC_MSG_RESULT($_ax_prog_cc_mpi_mpi_found)
-      if test "x$_ax_prog_cc_mpi_mpi_found" = "xyes"; then
-        break;
-      fi
-      LIBS=$save_LIBS
-    done
-
-    # Check for header
-    AS_IF([test x"$_ax_prog_cc_mpi_mpi_found" = xyes], [
-      AC_MSG_CHECKING([for mpi.h])
-      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([#include <mpi.h>])],
-        [ AC_MSG_RESULT(yes)],
-        [ AC_MSG_RESULT(no)
-         _ax_prog_cc_mpi_mpi_found=no
-      ])
-    ])
-    AC_LANG_POP([C])
-])
-
-# Finally, execute ACTION-IF-FOUND/ACTION-IF-NOT-FOUND:
-AS_IF([test x"$_ax_prog_cc_mpi_mpi_found" = xyes], [
-        ifelse([$2],,[AC_DEFINE(HAVE_MPI,1,[Define if you have the MPI library.])],[$2])
-        :
-],[
-        $3
-        :
-])
-
-])dnl AX_PROG_CC_MPI
-
-dnl _AX_PROG_CC_MPI is an internal macro required by AX_PROG_CC_MPI.
-dnl To ensure the right expansion order, the main function AX_PROG_CC_MPI
-dnl has to be split into two parts.
-dnl
-dnl Known MPI C compilers:
-dnl  mpicc
-dnl  mpixlc_r
-dnl  mpixlc
-dnl  hcc
-dnl  mpxlc_r
-dnl  mpxlc
-dnl  sxmpicc  NEC SX
-dnl  mpifcc   Fujitsu
-dnl  mpgcc
-dnl  mpcc
-dnl  cmpicc
-dnl  cc
-dnl
-AC_DEFUN([_AX_PROG_CC_MPI], [
-  AC_ARG_VAR(MPICC,[MPI C compiler command])
-  ifelse([$1],,[_ax_prog_cc_mpi_mpi_wanted=yes],[
-    AC_MSG_CHECKING([whether to compile using MPI])
-    if $1; then
-      _ax_prog_cc_mpi_mpi_wanted=yes
-    else
-      _ax_prog_cc_mpi_mpi_wanted=no
-    fi
-    AC_MSG_RESULT($_ax_prog_cc_mpi_mpi_wanted)
-  ])
-  if test x"$_ax_prog_cc_mpi_mpi_wanted" = xyes; then
-    if test -z "$CC" && test -n "$MPICC"; then
-      CC="$MPICC"
-    else
-      AC_CHECK_TOOLS([CC], [mpicc mpixlc_r mpixlc hcc mpxlc_r mpxlc sxmpicc mpifcc mpgcc mpcc cmpicc cc gcc])
-    fi
-  fi
-  AC_PROG_CC
-])dnl _AX_PROG_CC_MPI
-
-# Copyright (C) 2002-2018 Free Software Foundation, Inc.
+# Copyright (C) 2002-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -207,7 +35,7 @@ AC_DEFUN([AM_AUTOMAKE_VERSION],
 [am__api_version='1.16'
 dnl Some users find AM_AUTOMAKE_VERSION and mistake it for a way to
 dnl require some minimum version.  Point them to the right macro.
-m4_if([$1], [1.16.1], [],
+m4_if([$1], [1.16.5], [],
       [AC_FATAL([Do not call $0, use AM_INIT_AUTOMAKE([$1]).])])dnl
 ])
 
@@ -223,14 +51,14 @@ m4_define([_AM_AUTOCONF_VERSION], [])
 # Call AM_AUTOMAKE_VERSION and AM_AUTOMAKE_VERSION so they can be traced.
 # This function is AC_REQUIREd by AM_INIT_AUTOMAKE.
 AC_DEFUN([AM_SET_CURRENT_AUTOMAKE_VERSION],
-[AM_AUTOMAKE_VERSION([1.16.1])dnl
+[AM_AUTOMAKE_VERSION([1.16.5])dnl
 m4_ifndef([AC_AUTOCONF_VERSION],
   [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
 _AM_AUTOCONF_VERSION(m4_defn([AC_AUTOCONF_VERSION]))])
 
 # AM_AUX_DIR_EXPAND                                         -*- Autoconf -*-
 
-# Copyright (C) 2001-2018 Free Software Foundation, Inc.
+# Copyright (C) 2001-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -282,7 +110,7 @@ am_aux_dir=`cd "$ac_aux_dir" && pwd`
 
 # AM_CONDITIONAL                                            -*- Autoconf -*-
 
-# Copyright (C) 1997-2018 Free Software Foundation, Inc.
+# Copyright (C) 1997-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -313,7 +141,7 @@ AC_CONFIG_COMMANDS_PRE(
 Usually this means the macro was only invoked conditionally.]])
 fi])])
 
-# Copyright (C) 1999-2018 Free Software Foundation, Inc.
+# Copyright (C) 1999-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -504,7 +332,7 @@ _AM_SUBST_NOTMAKE([am__nodep])dnl
 
 # Generate code to set up dependency tracking.              -*- Autoconf -*-
 
-# Copyright (C) 1999-2018 Free Software Foundation, Inc.
+# Copyright (C) 1999-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -543,7 +371,9 @@ AC_DEFUN([_AM_OUTPUT_DEPENDENCY_COMMANDS],
   done
   if test $am_rc -ne 0; then
     AC_MSG_FAILURE([Something went wrong bootstrapping makefile fragments
-    for automatic dependency tracking.  Try re-running configure with the
+    for automatic dependency tracking.  If GNU make was not used, consider
+    re-running the configure script with MAKE="gmake" (or whatever is
+    necessary).  You can also try re-running configure with the
     '--disable-dependency-tracking' option to at least be able to build
     the package (albeit without support for automatic dependency tracking).])
   fi
@@ -570,7 +400,7 @@ AC_DEFUN([AM_OUTPUT_DEPENDENCY_COMMANDS],
 
 # Do all the work for Automake.                             -*- Autoconf -*-
 
-# Copyright (C) 1996-2018 Free Software Foundation, Inc.
+# Copyright (C) 1996-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -598,6 +428,10 @@ m4_defn([AC_PROG_CC])
 # release and drop the old call support.
 AC_DEFUN([AM_INIT_AUTOMAKE],
 [AC_PREREQ([2.65])dnl
+m4_ifdef([_$0_ALREADY_INIT],
+  [m4_fatal([$0 expanded multiple times
+]m4_defn([_$0_ALREADY_INIT]))],
+  [m4_define([_$0_ALREADY_INIT], m4_expansion_stack)])dnl
 dnl Autoconf wants to disallow AM_ names.  We explicitly allow
 dnl the ones we care about.
 m4_pattern_allow([^AM_[A-Z]+FLAGS$])dnl
@@ -634,7 +468,7 @@ m4_ifval([$3], [_AM_SET_OPTION([no-define])])dnl
 [_AM_SET_OPTIONS([$1])dnl
 dnl Diagnose old-style AC_INIT with new-style AM_AUTOMAKE_INIT.
 m4_if(
-  m4_ifdef([AC_PACKAGE_NAME], [ok]):m4_ifdef([AC_PACKAGE_VERSION], [ok]),
+  m4_ifset([AC_PACKAGE_NAME], [ok]):m4_ifset([AC_PACKAGE_VERSION], [ok]),
   [ok:ok],,
   [m4_fatal([AC_INIT should be called with package and version arguments])])dnl
  AC_SUBST([PACKAGE], ['AC_PACKAGE_TARNAME'])dnl
@@ -686,6 +520,20 @@ AC_PROVIDE_IFELSE([AC_PROG_OBJCXX],
 		  [m4_define([AC_PROG_OBJCXX],
 			     m4_defn([AC_PROG_OBJCXX])[_AM_DEPENDENCIES([OBJCXX])])])dnl
 ])
+# Variables for tags utilities; see am/tags.am
+if test -z "$CTAGS"; then
+  CTAGS=ctags
+fi
+AC_SUBST([CTAGS])
+if test -z "$ETAGS"; then
+  ETAGS=etags
+fi
+AC_SUBST([ETAGS])
+if test -z "$CSCOPE"; then
+  CSCOPE=cscope
+fi
+AC_SUBST([CSCOPE])
+
 AC_REQUIRE([AM_SILENT_RULES])dnl
 dnl The testsuite driver may need to know about EXEEXT, so add the
 dnl 'am__EXEEXT' conditional if _AM_COMPILER_EXEEXT was seen.  This
@@ -767,7 +615,7 @@ for _am_header in $config_headers :; do
 done
 echo "timestamp for $_am_arg" >`AS_DIRNAME(["$_am_arg"])`/stamp-h[]$_am_stamp_count])
 
-# Copyright (C) 2001-2018 Free Software Foundation, Inc.
+# Copyright (C) 2001-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -788,7 +636,7 @@ if test x"${install_sh+set}" != xset; then
 fi
 AC_SUBST([install_sh])])
 
-# Copyright (C) 2003-2018 Free Software Foundation, Inc.
+# Copyright (C) 2003-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -809,7 +657,7 @@ AC_SUBST([am__leading_dot])])
 
 # Check to see how 'make' treats includes.	            -*- Autoconf -*-
 
-# Copyright (C) 2001-2018 Free Software Foundation, Inc.
+# Copyright (C) 2001-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -852,7 +700,7 @@ AC_SUBST([am__quote])])
 
 # Fake the existence of programs that GNU maintainers use.  -*- Autoconf -*-
 
-# Copyright (C) 1997-2018 Free Software Foundation, Inc.
+# Copyright (C) 1997-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -873,12 +721,7 @@ AC_DEFUN([AM_MISSING_HAS_RUN],
 [AC_REQUIRE([AM_AUX_DIR_EXPAND])dnl
 AC_REQUIRE_AUX_FILE([missing])dnl
 if test x"${MISSING+set}" != xset; then
-  case $am_aux_dir in
-  *\ * | *\	*)
-    MISSING="\${SHELL} \"$am_aux_dir/missing\"" ;;
-  *)
-    MISSING="\${SHELL} $am_aux_dir/missing" ;;
-  esac
+  MISSING="\${SHELL} '$am_aux_dir/missing'"
 fi
 # Use eval to expand $SHELL
 if eval "$MISSING --is-lightweight"; then
@@ -891,7 +734,7 @@ fi
 
 # Helper functions for option handling.                     -*- Autoconf -*-
 
-# Copyright (C) 2001-2018 Free Software Foundation, Inc.
+# Copyright (C) 2001-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -920,7 +763,7 @@ AC_DEFUN([_AM_SET_OPTIONS],
 AC_DEFUN([_AM_IF_OPTION],
 [m4_ifset(_AM_MANGLE_OPTION([$1]), [$2], [$3])])
 
-# Copyright (C) 1999-2018 Free Software Foundation, Inc.
+# Copyright (C) 1999-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -967,7 +810,7 @@ AC_LANG_POP([C])])
 # For backward compatibility.
 AC_DEFUN_ONCE([AM_PROG_CC_C_O], [AC_REQUIRE([AC_PROG_CC])])
 
-# Copyright (C) 2001-2018 Free Software Foundation, Inc.
+# Copyright (C) 2001-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -986,7 +829,7 @@ AC_DEFUN([AM_RUN_LOG],
 
 # Check to make sure that the build environment is sane.    -*- Autoconf -*-
 
-# Copyright (C) 1996-2018 Free Software Foundation, Inc.
+# Copyright (C) 1996-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -1067,7 +910,7 @@ AC_CONFIG_COMMANDS_PRE(
 rm -f conftest.file
 ])
 
-# Copyright (C) 2009-2018 Free Software Foundation, Inc.
+# Copyright (C) 2009-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -1127,7 +970,7 @@ AC_SUBST([AM_BACKSLASH])dnl
 _AM_SUBST_NOTMAKE([AM_BACKSLASH])dnl
 ])
 
-# Copyright (C) 2001-2018 Free Software Foundation, Inc.
+# Copyright (C) 2001-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -1155,7 +998,7 @@ fi
 INSTALL_STRIP_PROGRAM="\$(install_sh) -c -s"
 AC_SUBST([INSTALL_STRIP_PROGRAM])])
 
-# Copyright (C) 2006-2018 Free Software Foundation, Inc.
+# Copyright (C) 2006-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -1174,7 +1017,7 @@ AC_DEFUN([AM_SUBST_NOTMAKE], [_AM_SUBST_NOTMAKE($@)])
 
 # Check how to create a tarball.                            -*- Autoconf -*-
 
-# Copyright (C) 2004-2018 Free Software Foundation, Inc.
+# Copyright (C) 2004-2021 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,

@@ -15,10 +15,13 @@ LAUNCHER  =
 #===============================================================================
 
 program = main
+program_chain = main_chaining
 
 source = main.cpp linearprobing.cpp test.cpp
+source_chain = main_chaining.cpp chaining.cpp
 
 obj = $(source:.cpp=.o)
+obj_chain = $(source_chain:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
@@ -50,14 +53,27 @@ endif
 # Targets to Build
 #===============================================================================
 
+all: $(program) $(program_chain)
+
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp linearprobing.h
+$(program_chain): $(obj_chain)
+	$(CC) $(CFLAGS) $(obj_chain) -o $@ $(LDFLAGS)
+
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
+main.o: main.cpp linearprobing.h
+main_chaining.o: main_chaining.cpp chaining.h
+linearprobing.o: linearprobing.cpp linearprobing.h
+chaining.o: chaining.cpp chaining.h
+
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(program_chain) $(obj) $(obj_chain)
 
 run: $(program)
 	$(LAUNCHER) ./$(program) 16 8
+
+run_chaining: $(program_chain)
+	$(LAUNCHER) ./$(program_chain) 16 8

@@ -1,8 +1,8 @@
-# background-subtract-omp/CMakeLists.txt
+# background-subtract-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME background-subtract
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

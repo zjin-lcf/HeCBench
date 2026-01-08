@@ -16,7 +16,7 @@ LAUNCHER  =
 
 program = main
 
-source = test.cpp
+source = main.cpp
 
 obj = $(source:.cpp=.o)
 

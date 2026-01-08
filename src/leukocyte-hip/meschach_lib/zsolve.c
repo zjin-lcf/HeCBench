@@ -42,11 +42,10 @@ static	char	rcsid[] = "$Id: zsolve.c,v 1.1 1994/01/13 04:20:33 des Exp $";
 
 /* zUsolve -- back substitution with optional over-riding diagonal
 		-- can be in-situ but doesn't need to be */
-ZVEC	*zUsolve(
-ZMAT	*matrix,
-ZVEC	*b, 
-ZVEC    *out,
-double	diag)
+ZVEC	*zUsolve(matrix,b,out,diag)
+ZMAT	*matrix;
+ZVEC	*b, *out;
+double	diag;
 {
     unsigned int	dim /* , j */;
     int	i, i_lim;
@@ -54,7 +53,7 @@ double	diag)
     
     if ( matrix==ZMNULL || b==ZVNULL )
 	error(E_NULL,"zUsolve");
-    dim = macro_min(matrix->m,matrix->n);
+    dim = min(matrix->m,matrix->n);
     if ( b->dim < dim )
 	error(E_SIZES,"zUsolve");
     if ( out==ZVNULL || out->dim < dim )
@@ -99,18 +98,17 @@ double	diag)
 }
 
 /* zLsolve -- forward elimination with (optional) default diagonal value */
-ZVEC	*zLsolve(
-ZMAT	*matrix,
-ZVEC	*b,
-ZVEC    *out,
-double	diag)
+ZVEC	*zLsolve(matrix,b,out,diag)
+ZMAT	*matrix;
+ZVEC	*b,*out;
+double	diag;
 {
     unsigned int	dim, i, i_lim /* , j */;
     complex	**mat_ent, *mat_row, *b_ent, *out_ent, *out_col, sum;
     
     if ( matrix==ZMNULL || b==ZVNULL )
 	error(E_NULL,"zLsolve");
-    dim = macro_min(matrix->m,matrix->n);
+    dim = min(matrix->m,matrix->n);
     if ( b->dim < dim )
 	error(E_SIZES,"zLsolve");
     if ( out==ZVNULL || out->dim < dim )
@@ -155,11 +153,10 @@ double	diag)
 
 /* zUAsolve -- forward elimination with (optional) default diagonal value
 		using UPPER triangular part of matrix */
-ZVEC	*zUAsolve(
-ZMAT	*U,
-ZVEC	*b,
-ZVEC    *out,
-double	diag)
+ZVEC	*zUAsolve(U,b,out,diag)
+ZMAT	*U;
+ZVEC	*b,*out;
+double	diag;
 {
     unsigned int	dim, i, i_lim /* , j */;
     complex	**U_me, *b_ve, *out_ve, tmp;
@@ -167,7 +164,7 @@ double	diag)
     
     if ( ! U || ! b )
 	error(E_NULL,"zUAsolve");
-    dim = macro_min(U->m,U->n);
+    dim = min(U->m,U->n);
     if ( b->dim < dim )
 	error(E_SIZES,"zUAsolve");
     out = zv_resize(out,U->n);
@@ -217,16 +214,15 @@ double	diag)
 }
 
 /* zDsolve -- solves Dx=b where D is the diagonal of A -- may be in-situ */
-ZVEC	*zDsolve(
-ZMAT	*A,
-ZVEC	*b,
-ZVEC    *x)
+ZVEC	*zDsolve(A,b,x)
+ZMAT	*A;
+ZVEC	*b,*x;
 {
     unsigned int	dim, i;
     
     if ( ! A || ! b )
 	error(E_NULL,"zDsolve");
-    dim = macro_min(A->m,A->n);
+    dim = min(A->m,A->n);
     if ( b->dim < dim )
 	error(E_SIZES,"zDsolve");
     x = zv_resize(x,A->n);
@@ -244,11 +240,10 @@ ZVEC    *x)
 /* zLAsolve -- back substitution with optional over-riding diagonal
 		using the LOWER triangular part of matrix
 		-- can be in-situ but doesn't need to be */
-ZVEC	*zLAsolve(
-ZMAT	*L,
-ZVEC	*b, 
-ZVEC    *out,
-double	diag)
+ZVEC	*zLAsolve(L,b,out,diag)
+ZMAT	*L;
+ZVEC	*b, *out;
+double	diag;
 {
     unsigned int	dim;
     int		i, i_lim;
@@ -257,7 +252,7 @@ double	diag)
     
     if ( ! L || ! b )
 	error(E_NULL,"zLAsolve");
-    dim = macro_min(L->m,L->n);
+    dim = min(L->m,L->n);
     if ( b->dim < dim )
 	error(E_SIZES,"zLAsolve");
     out = zv_resize(out,L->n);

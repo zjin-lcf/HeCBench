@@ -72,7 +72,8 @@ int main(int argc, char* argv[]) {
       float xn = h_x[n];
       float yn = h_y[n];
       float zn = h_z[n];
-      #pragma omp parallel for simd reduction(+:r,i)
+      // Note: Removed nested parallel pragma to avoid compiler hang
+      #pragma omp simd reduction(+:r,i)
       for (int m = 0; m < voxels; m++) {
         float e = 2.f * (float)M_PI * 
                   (h_kx[m] * xn + h_ky[m] * yn + h_kz[m] * zn);
@@ -94,11 +95,12 @@ int main(int argc, char* argv[]) {
     printf("Computing root mean square error between host and device results.\n");
     printf("This will take a while..\n");
 
-    #pragma omp parallel for 
+    #pragma omp parallel for
     for (int n = 0; n < samples; n++) {
       float r = h_rfhd[n];
       float i = h_ifhd[n];
-      #pragma omp parallel for simd reduction(+:r,i)
+      // Note: Removed nested parallel pragma to avoid compiler hang
+      #pragma omp simd reduction(+:r,i)
       for (int m = 0; m < voxels; m++) {
         float e = 2.f * (float)M_PI * 
                   (h_kx[m] * h_x[n] + h_ky[m] * h_y[n] + h_kz[m] * h_z[n]);

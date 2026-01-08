@@ -98,7 +98,7 @@ __global__ void bcast_shfl_sg8(const int arg, int *out) {
 __global__ void bcast_shfl_xor_sg8(int *out) {
   int value = (threadIdx.x & 0x7);
   for (int mask = 1; mask < 0x7; mask *= 2)
-    value += __shfl_xor(value, mask);
+    value += __shfl_xor_sync(0xffffffff, value, mask);
   size_t oi = blockDim.x * blockIdx.x + threadIdx.x;
   out[oi] = value;
 }
@@ -114,7 +114,7 @@ __global__ void bcast_shfl_sg16(const int arg, int *out) {
 __global__ void bcast_shfl_xor_sg16(int *out) {
   int value = (threadIdx.x & 0xf);
   for (int mask = 1; mask < 0xf; mask *= 2)
-    value += __shfl_xor(value, mask);
+    value += __shfl_xor_sync(0xffffffff, value, mask);
   size_t oi = blockDim.x * blockIdx.x + threadIdx.x;
   out[oi] = value;
 }
@@ -129,7 +129,7 @@ __global__ void bcast_shfl_sg32(const int arg, int *out) {
 __global__ void bcast_shfl_xor_sg32(int *out) {
   int value = (threadIdx.x & 0x1f);
   for (int mask = 1; mask < 0x1f; mask *= 2)
-    value += __shfl_xor(value, mask);
+    value += __shfl_xor_sync(0xffffffff, value, mask);
   size_t oi = blockDim.x * blockIdx.x + threadIdx.x;
   out[oi] = value;
 }

@@ -1,8 +1,8 @@
-# bitonic-sort-omp/CMakeLists.txt
+# bitonic-sort-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME bitonic-sort
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

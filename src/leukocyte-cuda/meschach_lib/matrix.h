@@ -37,7 +37,6 @@
 #include	"machine.h"
 #include        "err.h"
 #include 	"meminfo.h"
-#include 	<unistd.h>
 
 /* unsigned integer type */
 /************************************************************
@@ -150,14 +149,12 @@ void	m_version( void );
 #endif /* ANSI_C */
 
 /* type independent min and max operations */
-//#ifndef max
-//#define	max(a,b)	((a) > (b) ? (a) : (b))
-//#endif /* max */
-//#ifndef min
-//#define	min(a,b)	((a) > (b) ? (b) : (a))
-//#endif /* min */
-#define	macro_max(a,b)	((a) > (b) ? (a) : (b))
-#define	macro_min(a,b)	((a) > (b) ? (b) : (a))
+#ifndef max
+#define	max(a,b)	((a) > (b) ? (a) : (b))
+#endif /* max */
+#ifndef min
+#define	min(a,b)	((a) > (b) ? (b) : (a))
+#endif /* min */
 
 
 #undef TRUE
@@ -203,13 +200,8 @@ extern  BAND *bd_get(int,int,int), *bd_resize(BAND *,int,int,int);
 /* free (de-allocate) (band) matrices, vectors, permutations and 
    integer vectors */
 extern  int iv_free(IVEC *);
-extern	int m_free(MAT *),v_free(VEC *),px_free(PERM *);
-extern   int wrapped_m_free(void*);
-extern   int wrapped_v_free(void*);
-extern   int wrapped_iv_free(void*);
-extern   int wrapped_px_free(void*);
+extern	m_free(MAT *),v_free(VEC *),px_free(PERM *);
 extern   int bd_free(BAND *);
-extern   int wrapped_bd_free(void*);
 
 #endif /* ANSI_C */
 

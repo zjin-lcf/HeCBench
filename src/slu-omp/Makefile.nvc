@@ -78,11 +78,8 @@ main.o: $(SLU_PATH)/main.cpp
 preprocess.o: $(SLU_PATH)/preprocess.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(SLU_PATH)/nicslu/lib/nicslu.a:
-	make -C $(SLU_PATH)/nicslu/
-
-$(SLU_PATH)/nicslu/util/nicslu_util.a:
-	make -C $(SLU_PATH)/nicslu/
+$(SLU_PATH)/nicslu/lib/nicslu.a $(SLU_PATH)/nicslu/util/nicslu_util.a:
+	make -j1 -C $(SLU_PATH)/nicslu/
 
 clean:
 	rm -rf $(program) $(obj) *.dat

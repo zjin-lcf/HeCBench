@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = /opt/nvidia/hpc_sdk/Linux_aarch64/25.11/compilers/bin/nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -Wall -qopenmp
+CFLAGS := $(EXTRA_CFLAGS) -Wall -mp=multicore
 
 # Linker Flags
 LDFLAGS = 
@@ -42,7 +42,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-mp=gpu
 endif
 #===============================================================================
 # Targets to Build

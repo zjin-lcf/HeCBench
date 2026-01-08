@@ -112,7 +112,7 @@ MAT	*m_ident(MAT *A)
 		error(E_NULL,"m_ident");
 
 	m_zero(A);
-	size = macro_min(A->m,A->n);
+	size = min(A->m,A->n);
 	for ( i = 0; i < size; i++ )
 		A->me[i][i] = 1.0;
 

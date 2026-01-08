@@ -100,7 +100,7 @@ int main(int argc, char** argv)
         #pragma omp target update to(sum)
         #pragma omp target teams distribute parallel for \
         num_teams(blocks/2) num_threads(threads) reduction(+:sum)
-        for (int i = 0; i < arrayLength; i=i+2) { 
+        for (int i = 0; i < arrayLength; i+=2) { 
           sum += array[i] + array[i+1];
         }
       }
@@ -121,7 +121,7 @@ int main(int argc, char** argv)
         #pragma omp target update to(sum)
         #pragma omp target teams distribute parallel for \
         num_teams(blocks/4) num_threads(threads) reduction(+:sum)
-        for (int i = 0; i < arrayLength; i=i+4) { 
+        for (int i = 0; i < arrayLength; i+=4) { 
           sum += array[i] + array[i+1] + array[i+2] + array[i+3];
         }
       }
@@ -142,7 +142,7 @@ int main(int argc, char** argv)
         #pragma omp target update to(sum)
         #pragma omp target teams distribute parallel for \
         num_teams(blocks/8) num_threads(threads) reduction(+:sum)
-        for (int i = 0; i < arrayLength; i=i+8) { 
+        for (int i = 0; i < arrayLength; i+=8) { 
           sum += array[i] + array[i+1] + array[i+2] + array[i+3] + 
                  array[i+4] + array[i+5] + array[i+6] + array[i+7];
         }
@@ -164,7 +164,7 @@ int main(int argc, char** argv)
         #pragma omp target update to(sum)
         #pragma omp target teams distribute parallel for \
         num_teams(blocks/16) num_threads(threads) reduction(+:sum)
-        for (int i = 0; i < arrayLength; i=i+16) { 
+        for (int i = 0; i < arrayLength; i+=16) { 
           sum += array[i] + array[i+1] + array[i+2] + array[i+3] + 
                  array[i+4] + array[i+5] + array[i+6] + array[i+7] +
                  array[i+8] + array[i+9] + array[i+10] + array[i+11] +

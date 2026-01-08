@@ -1,8 +1,9 @@
-# atan2-omp/CMakeLists.txt
+# atan2-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME atan2
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
+    COMPILE_OPTIONS --expt-relaxed-constexpr
 )

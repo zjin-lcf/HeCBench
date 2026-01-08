@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = icpx
+CC        = /opt/nvidia/hpc_sdk/Linux_aarch64/25.11/compilers/bin/nvc++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../quant-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../quantBnB-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -41,9 +41,9 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-mp=gpu
 else
-  CFLAGS +=-qopenmp
+  CFLAGS +=-mp=multicore
 endif
 #===============================================================================
 # Targets to Build
@@ -52,7 +52,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../quant-cuda/code.h
+%.o: %.cpp ../quantBnB-cuda/code.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

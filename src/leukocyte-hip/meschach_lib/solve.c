@@ -58,7 +58,7 @@ VEC	*Usolve(const MAT *matrix, const VEC *b, VEC *out, double diag)
 
 	if ( matrix==MNULL || b==VNULL )
 		error(E_NULL,"Usolve");
-	dim = macro_min(matrix->m,matrix->n);
+	dim = min(matrix->m,matrix->n);
 	if ( b->dim < dim )
 		error(E_SIZES,"Usolve");
 	if ( out==VNULL || out->dim < dim )
@@ -114,7 +114,7 @@ VEC	*Lsolve(const MAT *matrix, const VEC *b, VEC *out, double diag)
 
 	if ( matrix==(MAT *)NULL || b==(VEC *)NULL )
 		error(E_NULL,"Lsolve");
-	dim = macro_min(matrix->m,matrix->n);
+	dim = min(matrix->m,matrix->n);
 	if ( b->dim < dim )
 		error(E_SIZES,"Lsolve");
 	if ( out==(VEC *)NULL || out->dim < dim )
@@ -172,7 +172,7 @@ VEC	*UTsolve(const MAT *U, const VEC *b, VEC *out, double diag)
     
     if ( ! U || ! b )
 	error(E_NULL,"UTsolve");
-    dim = macro_min(U->m,U->n);
+    dim = min(U->m,U->n);
     if ( b->dim < dim )
 	error(E_SIZES,"UTsolve");
     out = v_resize(out,U->n);
@@ -229,7 +229,7 @@ VEC	*Dsolve(const MAT *A, const VEC *b, VEC *x)
     
     if ( ! A || ! b )
 	error(E_NULL,"Dsolve");
-    dim = macro_min(A->m,A->n);
+    dim = min(A->m,A->n);
     if ( b->dim < dim )
 	error(E_SIZES,"Dsolve");
     x = v_resize(x,A->n);
@@ -264,7 +264,7 @@ VEC	*LTsolve(const MAT *L, const VEC *b, VEC *out, double diag)
     
     if ( ! L || ! b )
 	error(E_NULL,"LTsolve");
-    dim = macro_min(L->m,L->n);
+    dim = min(L->m,L->n);
     if ( b->dim < dim )
 	error(E_SIZES,"LTsolve");
     out = v_resize(out,L->n);

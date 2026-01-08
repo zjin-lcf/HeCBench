@@ -156,8 +156,6 @@ int iter_free(ITER *ip)
    return 0;
 }
 
-int wrapped_iter_free(void* p) { return iter_free((ITER*)p); }
-
 #ifndef ANSI_C
 ITER *iter_resize(ip,new_lenb,new_lenx)
 ITER *ip;

@@ -195,7 +195,7 @@ VEC	*spLUsolve(const SPMAT *A, PERM *pivot, const VEC *b, VEC *x)
 	    x = v_copy(b,x);
 
 	x_ve = x->ve;
-	lim = macro_min(A->m,A->n);
+	lim = min(A->m,A->n);
 	for ( i = 0; i < lim; i++ )
 	{
 	    sum = x_ve[i];
@@ -253,7 +253,7 @@ VEC	*spLUTsolve(SPMAT *A, PERM *pivot, const VEC *b, VEC *x)
 	if ( ! A->flag_diag )
 	    sp_diag_access(A);
 
-	lim = macro_min(A->m,A->n);
+	lim = min(A->m,A->n);
 	tmp_ve = tmp->ve;
 	/* solve U^T.tmp = b */
 	for ( i = 0; i < lim; i++ )

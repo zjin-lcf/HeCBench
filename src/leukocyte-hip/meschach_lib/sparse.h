@@ -135,7 +135,6 @@ double	sp_get_val(const SPMAT *,int,int), sp_set_val(SPMAT *,int,int,double);
 VEC	*sp_mv_mlt(const SPMAT *, const VEC *, VEC *), 
         *sp_vm_mlt(const SPMAT *, const VEC *, VEC *);
 int	sp_free(SPMAT *);
-int	wrapped_sp_free(void*);
 
 /* Access path operations */
 SPMAT	*sp_col_access(SPMAT *);
@@ -164,7 +163,6 @@ SPROW *sprow_add(const SPROW *r1,const SPROW *r2, int j0,SPROW *r_out, int type)
         *sprow_smlt(const SPROW *r1,double alpha, int j0,SPROW *r_out, int type);
 double	sprow_set_val(SPROW *,int,double);
 int      sprow_free(SPROW *);
-int	wrapped_sprow_free(void*);
 int	sprow_idx(const SPROW *,int);
 void	sprow_foutput(FILE *,const SPROW *);
 

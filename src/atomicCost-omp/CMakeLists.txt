@@ -1,8 +1,8 @@
-# atomicCost-omp/CMakeLists.txt
+# atomicCost-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME atomicCost
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

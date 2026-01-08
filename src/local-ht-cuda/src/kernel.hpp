@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include <iostream>
+#include <cstdint>
 #define EMPTY 0xFFFFFFFF
 
 //TODO: add this in a separate file for definitions

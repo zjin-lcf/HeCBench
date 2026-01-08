@@ -1,8 +1,8 @@
-# channelShuffle-omp/CMakeLists.txt
+# channelShuffle-cuda/CMakeLists.txt
 
 add_hecbench_benchmark(
     NAME channelShuffle
-    MODEL omp
-    SOURCES main.cpp
+    MODEL cuda
+    SOURCES main.cu
     CATEGORIES algorithms
 )

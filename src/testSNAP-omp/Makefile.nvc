@@ -42,10 +42,16 @@ endif
 # Targets to Build
 #===============================================================================
 
+refdata_2J14_W.h:
+	@if [ ! -f refdata_2J14_W.h ]; then \
+		echo "Extracting refdata..."; \
+		tar -xzf refdata.tar.gz; \
+	fi
+
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp  utils.cpp snap.h
+%.o: %.cpp  utils.cpp snap.h refdata_2J14_W.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
