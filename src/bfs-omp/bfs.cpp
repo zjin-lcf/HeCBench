@@ -61,7 +61,7 @@ void run_bfs_cpu(int no_of_nodes, Node *h_graph_nodes, int edge_list_size, \
 //----------------------------------------------------------
 void run_bfs_gpu(int no_of_nodes, Node *d_graph_nodes, int edge_list_size, \
     int *d_graph_edges, char *d_graph_mask, char *d_updating_graph_mask, \
-    char *d_graph_visited, int *d_cost) throw(std::string)
+    char *d_graph_visited, int *d_cost)
 {
   char d_over[1];
 
