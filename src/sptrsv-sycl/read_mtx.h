@@ -18,7 +18,10 @@ int read_mtx(char  * filename, int* m_add, int *n_add, int *nnzA_add,
     
     // load matrix
     if ((f = fopen(filename, "r")) == NULL)
+    {
+        printf("Failed to open %s.\n", filename);
         return -1;
+    }
     
     if (mm_read_banner(f, &matcode) != 0)
     {
