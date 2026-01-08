@@ -100,8 +100,8 @@ int main(int argc, char** argv)
         #pragma omp target update to(sum)
         #pragma omp target teams distribute parallel for \
         num_teams(blocks/2) num_threads(threads) reduction(+:sum)
-        for (int i = 0; i < arrayLength; i=i+2) { 
-          sum += array[i] + array[i+1];
+        for (int i = 0; i < arrayLength/2; i++) { 
+          sum += array[i*2] + array[i*2+1];
         }
       }
       #pragma omp target update from(sum)
@@ -121,8 +121,8 @@ int main(int argc, char** argv)
         #pragma omp target update to(sum)
         #pragma omp target teams distribute parallel for \
         num_teams(blocks/4) num_threads(threads) reduction(+:sum)
-        for (int i = 0; i < arrayLength; i=i+4) { 
-          sum += array[i] + array[i+1] + array[i+2] + array[i+3];
+        for (int i = 0; i < arrayLength/4; i++) { 
+          sum += array[i*4] + array[i*4+1] + array[i*4+2] + array[i*4+3];
         }
       }
       #pragma omp target update from(sum)
@@ -142,9 +142,9 @@ int main(int argc, char** argv)
         #pragma omp target update to(sum)
         #pragma omp target teams distribute parallel for \
         num_teams(blocks/8) num_threads(threads) reduction(+:sum)
-        for (int i = 0; i < arrayLength; i=i+8) { 
-          sum += array[i] + array[i+1] + array[i+2] + array[i+3] + 
-                 array[i+4] + array[i+5] + array[i+6] + array[i+7];
+        for (int i = 0; i < arrayLength/8; i++) { 
+          sum += array[i*8] + array[i*8+1] + array[i*8+2] + array[i*8+3] + 
+                 array[i*8+4] + array[i*8+5] + array[i*8+6] + array[i*8+7];
         }
       }
       #pragma omp target update from(sum)
@@ -164,11 +164,11 @@ int main(int argc, char** argv)
         #pragma omp target update to(sum)
         #pragma omp target teams distribute parallel for \
         num_teams(blocks/16) num_threads(threads) reduction(+:sum)
-        for (int i = 0; i < arrayLength; i=i+16) { 
-          sum += array[i] + array[i+1] + array[i+2] + array[i+3] + 
-                 array[i+4] + array[i+5] + array[i+6] + array[i+7] +
-                 array[i+8] + array[i+9] + array[i+10] + array[i+11] +
-                 array[i+12] + array[i+13] + array[i+14] + array[i+15];
+        for (int i = 0; i < arrayLength/16; i++) { 
+          sum += array[i*16] + array[i*16+1] + array[i*16+2] + array[i*16+3] + 
+                 array[i*16+4] + array[i*16+5] + array[i*16+6] + array[i*16+7] +
+                 array[i*16+8] + array[i*16+9] + array[i*16+10] + array[i*16+11] +
+                 array[i*16+12] + array[i*16+13] + array[i*16+14] + array[i*16+15];
         }
       }
       #pragma omp target update from(sum)
