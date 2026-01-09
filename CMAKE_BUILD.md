@@ -75,7 +75,12 @@ cmake --build build/cuda-sm90 --parallel
 
 #### OpenMP
 - `openmp-intel` - Intel compiler with OpenMP offload
-- `openmp-nvidia` - NVIDIA nvc++ with OpenMP offload
+- `openmp-nvidia-sm70` - NVIDIA compiler with OpenMP offload to Volta
+- `openmp-nvidia-sm80` - NVIDIA compiler with OpenMP offload to Ampere
+- `openmp-nvidia-sm90` - NVIDIA compiler with OpenMP offload to Hopper
+- `openmp-amd-gfx908` - AMD compiler with OpenMP offload to MI100
+- `openmp-amd-gfx90a` - AMD compiler with OpenMP offload to MI210, MI250X
+- `openmp-amd-gfx942` - AMD compiler with OpenMP offload to MI300A/X
 
 #### Multi-Model
 - `all-models` - Build all programming models (requires all compilers)

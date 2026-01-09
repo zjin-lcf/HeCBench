@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL omp
     SOURCES main.cpp
     CATEGORIES algorithms
+    COMPILE_OPTIONS -Ddfloat=double -Ddlong=int
 )

@@ -1,8 +1,12 @@
 # sptrsv-omp/CMakeLists.txt
 
+set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/../sptrsv-sycl")
+
 add_hecbench_benchmark(
     NAME sptrsv
     MODEL omp
-    SOURCES sptrsv_syncfree.cpp
+    SOURCES sptrsv_syncfree.cpp ${INC_DIR}/main.cpp
     CATEGORIES algorithms
+    COMPILE_OPTIONS -DVALUE_TYPE=double
+    INCLUDE_DIRS ${INC_DIR}
 )

@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME chemv
     MODEL omp
-    SOURCES kernel.cpp main.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME gmm
     MODEL omp
-    SOURCES cluster.cpp gaussian_kernel.cpp main.cpp readData.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )
