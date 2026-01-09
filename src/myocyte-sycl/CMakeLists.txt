@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME myocyte
     MODEL sycl
-    SOURCES main.c
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

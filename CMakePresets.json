@@ -259,6 +259,7 @@
         "HECBENCH_ENABLE_SYCL": "ON",
         "HECBENCH_ENABLE_OPENMP": "OFF",
         "HECBENCH_SYCL_TARGET": "spir64",
+        "CMAKE_C_COMPILER": "icx",
         "CMAKE_CXX_COMPILER": "icpx"
       }
     },
