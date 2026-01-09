@@ -10,5 +10,4 @@ add_hecbench_benchmark(
             ${INC_DIR}/reference.cpp
             ${INC_DIR}/timer.cpp
     CATEGORIES algorithms
-    INCLUDE_DIRS ${INC_DIR}
 )

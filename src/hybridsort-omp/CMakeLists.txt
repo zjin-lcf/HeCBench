@@ -6,3 +6,4 @@ add_hecbench_benchmark(
     SOURCES bucketsort.c hybridsort.c mergesort.c
     CATEGORIES algorithms
 )
+set_source_files_properties(bucketsort.c hybridsort.c mergesort.c PROPERTIES LANGUAGE CXX)

@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME interleave
     MODEL omp
-    SOURCES main.cpp util.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

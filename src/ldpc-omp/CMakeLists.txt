@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME ldpc
     MODEL omp
-    SOURCES cpu.cpp kernel.cpp main.cpp
+    SOURCES cpu.cpp main.cpp
     CATEGORIES algorithms
 )

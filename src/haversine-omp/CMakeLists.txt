@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME haversine
     MODEL omp
-    SOURCES distance.cpp
+    SOURCES main.cpp distance.cpp
+    ENABLE_FASTMATH true
     CATEGORIES algorithms
 )

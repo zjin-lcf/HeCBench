@@ -23,6 +23,9 @@ set(DEPEND_ON_NCCL "ccl-cuda")
 # Global list for SYCL benchmarks that require C++20
 set(DEPEND_ON_CXX20 "adamw-sycl" "zmddft-sycl")
 
+# MKL GEMM
+set(DEPEND_ON_MKLOMPGEMM "blas-gemm-omp")
+
 # Path to test runner script
 set(HECBENCH_TEST_RUNNER "${CMAKE_SOURCE_DIR}/cmake/scripts/run_benchmark_test.py")
 
@@ -53,7 +56,7 @@ set(HECBENCH_TEST_RUNNER "${CMAKE_SOURCE_DIR}/cmake/scripts/run_benchmark_test.p
 function(add_hecbench_benchmark)
     # Parse arguments
     set(options "")
-    set(oneValueArgs NAME MODEL TEST_REGEX TEST_TIMEOUT)
+    set(oneValueArgs NAME MODEL TEST_REGEX TEST_TIMEOUT ENABLE_FASTMATH)
     set(multiValueArgs SOURCES CATEGORIES COMPILE_OPTIONS LINK_LIBRARIES INCLUDE_DIRS TEST_ARGS)
     cmake_parse_arguments(BENCH "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
@@ -98,6 +101,11 @@ function(add_hecbench_benchmark)
         endif()
     endif()
 
+    if("${BENCH_NAME}-${BENCH_MODEL_LOWER}" IN_LIST DEPEND_ON_MKLOMPGEMM)
+        message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER}")
+        return()
+    endif()
+
     if(${BENCH_NAME} IN_LIST DEPEND_ON_MPI)
         if(NOT MPI_FOUND)
             message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (MPI not found)")
@@ -124,7 +132,7 @@ function(add_hecbench_benchmark)
 
     if(${TARGET_NAME} IN_LIST DEPEND_ON_NCCL)
         if(NOT _FOUND)
-            message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (NCCL not found)")
+            message(STATUS "Skipping ${TARGET_NAME} (NCCL not found)")
             return()
         endif()
     endif()
@@ -205,7 +213,16 @@ function(add_hecbench_benchmark)
 
     elseif(BENCH_MODEL_LOWER STREQUAL "omp" OR BENCH_MODEL_LOWER STREQUAL "openmp")
         # OpenMP configuration
-        target_link_libraries(${TARGET_NAME} PRIVATE OpenMP::OpenMP_CXX)
+        target_compile_options(${TARGET_NAME} PRIVATE 
+                               ${HECBENCH_OMP_TARGET}
+                               ${HECBENCH_OMP_TARGET_BACKEND})
+        if(BENCH_ENABLE_FASTMATH)
+            target_compile_options(${TARGET_NAME} PRIVATE ${HECBENCH_OMP_FASTMATH})
+        endif()
+        target_link_libraries(${TARGET_NAME} PRIVATE
+                              ${HECBENCH_OMP_TARGET}
+                              ${HECBENCH_OMP_TARGET_BACKEND})
+        #target_link_libraries(${TARGET_NAME} PRIVATE OpenMP::OpenMP_CXX)
     endif()
 
     if(${BENCH_NAME} IN_LIST DEPEND_ON_MPI)
