@@ -17,6 +17,9 @@ set(DEPEND_ON_GSL "sss" "xlqc")
 # Global list for benchmarks that require GDAL
 set(DEPEND_ON_GDAL "stsg")
 
+# Global list for benchmarks that require NCCL
+set(DEPEND_ON_NCCL "ccl-cuda")
+
 # Global list for SYCL benchmarks that require C++20
 set(DEPEND_ON_CXX20 "adamw-sycl" "zmddft-sycl")
 
@@ -119,6 +122,13 @@ function(add_hecbench_benchmark)
     # Create target name
     set(TARGET_NAME "${BENCH_NAME}-${BENCH_MODEL_LOWER}")
 
+    if(${TARGET_NAME} IN_LIST DEPEND_ON_NCCL)
+        if(NOT _FOUND)
+            message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (NCCL not found)")
+            return()
+        endif()
+    endif()
+
     # For HIP, ensure .cu files are treated as HIP language
     if(BENCH_MODEL_LOWER STREQUAL "hip")
         set_source_files_properties(${BENCH_SOURCES} PROPERTIES LANGUAGE HIP)
@@ -161,6 +171,11 @@ function(add_hecbench_benchmark)
             CUDA_ARCHITECTURES ${HECBENCH_CUDA_ARCH}
         )
         target_link_libraries(${TARGET_NAME} PRIVATE CUDA::cudart)
+
+	if(${TARGET_NAME} IN_LIST DEPEND_ON_NCCL)
+            target_include_directories(${TARGET_NAME} PRIVATE ${NCCL_INCLUDE_DIRS})
+            target_link_libraries(${TARGET_NAME} PRIVATE ${NCCL_LIBRARIES})
+        endif()
 
     elseif(BENCH_MODEL_LOWER STREQUAL "hip")
         # HIP configuration
