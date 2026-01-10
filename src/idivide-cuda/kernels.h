@@ -11,7 +11,7 @@ __global__ void throughput_test(
   int x2 = x / d2;
   int x3 = x / d3;
   int aggregate = x1 + x2 + x3;  
-  if (aggregate & dummy == 1) buf[0] = aggregate;
+  if (aggregate && dummy) buf[0] = aggregate;
 }
 
 template<typename divisor_type>
@@ -40,7 +40,7 @@ __global__ void latency_test(
   x /= d8;
   x /= d9;
   x /= d10;
-  if (x & dummy == 1) buf[0] = x;
+  if (x && dummy) buf[0] = x;
 }
 
 __global__ void check(int_fastdiv divisor, int * results)
