@@ -5,5 +5,5 @@ add_hecbench_benchmark(
     MODEL sycl
     SOURCES main.cpp
     CATEGORIES ml
-    COMPILE_OPTIONS -ffast-math
+    #COMPILE_OPTIONS -ffast-math
 )
