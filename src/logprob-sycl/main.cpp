@@ -247,7 +247,7 @@ int main(int argc, char* argv[])
 #endif
       sycl::local_accessor<float, 0> s_max_logit (cgh);
       cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item)
-        [[intel::reqd_sub_group_size(SG)]] {
+        [[sycl::reqd_sub_group_size(SG)]] {
         log_probs_kernel<float>(
             item,
 #ifndef USE_SYCL_GROUP_REDUCE
@@ -264,7 +264,7 @@ int main(int argc, char* argv[])
       sycl::local_accessor<float, 1> sm (sycl::range<1>(SG), cgh);
 #endif
       cgh.parallel_for(sycl::nd_range<2>(gws2, lws), [=](sycl::nd_item<2> item)
-        [[intel::reqd_sub_group_size(SG)]] {
+        [[sycl::reqd_sub_group_size(SG)]] {
         accumulate_log_probs(
            item,
 #ifndef USE_SYCL_GROUP_REDUCE
@@ -318,7 +318,7 @@ int main(int argc, char* argv[])
 #endif
       sycl::local_accessor<float, 0> s_max_logit (cgh);
       cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item)
-        [[intel::reqd_sub_group_size(SG)]] {
+        [[sycl::reqd_sub_group_size(SG)]] {
         log_probs_kernel<float>(
             item,
 #ifndef USE_SYCL_GROUP_REDUCE
@@ -335,7 +335,7 @@ int main(int argc, char* argv[])
       sycl::local_accessor<float, 1> sm (sycl::range<1>(SG), cgh);
 #endif
       cgh.parallel_for(sycl::nd_range<2>(gws2, lws), [=](sycl::nd_item<2> item)
-        [[intel::reqd_sub_group_size(SG)]] {
+        [[sycl::reqd_sub_group_size(SG)]] {
         accumulate_log_probs(
            item,
 #ifndef USE_SYCL_GROUP_REDUCE

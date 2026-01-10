@@ -77,7 +77,7 @@ double cyclic_small_systems(sycl::queue &q, float *a, float *b, float *c, float 
                                       c_d,
                                       d_d,
                                       x_d,
-                                      lmem.get_pointer(),
+                                      lmem.get_multi_ptr<sycl::access::decorated::no>().get(),
                                       system_size,
                                       num_systems,
                                       iterations);
@@ -93,7 +93,7 @@ double cyclic_small_systems(sycl::queue &q, float *a, float *b, float *c, float 
                                     c_d,
                                     d_d,
                                     x_d,
-                                    lmem.get_pointer(),
+                                    lmem.get_multi_ptr<sycl::access::decorated::no>().get(),
                                     system_size,
                                     num_systems,
                                     iterations);

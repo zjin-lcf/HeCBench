@@ -118,7 +118,7 @@ void r_squared(sycl::queue &q, linear_param_t *params, data_t *dataset, sum_t *l
         sycl::local_accessor<rsquared_t, 1> sm (sycl::range<1>(wg_size), cgh);
         cgh.parallel_for<class rs>(
           sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-          rsquared(item, d_dataset, mean, equation, sm.get_pointer(), d_result);
+          rsquared(item, d_dataset, mean, equation, sm.get_multi_ptr<sycl::access::decorated::no>().get(), d_result);
         });
       });
     }
@@ -200,7 +200,7 @@ void parallelized_regression(linear_param_t *params, data_t *dataset, result_t *
         sycl::local_accessor<sum_t, 1> sm (sycl::range<1>(wg_size), cgh);
         cgh.parallel_for<class lr>(
          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-         linear_regression(item, d_dataset, sm.get_pointer(), d_result);
+         linear_regression(item, d_dataset, sm.get_multi_ptr<sycl::access::decorated::no>().get(), d_result);
         });
       });
     }

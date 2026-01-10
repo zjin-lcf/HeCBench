@@ -175,7 +175,7 @@ void PetrinetOnDevice(long long &time)
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         PetrinetKernel(
           item,
-          mt.get_pointer(),
+          mt.get_multi_ptr<sycl::access::decorated::no>().get(),
           g_places,
           g_vars,
           g_maxs,
@@ -204,7 +204,7 @@ void PetrinetOnDevice(long long &time)
       sycl::nd_range<1>(gws1, lws), [=] (sycl::nd_item<1> item) {
       PetrinetKernel(
         item,
-        mt.get_pointer(),
+        mt.get_multi_ptr<sycl::access::decorated::no>().get(),
         g_places,
         g_vars,
         g_maxs,

@@ -267,7 +267,7 @@ void kernel_128(sycl::queue &q, double &time, double &ktime) {
   q.submit([&] (sycl::handler &cgh) {
     sycl::local_accessor<float, 1> sm (sycl::range<1>(6*6*128), cgh);
     cgh.parallel_for<class k1>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-      kernel_128_winograd_BtdB (item, sm.get_pointer(), input, t_input);
+      kernel_128_winograd_BtdB (item, sm.get_multi_ptr<sycl::access::decorated::no>().get(), input, t_input);
     });
   });
 
@@ -276,7 +276,7 @@ void kernel_128(sycl::queue &q, double &time, double &ktime) {
   q.submit([&] (sycl::handler &cgh) {
     sycl::local_accessor<float, 1> sm (sycl::range<1>(8*128 + 64*128 + 8*128), cgh);
     cgh.parallel_for<class k2>(sycl::nd_range<2>(gws2, lws2), [=] (sycl::nd_item<2> item) {
-      kernel_128_OuterProduct_128(item, sm.get_pointer(), t_input, l_weights, ip);
+      kernel_128_OuterProduct_128(item, sm.get_multi_ptr<sycl::access::decorated::no>().get(), t_input, l_weights, ip);
     });
   });
 
@@ -288,7 +288,7 @@ void kernel_128(sycl::queue &q, double &time, double &ktime) {
     sycl::local_accessor<float, 1> sm_input (sycl::range<1>(6*6), cgh);
     cgh.parallel_for<class k3>(sycl::nd_range<3>(gws3, lws3), [=] (sycl::nd_item<3> item) {
       kernel_128_winograd_AtIA(item,
-        sm_bias, sm_scale, sm_input.get_pointer(),
+        sm_bias, sm_scale, sm_input.get_multi_ptr<sycl::access::decorated::no>().get(),
         ip, l_bnBias, l_bnScale, output);
     });
   });

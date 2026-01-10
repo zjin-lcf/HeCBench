@@ -101,7 +101,7 @@ void mergeType(sycl::queue &q, const uint64_t size, const uint32_t runs) {
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         workloadDiagonals<vec_t>(
           item, xt, yt, xb, yb,
-          found, oneorzero.get_pointer(),
+          found, oneorzero.get_multi_ptr<sycl::access::decorated::no>().get(),
           dA, size, dB, size, dpi);
       });
     });
@@ -118,7 +118,7 @@ void mergeType(sycl::queue &q, const uint64_t size, const uint32_t runs) {
       cgh.parallel_for<class merge<vec_t, blocks, threads, timing>>(
         sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         mergeSinglePath<vec_t,false,false> (
-          item, A.get_pointer(), xt, yt, xs, ys,
+          item, A.template get_multi_ptr<sycl::access::decorated::no>().get(), xt, yt, xs, ys,
           dA, size, dB, size,
           dpi, dC, size * 2);
       });

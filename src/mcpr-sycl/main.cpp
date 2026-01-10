@@ -143,7 +143,7 @@ int main(int argc, char* argv[]) {
       cgh.parallel_for<class k3>(
         sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
         compute_probs_unitStrides_sharedMem(d_alphas, d_rands, d_probs, n, K, M,
-                                            sm.get_pointer(), item);
+                                            sm.get_multi_ptr<sycl::access::decorated::no>().get(), item);
       });
     });
   }

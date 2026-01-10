@@ -178,7 +178,9 @@ void DCT8x8(
         sycl::local_accessor<float, 1> l_Transpose(sycl::range<1>(BLOCK_Y * (BLOCK_X+1)), cgh);
         cgh.parallel_for<class dct8x8>(
           sycl::nd_range<2>(sycl::range<2>(gws), sycl::range<2>(lws)), [=] (sycl::nd_item<2> item) {
-          DCT8x8_kernel(item, d_Dst, d_Src, l_Transpose.get_pointer(), stride, imageH, imageW);
+          DCT8x8_kernel(item, d_Dst, d_Src,
+                         l_Transpose.get_multi_ptr<sycl::access::decorated::no>().get(),
+                         stride, imageH, imageW);
         });
       });
     }
@@ -187,7 +189,9 @@ void DCT8x8(
         sycl::local_accessor<float, 1> l_Transpose(sycl::range<1>(BLOCK_Y * (BLOCK_X+1)), cgh);
         cgh.parallel_for<class idct8x8>(
           sycl::nd_range<2>(sycl::range<2>(gws), sycl::range<2>(lws)), [=] (sycl::nd_item<2> item) {
-          IDCT8x8_kernel(item, d_Dst, d_Src, l_Transpose.get_pointer(), stride, imageH, imageW);
+          IDCT8x8_kernel(item, d_Dst, d_Src,
+                         l_Transpose.get_multi_ptr<sycl::access::decorated::no>().get(),
+                         stride, imageH, imageW);
         });
       });
     }

@@ -65,7 +65,9 @@ int main(int argc, char* argv[])
       cgh.parallel_for<class debayer>(
         nd_range<2>(gws, lws), [=] (nd_item<2> item) {
         malvar_he_cutler_demosaic (
-          item, apron.get_pointer(), height, width, 
+          item,
+          apron.get_multi_ptr<sycl::access::decorated::no>().get(),
+          height, width, 
           d_input, input_image_pitch,
           d_output, output_image_pitch,
           bayer_pattern );

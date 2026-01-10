@@ -30,7 +30,7 @@ typedef struct
 {
   fp v, x, y, z;
 
-} __attribute__((aligned16)) FOUR_VECTOR;
+} FOUR_VECTOR;
 
 typedef struct nei_str
 {

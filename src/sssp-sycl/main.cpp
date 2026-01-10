@@ -545,7 +545,8 @@ int main(int argc, char **argv) {
                 SSSP_gpu(d_nodes, d_edges, d_cost, d_color,
                          d_qin, d_qout, d_num_t, d_head, d_tail,
                          d_overflow, d_gray_shade, d_iter,
-                         item, l_mem_acc.get_pointer(),
+                         item,
+                         l_mem_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
                          tail_bin_acc);
             });
           }).wait();

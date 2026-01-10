@@ -252,7 +252,7 @@ int main(int argc, char* argv[]) {
         find_min_in_sad_array (
           item,
           sad_array_size,
-          cache.get_pointer(),
+          cache.get_multi_ptr<sycl::access::decorated::no>().get(),
           d_sad_array,
           d_min_mse);
       });

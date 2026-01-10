@@ -52,7 +52,7 @@ void conv1d(sycl::nd_item<1> &item,
 
 template<typename T>
 void conv1d_tiled(sycl::nd_item<1> &item,
-                  sycl::local_ptr<T> tile,
+                        T *__restrict__ tile,
                   const T * __restrict__ mask,
                   const T *__restrict__ in,
                         T *__restrict__ out,
@@ -90,7 +90,7 @@ void conv1d_tiled(sycl::nd_item<1> &item,
 
 template<typename T>
 void conv1d_tiled_caching(sycl::nd_item<1> &item,
-                          sycl::local_ptr<T> tile,
+                                T *__restrict__ tile,
                           const T *__restrict__ mask,
                           const T *__restrict__ in,
                                 T *__restrict__ out,
@@ -203,7 +203,9 @@ void conv1D(sycl::queue &q, const int input_width, const int mask_width, const i
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<T, 1> tile (sycl::range<1>(TILE_SIZE + MAX_MASK_WIDTH - 1), cgh);
       cgh.parallel_for<class k2<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        conv1d_tiled(item, tile.get_pointer(), mask, d_a, d_b, input_width, mask_width);
+        conv1d_tiled(item,
+                     tile.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                     mask, d_a, d_b, input_width, mask_width);
       });
     });
   }
@@ -221,7 +223,9 @@ void conv1D(sycl::queue &q, const int input_width, const int mask_width, const i
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<T, 1> tile (sycl::range<1>(TILE_SIZE), cgh);
       cgh.parallel_for<class k3<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        conv1d_tiled_caching(item, tile.get_pointer(), mask, d_a, d_b, input_width, mask_width);
+        conv1d_tiled_caching(item,
+                             tile.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                             mask, d_a, d_b, input_width, mask_width);
       });
     });
   }

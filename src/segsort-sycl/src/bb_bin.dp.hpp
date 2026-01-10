@@ -201,9 +201,9 @@ void bb_bin(const Offset *d_seg_begins, const Offset *d_seg_ends,
     cgh.parallel_for(
         sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * num_threads),
                           sycl::range<3>(1, 1, num_threads)),
-        [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+        [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
           bb_bin_histo(d_bin_counter, d_seg_begins, d_seg_ends, num_segs,
-                       item_ct1, local_histo_acc_ct1.get_pointer());
+                       item_ct1, local_histo_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
         });
   });
 
