@@ -30,7 +30,8 @@ void scanExclusiveLocal1(
     sycl::local_accessor<uint, 1> l_Data(sycl::range<1>(2 * WORKGROUP_SIZE), cgh);
     cgh.parallel_for<class scan_exclusive_local1>(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-      scanExclusiveLocal1K(item, d_Dst, d_Src, l_Data.get_pointer(), size);
+      scanExclusiveLocal1K(item, d_Dst, d_Src,
+                           l_Data.get_multi_ptr<sycl::access::decorated::no>().get(), size);
     });
   });
 }
@@ -54,7 +55,7 @@ void scanExclusiveLocal2(
     cgh.parallel_for<class scan_exclusive_local2>(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       scanExclusiveLocal2K(item, d_Buf, d_Dst, d_Src,
-                           l_Data.get_pointer(), elements, size);
+                           l_Data.get_multi_ptr<sycl::access::decorated::no>().get(), elements, size);
     });
   });
 }

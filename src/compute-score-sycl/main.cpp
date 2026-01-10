@@ -363,7 +363,7 @@ int main(int argc, char** argv)
 
         if (item.get_local_id(0) == 0) {
            sycl::vec<ulong, 8> res;
-           res.load(0, partial.get_pointer());
+           res.load(0, partial.get_multi_ptr<sycl::access::decorated::no>().get());
            ulong final_result = res.s0() + res.s1() + res.s2() + res.s3() +
                                 res.s4() + res.s5() + res.s6() + res.s7();
            d_partialSums_dimm1[item.get_group(0)] = (uint) (final_result >> 32); 

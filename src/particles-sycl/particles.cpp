@@ -112,7 +112,7 @@ void findCellBoundsAndReorder(
                                  d_Index, 
                                  d_Pos, 
                                  d_Vel,
-                                 localHash.get_pointer(),
+                                 localHash.get_multi_ptr<sycl::access::decorated::no>().get(),
                                  numParticles);
       });
     });

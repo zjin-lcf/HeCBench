@@ -142,8 +142,10 @@ int main(int argc, char* argv[])
       cgh.parallel_for<class test>(
         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         matern_kernel(item, ntargets_small, l, d_sources, d_targets, d_weights, d_result,
-                      l_result.get_pointer(), l_targets.get_pointer(),
-                      l_sources.get_pointer(), l_weights.get_pointer());
+                      l_result.get_multi_ptr<sycl::access::decorated::no>().get(),
+                      l_targets.get_multi_ptr<sycl::access::decorated::no>().get(),
+                      l_sources.get_multi_ptr<sycl::access::decorated::no>().get(),
+                      l_weights.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
 
@@ -179,8 +181,10 @@ int main(int argc, char* argv[])
         cgh.parallel_for<class warmup>(
           sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
           matern_kernel(item, ntargets, l, d_sources, d_targets, d_weights, d_result,
-                        l_result.get_pointer(), l_targets.get_pointer(),
-                        l_sources.get_pointer(), l_weights.get_pointer());
+                        l_result.get_multi_ptr<sycl::access::decorated::no>().get(),
+                        l_targets.get_multi_ptr<sycl::access::decorated::no>().get(),
+                        l_sources.get_multi_ptr<sycl::access::decorated::no>().get(),
+                        l_weights.get_multi_ptr<sycl::access::decorated::no>().get());
         });
       });
     }
@@ -197,8 +201,10 @@ int main(int argc, char* argv[])
         cgh.parallel_for<class measure>(
           sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
           matern_kernel(item, ntargets, l, d_sources, d_targets, d_weights, d_result,
-                        l_result.get_pointer(), l_targets.get_pointer(),
-                        l_sources.get_pointer(), l_weights.get_pointer());
+                        l_result.get_multi_ptr<sycl::access::decorated::no>().get(),
+                        l_targets.get_multi_ptr<sycl::access::decorated::no>().get(),
+                        l_sources.get_multi_ptr<sycl::access::decorated::no>().get(),
+                        l_weights.get_multi_ptr<sycl::access::decorated::no>().get());
         });
       });
     }

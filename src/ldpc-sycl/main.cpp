@@ -260,7 +260,7 @@ int main()
                   d_R,
                   d_h_element_count1, 
                   d_h_compact1,
-                  RCache.get_pointer(),
+                  RCache.get_multi_ptr<sycl::access::decorated::no>().get(),
                   item);
               });
             });

@@ -147,7 +147,7 @@ static void Compress(sycl::queue &q, int blocks, int warpsperblock, int repeat, 
         //[[sycl::reqd_sub_group_size(WARPSIZE)]]
       {
         CompressionKernel(item, dimensionality, cbufd, dbufd, cutd, offd,
-                          ibufs.get_pointer());
+                          ibufs.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
   }

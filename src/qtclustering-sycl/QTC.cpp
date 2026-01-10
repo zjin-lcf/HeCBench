@@ -388,7 +388,9 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
           int degree = degrees[seed_index];
           if( degree <= max_cardinality ) continue;
           int  cnt = generate_candidate_cluster_compact_storage(
-              item, dist_array.get_pointer(), point_index_array.get_pointer(),
+              item,
+              dist_array.get_multi_ptr<sycl::access::decorated::no>().get(),
+              point_index_array.get_multi_ptr<sycl::access::decorated::no>().get(),
               seed_index, degree, Ai_mask_offset,
               distance_matrix,
               clustered_pnts_mask,
@@ -488,7 +490,9 @@ void QTC(const string& name, OptionParser& op, int matrix_type){
         int degree = degrees[winner_index];
 
         generate_candidate_cluster_compact_storage(
-            item, dist_array.get_pointer(), point_index_array.get_pointer(),
+            item,
+            dist_array.get_multi_ptr<sycl::access::decorated::no>().get(),
+            point_index_array.get_multi_ptr<sycl::access::decorated::no>().get(),
             winner_index, degree, Ai_mask,
             distance_matrix,
             clustered_pnts_mask,

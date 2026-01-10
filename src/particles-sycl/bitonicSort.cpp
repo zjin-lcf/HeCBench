@@ -67,8 +67,8 @@ void bitonicSort(
                              d_dstVal,
                              d_srcKey,
                              d_srcVal,
-                             l_key.get_pointer(),
-                             l_val.get_pointer(),
+                             l_key.get_multi_ptr<sycl::access::decorated::no>().get(),
+                             l_val.get_multi_ptr<sycl::access::decorated::no>().get(),
                              arrayLength,
                              dir);
           });
@@ -90,8 +90,8 @@ void bitonicSort(
                               d_dstVal,
                               d_srcKey,
                               d_srcVal,
-                              l_key.get_pointer(),
-                              l_val.get_pointer());
+                              l_key.get_multi_ptr<sycl::access::decorated::no>().get(),
+                              l_val.get_multi_ptr<sycl::access::decorated::no>().get());
           });
         });
 
@@ -141,8 +141,8 @@ void bitonicSort(
                                           d_dstVal,
                                           d_dstKey,
                                           d_dstVal,
-                                          l_key.get_pointer(),
-                                          l_val.get_pointer(),
+                                          l_key.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                          l_val.get_multi_ptr<sycl::access::decorated::no>().get(),
                                           arrayLength,
                                           size,
                                           stride,

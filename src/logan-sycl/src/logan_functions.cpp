@@ -603,7 +603,7 @@ void extendSeedL(std::vector<SeedL> &seeds,
           EXTEND_LEFTL_i, XDrop, scoreLeft_d_i,
           offsetLeftQ_d_i, offsetLeftT_d_i,
           ant_len_left_i, ant_l_i, n_threads,
-          item, sm.get_pointer());
+          item, sm.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
 
@@ -626,7 +626,7 @@ void extendSeedL(std::vector<SeedL> &seeds,
           EXTEND_RIGHTL_i, XDrop, scoreRight_d_i,
           offsetRightQ_d_i, offsetRightT_d_i,
           ant_len_right_i, ant_r_i, n_threads,
-          item, sm.get_pointer());
+          item, sm.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
   }

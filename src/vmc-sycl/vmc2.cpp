@@ -256,7 +256,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class sum_blocks>(
           sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           SumWithinBlocks(Npoint, d_stats + what * Npoint, d_blocksums,
-                          sdata.get_pointer(), item);
+                          sdata.get_multi_ptr<sycl::access::decorated::no>().get(), item);
         });
       });
 
@@ -266,7 +266,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class final_sum_blocks>(
           sycl::nd_range<1>(lws, lws), [=] (sycl::nd_item<1> item) {
           SumWithinBlocks(NBLOCK, d_blocksums, d_statsum + what,
-                          sdata.get_pointer(), item);
+                          sdata.get_multi_ptr<sycl::access::decorated::no>().get(), item);
         });
       });
     }

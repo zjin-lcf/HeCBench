@@ -264,7 +264,7 @@ std::vector<float> runKernel(Params params) {
     h.parallel_for<class warmup>(
       sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       fasten_main(item,
-                  s_forcefield.get_pointer(),
+                  s_forcefield.get_multi_ptr<sycl::access::decorated::no>().get(),
                   wgSize,
                   ntypes,
                   nposes,
@@ -290,7 +290,7 @@ std::vector<float> runKernel(Params params) {
       h.parallel_for<class run>(
         sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         fasten_main(item,
-                    s_forcefield.get_pointer(),
+                    s_forcefield.get_multi_ptr<sycl::access::decorated::no>().get(),
                     wgSize,
                     ntypes,
                     nposes,

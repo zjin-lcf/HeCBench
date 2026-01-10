@@ -182,7 +182,9 @@ void runTest (sycl::queue &q, const int64_t n, const int repeat, bool timing = f
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<T, 1> temp (sycl::range<1>(N), cgh);
       cgh.parallel_for<class base<T, N>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        scan<T, N>(item, temp.get_pointer(), num_blocks, d_out, d_in);
+        scan<T, N>(item,
+                   temp.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                   num_blocks, d_out, d_in);
       });
     });
   }
@@ -204,7 +206,9 @@ void runTest (sycl::queue &q, const int64_t n, const int repeat, bool timing = f
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<T, 1> temp (sycl::range<1>(N*2), cgh);
       cgh.parallel_for<class opt<T, N>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        scan_bcao<T, N>(item, temp.get_pointer(), num_blocks, d_out, d_in);
+        scan_bcao<T, N>(item,
+                        temp.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                        num_blocks, d_out, d_in);
       });
     });
   }

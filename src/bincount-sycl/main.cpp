@@ -104,7 +104,7 @@ void bincount (
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {     \
       bincount<output_t, input_t, IndexType, MEMORY_TYPE>(           \
         item,                                                        \
-        sm.get_pointer(),                                            \
+        sm.template get_multi_ptr<sycl::access::decorated::no>().get(), \
         d_output,                                                    \
         d_input,                                                     \
         nbins,                                                       \

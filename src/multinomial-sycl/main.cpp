@@ -205,7 +205,7 @@ int main(int argc, char* argv[])
     sycl::local_accessor<int, 0> foundPos (cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       sampleMultinomialOnce<float, float> (
-        item, smem.get_pointer(), found, foundPos,
+        item, smem.get_multi_ptr<sycl::access::decorated::no>().get(), found, foundPos,
         d_result, numDist, numCategories, d_sample, d_distr, numCategories, 1);
     });
   });
@@ -235,7 +235,7 @@ int main(int argc, char* argv[])
       sycl::local_accessor<int, 0> foundPos (cgh);
       cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         sampleMultinomialOnce<float, float> (
-          item, smem.get_pointer(), found, foundPos,
+          item, smem.get_multi_ptr<sycl::access::decorated::no>().get(), found, foundPos,
           d_result, numDist, numCategories, d_sample, d_distr, numCategories, 1);
       });
     });

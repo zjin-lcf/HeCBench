@@ -173,7 +173,7 @@ int runKernel(
                   inDataBuf,
                   outDataBuf,
                   partialOutDataBuf,
-                  lmem.get_pointer(),
+                  lmem.get_multi_ptr<sycl::access::decorated::no>().get(),
                   totalLevels,
                   curSignalLength,
                   levelsDone,

@@ -275,7 +275,7 @@ int main(int argc, char* argv[])
       {
         findTopK<float, 2048, block_size>(
           d_indices, d_count, d_scores, threshold, classwise_topK, num_classes, num_priors,
-          item, bins.get_pointer());
+          item, bins.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
   }

@@ -411,9 +411,9 @@ int main(int argc, char *argv[])
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         compute_bicluster(
           item,
-          vect.get_pointer(),
-          genekj.get_pointer(),
-          geneij.get_pointer(),
+          vect.get_multi_ptr<sycl::access::decorated::no>().get(),
+          genekj.get_multi_ptr<sycl::access::decorated::no>().get(),
+          geneij.get_multi_ptr<sycl::access::decorated::no>().get(),
           d_gene,
           n,maxbcn,D,thr,
           d_bc_sample,
