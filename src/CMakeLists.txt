@@ -273,6 +273,7 @@ set(HECBENCH_POC_BENCHMARKS
     mmcsf
     mnist
     moe
+    moe-sum
     morphology
     mpc
     mr
