@@ -1,5 +1,5 @@
-NVCC = icpx
-NVCC_FLAGS = --std=c++17 -O3 -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+CC = icpx
+CC_FLAGS = --std=c++17 -O3 -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 
 INC_DIR = include
 SRC_DIR = src
@@ -10,10 +10,10 @@ SRC_FILES := $(wildcard $(SRC_DIR)/*.cc)
 OBJ_FILES := $(patsubst $(SRC_DIR)/%.cc,$(OBJ_DIR)/%.o,$(SRC_FILES))
 
 $(OBJ_DIR)/$(EXEC_NAME): $(OBJ_FILES) 
-	$(NVCC) $(NVCC_FLAGS) $(OBJ_FILES) -o $(OBJ_DIR)/$(EXEC_NAME)
+	$(CC) $(CC_FLAGS) $(OBJ_FILES) -o $(OBJ_DIR)/$(EXEC_NAME)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc
-	$(NVCC) $(NVCC_FLAGS) -I $(INC_DIR) -c -o $@ $<
+	$(CC) $(CC_FLAGS) -I $(INC_DIR) -c -o $@ $<
 
 .PHONY: clean
 clean:
