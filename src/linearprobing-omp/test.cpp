@@ -7,7 +7,7 @@
 #include <random>
 #include "linearprobing.h"
 
-void test_correctness(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> delete_kvs, std::vector<KeyValue> kvs)
+bool test_correctness(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> delete_kvs, std::vector<KeyValue> kvs)
 {
   printf("Testing that there are no duplicate keys...\n");
   std::unordered_set<uint32_t> unique_keys;
@@ -20,7 +20,7 @@ void test_correctness(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> de
     if (unique_keys.find(node->key) != unique_keys.end())
     {
       printf("Duplicate key found in GPU hash table at slot %d\n", i);
-      exit(-1);
+      return false;
     }
     unique_keys.insert(node->key);
   }
@@ -58,7 +58,7 @@ void test_correctness(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> de
   if (unique_keys.size() != all_kvs_map.size())
   {
     printf("# of unique keys in hashtable is incorrect\n");
-    exit(-1);
+    return false;
   }
 
   printf("Testing that each key/value in hashtable is in the original list...\n");
@@ -71,18 +71,18 @@ void test_correctness(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> de
     if (iter == all_kvs_map.end())
     {
       printf("Hashtable key not found in original list\n");
-      exit(-1);
+      return false;
     }
 
     std::vector<uint32_t>& values = iter->second;
     if (std::find(values.begin(), values.end(), kvs[i].value) == values.end())
     {
       printf("Hashtable value not found in original list\n");
-      exit(-1);
+      return false;
     }
   }
 
   printf("Deleting std::unordered_map and std::unique_set...\n");
 
-  return;
+  return true;
 }
