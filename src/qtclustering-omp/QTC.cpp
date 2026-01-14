@@ -111,6 +111,8 @@ void calculate_participants(int point_count, int node_count, int cwrank,
   }
 
   *active_node_count  = ac_nd_cnt;
+  *thread_block_count = thr_blc_cnt;
+  *total_thread_block_count = total_thr_blc_cnt;
 
   return;
 }
