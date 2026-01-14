@@ -1,0 +1,5 @@
+outs:
+- md5: 5997f6bac9adb5d599a9f7211f933197
+  size: 1036186
+  hash: md5
+  path: kdd_cup.tar.bz
