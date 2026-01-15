@@ -43,14 +43,15 @@ void reference (output_t* out, const input_t* inp, const uint8_t* mask, acc_t sc
             //printf("ref scale: N=%zu j=%d %f\n", i, j, tmp_row[j]);
         }
 
-        acc_t maxval = -INFINITY;
+        //acc_t maxval = -INFINITY;
+        acc_t maxval = -10000.0;
         for (int j = 0; j < C; j++) {
             if (tmp_row[j] > maxval) {
                 maxval = tmp_row[j];
             }
         }
         //printf("ref maxval: N=%zu %f\n", i, maxval);
-        uint8_t mask_value = (maxval == (acc_t)-10000.0) ? 0 : 1;
+        uint8_t mask_value = (maxval == (acc_t)-10000.0) ? 1 : 0;
         acc_t sum = 0.0;
         for (int j = 0; j < C; j++) {
             tmp_row[j] = expf(tmp_row[j] - maxval);
@@ -58,9 +59,9 @@ void reference (output_t* out, const input_t* inp, const uint8_t* mask, acc_t sc
         }
         for (int j = 0; j < C; j++) {
             if (mask_value) 
-                out_row[j] = tmp_row[j] / sum;
-            else
                 out_row[j] = (output_t)0;
+            else
+                out_row[j] = tmp_row[j] / sum;
             //printf("ref out: N=%zu j=%d %f %f\n", i, j, tmp_row[j], sum);
         }
     } } }

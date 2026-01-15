@@ -443,8 +443,8 @@ void Vector::inner_product_1(int number_of_atoms, Vector& other, Vector& target,
        other_imag_part,
        target_real_part,
        target_imag_part,
-       s_data_real.get_pointer(),
-       s_data_imag.get_pointer(),
+       s_data_real.get_multi_ptr<sycl::access::decorated::no>().get(),
+       s_data_imag.get_multi_ptr<sycl::access::decorated::no>().get(),
        offset);
     });
   });
@@ -559,8 +559,8 @@ void Vector::inner_product_2(int number_of_atoms, int number_of_moments, Vector&
         imag_part_src,
         real_part_dst,
         imag_part_dst,
-        s_data_real.get_pointer(),
-        s_data_imag.get_pointer());
+        s_data_real.get_multi_ptr<sycl::access::decorated::no>().get(),
+        s_data_imag.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 #else

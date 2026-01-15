@@ -165,8 +165,8 @@ int main(int argc, char* argv[]) {
       sycl::local_accessor<float, 1> local_data (sycl::range<1>(TILE_WIDTH * D), cgh);
       sycl::local_accessor<float, 1> valid_data (sycl::range<1>(TILE_WIDTH), cgh);
       cgh.parallel_for<class opt>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        mean_shift::gpu::mean_shift_tiling(item, local_data.get_pointer(),
-                                           valid_data.get_pointer(),
+        mean_shift::gpu::mean_shift_tiling(item, local_data.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                           valid_data.get_multi_ptr<sycl::access::decorated::no>().get(),
                                            d_data, d_data_next);
       });
     }).wait();

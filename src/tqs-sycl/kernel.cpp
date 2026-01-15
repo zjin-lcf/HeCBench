@@ -109,7 +109,7 @@ void call_TaskQueue_gpu(sycl::queue &q,
     sycl::local_accessor<int, 1> l_mem (sycl::range<1>(l_mem_size/sizeof(int)), cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       TaskQueue_gpu(queue, data, consumed, iterations, offset,
-                    gpuQueueSize, item, l_mem.get_pointer());
+                    gpuQueueSize, item, l_mem.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 }

@@ -240,23 +240,25 @@ int main(int argc, char** argv)
           item.barrier(sycl::access::fence_space::local_space);
 
           sycl::uint4 best = evalAllPermutations(item,
-                                                 s_colors.get_pointer(),
+                                                 s_colors.get_multi_ptr<sycl::access::decorated::no>().get(),
                                                  d_permutations,
-                                                 s_covariance.get_pointer(),
+                                                 s_covariance.get_multi_ptr<sycl::access::decorated::no>().get(),
                                                  s_sums[0],
-                                                 s_permutations.get_pointer(), 
+                                                 s_permutations.get_multi_ptr<sycl::access::decorated::no>().get(), 
                                                  d_alphaTable4, d_prods4, 
                                                  d_alphaTable3, d_prods3);
 
           // Use a parallel reduction to find minimum error.
-          const int minIdx = findMinError(item, s_covariance.get_pointer(), s_int.get_pointer());    
+          const int minIdx = findMinError(item, s_covariance.get_multi_ptr<sycl::access::decorated::no>().get(), s_int.get_multi_ptr<sycl::access::decorated::no>().get());    
 
           item.barrier(sycl::access::fence_space::local_space);
           
           // Only write the result of the winner thread.
           if (idx == minIdx)
           {
-            saveBlockDXT1(item, best.x(), best.y(), best.z(), s_xrefs.get_pointer(), d_result, j);
+            saveBlockDXT1(item, best.x(), best.y(), best.z(),
+                          s_xrefs.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          d_result, j);
           }
         });
       });

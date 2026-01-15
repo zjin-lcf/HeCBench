@@ -115,8 +115,8 @@ int main(int argc, char * argv[])
                      inputBuffer,
                      rKeyBuffer,
                      rsBoxBuffer,
-                     block0.get_pointer(),
-                     block1.get_pointer(),
+                     block0.get_multi_ptr<sycl::access::decorated::no>().get(),
+                     block1.get_multi_ptr<sycl::access::decorated::no>().get(),
                      width, rounds, item);
         });
       });
@@ -131,8 +131,8 @@ int main(int argc, char * argv[])
                      inputBuffer,
                      rKeyBuffer,
                      sBoxBuffer,
-                     block0.get_pointer(),
-                     block1.get_pointer(),
+                     block0.get_multi_ptr<sycl::access::decorated::no>().get(),
+                     block1.get_multi_ptr<sycl::access::decorated::no>().get(),
                      width, rounds, item);
         });
       });

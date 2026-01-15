@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
           d_lookback_A_2,
           d_lookback_S_0,
           d_lookback_MU,
-          sm.get_pointer(),
+          sm.get_multi_ptr<sycl::access::decorated::no>().get(),
 	  item);
       });
     });

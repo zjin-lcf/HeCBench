@@ -266,7 +266,7 @@ float findBestGraph(sycl::queue &q, float *D_localscore, int *D_resP,
           sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           computeKernel(WORKLOAD, sizePerNode, D_localscore,
             D_parent, node, total, D_Score, D_resP,
-            sinblock.get_pointer(), item);
+            sinblock.get_multi_ptr<sycl::access::decorated::no>().get(), item);
         });
       });
 

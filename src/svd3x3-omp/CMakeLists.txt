@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME svd3x3
     MODEL omp
-    SOURCES kernels.cpp main.cpp
+    SOURCES main.cpp
+    ENABLE_FASTMATH true
     CATEGORIES algorithms
 )

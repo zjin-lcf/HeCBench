@@ -119,8 +119,8 @@ int main(int argc, char* argv[]) {
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         EstepKernel(
           item,
-          shared.get_pointer(),
-          reduce.get_pointer(),
+          shared.get_multi_ptr<sycl::access::decorated::no>().get(),
+          reduce.get_multi_ptr<sycl::access::decorated::no>().get(),
           d_cols,
           d_indptr,
           d_vali,
@@ -157,8 +157,8 @@ int main(int argc, char* argv[]) {
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         EstepKernel(
           item,
-          shared.get_pointer(),
-          reduce.get_pointer(),
+          shared.get_multi_ptr<sycl::access::decorated::no>().get(),
+          reduce.get_multi_ptr<sycl::access::decorated::no>().get(),
           d_cols,
           d_indptr,
           d_vali,

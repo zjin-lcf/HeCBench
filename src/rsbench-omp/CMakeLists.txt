@@ -5,4 +5,5 @@ add_hecbench_benchmark(
     MODEL omp
     SOURCES init.c io.c main.c material.c simulation.c utils.c
     CATEGORIES algorithms
+    LINK_LIBRARIES m
 )

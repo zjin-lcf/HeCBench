@@ -83,7 +83,7 @@ void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> 
       milliseconds, kNumKeyValues / seconds / 1000000.0f);
 }
 
-void test_correctness(std::vector<KeyValue>, std::vector<KeyValue>, std::vector<KeyValue>);
+bool test_correctness(std::vector<KeyValue>, std::vector<KeyValue>, std::vector<KeyValue>);
 
 int main(int argc, char* argv[])
 {
@@ -170,7 +170,9 @@ int main(int argc, char* argv[])
 
     test_unordered_map(insert_kvs, delete_kvs);
 
-    test_correctness(insert_kvs, delete_kvs, kvs);
+    bool ok = test_correctness(insert_kvs, delete_kvs, kvs);
+
+    printf("%s\n", ok ? "PASS" : "FAIL");
   }
 
   free(pHashTable);
@@ -178,7 +180,6 @@ int main(int argc, char* argv[])
   free(del_kvs);
   free(iter_kvs);
 
-  printf("Success\n");
 
   return 0;
 }

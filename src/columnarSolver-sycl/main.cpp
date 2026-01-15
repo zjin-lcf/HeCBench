@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
                    d_encrypted,
                    d_states,
                    d_decrypted,
-                   lscores.get_pointer());
+                   lscores.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 

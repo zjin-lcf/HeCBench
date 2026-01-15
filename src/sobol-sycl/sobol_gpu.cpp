@@ -195,7 +195,8 @@ double sobolGPU(sycl::queue &q, int repeat, int n_vectors, int n_dimensions,
           sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
           // Offset into the correct dimension as specified by the block y coordinate
           sobelGPU_kernel(item, d_directions, d_output,
-                          v.get_pointer(), n_vectors, n_dimensions);
+                          v.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          n_vectors, n_dimensions);
         });
       });
     }

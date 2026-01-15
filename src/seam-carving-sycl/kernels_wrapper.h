@@ -22,7 +22,7 @@ void compute_costs(
     sycl::local_accessor<pixel, 1> sm (sycl::range<1>(COSTS_BLOCKSIZE_Y * COSTS_BLOCKSIZE_X), cgh);
     cgh.parallel_for<class compute_costs>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       compute_costs_kernel(item,
-                           sm.get_pointer(),
+                           sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                            d_pixels,
                            d_costs_left,
                            d_costs_up,
@@ -42,7 +42,7 @@ void compute_costs(
       sycl::range<1>((COSTS_BLOCKSIZE_Y+1) * (COSTS_BLOCKSIZE_X+2)), cgh);
     cgh.parallel_for<class compute_costs_full>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       compute_costs_full_kernel(item,
-                                sm.get_pointer(),
+                                sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                 d_pixels,
                                 d_costs_left,
                                 d_costs_up,
@@ -72,7 +72,7 @@ void compute_M(
       sycl::local_accessor<int> sm (sycl::range<1>(2*current_w), cgh);
       cgh.parallel_for<class compute_M_small>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         compute_M_kernel_small(item,
-                               sm.get_pointer(),
+                               sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                d_costs_left,
                                d_costs_up,
                                d_costs_right,
@@ -96,7 +96,7 @@ void compute_M(
           sycl::range<1>(2*COMPUTE_M_BLOCKSIZE_X), cgh);
         cgh.parallel_for<class compute_M_step1>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
           compute_M_kernel_step1(item,
-                                 sm.get_pointer(),
+                                 sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                  d_costs_left,
                                  d_costs_up,
                                  d_costs_right,
@@ -134,7 +134,7 @@ void compute_M(
     sycl::local_accessor<int> sm (2*current_w, cgh);
     cgh.parallel_for<class compute_M_single>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       compute_M_kernel_single(item,
-                              sm.get_pointer(),
+                              sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                               d_costs_left,
                               d_costs_up,
                               d_costs_right,
@@ -202,8 +202,8 @@ void find_min_index(
       sycl::local_accessor<int, 1> sm_ix (sycl::range<1>(REDUCE_BLOCKSIZE_X), cgh);
       cgh.parallel_for<class reduce>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         min_reduce(item,
-                   sm_val.get_pointer(),
-                   sm_ix.get_pointer(),
+                   sm_val.get_multi_ptr<sycl::access::decorated::no>().get(),
+                   sm_ix.get_multi_ptr<sycl::access::decorated::no>().get(),
                    reduce_row,
                    d_indices,
                    reduce_num_elements);
@@ -312,10 +312,10 @@ void approx_setup(
 
     cgh.parallel_for<class approx_setup>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
       approx_setup_kernel(item,
-                          p_sm.get_pointer(),
-                          l_sm.get_pointer(),
-                          u_sm.get_pointer(),
-                          r_sm.get_pointer(),
+                          p_sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          l_sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          u_sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          r_sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                           d_pixels,
                           d_index_map,
                           d_offset_map,

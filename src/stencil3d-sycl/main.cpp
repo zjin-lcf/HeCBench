@@ -191,7 +191,7 @@ int main(int argc, char* argv[])
       sycl::local_accessor<Real, 1> sm_psi (sycl::range<1>(4*BSIZE*BSIZE), cgh);
       cgh.parallel_for<class diffusion>(
         sycl::nd_range<3>(gws, lws), [=] (sycl::nd_item<3> item) {
-        stencil3d(item, sm_psi.get_pointer(), d_Vm, d_dVm,
+        stencil3d(item, sm_psi.get_multi_ptr<sycl::access::decorated::no>().get(), d_Vm, d_dVm,
                   d_sigma, d_sigma + 3*vol, d_sigma + 6*vol,
                   nx, ny, nz);
       });

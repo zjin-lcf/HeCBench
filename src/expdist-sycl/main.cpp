@@ -88,8 +88,11 @@ void test(const int size, const int repeat) {
         sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
         distance_tiled<FP>(
           item, d_A, d_B, size, size, d_scaleA, d_scaleB, d_cost,
-          sh_A.get_pointer(), sh_B.get_pointer(), 
-          sh_scaleA.get_pointer(), sh_scaleB.get_pointer(), sum.get_pointer());
+          sh_A.template get_multi_ptr<sycl::access::decorated::no>().get(),
+          sh_B.template get_multi_ptr<sycl::access::decorated::no>().get(), 
+          sh_scaleA.template get_multi_ptr<sycl::access::decorated::no>().get(),
+          sh_scaleB.template get_multi_ptr<sycl::access::decorated::no>().get(),
+          sum.template get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
 
@@ -98,7 +101,9 @@ void test(const int size, const int repeat) {
       cgh.parallel_for<class reduceBlock<FP>>(
          sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
          reduce_cross_term<FP>(
-           item, d_output, d_cost, sum.get_pointer(), size, size, nblocks);
+           item, d_output, d_cost,
+           sum.template get_multi_ptr<sycl::access::decorated::no>().get(),
+           size, size, nblocks);
       });
     });
   }

@@ -369,7 +369,7 @@ int main(int argc, char* argv[])
       sycl::local_accessor<float, 1> smem (sycl::range<1>(64), cgh);
       cgh.parallel_for<class min_max1>(
         sycl::nd_range<3>(GridSizeLv1*BlockSizeLv1, BlockSizeLv1), [=] (sycl::nd_item<3> item) {
-        computeMinMaxLv1(minMaxLv1Device, smem.get_pointer(), item);
+        computeMinMaxLv1(minMaxLv1Device, smem.get_multi_ptr<sycl::access::decorated::no>().get(), item);
       });
     });
 
@@ -382,7 +382,7 @@ int main(int argc, char* argv[])
                    minMaxLv1Device,
                    blockIndicesLv1Device,
                    countedBlockNumLv1Device,
-                   smem.get_pointer(),
+                   smem.get_multi_ptr<sycl::access::decorated::no>().get(),
                    item);
       });
     });
@@ -414,7 +414,7 @@ int main(int argc, char* argv[])
                      blockIndicesLv2Device,
                      countedBlockNumLv1,
                      countedBlockNumLv2Device,
-                     smem.get_pointer(),
+                     smem.get_multi_ptr<sycl::access::decorated::no>().get(),
                      item);
       });
     });

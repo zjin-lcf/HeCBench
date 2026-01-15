@@ -196,7 +196,9 @@ int main(int argc, char** argv) {
       cgh.parallel_for<class radixSort_blocksKeys>(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
         radixSortBlocksKeysK(item, d_keys, d_tempKeys,
-                             nbits, startbit, sMem.get_pointer(), numtrue);
+                             nbits, startbit,
+                             sMem.get_multi_ptr<sycl::access::decorated::no>().get(),
+                             numtrue);
       });
     });
 

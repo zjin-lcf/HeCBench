@@ -183,10 +183,12 @@ int main(int argc, char **argv)
       sycl::nd_range<1>(sycl::range<1>(512*160), sycl::range<1>(160)),
       [=] (sycl::nd_item<1> item) {
       if (item.get_local_id(0) == 0) {
-        pre2post(device_regex + device_regex_table[0], buf.get_pointer());
+        pre2post(device_regex + device_regex_table[0],
+		 buf.get_multi_ptr<sycl::access::decorated::no>().get());
 
         pnstate = 0;
-        st = ppost2nfa(buf.get_pointer(), s.get_pointer(),
+        st = ppost2nfa(buf.get_multi_ptr<sycl::access::decorated::no>().get(),
+                       s.get_multi_ptr<sycl::access::decorated::no>().get(),
                        pnstate, device_match_state);
       }
 

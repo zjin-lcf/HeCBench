@@ -290,7 +290,7 @@ int main(int argc, char **argv) {
           d_table,
           readsCount,
           item,
-          result.get_pointer());
+          result.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     }); // word filter
 

@@ -33,7 +33,9 @@ void radixSortBlocksKeysOnly(
     cgh.parallel_for<class radixSort_blocksKeys>(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       radixSortBlocksKeysK(item, d_keys, d_tempKeys,
-                           nbits, startbit, sMem.get_pointer(), numtrue);
+                           nbits, startbit,
+                           sMem.get_multi_ptr<sycl::access::decorated::no>().get(),
+                           numtrue);
     });
   });
 }
@@ -57,8 +59,9 @@ void findRadixOffsets(
     cgh.parallel_for<class find_radix_Offsets>(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
       findRadixOffsetsK(item, d_tempKeys, d_counters,
-                        d_blockOffsets, sRadix1.get_pointer(),
-                        sStartPointers.get_pointer(),
+                        d_blockOffsets,
+                        sRadix1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                        sStartPointers.get_multi_ptr<sycl::access::decorated::no>().get(),
                         startbit, totalBlocks);
     });
   });
@@ -88,9 +91,9 @@ void reorderDataKeysOnly(
                            d_tempKeys,
                            d_blockOffsets,
                            d_countersSum,
-                           sKeys1.get_pointer(),
-                           sOffsets.get_pointer(),
-                           sBlockOffsets.get_pointer(),
+                           sKeys1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                           sOffsets.get_multi_ptr<sycl::access::decorated::no>().get(),
+                           sBlockOffsets.get_multi_ptr<sycl::access::decorated::no>().get(),
                            startbit,
                            numElements,
                            totalBlocks);

@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
   d_grad_in = (scalar_t *)sycl::malloc_device(input_size_bytes, q);
   q.memcpy(d_grad_in, h_grad_in, input_size_bytes);
 
-  int64_t *d_idx_dim = malloc_device<int64_t>(1, q);
+  int64_t *d_idx_dim = sycl::malloc_device<int64_t>(1, q);
   q.memcpy(d_idx_dim, &h_idx_dim, sizeof(int64_t));
 
   d_grad_out = (scalar_t *)sycl::malloc_device(output_size_bytes, q);

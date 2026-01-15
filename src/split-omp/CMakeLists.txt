@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME split
     MODEL omp
-    SOURCES main.cpp verify.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
 )

@@ -276,9 +276,9 @@ int main(int argc, char *argv[])
                         inum,
                         area,
                         d_avg_dist,
-                        sdx.get_pointer(),
-                        sdy.get_pointer(),
-                        sdz.get_pointer(),
+                        sdx.get_multi_ptr<sycl::access::decorated::no>().get(),
+                        sdy.get_multi_ptr<sycl::access::decorated::no>().get(),
+                        sdz.get_multi_ptr<sycl::access::decorated::no>().get(),
                         item);
     });
   });
@@ -334,9 +334,9 @@ int main(int argc, char *argv[])
                           inum,
                           area,
                           d_avg_dist,
-                          sdx.get_pointer(),
-                          sdy.get_pointer(),
-                          sdz.get_pointer(),
+                          sdx.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          sdy.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          sdz.get_multi_ptr<sycl::access::decorated::no>().get(),
                           item);
       });
     });

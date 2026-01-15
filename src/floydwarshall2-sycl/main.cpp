@@ -528,7 +528,8 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat, const int repeat) {
       cgh.parallel_for(sycl::nd_range<1>(lws, lws),
           [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
             FW0_64(d_AdjMat, upper, d_krows, d_kcols, item,
-                   temp.get_pointer(), krow.get_pointer());
+                   temp.get_multi_ptr<sycl::access::decorated::no>().get(),
+                   krow.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
 
@@ -543,8 +544,8 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat, const int repeat) {
           cgh.parallel_for(sycl::nd_range<1>(fw64_gws, lws),
               [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
                 FWrowcol_64(d_AdjMat, upper, d_krows, d_kcols, x, subm1, item,
-                            temp.get_pointer(),
-                            krow.get_pointer());
+                            temp.get_multi_ptr<sycl::access::decorated::no>().get(),
+                            krow.get_multi_ptr<sycl::access::decorated::no>().get());
           });
         });
 
@@ -555,7 +556,8 @@ static void FW_gpu_64(const ECLgraph g, mtype *const AdjMat, const int repeat) {
               sycl::nd_range<1>(fw64r_gws, lws),
               [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
                 FWrem_64(d_AdjMat, upper, d_krows, d_kcols, x, subm1, item,
-                         s_kj.get_pointer(), s_ik.get_pointer());
+                         s_kj.get_multi_ptr<sycl::access::decorated::no>().get(),
+                         s_ik.get_multi_ptr<sycl::access::decorated::no>().get());
           });
         });
       }

@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
     sycl::local_accessor<long, 1> s (sycl::range<1>(32), cgh);
     cgh.depends_on(e);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-      sum(d_a, nkernels, item, s.get_pointer());
+      sum(d_a, nkernels, item, s.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 

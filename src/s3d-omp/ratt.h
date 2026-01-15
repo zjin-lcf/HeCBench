@@ -1,6 +1,6 @@
     const real TEMP = T[i]*tconv;
 
-    const register real ALOGT = LOG(TEMP);
+    const real ALOGT = LOG(TEMP);
     const real TI = (real)1.0e0/(TEMP);
     const real TI2 = TI*TI;
     real TMP;

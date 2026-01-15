@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
         sycl::local_accessor<float, 1> sf (sycl::range<1>(shared_mem_size), cgh);
         cgh.parallel_for<class x2_zeroflux_a>(
           sycl::nd_range<2>(gws_x, lws_x), [=] (sycl::nd_item<2> item) {
-          derivative_x2_zeroflux(d_a, d_dx2, sf.get_pointer(), item, mx, my);
+          derivative_x2_zeroflux(d_a, d_dx2, sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my);
         });
       });
 
@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class y2_zeroflux_a>(
           sycl::nd_range<2>(gws_y, lws_y), [=] (sycl::nd_item<2> item) {
           derivative_y2_zeroflux(d_a, d_dy2,
-                                 sf.get_pointer(), item, mx, my, pencils);
+                                 sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my, pencils);
         });
       });
 
@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class z2_zeroflux_a>(
           sycl::nd_range<2>(gws_z, lws_z), [=] (sycl::nd_item<2> item) {
           derivative_z2_zeroflux(d_a, d_dz2,
-                                 sf.get_pointer(), item, mx, my, mz, pencils);
+                                 sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my, mz, pencils);
         });
       });
     } else {
@@ -132,7 +132,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class x2_pbc_a>(
           sycl::nd_range<2>(gws_x, lws_x), [=] (sycl::nd_item<2> item) {
           derivative_x2_pbc(d_a, d_dx2,
-                            sf.get_pointer(), item, mx, my, pencils);
+                            sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my, pencils);
         });
       });
 
@@ -142,7 +142,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class y2_pb_a>(
           sycl::nd_range<2>(gws_y, lws_y), [=] (sycl::nd_item<2> item) {
           derivative_y2_pbc(d_a, d_dy2,
-                            sf.get_pointer(), item, mx, my, pencils);
+                            sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my, pencils);
         });
       });
 
@@ -152,7 +152,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class z2_pbc_a>(
           sycl::nd_range<2>(gws_z, lws_z), [=] (sycl::nd_item<2> item) {
           derivative_z2_pbc(d_a, d_dz2,
-                            sf.get_pointer(), item, mx, my, mz, pencils);
+                            sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my, mz, pencils);
         });
       });
     }
@@ -174,7 +174,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class x2_zeroflux_b>(
           sycl::nd_range<2>(gws_x, lws_x), [=] (sycl::nd_item<2> item) {
           derivative_x2_zeroflux(d_b, d_dx2,
-                                 sf.get_pointer(), item, mx, my);
+                                 sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my);
         });
       });
 
@@ -184,7 +184,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class y2_zeroflux_b>(
           sycl::nd_range<2>(gws_y, lws_y), [=] (sycl::nd_item<2> item) {
           derivative_y2_zeroflux(d_b, d_dy2,
-                                 sf.get_pointer(), item, mx, my, pencils);
+                                 sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my, pencils);
         });
       });
 
@@ -194,7 +194,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class z2_zeroflux_b>(
           sycl::nd_range<2>(gws_z, lws_z), [=] (sycl::nd_item<2> item) {
           derivative_z2_zeroflux(d_b, d_dz2,
-                                 sf.get_pointer(), item, mx, my, mz, pencils);
+                                 sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my, mz, pencils);
         });
       });
     } else {
@@ -204,7 +204,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class x2_pbc_b>(
           sycl::nd_range<2>(gws_x, lws_x), [=] (sycl::nd_item<2> item) {
           derivative_x2_pbc(d_b, d_dx2,
-                            sf.get_pointer(), item, mx, my, pencils);
+                            sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my, pencils);
         });
       });
 
@@ -214,7 +214,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class y2_pb_b>(
           sycl::nd_range<2>(gws_y, lws_y), [=] (sycl::nd_item<2> item) {
           derivative_y2_pbc(d_b, d_dy2,
-                            sf.get_pointer(), item, mx, my, pencils);
+                            sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my, pencils);
         });
       });
 
@@ -224,7 +224,7 @@ int main(int argc, char* argv[]) {
         cgh.parallel_for<class z2_pbc_b>(
           sycl::nd_range<2>(gws_z, lws_z), [=] (sycl::nd_item<2> item) {
           derivative_z2_pbc(d_b, d_dz2,
-                            sf.get_pointer(), item, mx, my, mz, pencils);
+                            sf.get_multi_ptr<sycl::access::decorated::no>().get(), item, mx, my, mz, pencils);
         });
       });
     }

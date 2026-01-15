@@ -3,6 +3,7 @@
 add_hecbench_benchmark(
     NAME heartwall
     MODEL omp
-    SOURCES main.cpp
+    SOURCES main.cpp kernel/kernel.cpp util/avi/avilib.c util/avi/avimod.c util/file/file.c util/timer/timer.c
+    INCLUDE_DIRS util/avi util/file util/timer
     CATEGORIES algorithms
 )

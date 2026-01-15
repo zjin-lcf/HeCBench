@@ -124,7 +124,7 @@ void kernel_256_1_in(sycl::queue &q, double &time, double &ktime) {
     sycl::local_accessor<float, 1>
       sm (sycl::range<1>(4*1024 + 16*256 + 4*256 + 2*256), cgh);
     cgh.parallel_for<class k1024>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-      kernel_1024_one_256 (item, sm.get_pointer(), input_,
+      kernel_1024_one_256 (item, sm.get_multi_ptr<sycl::access::decorated::no>().get(), input_,
                            weight_, bnBias_, bnScale_, output_);
     });
   });
@@ -193,7 +193,7 @@ void kernel_256_1_out(sycl::queue &q, double &time, double &ktime) {
     sycl::local_accessor<float, 1>
       sm (sycl::range<1>(4*256 + 32*256 + 4*256 + 2*256), cgh);
     cgh.parallel_for<class k256_1024>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-      kernel_256_one_1024 (item, sm.get_pointer(), input_,
+      kernel_256_one_1024 (item, sm.get_multi_ptr<sycl::access::decorated::no>().get(), input_,
                            weight_, bnBias_, bnScale_, output_);
     });
   });

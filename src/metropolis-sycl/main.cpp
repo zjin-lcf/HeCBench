@@ -259,7 +259,7 @@ int main(int argc, char **argv) {
               kernel_metropolis(N, L, mdlat_k_ct2, dH, h,
                                 aT_atrs_k_i_ct5, apcga_k_ct6,
                                 apcgb_k_ct7, 0, item,
-                                ss_acc.get_pointer());
+                                ss_acc.get_multi_ptr<sycl::access::decorated::no>().get());
             });
           });
         }
@@ -279,7 +279,7 @@ int main(int argc, char **argv) {
               kernel_metropolis(N, L, mdlat_k_ct2, dH, h,
                                 aT_atrs_k_i_ct5, apcga_k_ct6,
                                 apcgb_k_ct7, 1, item,
-                                ss_acc.get_pointer());
+                                ss_acc.get_multi_ptr<sycl::access::decorated::no>().get());
             });
           });
         }
@@ -310,7 +310,7 @@ int main(int argc, char **argv) {
           cgh.parallel_for(sycl::nd_range<3>(redenergy_gws, redenergy_lws),
             [=](sycl::nd_item<3> item) [[sycl::reqd_sub_group_size(32)]] {
             kernel_redenergy<float>(mdlat_k, L, dE + k, dH, h, item,
-                                    shared_acc.get_pointer());
+                                    shared_acc.get_multi_ptr<sycl::access::decorated::no>().get());
           });
         });
         q.wait();

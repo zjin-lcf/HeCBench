@@ -118,7 +118,8 @@ void call_RANSAC_kernel_block(sycl::queue &q, int blocks, int threads, float *mo
   q.submit([&](sycl::handler &cgh) {
     sycl::local_accessor<int, 1> sm (sycl::range<1>(l_mem_size), cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-      RANSAC_kernel_block(item, sm.get_pointer(), model_param_local, flowvectors, 
+      RANSAC_kernel_block(item, sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          model_param_local, flowvectors, 
                           flowvector_count, max_iter, error_threshold, convergence_threshold,
                           g_out_id, model_candidate, outliers_candidate);
     });

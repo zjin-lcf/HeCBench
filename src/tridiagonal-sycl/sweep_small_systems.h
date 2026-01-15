@@ -60,7 +60,7 @@ double runReorderKernel(sycl::queue &q, float *d_a, float *d_t,
       sycl::local_accessor<float, 1> lmem (
          sycl::range<1>(TRANSPOSE_BLOCK_DIM * (TRANSPOSE_BLOCK_DIM+1)), cgh);
       cgh.parallel_for<class transpose_array>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-          transpose(item, d_t, d_a, lmem.get_pointer(), width, height);
+          transpose(item, d_t, d_a, lmem.get_multi_ptr<sycl::access::decorated::no>().get(), width, height);
       });
     });
   }

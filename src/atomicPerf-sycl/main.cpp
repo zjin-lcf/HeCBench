@@ -203,7 +203,7 @@ void atomicPerf (int n, int t, int repeat)
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<T, 1> smem (sycl::range<1>(BLOCK_SIZE), cgh);
       cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        BlockRangeAtomicOnSharedMem<T>(d_data, n, item, smem.get_pointer());
+        BlockRangeAtomicOnSharedMem<T>(d_data, n, item, smem.template get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
   }
@@ -224,7 +224,7 @@ void atomicPerf (int n, int t, int repeat)
     q.submit([&] (sycl::handler &cgh) {
       sycl::local_accessor<T, 1> smem (sycl::range<1>(32), cgh);
       cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        WarpRangeAtomicOnSharedMem<T>(d_data, n, item, smem.get_pointer());
+        WarpRangeAtomicOnSharedMem<T>(d_data, n, item, smem.template get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
   }
@@ -246,7 +246,7 @@ void atomicPerf (int n, int t, int repeat)
       sycl::local_accessor<T, 1> smem (sycl::range<1>(BLOCK_SIZE), cgh);
       cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
         SingleRangeAtomicOnSharedMem<T>(d_data, i % BLOCK_SIZE,
-                                        n, item, smem.get_pointer());
+                                        n, item, smem.template get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
   }
