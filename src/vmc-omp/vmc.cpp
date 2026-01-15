@@ -4,8 +4,6 @@
 #include <cstring>
 #include <omp.h>
 
-#define FLOAT float
-
 // Number of threads per block
 #define NTHR_PER_BLK 256
 // Number of blocks
@@ -17,8 +15,6 @@
 // No. of generations per block
 #define Ngen_per_block 5000
 
-#pragma omp declare target
-
 // Explicitly typed constants so can easily work with both floats and floats
 // Random step size
 #define DELTA 2.f
@@ -28,10 +24,14 @@
 #define HALF  0.5f
 #define ZERO  0.f
 
-inline float EXP(float x) {return expf(x);}
-inline double EXP(double x) {return exp(x);}
-inline float SQRT(float x) {return sqrtf(x);}
-inline double SQRT(double x) {return sqrt(x);}
+typedef float FLOAT;
+
+#pragma omp declare target
+
+//inline float EXPONENT(float x) {return expf(x);}
+//inline double EXPONENT(double x) {return exp(x);}
+//inline float SQRT(float x) {return sqrtf(x);}
+//inline double SQRT(double x) {return sqrt(x);}
 
 float LCG_random(unsigned int * seed) {
   const unsigned int m = 2147483648;
@@ -52,19 +52,19 @@ void compute_distances(const FLOAT x1, const FLOAT y1, const FLOAT z1,
                        const FLOAT x2, const FLOAT y2, const FLOAT z2,
                        FLOAT& r1, FLOAT& r2, FLOAT& r12) 
 {
-    r1 = SQRT(x1*x1 + y1*y1 + z1*z1);
-    r2 = SQRT(x2*x2 + y2*y2 + z2*z2);
+    r1 = std::sqrt(x1*x1 + y1*y1 + z1*z1);
+    r2 = std::sqrt(x2*x2 + y2*y2 + z2*z2);
     FLOAT xx = x1-x2;
     FLOAT yy = y1-y2;
     FLOAT zz = z1-z2;
-    r12 = SQRT(xx*xx + yy*yy + zz*zz);
+    r12 = std::sqrt(xx*xx + yy*yy + zz*zz);
 }
 
 FLOAT wave_function(const FLOAT x1, const FLOAT y1, const FLOAT z1, const FLOAT x2, const FLOAT y2, const FLOAT z2) 
 {
     FLOAT r1, r2, r12;
     compute_distances(x1, y1, z1, x2, y2, z2, r1, r2, r12);
-    return (ONE + HALF*r12)*EXP(-TWO*(r1 + r2));
+    return (ONE + HALF*r12)*std::exp(-TWO*(r1 + r2));
 }
 #pragma omp end declare target
 

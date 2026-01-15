@@ -47,9 +47,9 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(DEVICE),gpu)
-  CFLAGS +=-cxx=icpc -qnextgen -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+  CFLAGS +=-cxx=icpx  -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
 else
-  CFLAGS +=--cxx=icpc
+  CFLAGS +=--cxx=icpx
 endif
 #===============================================================================
 # Targets to Build

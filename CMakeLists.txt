@@ -25,6 +25,7 @@ find_package(Boost)
 find_package(MPI)
 find_package(GDAL CONFIG)
 find_package(GSL)
+find_package(NCCL)
 
 # Build options - which programming models to enable
 option(HECBENCH_ENABLE_CUDA "Enable CUDA benchmarks" ON)

@@ -275,7 +275,7 @@ int main(int argc, char* argv[])
           // loop over positions in global buffer
           for(uint stringPos=beginSearchIdx+localIdx; stringPos<endSearchIdx; stringPos+=localSize)
           {
-            if (compare(textBuf+stringPos, localPattern.get_pointer(), patternLength) == 1)
+            if (compare(textBuf+stringPos, localPattern.get_multi_ptr<sycl::access::decorated::no>().get(), patternLength) == 1)
             {
               int count = groupCnt_atomic_ref.fetch_add(1u);
               resultBuf[beginSearchIdx+count] = stringPos;
@@ -436,11 +436,11 @@ int main(int argc, char* argv[])
         #ifdef ENABLE_2ND_LEVEL_FILTER
                     revStackPos = stack2Cnt_atomic_ref.fetch_sub(1u);
                     int pos = stack2[--revStackPos];
-                    if (compare(textBuf+beginSearchIdx+pos+10, localPattern.get_pointer()+10, patternLength-10) == 1)
+                    if (compare(textBuf+beginSearchIdx+pos+10, localPattern.get_multi_ptr<sycl::access::decorated::no>().get()+10, patternLength-10) == 1)
         #else
                     revStackPos = stack1Cnt_atomic_ref.fetch_sub(1u);
                     int pos = stack1[--revStackPos];
-                    if (compare(textBuf+beginSearchIdx+pos+2, localPattern.get_pointer()+2, patternLength-2) == 1)
+                    if (compare(textBuf+beginSearchIdx+pos+2, localPattern.get_multi_ptr<sycl::access::decorated::no>().get()+2, patternLength-2) == 1)
         #endif
                     {
                         // Full match found

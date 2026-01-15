@@ -259,6 +259,7 @@
         "HECBENCH_ENABLE_SYCL": "ON",
         "HECBENCH_ENABLE_OPENMP": "OFF",
         "HECBENCH_SYCL_TARGET": "spir64",
+        "CMAKE_C_COMPILER": "icx",
         "CMAKE_CXX_COMPILER": "icpx"
       }
     },
@@ -271,11 +272,15 @@
         "HECBENCH_ENABLE_HIP": "OFF",
         "HECBENCH_ENABLE_SYCL": "OFF",
         "HECBENCH_ENABLE_OPENMP": "ON",
+        "HECBENCH_OMP_FASTMATH": "-ffast-math",
+        "HECBENCH_OMP_TARGET": "-fiopenmp",
+        "HECBENCH_OMP_TARGET_BACKEND": "-fopenmp-targets=spir64",
+        "CMAKE_C_COMPILER": "icx",
         "CMAKE_CXX_COMPILER": "icpx"
       }
     },
     {
-      "name": "openmp-nvidia",
+      "name": "openmp-nvidia-sm90",
       "displayName": "OpenMP with NVIDIA compiler",
       "inherits": "default",
       "cacheVariables": {
@@ -283,7 +288,91 @@
         "HECBENCH_ENABLE_HIP": "OFF",
         "HECBENCH_ENABLE_SYCL": "OFF",
         "HECBENCH_ENABLE_OPENMP": "ON",
+        "HECBENCH_OMP_FASTMATH": "-gpu=fastmath",
+        "HECBENCH_OMP_TARGET": "-mp=gpu",
+        "HECBENCH_OMP_TARGET_BACKEND": "-gpu=cc90",
+        "CMAKE_C_COMPILER": "nvc",
         "CMAKE_CXX_COMPILER": "nvc++"
+      }
+    },
+    {
+      "name": "openmp-nvidia-sm80",
+      "displayName": "OpenMP with NVIDIA compiler",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "OFF",
+        "HECBENCH_ENABLE_OPENMP": "ON",
+        "HECBENCH_OMP_FASTMATH": "-gpu=fastmath",
+        "HECBENCH_OMP_TARGET": "-mp=gpu",
+        "HECBENCH_OMP_TARGET_BACKEND": "-gpu=cc80",
+        "CMAKE_C_COMPILER": "nvc",
+        "CMAKE_CXX_COMPILER": "nvc++"
+      }
+    },
+    {
+      "name": "openmp-nvidia-sm70",
+      "displayName": "OpenMP with NVIDIA compiler",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "OFF",
+        "HECBENCH_ENABLE_OPENMP": "ON",
+        "HECBENCH_OMP_FASTMATH": "-gpu=fastmath",
+        "HECBENCH_OMP_TARGET": "-mp=gpu",
+        "HECBENCH_OMP_TARGET_BACKEND": "-gpu=cc70",
+        "CMAKE_C_COMPILER": "nvc",
+        "CMAKE_CXX_COMPILER": "nvc++"
+      }
+    },
+    {
+      "name": "openmp-amd-gfx908",
+      "displayName": "OpenMP with AMD Clang compiler",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "OFF",
+        "HECBENCH_ENABLE_OPENMP": "ON",
+        "HECBENCH_OMP_FASTMATH": "-ffast-math",
+        "HECBENCH_OMP_TARGET": "-fopenmp",
+        "HECBENCH_OMP_TARGET_BACKEND": "--offload-arch=gfx908",
+        "CMAKE_C_COMPILER": "amdclang",
+        "CMAKE_CXX_COMPILER": "amdclang++"
+      }
+    },
+    {
+      "name": "openmp-amd-gfx90a",
+      "displayName": "OpenMP with AMD Clang compiler",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "OFF",
+        "HECBENCH_ENABLE_OPENMP": "ON",
+        "HECBENCH_OMP_FASTMATH": "-ffast-math",
+        "HECBENCH_OMP_TARGET": "-fopenmp",
+        "HECBENCH_OMP_TARGET_BACKEND": "--offload-arch=gfx90a",
+        "CMAKE_C_COMPILER": "amdclang",
+        "CMAKE_CXX_COMPILER": "amdclang++"
+      }
+    },
+    {
+      "name": "openmp-amd-gfx942",
+      "displayName": "OpenMP with AMD Clang compiler",
+      "inherits": "default",
+      "cacheVariables": {
+        "HECBENCH_ENABLE_CUDA": "OFF",
+        "HECBENCH_ENABLE_HIP": "OFF",
+        "HECBENCH_ENABLE_SYCL": "OFF",
+        "HECBENCH_ENABLE_OPENMP": "ON",
+        "HECBENCH_OMP_FASTMATH": "-ffast-math",
+        "HECBENCH_OMP_TARGET": "-fopenmp",
+        "HECBENCH_OMP_TARGET_BACKEND": "--offload-arch=gfx942",
+        "CMAKE_C_COMPILER": "amdclang",
+        "CMAKE_CXX_COMPILER": "amdclang++"
       }
     },
     {

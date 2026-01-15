@@ -190,7 +190,7 @@ void gLFIB4(sycl::queue &q, uint32_t n, uint32_t *x, int s, int r, uint32_t *see
     sycl::local_accessor<uint32_t, 1> cx (sycl::range<1>(2 * P4), cgh);
     cgh.parallel_for<class firstCol>(
       sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-      firstColGPU(x, s, item, cx.get_pointer());
+      firstColGPU(x, s, item, cx.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 
@@ -198,7 +198,7 @@ void gLFIB4(sycl::queue &q, uint32_t n, uint32_t *x, int s, int r, uint32_t *see
     sycl::local_accessor<uint32_t, 1> cy (sycl::range<1>(3 * P4), cgh);
     cgh.parallel_for<class colY>(
       sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-      colYGPU(y, s, item, cy.get_pointer());
+      colYGPU(y, s, item, cy.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 
@@ -213,8 +213,10 @@ void gLFIB4(sycl::queue &q, uint32_t n, uint32_t *x, int s, int r, uint32_t *see
     cgh.parallel_for<class lastEnt>(
       sycl::nd_range<1>(gws2, lws2), [=](sycl::nd_item<1> item) {
       lastEntGPU(x, y, s, r, item,
-                 a0.get_pointer(), b0.get_pointer(),
-                 c0.get_pointer(), d0.get_pointer());
+                 a0.get_multi_ptr<sycl::access::decorated::no>().get(),
+                 b0.get_multi_ptr<sycl::access::decorated::no>().get(),
+                 c0.get_multi_ptr<sycl::access::decorated::no>().get(),
+                 d0.get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 

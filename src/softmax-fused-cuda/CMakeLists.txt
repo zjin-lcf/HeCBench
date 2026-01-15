@@ -5,5 +5,5 @@ add_hecbench_benchmark(
     MODEL cuda
     SOURCES main.cu
     CATEGORIES ml
-    COMPILE_OPTIONS --expt-relaxed-constexpr --use_fast_math
+    COMPILE_OPTIONS --expt-relaxed-constexpr #--use_fast_math
 )

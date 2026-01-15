@@ -1218,7 +1218,7 @@ void m_1_w_4_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1246,7 +1246,7 @@ void m_1_w_5_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1274,7 +1274,7 @@ void m_1_w_6_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1302,7 +1302,7 @@ void m_1_w_7_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1330,7 +1330,7 @@ void m_1_w_8_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1359,7 +1359,7 @@ void m_2_w_4_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1387,7 +1387,7 @@ void m_2_w_5_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1415,7 +1415,7 @@ void m_2_w_6_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1443,7 +1443,7 @@ void m_2_w_7_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1472,7 +1472,7 @@ void m_2_w_8_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1500,7 +1500,7 @@ void m_3_w_4_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1528,7 +1528,7 @@ void m_3_w_5_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1556,7 +1556,7 @@ void m_3_w_6_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1584,7 +1584,7 @@ void m_3_w_7_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1612,7 +1612,7 @@ void m_3_w_8_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1640,7 +1640,7 @@ void m_4_w_4_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1668,7 +1668,7 @@ void m_4_w_5_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1696,7 +1696,7 @@ void m_4_w_6_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1724,7 +1724,7 @@ void m_4_w_7_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });
@@ -1752,7 +1752,7 @@ void m_4_w_8_coding(
                                   (long *)d_data,
                                   (long *)d_code,
                                   d_bitmatrix,
-                                  sm.get_pointer(),
+                                  sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                                   item,
                                   workSizePerGridInLong);
     });

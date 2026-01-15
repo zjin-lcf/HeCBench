@@ -18,8 +18,8 @@ void intt_3_64k_modcrt(
     uint64 buffer[512];
     #pragma omp parallel 
     {
-      register uint64 samples[8], s8[8];
-      register uint32 fmem, tmem, fbuf, tbuf;
+      uint64 samples[8], s8[8];
+      uint32 fmem, tmem, fbuf, tbuf;
       fmem = (bidx<<9)|((tidx&0x3E)<<3)|(tidx&0x1);
       tbuf = tidx<<3;
       fbuf = ((tidx&0x38)<<3) | (tidx&0x7);

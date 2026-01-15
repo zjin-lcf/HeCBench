@@ -96,7 +96,7 @@ double xFresnel_Auxiliary_Cosine_Integral( double x )
 
 static double Chebyshev_Expansion_0_1( double x )
 { 
-   static double const c[] = {
+   double const c[] = {
       +4.200987560240514577713e-1,  -9.358785913634965235904e-2,
       -7.642539415723373644927e-3,  +4.958117751796130135544e-3,
       -9.750236036106120253456e-4,  +1.075201474958704192865e-4,
@@ -110,9 +110,9 @@ static double Chebyshev_Expansion_0_1( double x )
       -1.173365630675305693390e-20
    };
 
-   static const int degree = sizeof(c) / sizeof(double) - 1;
-   static const double midpoint = 0.5;
-   static const double scale = 0.5;
+   const int degree = sizeof(c) / sizeof(double) - 1;
+   const double midpoint = 0.5;
+   const double scale = 0.5;
    
    return xChebyshev_Tn_Series( (x - midpoint) / scale, c, degree );
 }
@@ -144,7 +144,7 @@ static double Chebyshev_Expansion_0_1( double x )
 
 static double Chebyshev_Expansion_1_3( double x )
 { 
-   static double const c[] = {
+   double const c[] = {
       +2.098677278318224971989e-1,  -9.314234883154103266195e-2,
       +1.739905936938124979297e-2,  -2.454274824644285136137e-3,
       +1.589872606981337312438e-4,  +4.203943842506079780413e-5,
@@ -160,8 +160,8 @@ static double Chebyshev_Expansion_1_3( double x )
       +8.760405943193778149078e-21
    };
 
-   static const int degree = sizeof(c) / sizeof(double) - 1;
-   static const double midpoint = 2.0;
+   const int degree = sizeof(c) / sizeof(double) - 1;
+   const double midpoint = 2.0;
    
    return xChebyshev_Tn_Series( (x - midpoint), c, degree );
 
@@ -194,7 +194,7 @@ static double Chebyshev_Expansion_1_3( double x )
 
 static double Chebyshev_Expansion_3_5( double x )
 { 
-   static double const c[] = {
+   double const c[] = {
       +1.025703371090289562388e-1,  -2.569833023232301400495e-2,
       +3.160592981728234288078e-3,  -3.776110718882714758799e-4,
       +4.325593433537248833341e-5,  -4.668447489229591855730e-6,
@@ -208,8 +208,8 @@ static double Chebyshev_Expansion_3_5( double x )
       +7.873130866418738207547e-21
    };
 
-   static const int degree = sizeof(c) / sizeof(double) - 1;
-   static const double midpoint = 4.0;
+   const int degree = sizeof(c) / sizeof(double) - 1;
+   const double midpoint = 4.0;
    
    return xChebyshev_Tn_Series( (x - midpoint), c, degree );
 }
@@ -241,7 +241,7 @@ static double Chebyshev_Expansion_3_5( double x )
 
 static double Chebyshev_Expansion_5_7( double x )
 { 
-   static double const c[] = {
+   double const c[] = {
       +6.738667333400589274018e-2,  -1.128146832637904868638e-2,
       +9.408843234170404670278e-4,  -7.800074103496165011747e-5,
       +6.409101169623350885527e-6,  -5.201350558247239981834e-7,
@@ -254,8 +254,8 @@ static double Chebyshev_Expansion_5_7( double x )
       -2.282438671525884861970e-21
    };
 
-   static const int degree = sizeof(c) / sizeof(double) - 1;
-   static const double midpoint = 6.0;
+   const int degree = sizeof(c) / sizeof(double) - 1;
+   const double midpoint = 6.0;
    
    return xChebyshev_Tn_Series( (x - midpoint), c, degree );
 

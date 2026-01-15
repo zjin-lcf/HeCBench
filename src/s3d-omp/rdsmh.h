@@ -3,7 +3,7 @@
     const real TLOG = LOG((TEMP));
     const real TI = (real)1.0e0/(TEMP);
 
-    const register real TN1 = TLOG - (real)1.0;
+    const real TN1 = TLOG - (real)1.0;
 
     if ((TEMP) > (real)1.0e3)
     {

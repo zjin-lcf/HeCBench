@@ -1,11 +1,11 @@
 
     const real TEMP = T[i]*tconv;
     //const real ALOGT = LOG(TEMP);
-    const register real SMALL_INV = (real)1e37;
+    const real SMALL_INV = (real)1e37;
     const real RU=(real)8.31451e7;
     const real PATM = (real)1.01325e6;
     const real PFAC = DIV (PATM, (RU*(TEMP)));
-    register real rtemp_inv;
+    real rtemp_inv;
 
     rtemp_inv = DIV ((EG(7)*EG(23)), (EG(8)*EG(22)));
     RB(176) = RF(176) * MIN(rtemp_inv, SMALL_INV);

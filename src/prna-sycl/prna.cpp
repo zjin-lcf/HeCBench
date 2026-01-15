@@ -904,7 +904,7 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       sycl::local_accessor<real_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
       cgh.parallel_for<class k_calc_internal>(
         sycl::nd_range<3>(gws2, lws2), [=] (sycl::nd_item<3> wi) {
-        calc_internal(wi, lmem.get_pointer(), d, n, d_s, d_bcp, d_v, d_par);
+        calc_internal(wi, lmem.get_multi_ptr<sycl::access::decorated::no>().get(), d, n, d_s, d_bcp, d_v, d_par);
       });
     });
 
@@ -912,7 +912,7 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       sycl::local_accessor<real_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
       cgh.parallel_for<class k_calc_coaxial>(
         sycl::nd_range<3>(gws3, lws3), [=] (sycl::nd_item<3> wi) {
-        calc_coaxial(wi, lmem.get_pointer(), d, n,
+        calc_coaxial(wi, lmem.get_multi_ptr<sycl::access::decorated::no>().get(), d, n,
                      d_s, d_bcp, d_v, d_y, d_w5, d_w3, d_par);
       });
     });
@@ -929,7 +929,7 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       sycl::local_accessor<real_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
       cgh.parallel_for<class k_calc_xl>(
         sycl::nd_range<3>(gws5, lws5), [=] (sycl::nd_item<3> wi) {
-        calc_xl(wi, lmem.get_pointer(), d, n, d_z, d_yl, d_xl);
+        calc_xl(wi, lmem.get_multi_ptr<sycl::access::decorated::no>().get(), d, n, d_z, d_yl, d_xl);
       });
     });
 
@@ -937,7 +937,7 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       sycl::local_accessor<real_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
       cgh.parallel_for<class k_calc_z>(
         sycl::nd_range<3>(gws6, lws6), [=] (sycl::nd_item<3> wi) {
-        calc_z(wi, lmem.get_pointer(), d, n,
+        calc_z(wi, lmem.get_multi_ptr<sycl::access::decorated::no>().get(), d, n,
                d_s, d_bcp, d_v, d_z, d_xl, d_wq, d_par);
       });
     });
@@ -953,7 +953,7 @@ prna_t prna_new(const char *s, param_t par, int quiet, int *base_cp)
       sycl::local_accessor<real_t, 1> lmem(sycl::range<1>(NTHREAD), cgh);
       cgh.parallel_for<class k_calc_w5_w3>(
         sycl::nd_range<3>(gws8, lws8), [=] (sycl::nd_item<3> wi) {
-        calc_w5_and_w3(wi, lmem.get_pointer(), d, n, d_w5, d_w3, d_wq);
+        calc_w5_and_w3(wi, lmem.get_multi_ptr<sycl::access::decorated::no>().get(), d, n, d_w5, d_w3, d_wq);
       });
     });
   }

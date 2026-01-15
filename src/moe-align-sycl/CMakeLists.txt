@@ -1,8 +1,8 @@
-# fsm-omp/CMakeLists.txt
+# moe-align-sycl/CMakeLists.txt
 
 add_hecbench_benchmark(
-    NAME fsm
-    MODEL omp
+    NAME moe-align
+    MODEL sycl
     SOURCES main.cpp
     CATEGORIES algorithms
 )

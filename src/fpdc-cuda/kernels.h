@@ -55,11 +55,10 @@ __global__ void CompressionKernel(
   for (int i = start + lane; i < term; i += WARPSIZE) {
     // calculate delta between value to compress and prediction
     // and negate if negative
-    diff = cbufd[i] - prev;
-    code = (diff >> 60) & 8;
-    if (code != 0) {
-      diff = -diff;
-    }
+    if (cbufd[i] >= prev)
+      diff = cbufd[i] - prev;
+    else
+      diff = prev - cbufd[i];
 
     // count leading zeros in positive delta
     bcount = 8 - (__clzll(diff) >> 3);

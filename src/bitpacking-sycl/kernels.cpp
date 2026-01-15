@@ -321,8 +321,8 @@ void bitPackConfigLaunch(
     sycl::local_accessor<LIMIT, 1> maxBuffer(sycl::range<1>(BLOCK_SIZE), cgh);
     cgh.parallel_for(sycl::nd_range<1>(grid * block, block), [=](sycl::nd_item<1> item) {
       bitPackConfigScanKernel(minValueScratch, maxValueScratch, in, numDevice, item,
-                              (LIMIT *)minBuffer.get_pointer(),
-                              (LIMIT *)maxBuffer.get_pointer());
+                              minBuffer.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                              maxBuffer.template get_multi_ptr<sycl::access::decorated::no>().get());
       });
   });
 
@@ -333,8 +333,8 @@ void bitPackConfigLaunch(
     cgh.parallel_for(sycl::nd_range<1>(block, block), [=](sycl::nd_item<1> item) {
       bitPackConfigFinalizeKernel(
          minValueScratch, maxValueScratch, numBitsPtr, minValOutPtr,
-         numDevice, item, (LIMIT *)minBuffer.get_pointer(),
-         (LIMIT *)maxBuffer.get_pointer());
+         numDevice, item, minBuffer.template get_multi_ptr<sycl::access::decorated::no>().get(),
+         maxBuffer.template get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 }
@@ -360,7 +360,7 @@ void bitPackLaunch(
     sycl::local_accessor<UINPUT, 1> inBuffer(sycl::range<1>(256), cgh);
     cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
       bitPackKernel(numBitsDevicePtr, minValueDevicePtr, outPtr, in,
-                    numDevice, item, inBuffer.get_pointer());
+                    numDevice, item, inBuffer.template get_multi_ptr<sycl::access::decorated::no>().get());
     });
   });
 }

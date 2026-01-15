@@ -156,8 +156,8 @@ static void SolveForUpdate(const float *du0, const float *dv0, const float *Ix,
                      [=](sycl::nd_item<3> item) {
                        JacobiIteration<32, 6>(du0, dv0, Ix, Iy, Iz, w, h, s,
                                               alpha, du1, dv1, item,
-                                              du_acc_ct1.get_pointer(),
-                                              dv_acc_ct1.get_pointer());
+                                              du_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                              dv_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
                      });
   });
 }

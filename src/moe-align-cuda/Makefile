@@ -3,11 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
-ARCH      = gfx906
+ARCH      = sm_60
 LAUNCHER  =
 
 #===============================================================================
@@ -16,52 +15,42 @@ LAUNCHER  =
 
 program = main
 
-source = main.cpp
+source = main.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../fsm-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -DDEBUG
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
-
-ifeq ($(DEVICE),gpu)
-  CFLAGS += -target x86_64-pc-linux-gnu \
-          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
-          -Xopenmp-target=amdgcn-amd-amdhsa \
-          -march=$(ARCH)
-else
-  CFLAGS +=-fopenmp
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp kernels.h ../fsm-cuda/parameters.h
+%.o: %.cu Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 65536
+	$(LAUNCHER) ./$(program) 100000

@@ -1,8 +1,11 @@
 # dxtc2-omp/CMakeLists.txt
 
+set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/../boxfilter-sycl")
+
 add_hecbench_benchmark(
     NAME dxtc2
     MODEL omp
-    SOURCES block.cpp kernel.cpp main.cpp
+    SOURCES block.cpp main.cpp ${INC_DIR}/shrUtils.cpp
     CATEGORIES algorithms
+    INCLUDE_DIRS ${INC_DIR}
 )

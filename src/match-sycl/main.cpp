@@ -787,8 +787,11 @@ int main(int argc, char *argv[])
       sycl::local_accessor<float, 1> scores(sycl::range<1>(M2H*M2W), cgh);
       cgh.parallel_for<class k2>(
         sycl::nd_range<2>(gws2, lws2), [=] (sycl::nd_item<2> item) {
-        Match2(item, buffer1.get_pointer(), buffer2.get_pointer(), scores.get_pointer(),
-               d_pts1, d_pts2, d_score, d_index);
+        Match2(item,
+                buffer1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                buffer2.get_multi_ptr<sycl::access::decorated::no>().get(),
+		scores.get_multi_ptr<sycl::access::decorated::no>().get(),
+                d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -811,8 +814,11 @@ int main(int argc, char *argv[])
       sycl::local_accessor<float, 1> scores(sycl::range<1>(M2H*M2W), cgh);
       cgh.parallel_for<class k3>(
         sycl::nd_range<2>(gws3, lws3), [=] (sycl::nd_item<2> item) {
-        Match3(item, buffer1.get_pointer(), buffer2.get_pointer(), scores.get_pointer(),
-               d_pts1, d_pts2, d_score, d_index);
+        Match3(item,
+                buffer1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                buffer2.get_multi_ptr<sycl::access::decorated::no>().get(),
+		scores.get_multi_ptr<sycl::access::decorated::no>().get(),
+                d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -835,8 +841,11 @@ int main(int argc, char *argv[])
       sycl::local_accessor<float, 1> scores(sycl::range<1>(M2H*M2W), cgh);
       cgh.parallel_for<class k4>(
         sycl::nd_range<2>(gws4, lws4), [=] (sycl::nd_item<2> item) {
-        Match4(item, buffer1.get_pointer(), buffer2.get_pointer(), scores.get_pointer(),
-               d_pts1, d_pts2, d_score, d_index);
+        Match4(item,
+                buffer1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                buffer2.get_multi_ptr<sycl::access::decorated::no>().get(),
+		scores.get_multi_ptr<sycl::access::decorated::no>().get(),
+                d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -859,8 +868,11 @@ int main(int argc, char *argv[])
       sycl::local_accessor<float, 1> scores(sycl::range<1>(M5H*M5W), cgh);
       cgh.parallel_for<class k5>(
         sycl::nd_range<2>(gws5, lws5), [=] (sycl::nd_item<2> item) {
-        Match5(item, buffer1.get_pointer(), buffer2.get_pointer(), scores.get_pointer(),
-               d_pts1, d_pts2, d_score, d_index);
+        Match5(item,
+                buffer1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                buffer2.get_multi_ptr<sycl::access::decorated::no>().get(),
+		scores.get_multi_ptr<sycl::access::decorated::no>().get(),
+                d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -882,8 +894,10 @@ int main(int argc, char *argv[])
       sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M5H*NDIM/4), cgh);
       cgh.parallel_for<class k6>(
         sycl::nd_range<2>(gws6, lws6), [=] (sycl::nd_item<2> item) {
-        Match6(item, buffer1.get_pointer(), buffer2.get_pointer(),
-               d_pts1, d_pts2, d_score, d_index);
+        Match6(item,
+                buffer1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                buffer2.get_multi_ptr<sycl::access::decorated::no>().get(),
+                d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -905,8 +919,10 @@ int main(int argc, char *argv[])
       sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M7H*NDIM/4), cgh);
       cgh.parallel_for<class k7>(
         sycl::nd_range<2>(gws7, lws7), [=] (sycl::nd_item<2> item) {
-        Match7(item, buffer1.get_pointer(), buffer2.get_pointer(),
-               d_pts1, d_pts2, d_score, d_index);
+        Match7(item,
+                buffer1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                buffer2.get_multi_ptr<sycl::access::decorated::no>().get(),
+                d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -928,8 +944,10 @@ int main(int argc, char *argv[])
       sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M7H*NDIM/4), cgh);
       cgh.parallel_for<class k8>(
         sycl::nd_range<2>(gws8, lws8), [=] (sycl::nd_item<2> item) {
-        Match8(item, buffer1.get_pointer(), buffer2.get_pointer(),
-               d_pts1, d_pts2, d_score, d_index);
+        Match8(item,
+                buffer1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                buffer2.get_multi_ptr<sycl::access::decorated::no>().get(),
+                d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -951,8 +969,10 @@ int main(int argc, char *argv[])
       sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M7H*NDIM/4), cgh);
       cgh.parallel_for<class k9>(
         sycl::nd_range<2>(gws9, lws9), [=] (sycl::nd_item<2> item) {
-        Match9(item, buffer1.get_pointer(), buffer2.get_pointer(),
-               d_pts1, d_pts2, d_score, d_index);
+        Match9(item,
+                buffer1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                buffer2.get_multi_ptr<sycl::access::decorated::no>().get(),
+                d_pts1, d_pts2, d_score, d_index);
       });
     });
   q.wait();
@@ -973,7 +993,9 @@ int main(int argc, char *argv[])
       sycl::local_accessor<float4, 1> buffer1(sycl::range<1>(M7W*NDIM/4), cgh);
       sycl::local_accessor<float4, 1> buffer2(sycl::range<1>(M7H*NUM), cgh);
       cgh.parallel_for<class k10>(sycl::nd_range<2>(gws10, lws10), [=] (sycl::nd_item<2> item) {
-        Match10(item, buffer1.get_pointer(), buffer2.get_pointer(),
+        Match10(item,
+                buffer1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                buffer2.get_multi_ptr<sycl::access::decorated::no>().get(),
                 d_pts1, d_pts2, d_score, d_index);
       });
     });

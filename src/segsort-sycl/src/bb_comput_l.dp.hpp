@@ -1264,11 +1264,11 @@ void gen_grid_kern_r2049(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
         sycl::nd_range<3>(block_per_grid *
                               sycl::range<3>(1, 1, threads_per_block),
                           sycl::range<3>(1, 1, threads_per_block)),
-        [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+        [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
           kern_block_sort(keys_d, vals_d, keysB_d, valsB_d, seg_begins_d,
                           seg_ends_d, bin_d, workloads_per_block, item_ct1,
-                          (K *)smem_acc_ct1.get_pointer(),
-                          tmem_acc_ct1.get_pointer());
+                          smem_acc_ct1.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                          tmem_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
         });
   });
 
@@ -1289,10 +1289,10 @@ void gen_grid_kern_r2049(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
           sycl::nd_range<3>(block_per_grid *
                                 sycl::range<3>(1, 1, threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             kern_block_merge(keys_d, vals_d, keysB_d, valsB_d, seg_begins_d,
                              seg_ends_d, bin_d, stride, workloads_per_block,
-                             item_ct1, (K *)smem_acc_ct1.get_pointer());
+                             item_ct1, smem_acc_ct1.template get_multi_ptr<sycl::access::decorated::no>().get());
           });
     });
         std::swap(keys_d, keysB_d);

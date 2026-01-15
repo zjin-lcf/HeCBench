@@ -807,7 +807,8 @@ int main(int argc, char* argv[])
       sycl::local_accessor<data, 1> sm (sycl::range<1>(n_threads_reduction), cgh);
       cgh.parallel_for<class calc_minRow>(
         sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
-        calc_min_in_rows(item, slack, min_in_rows, sm.get_pointer());
+        calc_min_in_rows(item, slack, min_in_rows,
+                         sm.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
 
@@ -826,7 +827,8 @@ int main(int argc, char* argv[])
       sycl::local_accessor<data, 1> sm (sycl::range<1>(n_threads_reduction), cgh);
       cgh.parallel_for<class calc_minCol>(
         sycl::nd_range<1>(gws2, lws2), [=] (sycl::nd_item<1> item) {
-        calc_min_in_cols(item, slack, min_in_cols, sm.get_pointer());
+        calc_min_in_cols(item, slack, min_in_cols,
+                         sm.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     });
 
@@ -947,7 +949,7 @@ int main(int argc, char* argv[])
                 cover_row,
                 cover_column,
                 d_min_in_mat_vect,
-                sm.get_pointer());
+                sm.get_multi_ptr<sycl::access::decorated::no>().get());
           });
         });
 
@@ -961,7 +963,7 @@ int main(int argc, char* argv[])
             min_reduce_kernel2(item,
                 d_min_in_mat_vect,
                 d_min_in_mat,
-                sm.get_pointer());
+                sm.get_multi_ptr<sycl::access::decorated::no>().get());
           });
         });
 

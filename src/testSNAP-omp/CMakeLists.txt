@@ -6,7 +6,7 @@ UNZIPFILE("${SRC_DIR}/refdata.tar.gz")
 add_hecbench_benchmark(
     NAME testSNAP
     MODEL omp
-    SOURCES main.cpp utils.cpp
+    SOURCES main.cpp
     CATEGORIES algorithms
     COMPILE_OPTIONS -DREFDATA_TWOJ=14
 )

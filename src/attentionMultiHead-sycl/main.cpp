@@ -203,7 +203,7 @@ int main(int argc, char* argv[])
         //[[sycl::reqd_sub_group_size(32)]] 
         {
         mha(dq, dk, dv, beamsize, n_steps, qk_col, v_col, nhead, scaler,
-            THRESHOLD, dst, item, shared.get_pointer(), s_max_val, s_sum);
+            THRESHOLD, dst, item, shared.get_multi_ptr<sycl::access::decorated::no>().get(), s_max_val, s_sum);
         });
     });
   }

@@ -16,6 +16,7 @@ struct Peak {
   float val;
 };
 
+#pragma omp declare target
 struct Position {
     Position(int _x, int _y) : x(_x), y(_y) { };
   int x;
@@ -33,6 +34,7 @@ static size_t posToIdx(const int width, const Position& pos)
 {
   return (pos.y * width) + pos.x;
 }
+#pragma omp end declare target
 
 void k_findPeak(
   const float *__restrict image, 

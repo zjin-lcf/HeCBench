@@ -66,7 +66,7 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk256_wp2_tc1_r2_r2_orig(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1);
@@ -85,7 +85,7 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk128_wp2_tc2_r3_r4_orig(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1);
@@ -104,7 +104,7 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk128_wp2_tc4_r5_r8_orig(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1);
@@ -123,7 +123,7 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk128_wp4_tc4_r9_r16_strd(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1);
@@ -142,7 +142,7 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk128_wp8_tc4_r17_r32_strd(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1);
@@ -161,7 +161,7 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk128_wp16_tc4_r33_r64_strd(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1);
@@ -180,7 +180,7 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk256_wp8_tc16_r65_r128_strd(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1);
@@ -199,7 +199,7 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk256_wp32_tc8_r129_r256_strd(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1);
@@ -221,11 +221,12 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk128_tc4_r257_r512_orig(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1,
-                (K *)smem_acc_ct1.get_pointer(), tmem_acc_ct1.get_pointer());
+                smem_acc_ct1.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                tmem_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
           });
     });
 
@@ -244,11 +245,12 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk256_tc4_r513_r1024_orig(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1,
-                (K *)smem_acc_ct1.get_pointer(), tmem_acc_ct1.get_pointer());
+                smem_acc_ct1.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                tmem_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
           });
     });
 
@@ -267,11 +269,12 @@ void dispatch_kernels(K *keys_d, T *vals_d, K *keysB_d, T *valsB_d,
       cgh.parallel_for(
           sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks * threads_per_block),
                             sycl::range<3>(1, 1, threads_per_block)),
-          [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(32)]] {
+          [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(32)]] {
             gen_bk512_tc4_r1025_r2048_orig(
                 keys_d, vals_d, keysB_d, valsB_d, d_seg_begins, d_seg_ends,
                 d_bin_segs_id_h_bin_counter_ct6, subwarp_num, item_ct1,
-                (K *)smem_acc_ct1.get_pointer(), tmem_acc_ct1.get_pointer());
+                smem_acc_ct1.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                tmem_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
           });
     });
 

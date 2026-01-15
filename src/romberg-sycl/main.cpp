@@ -115,7 +115,7 @@ int main( int argc, char** argv)
       sycl::local_accessor<double, 1> smem (sycl::range<1>(ROW_SIZE*wgs), cgh);
       cgh.parallel_for<class k>(
         sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        romberg(A, B, d_result, smem.get_pointer(), item);
+        romberg(A, B, d_result, smem.get_multi_ptr<sycl::access::decorated::no>().get(), item);
       });
     });
   }

@@ -323,7 +323,7 @@ void fused_softmax(int batches, int attn_heads, int query_seq_len,
       q, d_output, d_input, d_mask, scale_factor, query_seq_len, key_seq_len,
       batches, attn_heads, pad_batches);
 
-  q.memcpy(output, d_output, sizeof(scalar_t) * num_data_elems);
+  q.memcpy(output, d_output, sizeof(scalar_t) * num_data_elems).wait();
 
   reference<scalar_t, scalar_t, float>(output_ref, input, mask, scale_factor,
                                        pad_batches, batches, attn_heads, query_seq_len, key_seq_len);
