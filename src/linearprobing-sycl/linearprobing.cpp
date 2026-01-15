@@ -8,9 +8,9 @@ inline uint32_t atomicCAS(uint32_t &val, uint32_t expected, uint32_t desired)
 {
   uint32_t expected_value = expected;
   auto atm = sycl::atomic_ref<uint32_t,
-    sycl::memory_order::relaxed,
-    sycl::memory_scope::device,
-    sycl::access::address_space::global_space>(val);
+                              sycl::memory_order::relaxed,
+                              sycl::memory_scope::device,
+                              sycl::access::address_space::global_space>(val);
   atm.compare_exchange_strong(expected_value, desired);
   return expected_value;
 }
@@ -18,9 +18,9 @@ inline uint32_t atomicCAS(uint32_t &val, uint32_t expected, uint32_t desired)
 inline uint32_t atomicAdd(uint32_t *val, uint32_t operand)
 {
   auto atm = sycl::atomic_ref<uint32_t,
-    sycl::memory_order::relaxed,
-    sycl::memory_scope::device,
-    sycl::access::address_space::global_space>(*val);
+                              sycl::memory_order::relaxed,
+                              sycl::memory_scope::device,
+                              sycl::access::address_space::global_space>(*val);
   return atm.fetch_add(operand);
 }
 
@@ -36,11 +36,11 @@ uint32_t hash(uint32_t k)
 }
 
 // Insert the key/values in kvs into the hashtable
-void k_hashtable_insert(
-  sycl::nd_item<1> &item,
-  KeyValue*__restrict hashtable,
-  const KeyValue*__restrict kvs,
-  unsigned int numkvs)
+void
+k_hashtable_insert(sycl::nd_item<1> &item,
+		   KeyValue*__restrict__ hashtable,
+                   const KeyValue*__restrict__ kvs,
+                   unsigned int numkvs)
 {
   unsigned int tid = item.get_global_id(0);
   if (tid < numkvs)
@@ -52,6 +52,7 @@ void k_hashtable_insert(
     while (true)
     {
       uint32_t prev = atomicCAS(hashtable[slot].key, kEmpty, key);
+
       if (prev == kEmpty || prev == key)
       {
         hashtable[slot].value = value;
@@ -63,11 +64,7 @@ void k_hashtable_insert(
   }
 }
 
-double insert_hashtable(
-  sycl::queue &q,
-  KeyValue *pHashTable,
-  KeyValue *kvs,
-  uint32_t num_kvs)
+double insert_hashtable(sycl::queue &q, KeyValue* pHashTable, const KeyValue* kvs, uint32_t num_kvs)
 {
   // Insert all the keys into the hash table
   const int threadblocksize = 256;
@@ -82,11 +79,10 @@ double insert_hashtable(
   q.submit([&] (sycl::handler &cgh) {
     cgh.parallel_for<class insert_table>(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-      k_hashtable_insert(item, pHashTable, kvs, (uint32_t)num_kvs);
-    });
-  });
+        k_hashtable_insert(item, pHashTable, kvs, (uint32_t)num_kvs);
+      });
+  }).wait();
 
-  q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
@@ -96,11 +92,11 @@ double insert_hashtable(
 // Delete each key in kvs from the hash table, if the key exists
 // A deleted key is left in the hash table, but its value is set to kEmpty
 // Deleted keys are not reused; once a key is assigned a slot, it never moves
-void k_hashtable_delete(
-  sycl::nd_item<1> &item,
-  KeyValue*__restrict hashtable,
-  const KeyValue*__restrict kvs,
-  unsigned int numkvs)
+void
+k_hashtable_delete(sycl::nd_item<1> &item,
+		   KeyValue*__restrict__ hashtable,
+                   const KeyValue*__restrict__ kvs,
+                   unsigned int numkvs)
 {
   unsigned int tid = item.get_global_id(0);
   if (tid < numkvs)
@@ -124,11 +120,7 @@ void k_hashtable_delete(
   }
 }
 
-double delete_hashtable(
-  sycl::queue &q,
-  KeyValue *pHashTable,
-  KeyValue *kvs,
-  uint32_t num_kvs)
+double delete_hashtable(sycl::queue &q, KeyValue* pHashTable, const KeyValue* kvs, uint32_t num_kvs)
 {
   // Insert all the keys into the hash table
   const int threadblocksize = 256;
@@ -143,7 +135,7 @@ double delete_hashtable(
   q.submit([&] (sycl::handler &cgh) {
     cgh.parallel_for<class delete_table>(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-      k_hashtable_delete(item, pHashTable, kvs, (uint32_t)num_kvs);
+        k_hashtable_delete(item, pHashTable, kvs, (uint32_t)num_kvs);
     });
   }).wait();
 
@@ -154,11 +146,11 @@ double delete_hashtable(
 }
 
 // Iterate over every item in the hashtable; return non-empty key/values
-void k_iterate_hashtable(
-  sycl::nd_item<1> &item,
-  KeyValue*__restrict pHashTable,
-  KeyValue*__restrict kvs,
-  uint32_t* kvs_size)
+void
+k_iterate_hashtable(sycl::nd_item<1> &item,
+		    KeyValue*__restrict__ pHashTable,
+                    KeyValue*__restrict__ kvs,
+                    uint32_t* kvs_size)
 {
   unsigned int tid = item.get_global_id(0);
   if (tid < kHashTableCapacity)
@@ -177,10 +169,12 @@ void k_iterate_hashtable(
 
 std::vector<KeyValue> iterate_hashtable(sycl::queue &q, KeyValue *pHashTable)
 {
-  uint32_t *device_num_kvs = sycl::malloc_device<uint32_t>(1, q);
+  uint32_t* device_num_kvs;
+  device_num_kvs = sycl::malloc_device<uint32_t>(1, q);
   q.memset(device_num_kvs, 0, sizeof(uint32_t));
 
-  KeyValue *device_kvs = sycl::malloc_device<KeyValue>(kNumKeyValues, q);
+  KeyValue* device_kvs;
+  device_kvs = sycl::malloc_device<KeyValue>(kNumKeyValues, q);
 
   const int threadblocksize = 256;
   int gridsize = (kHashTableCapacity + threadblocksize - 1) / threadblocksize;
@@ -194,27 +188,22 @@ std::vector<KeyValue> iterate_hashtable(sycl::queue &q, KeyValue *pHashTable)
   q.submit([&] (sycl::handler &cgh) {
     cgh.parallel_for<class iterate_table>(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-      k_iterate_hashtable(item,
-                          pHashTable,
-                          device_kvs,
-                          device_num_kvs);
-    });
-  });
+        k_iterate_hashtable(item, pHashTable, device_kvs, device_num_kvs);
+      });
+  }).wait();
 
-  q.wait();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Kernel execution time (iterate): %f (s)\n", time * 1e-9f);
 
   uint32_t num_kvs;
-  q.memcpy(&num_kvs, device_num_kvs, sizeof(uint32_t));
+  q.memcpy(&num_kvs, device_num_kvs, sizeof(uint32_t)).wait();
 
   std::vector<KeyValue> kvs;
   kvs.resize(num_kvs);
 
-  q.memcpy(kvs.data(), device_kvs, sizeof(KeyValue) * num_kvs);
+  q.memcpy(kvs.data(), device_kvs, sizeof(KeyValue) * num_kvs).wait();
 
-  q.wait();
   sycl::free(device_kvs, q);
   sycl::free(device_num_kvs, q);
 
