@@ -1,6 +1,6 @@
 ARCH = cc70
-NVCC = nvc++
-NVCC_FLAGS = -Wall --std=c++14 -O3 -Minfo -mp=gpu -gpu=$(ARCH) -pthread 
+CC = nvc++
+CC_FLAGS = -Wall --std=c++14 -O3 -Minfo -mp=gpu -gpu=$(ARCH) -pthread 
 
 INC_DIR = include
 SRC_DIR = src
@@ -11,10 +11,10 @@ SRC_FILES := $(wildcard $(SRC_DIR)/*.cc)
 OBJ_FILES := $(patsubst $(SRC_DIR)/%.cc,$(OBJ_DIR)/%.o,$(SRC_FILES))
 
 $(OBJ_DIR)/$(EXEC_NAME): $(OBJ_FILES) 
-	$(NVCC) $(NVCC_FLAGS) $(OBJ_FILES) -o $(OBJ_DIR)/$(EXEC_NAME)
+	$(CC) $(CC_FLAGS) $(OBJ_FILES) -o $(OBJ_DIR)/$(EXEC_NAME)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc
-	$(NVCC) $(NVCC_FLAGS) -I $(INC_DIR) -c -o $@ $<
+	$(CC) $(CC_FLAGS) -I $(INC_DIR) -c -o $@ $<
 
 .PHONY: clean
 clean:

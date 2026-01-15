@@ -1,6 +1,6 @@
 ARCH = $(ARCH)
-NVCC = clang++
-NVCC_FLAGS = --std=c++17 -O3 -target x86_64-pc-linux-gnu \
+CC = clang++
+CC_FLAGS = --std=c++17 -O3 -target x86_64-pc-linux-gnu \
           -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
           -Xopenmp-target=amdgcn-amd-amdhsa \
           -march=$(ARCH) \
@@ -15,10 +15,10 @@ SRC_FILES := $(wildcard $(SRC_DIR)/*.cc)
 OBJ_FILES := $(patsubst $(SRC_DIR)/%.cc,$(OBJ_DIR)/%.o,$(SRC_FILES))
 
 $(OBJ_DIR)/$(EXEC_NAME): $(OBJ_FILES) 
-	$(NVCC) $(NVCC_FLAGS) $(OBJ_FILES) -o $(OBJ_DIR)/$(EXEC_NAME)
+	$(CC) $(CC_FLAGS) $(OBJ_FILES) -o $(OBJ_DIR)/$(EXEC_NAME)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc
-	$(NVCC) $(NVCC_FLAGS) -I $(INC_DIR) -c -o $@ $<
+	$(CC) $(CC_FLAGS) -I $(INC_DIR) -c -o $@ $<
 
 .PHONY: clean
 clean:

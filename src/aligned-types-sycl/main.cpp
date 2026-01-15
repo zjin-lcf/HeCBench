@@ -237,13 +237,12 @@ int runTest(
   //Read back GPU results and run validation
   q.memcpy(h_odataGPU, d_odata, memory_size).wait();
 
-  int flag = testCPU(
-      (TData *)h_odataGPU,
-      (TData *)h_idataCPU,
-      numElements,
-      packedElementSize);
+  int flag = testCPU((TData *)h_odataGPU,
+                     (TData *)h_idataCPU,
+                     numElements,
+                     packedElementSize);
 
-  printf(flag ? "\tTEST OK\n" : "\tTEST FAILURE\n");
+  printf("\tTEST %s\n", flag ? "PASS" : "FAIL");
 
   return !flag;
 }
