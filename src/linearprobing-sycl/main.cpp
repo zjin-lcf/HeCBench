@@ -82,7 +82,7 @@ void test_unordered_map(std::vector<KeyValue> insert_kvs, std::vector<KeyValue> 
       milliseconds, kNumKeyValues / seconds / 1000000.0f);
 }
 
-void test_correctness(std::vector<KeyValue>, std::vector<KeyValue>, std::vector<KeyValue>);
+bool test_correctness(std::vector<KeyValue>, std::vector<KeyValue>, std::vector<KeyValue>);
 
 int main(int argc, char* argv[])
 {
@@ -119,7 +119,8 @@ int main(int argc, char* argv[])
   Time timer = start_timer();
 
   // Create a hash table. For linear probing, this is just an array of KeyValues
-  KeyValue *pHashTable = sycl::malloc_device<KeyValue>(kHashTableCapacity, q);
+  KeyValue* pHashTable;
+  pHashTable = sycl::malloc_device<KeyValue>(kHashTableCapacity, q);
 
   // Initialize hash table to empty
   static_assert(kEmpty == 0xffffffff, "memset expected kEmpty=0xffffffff");
@@ -130,12 +131,14 @@ int main(int argc, char* argv[])
   // Insert items into the hash table
   uint32_t num_inserts_per_batch = (uint32_t)insert_kvs.size() / num_insert_batches;
 
-  KeyValue *pInsertKvs = sycl::malloc_device<KeyValue>(num_inserts_per_batch, q);
+  // Create insert key values
+  KeyValue* pInsertKvs;
+  pInsertKvs = sycl::malloc_device<KeyValue>(num_inserts_per_batch, q);
 
   for (uint32_t i = 0; i < num_insert_batches; i++)
   {
     q.memcpy(pInsertKvs, insert_kvs.data() + i * num_inserts_per_batch,
-             sizeof(KeyValue) * num_inserts_per_batch);
+                sizeof(KeyValue) * num_inserts_per_batch).wait();
 
     total_ktime += insert_hashtable(q, pHashTable, pInsertKvs, num_inserts_per_batch);
   }
@@ -145,12 +148,14 @@ int main(int argc, char* argv[])
   total_ktime = 0.0;
   uint32_t num_deletes_per_batch = (uint32_t)delete_kvs.size() / num_delete_batches;
 
-  KeyValue *pDeleteKvs = sycl::malloc_device<KeyValue>(num_deletes_per_batch, q);
+  // Create delete key values
+  KeyValue* pDeleteKvs;
+  pDeleteKvs = sycl::malloc_device<KeyValue>(num_deletes_per_batch, q);
 
   for (uint32_t i = 0; i < num_delete_batches; i++)
   {
     q.memcpy(pDeleteKvs, delete_kvs.data() + i * num_deletes_per_batch,
-             sizeof(KeyValue) * num_deletes_per_batch);
+                sizeof(KeyValue) * num_deletes_per_batch).wait();
 
     total_ktime += delete_hashtable(q, pHashTable, pDeleteKvs, num_deletes_per_batch);
   }
@@ -171,9 +176,9 @@ int main(int argc, char* argv[])
 
   test_unordered_map(insert_kvs, delete_kvs);
 
-  test_correctness(insert_kvs, delete_kvs, kvs);
+  bool ok = test_correctness(insert_kvs, delete_kvs, kvs);
 
-  printf("Success\n");
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   return 0;
 }
