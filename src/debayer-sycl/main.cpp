@@ -46,6 +46,7 @@ int main(int argc, char* argv[])
 
   uchar *d_input = malloc_device<uchar>(numPix, q);
   q.memcpy(d_input, input, input_image_size);
+  q.wait();
 
   uchar *d_output = malloc_device<uchar>(numPix * 4, q);
 
@@ -81,6 +82,7 @@ int main(int argc, char* argv[])
   printf("Average kernel execution time %f (s)\n", time * 1e-9f / repeat);
 
   q.memcpy(output, d_output, output_image_size);
+  q.wait();
 
   long sum = 0;
   for (int i = 0; i < numPix; i++) sum += output[i];
