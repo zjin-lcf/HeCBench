@@ -1,0 +1,5 @@
+outs:
+- md5: 7d554520463d4f6a3a6210c70adeee45
+  size: 412630
+  hash: md5
+  path: nn.tar.bz
