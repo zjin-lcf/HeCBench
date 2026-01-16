@@ -1,9 +1,8 @@
 
 #include <iostream>
 #include <fstream>
-#include <sys/time.h>
+#include <chrono>
 
-#include "timer/timer.hpp"
 #include "divergence.hpp"
 
 constexpr const int DIMS = 2;
@@ -66,21 +65,21 @@ void compareDivergences(const real *v,
                         const derivative<np, real> &deriv,
                         const real *divergence_e,
                         const int numtests) {
-  Timer::Timer time_c;
   /* Initial run to prevent cache timing from affecting us
    */
   std::cout << "Divergence on the CPU\n";
   real divergence_c[np*np];
-  // warmup 
+  // warmup
   for(int i = 0; i < numtests; i++) {
     divergence_sphere_cpu<np, real>(v, deriv, elem, divergence_c);
   }
 
-  time_c.startTimer();
+  auto start_c = std::chrono::steady_clock::now();
   for(int i = 0; i < numtests; i++) {
     divergence_sphere_cpu<np, real>(v, deriv, elem, divergence_c);
   }
-  time_c.stopTimer();
+  auto stop_c = std::chrono::steady_clock::now();
+  auto time_c = std::chrono::duration_cast<std::chrono::microseconds>(stop_c - start_c).count();
 
   std::cout << "Divergence on the GPU\n";
 #ifdef USE_GPU
@@ -89,17 +88,19 @@ void compareDivergences(const real *v,
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  Timer::Timer time_f;
   real divergence_f[np*np];
-  // warmup 
+  // warmup
   for(int i = 0; i < numtests; i++) {
     divergence_sphere_gpu(q, v, deriv, elem, divergence_f);
   }
-  time_f.startTimer();
+
+  auto start_f = std::chrono::steady_clock::now();
   for(int i = 0; i < numtests; i++) {
     divergence_sphere_gpu(q, v, deriv, elem, divergence_f);
   }
-  time_f.stopTimer();
+  auto stop_f = std::chrono::steady_clock::now();
+  auto time_f = std::chrono::duration_cast<std::chrono::microseconds>(stop_f - start_f).count();
+
   std::cout << "Divergence Errors\n";
   std::cout << "CPU             GPU\n";
   for(int i = 0; i < np; i++) {
@@ -112,8 +113,8 @@ void compareDivergences(const real *v,
     std::cout << "\n";
   }
 
-  std::cout << "CPU Time:\n" << time_c
-            << "\n\nGPU Time:\n" << time_f << "\n";
+  std::cout << "Total CPU Time: " << time_c * 1e-3f << " (ms)" << std::endl;
+  std::cout << "Total GPU Time: " << time_f * 1e-3f << " (ms)" << std::endl;
 }
 
 int main(int argc, char **argv) {

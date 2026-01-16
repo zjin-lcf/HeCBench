@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME divergence
     MODEL hip
-    SOURCES divergence.cu timer/timer.cpp
+    SOURCES divergence.cu
     CATEGORIES algorithms
 )
