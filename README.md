@@ -106,8 +106,10 @@ Each benchmark falls into a single category. While such classification is not ac
       Users may need to set appropriate values (e.g., `sm_80`, `sm_90`, `gfx906`, `gfx1030`) for their target offloading devices  
       `make -f Makefile.nvc SM=cc80 run`
       `make -f Makefile.aomp ARCH=gfx906 run`
+
+  Option 2 (Experimental): Build a set of benchmarks with [CMake build] (CMAKE_BUILD.md)
       
-  Option 2: Python scripts that help build, run and gather results from the benchmarks. As well as a basic script to compare results from two different runs.
+  Option 3: Python scripts that help build, run and gather results from the benchmarks. As well as a basic script to compare results from two different runs.
 
     It works with a `.json` file containing the benchmark names, a regex to
     find the timings in the benchmark output and optional arguments that
