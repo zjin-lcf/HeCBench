@@ -1701,7 +1701,7 @@ Abhishek Bagusetty, Andrew Barker, Andrey Alekseenko, Anton Gorshkov, Beau Johns
 
 Codeplay<sup>®</sup> and Intel<sup>®</sup> for their contributions to the oneAPI ecosystem   
 
-The project uses resources at the Intel<sup>®</sup> DevCloud, the Chameleon testbed supported by the National Science Foundation, the Argonne Leadership Computing Facility supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC02-06CH11357, and the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.
+The project used resources at the Intel<sup>®</sup> DevCloud, the Chameleon testbed supported by the National Science Foundation, the University of Oregon Neuroinformatics Center, the Argonne Leadership Computing Facility supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC02-06CH11357, and the Experimental Computing Laboratory (ExCL) at Oak Ridge National Laboratory supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.
 
 ## License
 HeCBench has a BSD-3 license, as found in the [LICENSE](LICENSE) file.
