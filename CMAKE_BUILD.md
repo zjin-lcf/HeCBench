@@ -64,16 +64,16 @@ cmake --build build/cuda-sm90 --parallel
 - `hip-gfx1030` - Radeon RX 6900
 
 #### SYCL
-- `sycl-cuda-sm70` - SYCL with CUDA backend targeting Volta
-- `sycl-cuda-sm80` - SYCL with CUDA backend targeting Ampere
-- `sycl-cuda-sm90` - SYCL with CUDA backend targeting Hopper
-- `sycl-hip-gfx908` - SYCL with HIP backend targeting MI100
-- `sycl-hip-gfx90a` - SYCL with HIP backend targeting MI210, MI250X
-- `sycl-hip-gfx942` - SYCL with HIP backend targeting MI300A/X
+- `sycl-cuda-sm70` - SYCL with CUDA backend targeting Volta (Experimental)
+- `sycl-cuda-sm80` - SYCL with CUDA backend targeting Ampere (Experimental)
+- `sycl-cuda-sm90` - SYCL with CUDA backend targeting Hopper (Experimental)
+- `sycl-hip-gfx908` - SYCL with HIP backend targeting MI100 (Experimental)
+- `sycl-hip-gfx90a` - SYCL with HIP backend targeting MI210, MI250X (Experimental)
+- `sycl-hip-gfx942` - SYCL with HIP backend targeting MI300A/X (Experimental)
 - `sycl-cpu` - SYCL with CPU backend
 - `sycl-xpu` - SYCL with XPU backend (Intel GPUs)
 
-#### OpenMP
+#### OpenMP offload
 - `openmp-intel` - Intel compiler with OpenMP offload
 - `openmp-nvidia-sm70` - NVIDIA compiler with OpenMP offload to Volta
 - `openmp-nvidia-sm80` - NVIDIA compiler with OpenMP offload to Ampere
