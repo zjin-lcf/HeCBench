@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
         delete [] hostInvInput; 
         delete [] d->offsets; 
 
-    } catch (const cxxopts::OptionException& e) {
+    } catch (const cxxopts::exceptions::exception& e) {
         fmt::print("{}\n", e.what());
         return 1;
     }
