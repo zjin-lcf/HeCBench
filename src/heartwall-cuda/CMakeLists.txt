@@ -2,6 +2,8 @@
 
 set(INC_DIR "${CMAKE_CURRENT_LIST_DIR}/util")
 
+UNZIPFILE("${CMAKE_CURRENT_LIST_DIR}/../data/heartwall/heartwall.tar.bz")
+
 add_hecbench_benchmark(
     NAME heartwall
     MODEL cuda
