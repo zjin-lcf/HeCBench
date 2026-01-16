@@ -24,7 +24,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../quant-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../quantBnB-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -52,7 +52,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../quant-cuda/code.h
+%.o: %.cpp ../quantBnB-cuda/code.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
