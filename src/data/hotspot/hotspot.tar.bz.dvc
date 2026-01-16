@@ -1,0 +1,5 @@
+outs:
+- md5: b91eb6812aa70e70a58c32ac649c15f2
+  size: 858818
+  hash: md5
+  path: hotspot.tar.bz
