@@ -1,8 +1,7 @@
 import torch
-import intel_extension_for_pytorch
 import torch.nn as nn
 from torch.nn import functional as F
-from torch.xpu.cpp_extension import load
+from torch.utils.cpp_extension import load
 
 ######################################################################################################
 # From https://github.com/BlinkDL/RWKV-GPU
@@ -57,8 +56,10 @@ T_MAX = 768
 B_GROUP_FORWARD = 8
 B_GROUP_BACKWARD = 2
 
-timex_xpu = load(name="timex", sources=["src/timex_op.cpp", "src/timex.cpp"],
-                 verbose=True, extra_cflags=['-ffast-math', f'-DTmax={T_MAX}', f'-DBF={B_GROUP_FORWARD}', f'-DBB={B_GROUP_BACKWARD}'])
+timex_xpu = load(name="timex", sources=["src/timex_op.cpp", "src/timex.sycl"],
+                 verbose=True, with_sycl=True,
+                 extra_sycl_cflags=['-ffast-math'],
+                 extra_cflags = [f'-DTmax={T_MAX}', f'-DBF={B_GROUP_FORWARD}', f'-DBB={B_GROUP_BACKWARD}'])
 
 def check_input(ctx):
     assert ctx.T % 4 == 0 and ctx.T <= T_MAX and ctx.B % B_GROUP_FORWARD == 0 and ctx.B % B_GROUP_BACKWARD == 0, \
@@ -131,13 +132,13 @@ def CHECK_GPU(silent=False):
 
     # check forward
 
-    with torch.autograd.profiler.profile(use_device='xpu') as prof:
+    with torch.autograd.profiler.profile(use_device='xpu', use_kineto=True) as prof:
         r1 = RUN_PYTORCH(w, k, B, C, T, eps)
     if not silent:
         print('pytorch forward\n', prof.key_averages(group_by_stack_n=5).table(
             sort_by='self_xpu_time_total', row_limit=5))
 
-    with torch.autograd.profiler.profile(use_device='xpu') as prof:
+    with torch.autograd.profiler.profile(use_device='xpu', use_kineto=True) as prof:
         r2 = RUN_GPU(w, k, B, C, T, eps)
     if not silent:
         print('GPU forward\n', prof.key_averages(group_by_stack_n=5).table(
@@ -150,7 +151,7 @@ def CHECK_GPU(silent=False):
 
     # a strange loss for better verification
     loss1 = ((r1 * r1) - torch.tanh(r1)).sum()
-    with torch.autograd.profiler.profile(use_device='xpu') as prof:
+    with torch.autograd.profiler.profile(use_device='xpu', use_kineto=True) as prof:
         loss1.backward()
     if not silent:
         print('pytorch backward\n', prof.key_averages(group_by_stack_n=5).table(
@@ -162,7 +163,7 @@ def CHECK_GPU(silent=False):
     k.grad.data.zero_()
 
     loss2 = ((r2 * r2) - torch.tanh(r2)).sum()
-    with torch.autograd.profiler.profile(use_device='xpu') as prof:
+    with torch.autograd.profiler.profile(use_device='xpu', use_kineto=True) as prof:
         loss2.backward()
     if not silent:
         print('GPU backward\n', prof.key_averages(group_by_stack_n=5).table(

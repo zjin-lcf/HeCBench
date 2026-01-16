@@ -10,7 +10,7 @@ LAUNCHER   =
 # PyTorch Configuration
 #===============================================================================
 
-# NVIDIA PyTorch container for IPEX support
+# PyTorch container for XPU support
 DOCKER_IMAGE = intel/intel-extension-for-pytorch:2.8.10-xpu
 
 ifeq ($(USE_DOCKER),yes)
@@ -28,9 +28,9 @@ endif
 
 all: run
 
-# PyTorch compiles IPEX extensions on-the-fly during first run
+# PyTorch compiles XPU extensions on-the-fly during first run
 build:
-	@echo "Note: PyTorch will compile IPEX extensions on first run"
+	@echo "Note: PyTorch will compile XPU extensions on first run"
 
 clean:
 	rm -rf __pycache__ build *.so
