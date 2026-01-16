@@ -6,6 +6,7 @@
 #include "linearprobing.h"
 
 // 32 bit Murmur3 hash
+#pragma omp declare target
 uint32_t hash(uint32_t k)
 {
   k ^= k >> 16;
@@ -15,6 +16,7 @@ uint32_t hash(uint32_t k)
   k ^= k >> 16;
   return k & (kHashTableCapacity-1);
 }
+#pragma omp end declare target
 
 // Insert the key/values in kvs into the hashtable
 double insert_hashtable(KeyValue*__restrict pHashTable,
@@ -37,12 +39,13 @@ double insert_hashtable(KeyValue*__restrict pHashTable,
     while (true)
     {
       uint32_t prev;
-
-      #pragma omp atomic capture
-      //#pragma omp critical
+      // OpenMP 5.1 not necessarily supported by all compilers
+      #pragma omp atomic compare capture
       {
         prev = pHashTable[slot].key;
-        pHashTable[slot].key = (prev == kEmpty) ? key : prev;
+        if (pHashTable[slot].key == kEmpty) {
+          pHashTable[slot].key = key;
+        }
       }
       if (prev == kEmpty || prev == key)
       {
