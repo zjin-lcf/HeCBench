@@ -1,2 +1,2 @@
-Before running the program, go to the `data` folder and type `python gengraph.py` to generate input file
+Decompress the file `data.tar.bz` located in `lanczos-cuda`. The input file `social-large-800k.txt` is pre-generated in the `data` folder. To generate more inputs, edit `gengraph.py` and then type `python gengraph.py`.
 
