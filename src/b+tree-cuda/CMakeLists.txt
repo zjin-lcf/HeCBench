@@ -1,5 +1,7 @@
 # b+tree-cuda/CMakeLists.txt
 
+UNZIPFILE("${CMAKE_CURRENT_LIST_DIR}/../data/b+tree/bfs.tar.bz")
+
 add_hecbench_benchmark(
     NAME b+tree
     MODEL cuda
