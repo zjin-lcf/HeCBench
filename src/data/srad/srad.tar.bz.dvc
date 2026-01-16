@@ -1,0 +1,5 @@
+outs:
+- md5: 5ff29dba91725c62e2ce54990ef3ec47
+  size: 115883
+  hash: md5
+  path: srad.tar.bz
