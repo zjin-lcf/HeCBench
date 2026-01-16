@@ -63,5 +63,5 @@ debug: $(program)
 	./$(program) -g data/social-small.txt -n 100 -k 3 -d float
 
 run: $(program)
-	$(LAUNCHER) ./$(program) -g data/social-large-800k.txt -n 800000 -k 3 -d float
+	$(LAUNCHER) ./$(program) -g ../lanczos-cuda/data/social-large-800k.txt -n 800000 -k 3 -d float
 
