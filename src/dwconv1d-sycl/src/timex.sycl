@@ -1,12 +1,5 @@
-#include <stdio.h>
+#include <c10/xpu/XPUStream.h>
 #include <sycl/sycl.hpp>
-#include <xpu/Macros.h>
-#include <xpu/Stream.h>
-#include <c10/core/Device.h>
-#include <c10/core/DeviceGuard.h>
-#include <c10/core/Stream.h>
-#include <c10/core/StreamGuard.h>
-
 
 // require T <= Tmax, T % 4 == 0, B % BF == 0, B % BB === 0 (Tmax and BF and BB are passed by compiler)
 
@@ -14,10 +7,7 @@
 
 inline sycl::queue& getQueue() 
 {
-  auto device_type = c10::DeviceType::XPU;
-  c10::impl::VirtualGuardImpl impl(device_type);
-  c10::Stream xpu_stream = impl.getStream(impl.getDevice());
-  return xpu::get_queue_from_stream(xpu_stream);
+  return c10::xpu::getCurrentXPUStream().queue();
 }
 
 /* template <typename F>
@@ -166,10 +156,9 @@ void gpu_forward(const float *w, const float *k, float *x, float eps, int B, int
         sycl::local_accessor<float, 1> ww_acc(sycl::range<1>(Tmax), cgh);
         sycl::local_accessor<float, 1> kk_acc(sycl::range<1>(Tmax * BF), cgh);
 
-        cgh.parallel_for(
-            sycl::nd_range<3>(gridDim * blockDim, blockDim),
+        cgh.parallel_for<class KernelFWD>(sycl::nd_range<3>(gridDim * blockDim, blockDim),
             [=](sycl::nd_item<3> item) {
-                kernel_forward(
+                kernel_forward<float>(
                     w, k, x, eps, B, C, T, item,
                     ww_acc.template get_multi_ptr<sycl::access::decorated::no>().get(),
                     kk_acc.template get_multi_ptr<sycl::access::decorated::no>().get());
@@ -185,10 +174,9 @@ void gpu_backward(const float *w, const float *k, const float *gwk, float *gw, f
         sycl::local_accessor<float, 1> kk_acc(sycl::range<1>(Tmax * BB), cgh);
         sycl::local_accessor<float, 1> gg_acc(sycl::range<1>(Tmax * BB), cgh);
 
-        cgh.parallel_for(
-            sycl::nd_range<3>(gridDim * blockDim, blockDim),
+        cgh.parallel_for<class KernelBWD>(sycl::nd_range<3>(gridDim * blockDim, blockDim),
             [=](sycl::nd_item<3> item) {
-                kernel_backward(
+                kernel_backward<float>(
                     w, k, gwk, gw, gk, B, C, T, item,
                     ww_acc.template get_multi_ptr<sycl::access::decorated::no>().get(),
                     kk_acc.template get_multi_ptr<sycl::access::decorated::no>().get(),
