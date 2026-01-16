@@ -1,7 +1,7 @@
 #include <cxxopts.hpp>
 #include <fmt/core.h>
 #include <hip/hip_runtime.h>
-#include <hipblas.h>
+#include <hipblas/hipblas.h>
 #include <thrust/scan.h>
 #include "io.hpp"
 #include "util.hpp"
@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
             writeResult<float, true>(runs, partition, counts, output);
             fmt::print("Finished\n");
         }
-    } catch (const cxxopts::OptionException& e) {
+    } catch (const cxxopts::exceptions::exception& e) {
         fmt::print("{}\n", e.what());
         return 1;
     }

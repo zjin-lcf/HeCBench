@@ -130,7 +130,7 @@ int main(int argc, char** argv)
 
         fmt::print("Finished!\n");
 
-    } catch (const cxxopts::OptionException& e) {
+    } catch (const cxxopts::exceptions::exception& e) {
         fmt::print("{}\n", e.what());
         return 1;
     }
