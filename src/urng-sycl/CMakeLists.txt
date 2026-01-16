@@ -2,6 +2,8 @@
 
 set(SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/../include")
 
+UNZIPFILE("${CMAKE_CURRENT_LIST_DIR}/image.tar.gz")
+
 add_hecbench_benchmark(
     NAME urng
     MODEL sycl
