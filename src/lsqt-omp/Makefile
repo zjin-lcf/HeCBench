@@ -41,4 +41,4 @@ clean:
 	rm -f $(ODIR)/*.o lsqt_gpu *.out
 
 run: lsqt_gpu
-	./$(program) ../lsqt-cuda/examples/input.txt
+	./lsqt_gpu ../lsqt-cuda/examples/input.txt
