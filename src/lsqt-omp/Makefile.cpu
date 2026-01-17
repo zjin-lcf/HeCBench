@@ -22,3 +22,6 @@ lsqt_cpu: $(OBJ)
 
 clean:
 	rm $(ODIR)/*o lsqt_cpu *.out
+
+run: lsqt_cpu
+	./lsqt_cpu ../lsqt-cuda/examples/input.txt
