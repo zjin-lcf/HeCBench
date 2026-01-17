@@ -1,5 +1,7 @@
 # lsqt-cuda/CMakeLists.txt
 
+UNZIPFILE("${CMAKE_CURRENT_LIST_DIR}/examples.tar.gz")
+
 add_hecbench_benchmark(
     NAME lsqt
     MODEL cuda
