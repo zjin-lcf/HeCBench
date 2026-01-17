@@ -1,5 +1,7 @@
 # face-cuda/CMakeLists.txt
 
+UNZIPFILE("${CMAKE_CURRENT_LIST_DIR}/dataset.tar.gz")
+
 add_hecbench_benchmark(
     NAME face
     MODEL cuda
