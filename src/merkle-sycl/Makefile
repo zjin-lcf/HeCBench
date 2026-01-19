@@ -6,6 +6,7 @@
 CC        = clang++
 OPTIMIZE  = yes
 DEBUG     = no
+VERIFY    = no
 LAUNCHER  =
 
 GPU       = yes
@@ -55,6 +56,11 @@ endif
 ifeq ($(DEBUG),yes)
   CFLAGS  += -g -DDEBUG
   LDFLAGS += -g
+endif
+
+# Verification Flags
+ifeq ($(VERIFY),yes)
+  CFLAGS  += -DDEBUG
 endif
 
 # Optimization Flags
