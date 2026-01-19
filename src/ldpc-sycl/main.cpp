@@ -305,7 +305,7 @@ int main()
         total_time += time;
 
         // copy the decoded data from device to host
-        q.memcpy(hard_decision_gpu, d_hard_decision, memorySize_hard_decision_gpu);
+        q.memcpy(hard_decision_gpu, d_hard_decision, memorySize_hard_decision_gpu).wait();
 
         this_error = error_check(info_bin_gpu, hard_decision_gpu);
         total_bit_error += this_error.bit_error;
