@@ -199,6 +199,7 @@ void nqueens(short size, int initial_depth, unsigned int n_explorers, QueenRoot 
 
   q.memcpy(vector_of_tree_size_h, vector_of_tree_size_d, n_explorers*sizeof(unsigned long long));
   q.memcpy(sols_h, sols_d, n_explorers*sizeof(unsigned long long));
+  q.wait();
 
   sycl::free(vector_of_tree_size_d, q);
   sycl::free(sols_d, q);
