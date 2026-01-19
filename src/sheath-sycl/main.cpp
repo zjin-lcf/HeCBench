@@ -215,6 +215,8 @@ int main(int argc, char* argv[])
     PushSpecies(q, &electrons, electrons_part_gpu, ef_gpu);
     PushSpecies(q, &ions, ions_part_gpu, ef_gpu);
 
+    q.wait();
+
     /*write diagnostics*/
     if (ts % 25 == 0)
     {
