@@ -171,6 +171,7 @@ template<typename T>
 void print_mask_ratio (sycl::queue &q, T *h_out, T *d_out, T fill_val, int data_size) {
   T* out = (T*) malloc (data_size * sizeof(T));
   q.memcpy(out, d_out, data_size * sizeof(T));
+  q.wait();
   int error = memcmp(h_out, out, data_size * sizeof(T));
   int cnt_fill = 0;
   for (int i = 0; i < data_size; i++) {
