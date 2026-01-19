@@ -498,6 +498,7 @@ int main(int argc, char *argv[])
 
   q.memcpy(fluid_particles, d_fluid_particles,
            num_fluid_particles * sizeof(fluid_particle));
+  q.wait();
 
   writeFile(fluid_particles, &params);
 
