@@ -80,6 +80,7 @@ void device_chain_kernel_wrapper(
   printf("Total kernel execution time: %f (s)\n", k_time * 1e-9);
 
   q.memcpy(h_ret, d_ret, batch_count * TILE_SIZE * PE_NUM * sizeof(return_dt));
+  q.wait();
 
   sycl::free(d_control, q);
   sycl::free(d_arg, q);
