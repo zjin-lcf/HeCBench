@@ -89,6 +89,7 @@ int main(int argc, char* argv[]) {
 
   // Copy result back to host
   q.memcpy(b, d_out, output_size_bytes);
+  q.wait();
 
   // verification
   bool ok = true;
