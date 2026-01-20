@@ -64,7 +64,7 @@ vj-cpu: main.o haar-cpu.o image.o stdio-wrapper.o rectangles.o
 	$(CC) $(CFLAGS) -o $@ $+ 
 
 vj-gpu: main.o haar-gpu.o image.o stdio-wrapper.o rectangles.o
-	$(CC) $(CFLAGS) -o $@ $+
+	$(CC) $(CFLAGS) -mp=gpu -gpu=$(SM) -o $@ $+
 
 clean:
 	rm -f $(program) *.o Output-cpu.pgm Output-gpu.pgm
