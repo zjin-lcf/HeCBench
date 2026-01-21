@@ -285,6 +285,7 @@ void Vector::copy_from_host(real* other_real, real* other_imag)
 #ifndef CPU_ONLY
   q.memcpy(real_part, other_real, array_size);
   q.memcpy(imag_part, other_imag, array_size);
+  q.wait();
 #else
   memcpy(real_part, other_real, array_size);
   memcpy(imag_part, other_imag, array_size);
