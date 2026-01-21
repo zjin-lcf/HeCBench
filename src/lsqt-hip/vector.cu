@@ -114,6 +114,7 @@ Vector::Vector(Vector& original)
 Vector::~Vector()
 {
 #ifndef CPU_ONLY
+  CHECK(hipDeviceSynchronize());
   CHECK(hipFree(real_part));
   CHECK(hipFree(imag_part));
 #else
