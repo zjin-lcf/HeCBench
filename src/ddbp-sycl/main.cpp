@@ -671,7 +671,7 @@ void backprojectionDDb(
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time %f (s)\n", time * 1e-9f);
 
-  q.memcpy(h_pVolume, d_pVolume, nSlices* nPixX * nPixY * sizeof(double));
+  q.memcpy(h_pVolume, d_pVolume, nSlices* nPixX * nPixY * sizeof(double)).wait();
 
   sycl::free(d_pProj, q);
   sycl::free(d_sliceI, q);
