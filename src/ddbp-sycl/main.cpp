@@ -572,8 +572,8 @@ void backprojectionDDb(
     //printf("Tube angle:%f Det angle:%f\n", theta, phi);
 
     // Tube rotation
-    double rtubeY = ((tubeY - isoY)*cos(theta) - (tubeZ - isoZ)*sin(theta)) + isoY;
-    double rtubeZ = ((tubeY - isoY)*sin(theta) + (tubeZ - isoZ)*cos(theta)) + isoZ;
+    double rtubeY = ((tubeY - isoY)*std::cos(theta) - (tubeZ - isoZ)*std::sin(theta)) + isoY;
+    double rtubeZ = ((tubeY - isoY)*std::sin(theta) + (tubeZ - isoZ)*std::cos(theta)) + isoZ;
 
     //printf("R tube Y:%f R tube Z:%f\n", rtubeY, rtubeZ);
 
