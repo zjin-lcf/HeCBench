@@ -103,6 +103,7 @@ int main(int argc, char* argv[])
 
     FROMDEV2(rain) ;
     FROMDEV2(snow) ;
+    Q.wait();
 
     rain_sum = snow_sum = 0;
     for (int i = 0; i < d2; i++) {
