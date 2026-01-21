@@ -243,7 +243,7 @@ int main(int argc, char **argv) {
             n_flow_vectors, p.max_iter, p.error_threshold, p.convergence_threshold,
             d_g_out_id, d_model_candidate, d_outliers_candidate, 1);
 
-        q.memcpy(&candidates, d_g_out_id, sizeof(int));
+        q.memcpy(&candidates, d_g_out_id, sizeof(int)).wait();
         q.memcpy(h_model_candidate, d_model_candidate, candidates * sizeof(int));
         q.memcpy(h_outliers_candidate, d_outliers_candidate, candidates * sizeof(int));
         q.wait();
