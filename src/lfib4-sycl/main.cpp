@@ -229,6 +229,7 @@ void gLFIB4(sycl::queue &q, uint32_t n, uint32_t *x, int s, int r, uint32_t *see
     });
   });
 
+  q.wait();
   sycl::free(y, q);
 }
 
