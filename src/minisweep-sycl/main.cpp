@@ -372,10 +372,9 @@ int main( int argc, char** argv )
         k_end = get_time();
         ktime += k_end - k_start;
 
-        q.memcpy(vo, d_vo, v_size);
+        q.memcpy(vo, d_vo, v_size).wait();
 
 #ifdef DEBUG
-        q.wait();
         for (int i = 0; i < v_size/sizeof(P); i++) printf("vo %d %f\n", i, vo[i]);
 #endif
       }
