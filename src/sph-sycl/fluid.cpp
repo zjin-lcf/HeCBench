@@ -497,7 +497,7 @@ int main(int argc, char *argv[])
   printf("Average execution time of sph kernels: %f (ms)\n", (time * 1e-6f) / params.number_steps);
 
   q.memcpy(fluid_particles, d_fluid_particles,
-           num_fluid_particles * sizeof(fluid_particle));
+           num_fluid_particles * sizeof(fluid_particle)).wait();
 
   writeFile(fluid_particles, &params);
 
