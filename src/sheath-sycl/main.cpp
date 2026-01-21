@@ -232,6 +232,7 @@ int main(int argc, char* argv[])
     if (ts % 1000 == 0)
       WriteResults(ts);
   }
+  q.wait();
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

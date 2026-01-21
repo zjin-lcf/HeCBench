@@ -244,6 +244,7 @@ int main(int argc, char* argv[])
     /*save data*/
     if (ts % 1000 == 0) WriteResults(ts);
   }
+  cudaDeviceSynchronize();
 
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
