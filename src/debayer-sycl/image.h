@@ -1,6 +1,8 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
+typedef unsigned char uchar;
+
 enum pattern_t {
   RGGB = 0,
   GRBG = 1,
