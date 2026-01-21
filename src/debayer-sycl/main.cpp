@@ -80,7 +80,7 @@ int main(int argc, char* argv[])
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", time * 1e-9f / repeat);
 
-  q.memcpy(output, d_output, output_image_size);
+  q.memcpy(output, d_output, output_image_size).wait();
 
   long sum = 0;
   for (int i = 0; i < numPix; i++) sum += output[i];
