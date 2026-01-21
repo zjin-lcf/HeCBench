@@ -140,6 +140,7 @@ Vector::Vector(Vector& original)
 Vector::~Vector()
 {
 #ifndef CPU_ONLY
+  q.wait();
   sycl::free(real_part, q);
   sycl::free(imag_part, q);
 #else

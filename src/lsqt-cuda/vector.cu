@@ -114,6 +114,7 @@ Vector::Vector(Vector& original)
 Vector::~Vector()
 {
 #ifndef CPU_ONLY
+  CHECK(cudaDeviceSynchronize());
   CHECK(cudaFree(real_part));
   CHECK(cudaFree(imag_part));
 #else
