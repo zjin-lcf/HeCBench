@@ -64,9 +64,9 @@ void device_chain_kernel_wrapper(
                            d_control + batch * PE_NUM,
                            d_max_tracker,
                            d_j_tracker,
-                           active_sm.get_pointer(),
-                           max_tracker_sm.get_pointer(),
-                           j_tracker_sm.get_pointer(),
+                           active_sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                           max_tracker_sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                           j_tracker_sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                            item,
                            max_dist_x, max_dist_y, bw);
 
