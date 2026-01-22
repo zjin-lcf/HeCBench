@@ -163,14 +163,13 @@ For other benchmarks, datasets are either included with the benchmarks or could 
 
 # Known issues
 The programs have not been evaluated on Windows or MacOS  
-The lastest Intel SYCL compiler (not the Intel oneAPI toolkit) may be needed for building some SYCL programs successfully  
 Kernel results do not exactly match using these programming languages on a platform for certain programs  
 Not all programs automate the verification of host and device results  
 Not all CUDA programs have SYCL, HIP or OpenMP equivalents  
-Not all programs have OpenMP target offloading implementations  
 Raw performance of any program may be suboptimal  
 Some programs may take long to complete on an integrated GPU  
 Some host programs contain platform-specific intrinsics, so they may cause compile error on a PowerPC platform
+Program hang: bh-hip, mpc-sycl 
 
 # Emulation
 When double-precision floating-point operations are not supported on certain Intel GPU devices, software emulation may be enabled. [FP64 emulation](https://github.com/intel/compute-runtime/blob/master/opencl/doc/FAQ.md#feature-double-precision-emulation-fp64)
