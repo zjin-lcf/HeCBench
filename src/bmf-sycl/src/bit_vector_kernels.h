@@ -20,7 +20,7 @@ inline T warpReduceSum(T val, sycl::nd_item<1> &item, int width = 32) {
 }
 
 template<typename T>
-inline T blockReduceSum(T val, sycl::local_ptr<T> reductionArray, sycl::nd_item<1> &item) {
+inline T blockReduceSum(T val, T *reductionArray, sycl::nd_item<1> &item) {
   const int sub_group_size = item.get_sub_group().get_local_range().get(0);
   const int lane = item.get_local_id(0) % sub_group_size; 
   const int wid = item.get_local_id(0) / sub_group_size;
@@ -75,10 +75,10 @@ void computeDistanceRowsShared(
   const uint8_t factorDim,
   const error_t weight,
   error_t *global_error,
-  sycl::nd_item<1> item,
-  sycl::local_ptr<bit_factor_t> B_block,
-  sycl::local_ptr<bit_matrix_t> C_block,
-  sycl::local_ptr<error_t> reductionArray)
+  sycl::nd_item<1> &item,
+  bit_factor_t *B_block,
+  bit_matrix_t *C_block,
+  error_t *reductionArray)
 {
   const int sub_group_size = item.get_sub_group().get_local_range().get(0);
   const index_t warpIdIntern = item.get_local_id(0) / sub_group_size;
@@ -147,8 +147,8 @@ void vectorMatrixMultCompareRowWarpShared(
   const uint32_t flipManyDepth,
   const error_t weight,
   sycl::nd_item<1> &item,
-  sycl::local_ptr<bit_factor_t> B_block,
-  sycl::local_ptr<bit_matrix_t> C_block)
+  bit_factor_t *B_block,
+  bit_matrix_t *C_block)
 {
 
   const int sub_group_size = item.get_sub_group().get_local_range().get(0);
@@ -230,9 +230,9 @@ void vectorMatrixMultCompareColWarpShared(
   const float flipManyChance,
   const uint32_t flipManyDepth,
   const error_t weight,
-  sycl::nd_item<1> item,
-  sycl::local_ptr<bit_factor_t> A_block,
-  sycl::local_ptr<bit_matrix_t> C_block)
+  sycl::nd_item<1> &item,
+  bit_factor_t *A_block,
+  bit_matrix_t *C_block)
 {
   const int sub_group_size = item.get_sub_group().get_local_range().get(0);
   const index_t warpIdIntern = item.get_local_id(0) / sub_group_size;

@@ -168,9 +168,9 @@ class cuBool
             handler.d_A, handler.d_B, d_C_t, height_t,
             width_t, width_C_padded_t, handler.factorDim_,
             weight, handler.d_distance_, item,
-            B_block_sm.get_pointer(),
-            C_block_sm.get_pointer(),
-            reductionArray_sm.get_pointer());
+            B_block_sm.template get_multi_ptr<sycl::access::decorated::no>().get(),
+            C_block_sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+            reductionArray_sm.get_multi_ptr<sycl::access::decorated::no>().get());
         });
       });
       q.memcpy(handler.distance_, handler.d_distance_, sizeof(error_t)).wait();
@@ -293,9 +293,9 @@ class cuBool
             handler.d_A, handler.d_B, d_C_t, height_t,
             width_t, width_C_padded_t, handler.factorDim_,
             weight, d_distance_proof, item,
-            B_block_sm.get_pointer(),
-            C_block_sm.get_pointer(),
-            reductionArray_sm.get_pointer());
+            B_block_sm.template get_multi_ptr<sycl::access::decorated::no>().get(),
+            C_block_sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+            reductionArray_sm.get_multi_ptr<sycl::access::decorated::no>().get());
         });
       });
       q.memcpy(distance_proof, d_distance_proof, sizeof(error_t)).wait();
@@ -478,8 +478,8 @@ class cuBool
               handler.factorDim_,
               lineToBeChanged, handler.d_distance_, gpuSeed, temperature/10,
               config.flipManyChance, config.flipManyDepth, weight, item,
-              B_block_sm.get_pointer(),
-              C_block_sm.get_pointer());
+              B_block_sm.template get_multi_ptr<sycl::access::decorated::no>().get(),
+              C_block_sm.get_multi_ptr<sycl::access::decorated::no>().get());
           });
         });
 
@@ -511,8 +511,8 @@ class cuBool
              handler.factorDim_,
              lineToBeChanged, handler.d_distance_, gpuSeed, temperature/10,
              config.flipManyChance, config.flipManyDepth, weight, item,
-             A_block_sm.get_pointer(),
-             C_block_sm.get_pointer());
+             A_block_sm.template get_multi_ptr<sycl::access::decorated::no>().get(),
+             C_block_sm.get_multi_ptr<sycl::access::decorated::no>().get());
            });
         });
 
