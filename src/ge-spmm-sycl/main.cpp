@@ -47,8 +47,8 @@ void spmmWrapper(
           sycl::range<2> ((B_ncols+31)/32 * tile_row,
                           (A_nrows+tile_row-1)/tile_row * 32), lws),
           [=] (sycl::nd_item<2> item) {
-          spmm_test1<float>(item, sm.get_pointer(), A_nrows, B_ncols, 
-                            A_rowPtr , A_colInd, A_val, B, C);
+          spmm_test1<float>(item, sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                            A_nrows, B_ncols, A_rowPtr , A_colInd, A_val, B, C);
         });
       });
       break;
@@ -59,8 +59,8 @@ void spmmWrapper(
           sycl::range<2> ((B_ncols+63)/64 * tile_row, 
                           (A_nrows+tile_row-1)/tile_row * 32), lws),
           [=] (sycl::nd_item<2> item) {
-          spmm_test2<float>(item, sm.get_pointer(), A_nrows, B_ncols, 
-                            A_rowPtr , A_colInd, A_val, B, C);
+          spmm_test2<float>(item, sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                            A_nrows, B_ncols, A_rowPtr , A_colInd, A_val, B, C);
         });
       });
       break;
@@ -71,8 +71,8 @@ void spmmWrapper(
           sycl::range<2> ((B_ncols+127)/128 * tile_row, 
                           (A_nrows+tile_row-1)/tile_row * 32), lws),
           [=] (sycl::nd_item<2> item) {
-          spmm_test3<float>(item, sm.get_pointer(), A_nrows, B_ncols, 
-                            A_rowPtr , A_colInd, A_val, B, C);
+          spmm_test3<float>(item, sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                            A_nrows, B_ncols, A_rowPtr , A_colInd, A_val, B, C);
         });
       });
       break;
@@ -83,8 +83,8 @@ void spmmWrapper(
           sycl::range<2> ((B_ncols+255)/256 * tile_row, 
                           (A_nrows+tile_row-1)/tile_row * 32), lws),
           [=] (sycl::nd_item<2> item) {
-          spmm_test4<float>(item, sm.get_pointer(), A_nrows, B_ncols, 
-                            A_rowPtr , A_colInd, A_val, B, C);
+          spmm_test4<float>(item, sm.get_multi_ptr<sycl::access::decorated::no>().get(),
+                            A_nrows, B_ncols, A_rowPtr , A_colInd, A_val, B, C);
         });
       });
       break;
