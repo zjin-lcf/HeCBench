@@ -129,7 +129,7 @@ void call_Padding_kernel(sycl::queue &q, int blocks, int threads, int n, int m,
 
     Padding_kernel(n, m, pad, n_tasks, alpha, matrix_out, matrix, flags
 #ifdef DYNAMIC_PARTITION
-        , worklist, sm.get_pointer()
+        , worklist, sm.get_multi_ptr<sycl::access::decorated::no>().get()
 #endif
         , item);
     });
