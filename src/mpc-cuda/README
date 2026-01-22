@@ -1,6 +1,8 @@
-Datasets are available at https://userweb.cs.txstate.edu/~burtscher/research/datasets/FPdouble/
+Unzip the file "trace.tar.bz" before running the program
 
-To download the dataset for the benchmark:
+More datasets are available at https://userweb.cs.txstate.edu/~burtscher/research/datasets/FPdouble/
+
+For example, to download a dataset for the benchmark:
 
   wget --no-check-certificate http://www.cs.txstate.edu/~burtscher/research/datasets/FPdouble/msg_sp.trace.fpc
 
