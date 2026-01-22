@@ -13,7 +13,7 @@ CUDA      = no
 CUDA_ARCH = sm_70
 HIP       = no
 HIP_ARCH  = gfx908
-GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
+#GCC_TOOLCHAIN = "/auto/software/gcc/x86_64/gcc-9.1.0/"
 
 #===============================================================================
 # Program name & source code list
@@ -30,7 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../include -I../mpc-cuda -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../mpc-cuda -fsycl
 
 ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS_TMP := $(CFLAGS)
@@ -80,5 +80,5 @@ clean:
 
 run: $(program)
 	$(LAUNCHER) ./$(program) ../mpc-cuda/msg_sp.trace.out 1
-	./$(program) ../mpc-cuda/msg_sp.trace.out.mpc 
+	$(LAUNCHER) ./$(program) ../mpc-cuda/msg_sp.trace.out.mpc 
 	diff ../mpc-cuda/msg_sp.trace.out msg_sp.trace.out.mpc.org
