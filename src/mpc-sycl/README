@@ -1,3 +1,1 @@
-Datasets are available at https://userweb.cs.txstate.edu/~burtscher/research/datasets/FPdouble/
-
-Please see the Makefile in mpc-cuda for preprocessing a dataset.
+Unzip the file "trace.tar.bz" in mpc-cuda before running the program
