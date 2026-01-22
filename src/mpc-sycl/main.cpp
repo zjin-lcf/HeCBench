@@ -40,11 +40,11 @@ of the IEEE International Conference on Cluster Computing, pp. 381-389.
 September 2015.
 */
 
-#include <sycl/sycl.hpp>
 #include <cstdio>
 #include <cassert>
 #include <string>
 #include <sys/time.h>
+#include <sycl/sycl.hpp>
 #include "utils.h"
 
 using std::string;
@@ -183,8 +183,8 @@ void MPCcompress(
   volatile int* __restrict const goffset,
   unsigned char dim,
   sycl::nd_item<1> &item,
-  int *start,
-  int *top,
+  int &start,
+  int &top,
   long *sbuf1,
   long *sbuf2)
 {
@@ -268,14 +268,14 @@ void MPCcompress(
       if (chunk == chunksm1) {
         compressed[0] = (((long)(st + loc)) << 32) + (0x43504d00 - 1) + dim;
       }
-      *top = loc;
-      *start = st;
+      top = loc;
+      start = st;
     }
 
     item.barrier(sycl::access::fence_space::local_space);
 
-    if (tid < *top) {
-      compressed[*start + tid] = sbuf2[tid];
+    if (tid < top) {
+      compressed[start + tid] = sbuf2[tid];
     }
   }
 }
@@ -306,8 +306,8 @@ void MPCdecompress(
   long* __restrict const decompressed,
   volatile int* __restrict const goffset,
   sycl::nd_item<1> &item,
-  int *__restrict start,
-  int *__restrict top,
+  int &start,
+  int &top,
   long *__restrict sbuf1,
   long *__restrict sbuf2)
 {
@@ -345,14 +345,14 @@ void MPCdecompress(
       }
       goffset[bid1] = st + loc;
       goffset[bid] = -1;
-      *top = loc;
-      *start = st;
+      top = loc;
+      start = st;
     }
 
     item.barrier(sycl::access::fence_space::local_space);
 
-    if (tid < *top) {
-      sbuf2[tid] = compressed[*start + tid];
+    if (tid < top) {
+      sbuf2[tid] = compressed[start + tid];
     }
 
     item.barrier(sycl::access::fence_space::local_space);
@@ -440,21 +440,16 @@ int main(int argc, char *argv[])
     q.memset(d_offs, -1, blocks * sizeof(int)).wait();
  
     q.submit([&](sycl::handler &cgh) {
-      sycl::accessor<int, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local> sm_start(1, cgh);
-      sycl::accessor<int, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local> sm_top(1, cgh);
-      sycl::accessor<long, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local> sbuf1(TPB, cgh);
-      sycl::accessor<long, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local> sbuf2(TPB, cgh);
+      sycl::local_accessor<int, 0> sm_start(cgh);
+      sycl::local_accessor<int, 0> sm_top(cgh);
+      sycl::local_accessor<long, 1> sbuf1(TPB, cgh);
+      sycl::local_accessor<long, 1> sbuf2(TPB, cgh);
 
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws),
-          [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
-            MPCcompress(insize, d_in, d_out, d_offs, dim, item,
-                        sm_start.get_pointer(), sm_top.get_pointer(),
-                        sbuf1.get_pointer(),
-                        sbuf2.get_pointer());
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        MPCcompress(insize, d_in, d_out, d_offs, dim, item,
+                    sm_start, sm_top,
+                    sbuf1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                    sbuf2.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     }).wait();
 
@@ -478,21 +473,17 @@ int main(int argc, char *argv[])
     gettimeofday(&start, NULL);
     q.memset(d_offs, -1, blocks * sizeof(int)).wait();
     q.submit([&](sycl::handler &cgh) {
-      sycl::accessor<int, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local> sm_start(1, cgh);
-      sycl::accessor<int, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local> sm_top(1, cgh);
-      sycl::accessor<long, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local> sbuf1(TPB, cgh);
-      sycl::accessor<long, 1, sycl::access_mode::read_write,
-                     sycl::access::target::local> sbuf2(TPB, cgh);
+      sycl::local_accessor<int, 0> sm_start(cgh);
+      sycl::local_accessor<int, 0> sm_top(cgh);
+      sycl::local_accessor<long, 1> sbuf1(TPB, cgh);
+      sycl::local_accessor<long, 1> sbuf2(TPB, cgh);
 
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws),
-          [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(32)]] {
-            MPCdecompress(
-                d_in, d_out, d_offs, item, sm_start.get_pointer(),
-                sm_top.get_pointer(), sbuf1.get_pointer(),
-                sbuf2.get_pointer());
+      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+        MPCdecompress(
+            d_in, d_out, d_offs, item,
+            sm_start, sm_top,
+            sbuf1.get_multi_ptr<sycl::access::decorated::no>().get(),
+            sbuf2.get_multi_ptr<sycl::access::decorated::no>().get());
       });
     }).wait();
 
