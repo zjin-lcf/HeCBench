@@ -17,6 +17,10 @@ int main(int argc, char *argv[]) {
     } else if (argc == 3) {
         in = fopen(argv[1], "r");
         out = fopen(argv[2], "w");
+        if (in == nullptr || out == nullptr) {
+          fprintf(stderr, "ERROR: failed to open the input or output file\n");
+          return 1;
+        }
     } else {
         fprintf(stderr, "ERROR: %s [infile] [outfile]\n",
                 argv[0]);

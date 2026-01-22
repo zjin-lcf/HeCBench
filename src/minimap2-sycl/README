@@ -1,0 +1,5 @@
+Unzip the data "in-1k.txt.tar.gz" before running the program
+
+./main in-1k.txt kernel-out.txt
+
+The output of the program is saved in "kernel-out.txt". It should match the file "out-1k.txt".
