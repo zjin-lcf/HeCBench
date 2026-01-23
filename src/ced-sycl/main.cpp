@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
         q.submit([&] (sycl::handler &cgh) {
           auto data = d_in_out.get_access<sycl::access::mode::read>(cgh);
           auto out = d_interm_gpu_proxy.get_access<sycl::access::mode::discard_write>(cgh);
-          auto gaus = d_gaus.get_access<sycl::access::mode::read, sycl::access::target::constant_buffer>(cgh);
+          auto gaus = d_gaus.get_access<sycl::access::mode::read, sycl::access::target::device>(cgh);
           sycl::local_accessor<int, 1> l_data(sycl::range<1>((threads+2)*(threads+2)), cgh);
           cgh.parallel_for<class gaussian>(
             sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
@@ -289,8 +289,8 @@ int main(int argc, char **argv) {
           auto data = d_interm_gpu_proxy.get_access<sycl::access::mode::read>(cgh);
           auto out = d_in_out.get_access<sycl::access::mode::discard_write>(cgh);
           auto theta = d_theta_gpu_proxy.get_access<sycl::access::mode::discard_write>(cgh);
-          auto sobx = d_sobx.get_access<sycl::access::mode::read, sycl::access::target::constant_buffer>(cgh);
-          auto soby = d_soby.get_access<sycl::access::mode::read, sycl::access::target::constant_buffer>(cgh);
+          auto sobx = d_sobx.get_access<sycl::access::mode::read, sycl::access::target::device>(cgh);
+          auto soby = d_soby.get_access<sycl::access::mode::read, sycl::access::target::device>(cgh);
           sycl::local_accessor<int, 1> l_data(sycl::range<1>((threads+2)*(threads+2)), cgh);
           cgh.parallel_for<class sobel>(
             sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
