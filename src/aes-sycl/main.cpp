@@ -5,7 +5,7 @@
 #include <sycl/sycl.hpp>
 
 using uchar4 = sycl::uchar4;
-using uchar = sycl::uchar;
+using uchar = unsigned char;
 
 #include "SDKBitMap.h"
 #include "aes.h"
