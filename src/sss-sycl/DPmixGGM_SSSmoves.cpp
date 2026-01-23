@@ -291,14 +291,13 @@ int updateOneEdgeInOneG(myInt l, myInt nBestLeft, LPGraph G, myInt *xi, State a,
     short *device_d_in_add = device.d_in_add;
     short *device_d_which_add = device.d_which_add;
 
-    cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(device.n_add) *
-                                       sycl::range<1>(BLOCK_SIZE),
+    cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(device.n_add * BLOCK_SIZE),
                                        sycl::range<1>(BLOCK_SIZE)),
       [=](sycl::nd_item<1> item) {
       CanAddEdge(device_d_in_delete, device_d_in_add,
                  device_d_which_add, item,
-                 shmem_acc.get_pointer(), nS_acc,
-                 pR_acc, pT_acc, contain_a_acc,
+                 shmem_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                 nS_acc, pR_acc, pT_acc, contain_a_acc,
                  contain_b_acc, aSi_acc, bSi_acc,
                  common_parent_acc, a_acc, b_acc,
                  flag_acc);
