@@ -541,7 +541,7 @@ std::vector<float> bc_gpu(
         endpoints_len_sm,
         sp_calc_done_sm,
         next_index_sm,
-        diameter_keys_sm.get_pointer());
+        diameter_keys_sm.get_multi_ptr<sycl::access::decorated::no>().get());
      });
   }).wait();
 
