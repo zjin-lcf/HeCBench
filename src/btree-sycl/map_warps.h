@@ -30,8 +30,14 @@ namespace warps {
 #define KEY_PIVOT_MASK 0xAAAAAAA8
 #define PIVOT_KEY_MASK 0x55555554
 #define getAddressPtr(address) (d_pool + address * 32)
-#define allocate() \
-   sycl::atomic<uint32_t>(sycl::global_ptr<uint32_t>(d_count)).fetch_add(1)
+
+inline uint32_t atomicAdd(uint32_t *d_count) {
+  auto ao = sycl::atomic_ref<uint32_t, \
+            sycl::memory_order::relaxed, \
+            sycl::memory_scope::device, \
+            sycl::access::address_space::global_space> (*d_count);
+  return ao.fetch_add(1);
+}
 
 inline uint32_t volatileRead(uint32_t *address) {
   uint32_t data;
@@ -207,7 +213,7 @@ inline bool split_node1(uint32_t myParent, uint32_t src_key,
 
   uint32_t rightIdx;
   if (!lane_id(item)) {
-    rightIdx = allocate();
+    rightIdx = atomicAdd(d_count);
   }
 
   rightIdx = sycl::select_from_group(sg, rightIdx, 0);
@@ -260,8 +266,8 @@ inline void split_root_node(uint32_t src_key, uint32_t &nodeIdx,
   uint32_t leftIdx, rightIdx;
 
   if (!lane_id(item)) {
-    leftIdx = allocate();
-    rightIdx = allocate();
+    leftIdx = atomicAdd(d_count);
+    rightIdx = atomicAdd(d_count);
   }
 
   auto sg = item.get_sub_group();

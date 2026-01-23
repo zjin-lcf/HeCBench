@@ -61,7 +61,7 @@ void init_btree(uint32_t *__restrict d_root,
 
   uint32_t root_id;
   if (laneId == 0)
-    root_id = allocate();
+    root_id = warps::atomicAdd(d_count);
 
   root_id = sycl::select_from_group(item.get_sub_group(), root_id, 0);
 
