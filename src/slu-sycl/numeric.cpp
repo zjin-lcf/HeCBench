@@ -1,8 +1,8 @@
-#include <iostream>
 #include <cmath>
+#include <iostream>
+#include <sycl/sycl.hpp>
 #include "symbolic.h"
 #include "Timer.h"
-#include <sycl/sycl.hpp>
 
 #define TMPMEMNUM  10353
 
@@ -432,7 +432,7 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
             cgh.parallel_for<class RLk>(
               sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
               RL(item,
-                 sm.get_pointer(),
+                 sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                  sym_c_ptr_dev,
                  sym_r_idx_dev,
                  val_dev,
@@ -454,7 +454,7 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
               sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
               RL_perturb(
                 item,
-                sm.get_pointer(),
+                sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                 sym_c_ptr_dev,
                 sym_r_idx_dev,
                 val_dev,
@@ -488,7 +488,7 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
             cgh.parallel_for<class RLk2>(
               sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
               RL(item,
-                 sm.get_pointer(),
+                 sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                  sym_c_ptr_dev,
                  sym_r_idx_dev,
                  val_dev,
@@ -510,7 +510,7 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
               sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
               RL_perturb(
                 item,
-                sm.get_pointer(),
+                sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                 sym_c_ptr_dev,
                 sym_r_idx_dev,
                 val_dev,
@@ -543,7 +543,7 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
             cgh.parallel_for<class RLk3>(
               sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
               RL(item,
-                 sm.get_pointer(),
+                 sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                  sym_c_ptr_dev,
                  sym_r_idx_dev,
                  val_dev,
@@ -565,7 +565,7 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
               sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
               RL_perturb(
                 item,
-                sm.get_pointer(),
+                sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                 sym_c_ptr_dev,
                 sym_r_idx_dev,
                 val_dev,
@@ -634,7 +634,7 @@ void LUonDevice(Symbolic_Matrix &A_sym, std::ostream &out, std::ostream &err, bo
                   sycl::nd_range<1>(256*subMatSize, 256), [=] (sycl::nd_item<1> item) {
                   RL_onecol_updateSubmat(
                     item,
-                    sm.get_pointer(),
+                    sm.get_multi_ptr<sycl::access::decorated::no>().get(),
                     sym_c_ptr_dev,
                     sym_r_idx_dev,
                     val_dev,
