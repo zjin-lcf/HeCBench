@@ -15,7 +15,8 @@ Boost: hbc, ge-spmm, mmcsf, warpsort, gerbil<br>
 MPI:   miniDGS, miniWeather, pingpong, sparkler, allreduce, ccl, halo-finder<br>
 CCL:   ccl<br>
 GSL:   sss, xlqc<br>
-GDAL:  stsg
+GDAL:  stsg<br>
+BZip2: gerbil
 
 # Benchmark categories
 Each benchmark falls into a single category. While such classification is not accurate, the arrangement serves as a starting point for users of the benchmark suite. Please see the Reference for more information about each benchmark. 
