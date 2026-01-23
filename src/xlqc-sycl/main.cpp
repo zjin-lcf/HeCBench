@@ -440,20 +440,22 @@ int main(int argc, char* argv[])
       q.submit([&] (sycl::handler &cgh) {
         sycl::local_accessor<double, 1> smem (sycl::range<1>(BLOCKSIZE * BLOCKSIZE), cgh);
         cgh.parallel_for<class matJ_dp>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-          cuda_mat_J_PI_dp(item, smem.get_pointer(),
-                        d_pbf_xlec,
-                        d_pbf_to_cbf,
-                        n_pbf,
-                        d_mat_D,
-                        d_mat_J_PI,
-                        d_mat_Q);
+          cuda_mat_J_PI_dp(item,
+                           smem.get_multi_ptr<sycl::access::decorated::no>().get(),
+                           d_pbf_xlec,
+                           d_pbf_to_cbf,
+                           n_pbf,
+                           d_mat_D,
+                           d_mat_J_PI,
+                           d_mat_Q);
         });
       });
     } else {
       q.submit([&] (sycl::handler &cgh) {
         sycl::local_accessor<double, 1> smem (sycl::range<1>(BLOCKSIZE * BLOCKSIZE), cgh);
         cgh.parallel_for<class matJ>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-          cuda_mat_J_PI(item, smem.get_pointer(),
+          cuda_mat_J_PI(item,
+                        smem.get_multi_ptr<sycl::access::decorated::no>().get(),
                         d_pbf_xlec,
                         d_pbf_to_cbf,
                         n_pbf,
@@ -478,20 +480,22 @@ int main(int argc, char* argv[])
       q.submit([&] (sycl::handler &cgh) {
         sycl::local_accessor<double, 1> smem (sycl::range<1>(BLOCKSIZE * BLOCKSIZE), cgh);
         cgh.parallel_for<class matK_dp>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-          cuda_mat_K_PI_dp(item, smem.get_pointer(),
-                        d_pbf_xlec,
-                        d_pbf_to_cbf,
-                        n_pbf,
-                        d_mat_D,
-                        d_mat_K_PI,
-                        d_mat_Q);
+          cuda_mat_K_PI_dp(item,
+                           smem.get_multi_ptr<sycl::access::decorated::no>().get(),
+                           d_pbf_xlec,
+                           d_pbf_to_cbf,
+                           n_pbf,
+                           d_mat_D,
+                           d_mat_K_PI,
+                           d_mat_Q);
         });
       });
     } else {
       q.submit([&] (sycl::handler &cgh) {
         sycl::local_accessor<double, 1> smem (sycl::range<1>(BLOCKSIZE * BLOCKSIZE), cgh);
         cgh.parallel_for<class matK>(sycl::nd_range<2>(gws, lws), [=] (sycl::nd_item<2> item) {
-          cuda_mat_K_PI(item, smem.get_pointer(),
+          cuda_mat_K_PI(item,
+                        smem.get_multi_ptr<sycl::access::decorated::no>().get(),
                         d_pbf_xlec,
                         d_pbf_to_cbf,
                         n_pbf,
