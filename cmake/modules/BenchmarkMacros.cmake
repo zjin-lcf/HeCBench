@@ -20,6 +20,9 @@ set(DEPEND_ON_GDAL "stsg")
 # Global list for benchmarks that require NCCL
 set(DEPEND_ON_NCCL "ccl-cuda")
 
+# Global list for benchmarks that require BZip2
+set(DEPEND_ON_BZIP2 "gerbil")
+
 # Global list for SYCL benchmarks that require C++20
 set(DEPEND_ON_CXX20 "adamw-sycl" "zmddft-sycl")
 
@@ -123,6 +126,16 @@ function(add_hecbench_benchmark)
     if(${BENCH_NAME} IN_LIST DEPEND_ON_GDAL)
         if(NOT GDAL_FOUND)
             message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (GDAL not found)")
+            return()
+        endif()
+    endif()
+
+    if(${BENCH_NAME} IN_LIST DEPEND_ON_BZIP2)
+        if(BZip2_FOUND)
+            message(STATUS "BZip2 found: ${BZIP2_INCLUDE_DIRS}")
+            include_directories(${BZIP2_INCLUDE_DIRS})
+        else()
+            message(STATUS "Skipping ${BENCH_NAME}-${BENCH_MODEL_LOWER} (BZip2 not found)")
             return()
         endif()
     endif()
