@@ -108,7 +108,8 @@ cmake --preset hip-gfx90a
 cmake --build build/hip-gfx90a --target attention-hip
 
 # Build only SYCL XPU version of attention
-cmake -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx --preset sycl-xpu
+source /opt/intel/oneapi/setvars.sh
+cmake --preset sycl-xpu
 cmake --build build/sycl-xpu --target attention-sycl
 ```
 
