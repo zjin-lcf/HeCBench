@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../rng-wallace-cuda
 
 # Linker Flags
 LDFLAGS = 
@@ -46,7 +46,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu wallace_kernel.cu constants.h rand_helpers.h Makefile
+%.o: %.cu ../rng-wallace-cuda/wallace_kernel.h constants.h rand_helpers.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

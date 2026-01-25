@@ -7,7 +7,8 @@
 
 #include "rand_helpers.h"
 #include "constants.h"
-#include "wallace_kernel.cu"
+#include "wallace_kernel.h"
+#include "reference.h"
 
 int main(int argc, char* argv[]) {
   if (argc != 2) {
@@ -18,9 +19,11 @@ int main(int argc, char* argv[]) {
 
   // host buffers
   float *hostPool = (float *) malloc(4 * WALLACE_TOTAL_POOL_SIZE);
+  float *Pool_ref = (float *) malloc(4 * WALLACE_TOTAL_POOL_SIZE);
+
   for (unsigned i = 0; i < WALLACE_TOTAL_POOL_SIZE; i++) {
     float x = RandN();
-    hostPool[i] = x;
+    Pool_ref[i] = hostPool[i] = x;
   }
 
   float* rngChi2Corrections = (float *) malloc(4 * WALLACE_CHI2_COUNT);
@@ -29,6 +32,7 @@ int main(int argc, char* argv[]) {
     rngChi2Corrections[i] = MakeChi2Scale(WALLACE_TOTAL_POOL_SIZE);
   }
   float* randomNumbers = (float *) malloc(4 * WALLACE_OUTPUT_SIZE);
+  float* randomNumbers_ref = (float *) malloc(4 * WALLACE_OUTPUT_SIZE);
 
   // device buffers
   float *device_randomNumbers;
@@ -46,6 +50,38 @@ int main(int argc, char* argv[]) {
   dim3 rng_wallace_threads(WALLACE_NUM_THREADS, 1, 1);
   const unsigned seed = 1;
 
+  // warmup and quick validation
+  for (int i = 0; i < 30; i++) {
+    rng_wallace <<< rng_wallace_grid, rng_wallace_threads >>> (
+        seed, devPool, device_randomNumbers, devicerngChi2Corrections);
+  }
+
+  for (int i = 0; i < 30; i++) {
+    reference(seed, Pool_ref, randomNumbers_ref, rngChi2Corrections, WALLACE_NUM_BLOCKS);
+  }
+
+  cudaMemcpy(randomNumbers, device_randomNumbers,
+             4 * WALLACE_OUTPUT_SIZE, cudaMemcpyDeviceToHost);
+  cudaMemcpy(hostPool, devPool,
+             4 * WALLACE_TOTAL_POOL_SIZE, cudaMemcpyDeviceToHost);
+
+  bool ok = true;
+  for (unsigned int n = 0; n < WALLACE_OUTPUT_SIZE; n++) {
+    if (fabsf(randomNumbers_ref[n] - randomNumbers[n]) > 1e-3f) {
+      printf("randNumbers mismatch at index %d: %f %f\n", n, randomNumbers_ref[n], randomNumbers[n]);
+      ok = false;
+      break;
+    }
+  }
+  for (unsigned int n = 0; n < WALLACE_TOTAL_POOL_SIZE; n++) {
+    if (fabsf(Pool_ref[n] - hostPool[n]) > 1e-3f) {
+      printf("Pool mismatch at index %d: %f %f\n", n, Pool_ref[n], hostPool[n]);
+      ok = false;
+      break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
@@ -59,17 +95,11 @@ int main(int argc, char* argv[]) {
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time: %f (us)\n", time * 1e-3f / repeat);
 
-  cudaMemcpy(randomNumbers, device_randomNumbers,
-             4 * WALLACE_OUTPUT_SIZE, cudaMemcpyDeviceToHost);
-#ifdef DEBUG
-  // random numbers are different for each i iteration 
-  for (unsigned int n = 0; n < WALLACE_OUTPUT_SIZE; n++) 
-    printf("%.3f\n", randomNumbers[n]);
-#endif
-
   free(rngChi2Corrections);
   free(randomNumbers);
+  free(randomNumbers_ref);
   free(hostPool);
+  free(Pool_ref);
   cudaFree(devicerngChi2Corrections);
   cudaFree(device_randomNumbers);
   cudaFree(devPool);
