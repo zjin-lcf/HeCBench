@@ -47,7 +47,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu wallace_kernel.cu constants.h rand_helpers.h Makefile
+%.o: %.cu wallace_kernel.h constants.h rand_helpers.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
