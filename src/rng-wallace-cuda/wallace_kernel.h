@@ -18,6 +18,8 @@
 // of threads.
 // ************************************************
 
+#define __mul24(a,b) ((a) * (b))
+
 __device__ void Hadamard4x4a(float &p, float &q, float &r, float &s)
 {
 	float t = (p + q + r + s) / 2.f;
@@ -37,7 +39,10 @@ __device__ void Hadamard4x4b(float &p, float &q, float &r, float &s)
 }
 
 
-__global__ void rng_wallace(unsigned m_seed, float *globalPool, float *generatedRandomNumberPool, float *chi2Corrections)
+__global__ void rng_wallace(unsigned m_seed,
+                            float *__restrict__ globalPool,
+                            float *__restrict__ generatedRandomNumberPool,
+                            const float *chi2Corrections)
 {
 
   __shared__ float pool[WALLACE_POOL_SIZE + WALLACE_CHI2_SHARED_SIZE];
@@ -59,7 +64,7 @@ __global__ void rng_wallace(unsigned m_seed, float *globalPool, float *generated
 	for (int loop = 0; loop < WALLACE_NUM_OUTPUTS_PER_RUN; loop++)
 	{
 
-		m_seed = (1664525U * m_seed + 1013904223U) & 0xFFFFFFFF;
+		m_seed = 1664525U * m_seed + 1013904223U;
 
 		unsigned intermediate_address = __mul24(loop, 8 * WALLACE_TOTAL_NUM_THREADS) + 
 			__mul24(8 * WALLACE_NUM_THREADS, blockIdx.x) + threadIdx.x;
@@ -78,7 +83,6 @@ __global__ void rng_wallace(unsigned m_seed, float *globalPool, float *generated
 		for (int i = 0; i < WALLACE_NUM_POOL_PASSES; i++)
 		{
 			unsigned seed = (m_seed + threadIdx.x) & mod_mask;
-			__syncthreads();
 			seed = (__mul24(seed, lcg_a) + lcg_c) & mod_mask;
 			rin0_0 = pool[((seed << 3))];
 			seed = (__mul24(seed, lcg_a) + lcg_c) & mod_mask;
@@ -113,8 +117,6 @@ __global__ void rng_wallace(unsigned m_seed, float *globalPool, float *generated
 			__syncthreads();
 		}
 	}
-
-	__syncthreads();
 
   #pragma unroll
 	for (int i = 0; i < 8; i++)
