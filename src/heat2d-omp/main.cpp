@@ -86,7 +86,6 @@ int main(int argc, char *argv[]) {
   float *buffer = (float*) malloc(sizeof(float)*Lx*Ly);
   float *h_out = (float*) malloc(sizeof(float)*Lx*Ly);
   float *h_in  = (float*) malloc(sizeof(float)*Lx*Ly);
-  float *d_res = (float*) malloc(sizeof(float)*Lx*Ly);
 
   int i, j, x, y;
   for (i = 0; i < Lx; i += 16) {
