@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+VERIFY    = no
 LAUNCHER  =
 
 #===============================================================================
@@ -34,6 +35,10 @@ ifeq ($(DEBUG),yes)
   LDFLAGS  += -g
 endif
 
+# Verification Flags
+ifeq ($(VERIFY),yes)
+  CFLAGS += -DDEBUG
+endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
