@@ -21,7 +21,7 @@ HIP_ARCH  = gfx908
 
 program = main
 
-source = divergence.cpp timer/timer.cpp
+source = divergence.cpp
 
 obj = $(source:.cpp=.o)
 
@@ -72,9 +72,6 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 divergence.o: divergence.cpp divergence.hpp
-	$(CC) $(CFLAGS) -c $< -o $@
-
-timer.o: timer/timer.cpp timer/timer.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

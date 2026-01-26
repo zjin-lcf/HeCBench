@@ -46,13 +46,10 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): divergence.o timer.o 
+$(program): divergence.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 divergence.o: divergence.cpp divergence.hpp Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
-
-timer.o: timer/timer.cpp timer/timer.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
