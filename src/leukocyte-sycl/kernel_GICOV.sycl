@@ -21,13 +21,13 @@
 		// Iterate across each sample point in the current stencil
 		for (n = 0; n < NPOINTS; n++) {
 			// Determine the x- and y-coordinates of the current sample point
-			y = j + tY_acc[(k * NPOINTS) + n];
-			x = i + tX_acc[(k * NPOINTS) + n];
+			y = j + d_tY[(k * NPOINTS) + n];
+			x = i + d_tX[(k * NPOINTS) + n];
 			
 			// Compute the combined gradient value at the current sample point
 			int addr = x * grad_m + y;
-			float p = grad_x_acc[addr] * cos_angle_acc[n] + 
-                                  grad_y_acc[addr] * sin_angle_acc[n];
+			float p = d_grad_x[addr] * d_cos_angle[n] +
+                                  d_grad_y[addr] * d_sin_angle[n];
 			
 			// Update the running total
 			sum += p;
@@ -49,4 +49,4 @@
 	}
 	
 	// Store the maximal GICOV value
-	gicov_acc[(i * grad_m) + j] = max_GICOV;
+	d_gicov[(i * grad_m) + j] = max_GICOV;
