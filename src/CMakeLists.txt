@@ -516,6 +516,7 @@ set(HECBENCH_POC_BENCHMARKS
     crossEntropy
     daphne
     gerbil
+    hadamard
     halo-finder
     leukocyte
     miniFE
