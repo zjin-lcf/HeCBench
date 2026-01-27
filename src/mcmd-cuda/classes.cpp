@@ -390,7 +390,11 @@ class Constants {
     int openmp_threads = 0; // parallel OpenMP feature. on if != 0.
 
 #ifdef SYCL
+#ifdef USE_GPU
     sycl::queue q {sycl::gpu_selector_v, sycl::property::queue::in_order()};
+#else
+    sycl::queue q{sycl::cpu_selector_v, sycl::property::queue::in_order()};
+#endif
 #endif
 
     // TIMING
@@ -434,7 +438,7 @@ class Pbc {
       printf(":: basis2 %.5f %.5f %.5f\n", basis[1][0], basis[1][1], basis[1][2]);
       printf(":: basis3 %.5f %.5f %.5f\n", basis[2][0], basis[2][1], basis[2][2]);
       printf(":: Basis vectors: { a = %9.5f; b = %9.5f; c = %9.5f }\n", a, b,c);
-      printf(":: Basis angles:  { α = %9.5f; β = %9.5f; γ = %9.5f }\n", alpha,beta,gamma);
+      printf(":: Basis angles:  { alpha = %9.5f; beta = %9.5f; gamma = %9.5f }\n", alpha,beta,gamma);
       printf(":: Box vertices ::\n");
       for (int n=0; n<8; n++)
         printf("   -> %i : %9.5f %9.5f %9.5f\n", n, box_vertices[n][0], box_vertices[n][1], box_vertices[n][2]);
