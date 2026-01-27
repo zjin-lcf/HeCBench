@@ -453,7 +453,7 @@ set(HECBENCH_POC_BENCHMARKS
     zeropoint
     zmddft
     zoom
-    # Final batch: remaining benchmarks (63 benchmarks)
+    # Final batch: remaining benchmarks
     addBiasQKV
     addBiasResidualLayerNorm
     allreduce
@@ -517,6 +517,7 @@ set(HECBENCH_POC_BENCHMARKS
     daphne
     gerbil
     halo-finder
+    leukocyte
     miniFE
     softmax-fused
     softmax-online
