@@ -321,7 +321,7 @@ int validate_and_print_results(Input input, double runtime, unsigned long vhash,
 			is_invalid = 0;
 		}
 		else
-			printf("Verification checksum: %lu (WARNING - INAVALID CHECKSUM!)\n", vhash);
+			printf("Verification checksum: %lu (WARNING - INVALID CHECKSUM!)\n", vhash);
 	}
 	else if( input.HM  == SMALL )
 	{
@@ -331,7 +331,7 @@ int validate_and_print_results(Input input, double runtime, unsigned long vhash,
 			is_invalid = 0;
 		}
 		else
-			printf("Verification checksum: %lu (WARNING - INAVALID CHECKSUM!)\n", vhash);
+			printf("Verification checksum: %lu (WARNING - INVALID CHECKSUM!)\n", vhash);
 	}
 
 	return is_invalid;
