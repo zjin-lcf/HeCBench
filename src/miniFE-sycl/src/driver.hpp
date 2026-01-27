@@ -305,6 +305,8 @@ driver(const Box& global_box, Box& my_box,
     //}
   }
 
+  std::cout << "Average time per iteration: " <<  cg_times[TOTAL]/num_iters << std::endl;
+
 #ifdef MINIFE_DEBUG
   write_vector("x.vec", x);
 #endif
