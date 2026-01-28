@@ -382,7 +382,7 @@ set(HECBENCH_POC_BENCHMARKS
     simpleMultiDevice
     simpleSpmv
     slit
-    #slu
+    slu
     snake
     sobel
     sobol
