@@ -139,11 +139,14 @@ MPlib        = -lmpi #$(MPdir)/lib/release/libmpi.so
 # header files,  LAlib  is defined  to be the name of  the library to be
 # used. The variable LAdir is only used for defining LAinc and LAlib.
 #
-LAdir        = /noback/5zj/llvm-ornl-m3/lapack/build32
+LAdir        = $(HOME)/lapack/build_lapack_32
 LAinc        = -I$(LAdir)/include -I$(TOPdir)/src/cuda/
-LAlib 	     = -L$(TOPdir)/src/cuda/ -ldgemm -L$(LAdir)/lib/ -lcblas -lm -lstdc++ \
-		-L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/cuda/lib64 -lcudart \
-		-L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/lib64 -lcublas
+LAlib 	     = -L$(TOPdir)/src/cuda/ -ldgemm \
+		-L$(LAdir)/lib/ -lcblas \
+		-L$(LAdir)/lib -lblas \
+		-lm -lstdc++ \
+		-L/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/cuda/lib64 -lcudart \
+		-L/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/math_libs/lib64 -lcublas
 #
 # ----------------------------------------------------------------------
 # - F77 / C interface --------------------------------------------------
@@ -222,7 +225,7 @@ HPL_DEFS     = $(F2CDEFS) $(HPL_OPTS) $(HPL_INCLUDES)
 #
 CC           = mpicc
 CCNOOPT      = $(HPL_DEFS)
-CCFLAGS      = $(HPL_DEFS) -fomit-frame-pointer -O3 -funroll-loops -W -Wall -fopenmp
+CCFLAGS      = $(HPL_DEFS) -fomit-frame-pointer -O3 -W -Wall -fopenmp
 #
 # On some platforms,  it is necessary  to use the Fortran linker to find
 # the Fortran internals used in the BLAS library.

@@ -107,15 +107,16 @@ DEFINES = -DMPI
 %.o: %.cpp
 	#mpicc -O0 -c -fPIC $(DEFINES) $*.cpp -o $*.o -I/usr/local/cuda/include
 	mpicc -O3 -c -fPIC $(DEFINES) $*.cpp -o $*.o \
-	-I/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/cuda/include \
-	-I/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/include 
+	-I$(HOME)/lapack/build_lapack_32/include \
+	-I/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/cuda/include \
+	-I/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/math_libs/include 
 
 libdgemm.so.1.0.1: $(OBJS)
 
 	#mpicc -O3 -shared -Wl,-soname,libdgemm.so.1 -o libdgemm.so.1.0.1 $(OBJS) -L/usr/local/cuda/lib64 -lcudart -lcuda -lcublas
 	mpicc -O3 -shared -Wl,-soname,libdgemm.so.1 -o libdgemm.so.1.0.1 $(OBJS) \
-	-L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/cuda/lib64 -lcudart \
-	-L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/lib64 -lcublas
+	-L/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/cuda/lib64 -lcudart \
+	-L/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/math_libs/lib64 -lcublas
 	ln -sf libdgemm.so.1.0.1 libdgemm.so.1.0
 	ln -sf libdgemm.so.1.0 libdgemm.so.1
 	ln -sf libdgemm.so.1 libdgemm.so
