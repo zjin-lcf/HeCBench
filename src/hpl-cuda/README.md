@@ -2,23 +2,21 @@ This is a workload for high performance linpack. <br />
 
 ## Dependencies
 
+cd 
 git clone https://github.com/Reference-LAPACK/lapack.git
-
 cd lapack
-
 mkdir build_lapack_32 && cd build_lapack_32
-
 cmake .. -GNinja -DCMAKE_C_COMPILER="/usr/bin/gcc" -DBUILD_SHARED_LIBS=ON -DBUILD_INDEX64=OFF -DLAPACKE=ON -DCBLAS=ON
-
+ninja
 
 ## Build and run the benchmark <br />
 cd src/hpl-2.3/ <br />
-edit the Make.inte64 to specify the paths to cblas and cublas <br />
+edit the Make.intel64 to specify the paths to cblas and cublas <br />
 make clean && make <br />
 cd bin/intel64/ <br />
 cp ../../../../datafiles/HPL_small_gpu.dat HPL.dat <br />
 export LD_LIBRARY_PATH=../../src/cuda/:$LD_LIBRARY_PATH <br />
-export LD_LIBRARY_PATH=/path/to/build_lapack_32:$LD_LIBRARY_PATH <br />
+export LD_LIBRARY_PATH=$HOME/lapack/build_lapack_32:$LD_LIBRARY_PATH <br />
 mpirun -n 1 ./xhpl <br />
 
 

@@ -107,7 +107,9 @@
 #include <iostream>
 #endif
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 void dpcpp_dgemm(const int ORDER, const int TRANSA, const int TRANSB,
                  const int M, const int N, const int K, const double ALPHA,
@@ -117,7 +119,9 @@ void dpcpp_dgemm(const int ORDER, const int TRANSA, const int TRANSB,
 void dpcpp_dtrsm(int HPL_ORDER, int HPL_SIDE, int HPL_UPLO, int HPL_TRANS,
                  int HPL_DIAG, const int, const int, const double,
                  const double *, const int, double *, const int);
+#ifdef __cplusplus
 }
+#endif
 
 void dpcpp_dgemm(const int ORDER, const int TRANSA, const int TRANSB,
                  const int M, const int N, const int K, const double ALPHA,
