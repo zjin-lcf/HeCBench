@@ -3,7 +3,7 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = amdclang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
