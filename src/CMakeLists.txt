@@ -520,6 +520,7 @@ set(HECBENCH_POC_BENCHMARKS
     halo-finder
     leukocyte
     miniFE
+    saxpy-ompt
     softmax-fused
     softmax-online
     tridiagonal
