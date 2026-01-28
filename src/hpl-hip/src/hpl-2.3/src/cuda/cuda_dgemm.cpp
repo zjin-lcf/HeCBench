@@ -109,7 +109,9 @@
 #include <iostream>
 #endif
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
     void dpcpp_dgemm 
         (   const int ORDER,
@@ -132,7 +134,9 @@ extern "C" {
        const int,
        double *,
        const int);
+#ifdef __cplusplus
 }
+#endif
 
 
 void dpcpp_dgemm 
