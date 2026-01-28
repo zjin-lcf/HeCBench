@@ -139,9 +139,13 @@ MPlib        = -lmpi #$(MPdir)/lib/release/libmpi.so
 # header files,  LAlib  is defined  to be the name of  the library to be
 # used. The variable LAdir is only used for defining LAinc and LAlib.
 #
-LAdir        = /noback/5zj/llvm-ornl-m3/lapack/build32
+LAdir        = $(HOME)/lapack/build_lapack_32
 LAinc        = -I$(LAdir)/include -I$(TOPdir)/src/cuda/
-LAlib 	     = -L$(TOPdir)/src/cuda/ -ldgemm -L$(LAdir)/lib/ -lcblas -lm -lstdc++ -L/opt/rocm/lib/ -lhipblas 
+LAlib 	     = -L$(TOPdir)/src/cuda/ -ldgemm \
+		-L$(LAdir)/lib/ -lcblas \
+		-L$(LAdir)/lib -lblas \
+		-lm -lstdc++ \
+		-L/opt/rocm/lib/ -lhipblas 
 #
 # ----------------------------------------------------------------------
 # - F77 / C interface --------------------------------------------------
