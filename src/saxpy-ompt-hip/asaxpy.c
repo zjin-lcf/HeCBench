@@ -22,7 +22,7 @@
 #include <time.h>
 #include <omp.h>
 #include <hip/hip_runtime.h>
-#include <hipblas.h>
+#include <hipblas/hipblas.h>
 #include "wtcalc.h"
 #include "asaxpy.h"
 
