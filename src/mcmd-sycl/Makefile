@@ -9,7 +9,6 @@ DEBUG     = no
 VERIFY    = no
 LAUNCHER  =
 
-# if GPU = no, then -DSYCL has not effect
 GPU       = yes
 CUDA      = no
 CUDA_ARCH = sm_70
@@ -32,7 +31,7 @@ obj = main.o force_kernel.o
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I../mcmd-cuda -fsycl \
           --gcc-toolchain=$(GCC_TOOLCHAIN) \
           -D_MWAITXINTRIN_H_INCLUDED -D_FORCE_INLINES -D__STRICT_ANSI__ \
-          -DSYCL
+          -DSYCL -DGPU
 
 ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS_TMP := $(CFLAGS)
@@ -43,7 +42,7 @@ endif
 LDFLAGS = 
 
 ifeq ($(GPU),yes)
-  CFLAGS += -DGPU
+  CFLAGS += -DUSE_GPU
 endif
 
 ifeq ($(CUDA), yes)
