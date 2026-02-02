@@ -205,41 +205,18 @@ build/<preset>/bin/<model>/
 CUDA_VISIBLE_DEVICES=0 ./build/cuda-sm80/bin/cuda/attention
 ```
 
-## Migration Status
-
-The CMake build system migration is **98% complete**:
-
-| Metric | Count |
-|--------|-------|
-| Total benchmark implementations | 1,818 |
-| Converted to CMake | **1,790** |
-| Remaining | 28 |
-| Coverage | **98.5%** |
-
-### Converted Benchmarks
-
-**497 of 508 unique benchmarks** now have CMake support across their implementations:
-- CUDA: ~495 benchmarks
-- HIP: ~490 benchmarks
-- SYCL: ~475 benchmarks
-- OpenMP: ~320 benchmarks
-
 ### Benchmarks Not Yet Converted
 
-The following 11 benchmarks (28 implementations) have complex dependencies that require additional work:
+The following benchmarks do not support CMake build.
 
 | Benchmark | Variants | Reason |
 |-----------|----------|--------|
-| `convolutionDeformable` | cuda, hip, sycl | Python/PyTorch extension (setup.py build) |
+| `convolutioneformable` | cuda, hip, sycl | Python/PyTorch extension (setup.py build) |
 | `dwconv1d` | cuda, hip, sycl | Python/PyTorch extension (run.py build) |
-| `gerbil` | cuda, hip | Requires Boost libraries |
-| `halo-finder` | cuda, hip, sycl | MPI dependency + complex archive build |
-| `hpl` | cuda, hip, sycl | HPL benchmark with external dependencies |
-| `leukocyte` | cuda, hip, sycl, omp | External meschach library (requires pre-build) |
+| `dp` | cuda | Requires nvc++ compiler |
+| `hpl` | cuda, hip, sycl | complex workflow |
 | `miniDGS` | cuda | MPI + ParMetis dependency |
-| `miniFE` | cuda, hip, sycl, omp | Script-based build (get_common_files, generate_info_header) |
-| `saxpy-ompt` | cuda, hip, sycl | Requires nvc++ compiler (OpenMP target offload) |
-| `slu` | cuda | External nicslu library |
+| `saxpy-ompt` | cuda, hip | Requires nvc++ compiler and amdclang++ (OpenMP target offload) |
 
 These benchmarks still work with their original Makefiles.
 
