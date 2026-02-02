@@ -5,7 +5,6 @@ from __future__ import division
 
 import time
 import torch
-import intel_extension_for_pytorch
 from dcn_v2 import DCN
 
 def example_dconv():

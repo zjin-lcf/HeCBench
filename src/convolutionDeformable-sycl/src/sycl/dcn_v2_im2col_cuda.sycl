@@ -338,9 +338,8 @@ void modulated_deformable_im2col_cuda(
   // num_axes should be smaller than block size
   const int channel_per_deformable_group = channels / deformable_group;
   const int num_kernels = channels * batch_size * height_col * width_col;
-  stream.parallel_for(
-      sycl::nd_range<3>(sycl::range<3>(1, 1, GET_BLOCKS(num_kernels)) *
-                        sycl::range<3>(1, 1, NUM_THREADS),
+  stream.parallel_for<class modulated_deformable_im2col>(
+      sycl::nd_range<3>(sycl::range<3>(1, 1, GET_BLOCKS(num_kernels) * NUM_THREADS),
                         sycl::range<3>(1, 1, NUM_THREADS)),
       [=](sycl::nd_item<3> item) {
         modulated_deformable_im2col_gpu_kernel(
@@ -363,9 +362,8 @@ void modulated_deformable_col2im_cuda(
 
   const int channel_per_deformable_group = channels / deformable_group;
   const int num_kernels = channels * kernel_h * kernel_w * batch_size * height_col * width_col;
-  stream.parallel_for(
-      sycl::nd_range<3>(sycl::range<3>(1, 1, GET_BLOCKS(num_kernels)) *
-                        sycl::range<3>(1, 1, NUM_THREADS),
+  stream.parallel_for<class modulated_deformable_col2im>(
+      sycl::nd_range<3>(sycl::range<3>(1, 1, GET_BLOCKS(num_kernels) * NUM_THREADS),
                         sycl::range<3>(1, 1, NUM_THREADS)),
       [=](sycl::nd_item<3> item) {
         modulated_deformable_col2im_gpu_kernel(
@@ -386,9 +384,8 @@ void modulated_deformable_col2im_coord_cuda(
     const int deformable_group, float *grad_offset, float *grad_mask) {
   const int num_kernels = batch_size * height_col * width_col * 2 * kernel_h * kernel_w * deformable_group;
   const int channel_per_deformable_group = channels * kernel_h * kernel_w / deformable_group;
-  stream.parallel_for(
-      sycl::nd_range<3>(sycl::range<3>(1, 1, GET_BLOCKS(num_kernels)) *
-                        sycl::range<3>(1, 1, NUM_THREADS),
+  stream.parallel_for<class modulated_deformable_col2im_coord>(
+      sycl::nd_range<3>(sycl::range<3>(1, 1, GET_BLOCKS(num_kernels) * NUM_THREADS),
                         sycl::range<3>(1, 1, NUM_THREADS)),
       [=](sycl::nd_item<3> item) {
         modulated_deformable_col2im_coord_gpu_kernel(
