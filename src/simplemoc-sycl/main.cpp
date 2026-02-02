@@ -557,7 +557,6 @@ int main( int argc, char * argv[] )
   printf("Simulation Complete.\n");
 
 #ifdef VERIFY
-  int egroups = I->egroups;
   const float* q0 = simd_vecs_debug;
   const float* q1 = simd_vecs_debug + egroups;
   const float* q2 = simd_vecs_debug + egroups * 2;

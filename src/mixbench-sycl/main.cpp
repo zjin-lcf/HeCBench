@@ -44,7 +44,7 @@ void benchmark_func(sycl::nd_item<1> &item,
   }
 }
 
-void mixbenchGPU(long size, int repeat) {
+void mixbenchGPU(long size, int compute_iterations, int repeat) {
   const char *benchtype = "compute with global memory (block strided)";
   printf("Trade-off type:%s\n", benchtype);
   float *cd = (float*) malloc (size*sizeof(float));
@@ -70,7 +70,7 @@ void mixbenchGPU(long size, int repeat) {
     q.submit([&](sycl::handler &h) {
       h.parallel_for<class mixbench_warmup>(
         sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        benchmark_func(item, d_cd, i);
+        benchmark_func(item, d_cd, compute_iterations);
       });
     });
   }
@@ -82,7 +82,7 @@ void mixbenchGPU(long size, int repeat) {
     q.submit([&](sycl::handler &h) {
       h.parallel_for<class mixbench_timing>(
         sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        benchmark_func(item, d_cd, i);
+        benchmark_func(item, d_cd, compute_iterations);
       });
     });
   }
@@ -113,17 +113,18 @@ void mixbenchGPU(long size, int repeat) {
 
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <compute iterations> <repeat>\n", argv[0]);
     return 1;
   }
-  const int repeat = atoi(argv[1]);
+  const int compute_iterations = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
 
   unsigned int datasize = VECTOR_SIZE*sizeof(float);
 
   printf("Buffer size: %dMB\n", datasize/(1024*1024));
 
-  mixbenchGPU(VECTOR_SIZE, repeat);
+  mixbenchGPU(VECTOR_SIZE, compute_iterations, repeat);
 
   return 0;
 }

@@ -47,7 +47,7 @@ __global__ void benchmark_func(float *g_data,
   }
 }
 
-void mixbenchGPU(long size, int repeat) {
+void mixbenchGPU(long size, int compute_iterations, int repeat) {
   const char *benchtype = "compute with global memory (block strided)";
   printf("Trade-off type:%s\n", benchtype);
   float *cd = (float*) malloc (size*sizeof(float));
@@ -63,14 +63,14 @@ void mixbenchGPU(long size, int repeat) {
 
   // warmup
   for (int i = 0; i < repeat; i++) {
-    benchmark_func<<<grid_dim, block_dim>>>(d_cd, i);
+    benchmark_func<<<grid_dim, block_dim>>>(d_cd, compute_iterations);
   }
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    benchmark_func<<<grid_dim, block_dim>>>(d_cd, i);
+    benchmark_func<<<grid_dim, block_dim>>>(d_cd, compute_iterations);
   }
 
   cudaDeviceSynchronize();
@@ -98,17 +98,18 @@ void mixbenchGPU(long size, int repeat) {
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <compute iterations> <repeat>\n", argv[0]);
     return 1;
   }
-  const int repeat = atoi(argv[1]);
+  const int compute_iterations = atoi(argv[1]);
+  const int repeat = atoi(argv[2]);
 
   unsigned int datasize = VECTOR_SIZE*sizeof(float);
 
   printf("Buffer size: %dMB\n", datasize/(1024*1024));
 
-  mixbenchGPU(VECTOR_SIZE, repeat);
+  mixbenchGPU(VECTOR_SIZE, compute_iterations, repeat);
 
   return 0;
 }

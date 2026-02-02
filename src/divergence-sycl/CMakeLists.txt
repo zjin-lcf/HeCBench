@@ -3,6 +3,6 @@
 add_hecbench_benchmark(
     NAME divergence
     MODEL sycl
-    SOURCES divergence.cpp timer/timer.cpp
+    SOURCES divergence.cpp
     CATEGORIES algorithms
 )

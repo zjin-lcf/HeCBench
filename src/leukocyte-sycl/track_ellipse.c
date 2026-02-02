@@ -4,9 +4,9 @@
 #include "matrix.h"
 #include "helper.h"
 
-extern void IMGVF_SYCL(cl::sycl::queue &q, MAT **I, MAT **IMGVF, double vx, double vy, double e, int max_iterations, double cutoff, int Nc);
+extern void IMGVF_SYCL(sycl::queue &q, MAT **I, MAT **IMGVF, double vx, double vy, double e, int max_iterations, double cutoff, int Nc);
 
-void ellipsetrack(cl::sycl::queue &q, avi_t *video, double *xc0, double *yc0, int Nc, int R, int Np, int Nf) {
+void ellipsetrack(sycl::queue &q, avi_t *video, double *xc0, double *yc0, int Nc, int R, int Np, int Nf) {
 	/*
 	% ELLIPSETRACK tracks cells in the movie specified by 'video', at
 	%  locations 'xc0'/'yc0' with radii R using an ellipse with Np discrete
@@ -237,7 +237,7 @@ void ellipsetrack(cl::sycl::queue &q, avi_t *video, double *xc0, double *yc0, in
 }
 
 
-MAT **MGVF(cl::sycl::queue &q, MAT **IE, double vx, double vy, int Nc) {
+MAT **MGVF(sycl::queue &q, MAT **IE, double vx, double vy, int Nc) {
 	/*
 	% MGVF calculate the motion gradient vector flow (MGVF) 
 	%  for the image 'I'
