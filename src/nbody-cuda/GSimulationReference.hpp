@@ -19,7 +19,7 @@ void accelerate_particles_ref( Particle* p, const int n, const float kSofteningS
 
       distance_sqr =
         dx * dx + dy * dy + dz * dz + kSofteningSquared;  // 6flops
-      distance_inv = 1.0f / sqrt(distance_sqr);       // 1div+1sqrt
+      distance_inv = 1.0f / std::sqrt(distance_sqr);       // 1div+1sqrt
 
       acc0 += dx * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
       acc1 += dy * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
@@ -98,6 +98,6 @@ void GSimulation::Verify() {
     ref_kenergy_ = 0.5 * energy[0];
   }  // end of the time step loop
   std::cout << "\n";
-  bool ok = fabsf(kenergy_ - ref_kenergy_) < 1e-1f;
+  bool ok = fabsf(kenergy_ - ref_kenergy_) < 1e-3f;
   printf("%s\n", ok ? "PASS" : "FAIL");
 }
