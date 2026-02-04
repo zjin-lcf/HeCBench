@@ -72,7 +72,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../layernorm-cuda/reference.h
+%.o: %.cpp ../layernorm-cuda/reference.h common.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
