@@ -81,12 +81,11 @@ int main(int argc, char **argv) {
 
   permuate_cpu(inp, q, k, v, B, T, C, NH);
 
-  int block_sizes[] = {32, 64, 128, 256, 512};
+  int block_sizes[] = {32, 64, 128, 256, 512, 1024};
 
   #pragma omp target data map(to: inp[0:S*3]) map(alloc: out[0:S*3])
   {
-    for (size_t j = 0; j < sizeof(block_sizes) / sizeof(int); j++) {
-      int block_size = block_sizes[j];
+    for (int block_size : block_sizes) {
       printf("Checking block size %d.\n", block_size);
       permute (out, inp, B, T, C, NH, block_size);
       validate_result(out, q, "q", S, 1e-6f);
@@ -96,8 +95,7 @@ int main(int argc, char **argv) {
     printf("All results match. Starting benchmarks.\n\n");
 
     // benchmark speed of the kernel
-    for (size_t j = 0; j < sizeof(block_sizes) / sizeof(int); j++) {
-      int block_size = block_sizes[j];
+    for (int block_size : block_sizes) {
       float elapsed_time = benchmark_kernel(repeat_times, permute,
           out, inp, B, T, C, NH, block_size);
 
