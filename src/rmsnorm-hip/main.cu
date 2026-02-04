@@ -105,8 +105,7 @@ int main(int argc, char **argv) {
   rmsnorm_forward_cpu(out, inp, gamma, N, H);
 
   // check the correctness of the kernel at all block sizes
-  for (size_t j = 0; j < sizeof(block_sizes) / sizeof(int); j++) {
-      int block_size = block_sizes[j];
+  for (int block_size : block_sizes) {
       printf("Checking block size %d.\n", block_size);
 
       rmsnorm_forward(d_inp, d_gamma, d_out, H, N, 1e-5f, block_size);
@@ -117,8 +116,7 @@ int main(int argc, char **argv) {
   printf("All results match. Starting benchmarks.\n\n");
 
   // time the kernel at different block sizes
-  for (size_t j = 0; j < sizeof(block_sizes) / sizeof(int); j++) {
-    int block_size = block_sizes[j];
+  for (int block_size : block_sizes) {
 
     auto start = std::chrono::high_resolution_clock::now();
 
