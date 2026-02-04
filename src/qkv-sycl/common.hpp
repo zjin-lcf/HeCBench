@@ -11,7 +11,7 @@ sycl::queue q;
 float* make_random_float(size_t N) {
     float* arr = (float*)malloc(N * sizeof(float));
     for (size_t i = 0; i < N; i++) {
-        arr[i] = ((float)rand() / RAND_MAX) * 2.0 - 1.0; // range -1..1
+        arr[i] = rand() / (float)RAND_MAX * 2.f - 1.f; // range -1..1
     }
     return arr;
 }
