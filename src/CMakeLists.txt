@@ -521,6 +521,7 @@ set(HECBENCH_POC_BENCHMARKS
     halo-finder
     leukocyte
     miniFE
+    rmsnorm
     saxpy-ompt
     softmax-fused
     softmax-online
