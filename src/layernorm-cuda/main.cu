@@ -195,8 +195,7 @@ int main(int argc, char **argv) {
     layernorm_forward_cpu(out, mean, rstd, inp, weight, bias, B, T, C);
 
     // check the correctness of the kernel at all block sizes
-    for (int j = 0; j < sizeof(block_sizes) / sizeof(int); j++) {
-        int block_size = block_sizes[j];
+    for (int block_size : block_sizes) {
         printf("Checking block size %d.\n", block_size);
 
         layernorm_forward(kernel_num, d_out, d_mean, d_rstd, d_inp, d_weight, d_bias, B, T, C, block_size);
@@ -209,8 +208,7 @@ int main(int argc, char **argv) {
     printf("All results match. Starting benchmarks.\n\n");
 
     // time the kernel at different block sizes
-    for (int j = 0; j < sizeof(block_sizes) / sizeof(int); j++) {
-        int block_size = block_sizes[j];
+    for (int block_size : block_sizes) {
 
         int repeat_times = 2000;
         float elapsed_time = benchmark_kernel(repeat_times, layernorm_forward,
