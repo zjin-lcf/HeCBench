@@ -69,7 +69,7 @@ void permute (float* out, const float* inp,
   int total_threads = B * T * C;
   int num_blocks = ceil_div(total_threads, block_size);
   permute_kernel<<<num_blocks, block_size>>>(Q, K, V, inp, B, T, NH, HS);
-  hipDeviceSynchronize();
+  hipCheck(hipDeviceSynchronize());
 }
 
 int main(int argc, char **argv) {
