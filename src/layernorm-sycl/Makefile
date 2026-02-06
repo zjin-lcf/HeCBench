@@ -30,7 +30,8 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../layernorm-cuda  -fsycl \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../layernorm-cuda \
+          -I../rmsnorm-sycl -fsycl \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
@@ -72,12 +73,14 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../layernorm-cuda/reference.h common.hpp
+%.o: %.cpp ../layernorm-cuda/reference.h \
+           ../rmsnorm-sycl/utils.h \
+           common.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 1
-	$(LAUNCHER) ./$(program) 2
+	$(LAUNCHER) ./$(program) 8 1024 768 2000
+	$(LAUNCHER) ./$(program) 8 1024 12288 2000

@@ -7,6 +7,75 @@ Kernels for layernorm forward pass.
 #include <cassert>
 #include "common.hpp"
 #include "reference.h"
+#include "utils.h"
+
+template <int UNROLL, int THREADS_PER_WARP>
+void layernorm_forward_kernel0(sycl::nd_item<1> &item,
+                               float* __restrict__ out, float* __restrict__ mean, float* __restrict__ rstd,
+                               const float*  __restrict__ inp, const float*  __restrict__ weight,
+                               const float* __restrict__ bias, int N, int C)
+{
+    const int BLOCKSIZE = item.get_local_range(0);
+    const int bid = item.get_group(0);
+    const int warp_id = item.get_local_id(0) / THREADS_PER_WARP;
+    const int lane_id = item.get_local_id(0) % THREADS_PER_WARP;
+
+    const float *input_ptr  = inp + bid * C;
+    const float *weight_ptr = weight;
+    const float *bias_ptr   = bias;
+    float       *output_ptr = out + bid * C;
+
+    const int start_offset = warp_id * THREADS_PER_WARP * UNROLL + lane_id * UNROLL;
+    float     ld_input_regs[UNROLL];
+    float     local_sum = 0.0f;
+    for (int64_t offset = start_offset; offset < C; offset += (BLOCKSIZE * UNROLL)) {
+        load_data<float, UNROLL>(input_ptr + offset, ld_input_regs);
+#pragma unroll
+        for (int i = 0; i < UNROLL; ++i) {
+            const float val = static_cast<float>(ld_input_regs[i]);
+            local_sum += val;
+        }
+    }
+
+    auto g = item.get_group();
+    const float mean_sum = sycl::reduce_over_group(g, local_sum, sycl::plus<float>{}) / static_cast<float>(C);
+
+    if (item.get_local_id(0) == 0)
+      mean[bid] = mean_sum;
+
+    local_sum = 0.0f;
+    for (int64_t offset = start_offset; offset < C; offset += (BLOCKSIZE * UNROLL)) {
+        load_data<float, UNROLL>(input_ptr + offset, ld_input_regs);
+#pragma unroll
+        for (int i = 0; i < UNROLL; ++i) {
+            const float diff = static_cast<float>(ld_input_regs[i]) - mean_sum;
+            local_sum += diff * diff;
+        }
+    }
+    const float mean_square = sycl::reduce_over_group(g, local_sum, sycl::plus<float>{}) / static_cast<float>(C);
+    float s = sycl::rsqrt(mean_square + 1e-5f);
+    if(item.get_local_id(0) == 0 && rstd != nullptr) {
+        rstd[bid] = s;
+    }
+
+    float st_regs[UNROLL];
+    float ld_weight_regs[UNROLL];
+    float ld_bias_regs[UNROLL];
+
+    for (int64_t offset = start_offset; offset < C; offset += (BLOCKSIZE * UNROLL)) {
+        load_data<float, UNROLL>(input_ptr + offset, ld_input_regs);
+        load_data<float, UNROLL>(weight_ptr + offset, ld_weight_regs);
+        load_data<float, UNROLL>(bias_ptr + offset, ld_bias_regs);
+
+#pragma unroll
+        for (int i = 0; i < UNROLL; ++i) {
+            float n = (static_cast<float>(ld_input_regs[i]) - mean_sum) * s;
+            st_regs[i] = n * static_cast<float>(ld_weight_regs[i]) +
+                         static_cast<float>(ld_bias_regs[i]);
+        }
+        store_data<float, UNROLL>(output_ptr + offset, st_regs);
+    }
+}
 
 void layernorm_forward_kernel1(sycl::nd_item<1> id, float* __restrict__ out, float* __restrict__ mean, float* __restrict__ rstd,
                                const float*  __restrict__ inp, const float*  __restrict__ weight,
@@ -102,6 +171,45 @@ void layernorm_forward_kernel2(sycl::nd_item<1> id, float* __restrict__ out, flo
 
 // ----------------------------------------------------------------------------
 // kernel launcher
+void layernorm_forward0(sycl::queue &q, float* out, float* mean, float* rstd,
+                        const float* inp, const float* weight, const float* bias,
+                        int B, int T, int C,
+                        const int block_size) {
+    assert(block_size % 32 == 0);
+    auto sg_sizes = q.get_device().get_info<sycl::info::device::sub_group_sizes>();
+    auto r = std::max_element(sg_sizes.begin(), sg_sizes.end());
+    int warpSize = *r;
+    const int N = B * T;
+    const int UNROLL = sizeof(sycl::float4) / sizeof(float);
+    if (C % UNROLL == 0) {
+      if (warpSize == 64)
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for(sycl::nd_range<1>(N * block_size, block_size), [=](sycl::nd_item<1> id) {
+            layernorm_forward_kernel0<UNROLL, 64>(id, out, mean, rstd, inp, weight, bias, N, C);
+          });
+        }).wait();
+      else
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for(sycl::nd_range<1>(N * block_size, block_size), [=](sycl::nd_item<1> id) {
+            layernorm_forward_kernel0<UNROLL, 32>(id, out, mean, rstd, inp, weight, bias, N, C);
+          });
+        }).wait();
+    } else {
+      if (warpSize == 64)
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for(sycl::nd_range<1>(N * block_size, block_size), [=](sycl::nd_item<1> id) {
+            layernorm_forward_kernel0<1, 64>(id, out, mean, rstd, inp, weight, bias, N, C);
+          });
+        }).wait();
+      else
+        q.submit([&] (sycl::handler &cgh) {
+          cgh.parallel_for(sycl::nd_range<1>(N * block_size, block_size), [=](sycl::nd_item<1> id) {
+            layernorm_forward_kernel0<1, 32>(id, out, mean, rstd, inp, weight, bias, N, C);
+          });
+        }).wait();
+    }
+}
+
 
 void layernorm_forward1(sycl::queue &q, float* out, float* mean, float* rstd,
                         const float* inp, const float* weight, const float* bias,
@@ -135,6 +243,9 @@ void layernorm_forward(int kernel_num,
                        int B, int T, int C,
                        const int block_size) {
     switch (kernel_num) {
+        case 0:
+            layernorm_forward0(q, out, mean, rstd, inp, weight, bias, B, T, C, block_size);
+            break;
         case 1:
             layernorm_forward1(q, out, mean, rstd, inp, weight, bias, B, T, C, block_size);
             break;
@@ -150,93 +261,98 @@ void layernorm_forward(int kernel_num,
 // ----------------------------------------------------------------------------
 // Main
 
-int main(int argc, char** argv) {
-    srand(0);
+int main(int argc, char **argv) {
 
-    int B = 8; // batch size
-    int T = 1024; // sequence length
-    int C = 768; // embedding size
+  if (argc != 5) {
+    printf("Usage: %s <batch size> <sequence length> <channel length> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const size_t B = atoi(argv[1]);
+  const size_t T = atoi(argv[2]);
+  const size_t C = atoi(argv[3]);
+  const int repeat = atoi(argv[4]);
 
 #ifdef USE_GPU
-    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+  sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
 #else
-    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+  sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-    // create host memory of random numbers
-    float* out = (float*)malloc(B * T * C * sizeof(float));
-    float* mean = (float*)malloc(B * T * sizeof(float));
-    float* rstd = (float*)malloc(B * T * sizeof(float));
-    float* inp = make_random_float(B * T * C);
-    float* weight = make_random_float(C);
-    float* bias = make_random_float(C);
+  // create host memory of random numbers
+  srand(0);
+  float* out = (float*)malloc(B * T * C * sizeof(float));
+  float* mean = (float*)malloc(B * T * sizeof(float));
+  float* rstd = (float*)malloc(B * T * sizeof(float));
+  float* inp = make_random_float(B * T * C);
+  float* weight = make_random_float(C);
+  float* bias = make_random_float(C);
 
-    // Device memory allocation
-    float* d_out = sycl::malloc_device<float>(B * T * C, q);
-    float* d_mean = sycl::malloc_device<float>(B * T, q);
-    float* d_rstd = sycl::malloc_device<float>(B * T, q);
-    float* d_inp = sycl::malloc_device<float>(B * T * C, q);
-    float* d_weight = sycl::malloc_device<float>(C, q);
-    float* d_bias = sycl::malloc_device<float>(C, q);
+  // Device memory allocation
+  float* d_out = sycl::malloc_device<float>(B * T * C, q);
+  float* d_mean = sycl::malloc_device<float>(B * T, q);
+  float* d_rstd = sycl::malloc_device<float>(B * T, q);
+  float* d_inp = sycl::malloc_device<float>(B * T * C, q);
+  float* d_weight = sycl::malloc_device<float>(C, q);
+  float* d_bias = sycl::malloc_device<float>(C, q);
 
-    // Copy data to device
-    q.memcpy(d_inp, inp, B * T * C * sizeof(float)).wait();
-    q.memcpy(d_weight, weight, C * sizeof(float)).wait();
-    q.memcpy(d_bias, bias, C * sizeof(float)).wait();
+  // Copy data to device
+  q.memcpy(d_inp, inp, B * T * C * sizeof(float));
+  q.memcpy(d_weight, weight, C * sizeof(float));
+  q.memcpy(d_bias, bias, C * sizeof(float));
+  q.wait();
 
-    // read kernel_num from command line
-    int kernel_num = 2;
-    if (argc > 1)
-        kernel_num = atoi(argv[1]);
+  const int block_sizes[] = {32, 64, 128, 256, 512, 1024};
+
+  for (int kernel_num = 0; kernel_num < 3; kernel_num++) {
+    printf("Using kernel %d\n", kernel_num);
     std::cout << "Using kernel version: " << kernel_num << std::endl;
 
     layernorm_forward_cpu(out, mean, rstd, inp, weight, bias, B, T, C);
 
-    int block_sizes[] = {32, 64, 128, 256, 512, 1024};
     for (int block_size : block_sizes) {
-        std::cout << "Checking block size " <<  block_size << '\n';
+      std::cout << "Checking block size " <<  block_size << '\n';
 
-        layernorm_forward(kernel_num, q, d_out, d_mean, d_rstd, d_inp, d_weight, d_bias, B, T, C, block_size);
+      layernorm_forward(kernel_num, q, d_out, d_mean, d_rstd, d_inp, d_weight, d_bias, B, T, C, block_size);
 
-        validate_result(d_out, out, "out", B * T * C, 1e-5f);
-        validate_result(d_mean, mean, "mean", B * T, 1e-5f);
-        validate_result(d_rstd, rstd, "rstd", B * T, 1e-5f);
+      validate_result(d_out, out, "out", B * T * C, 1e-5f);
+      validate_result(d_mean, mean, "mean", B * T, 1e-5f);
+      validate_result(d_rstd, rstd, "rstd", B * T, 1e-5f);
     }
 
     std::cout << "All results match. Starting benchmarks.\n\n";
 
     // time the kernel at different block sizes
     for (int block_size : block_sizes) {
-        int repeat_times = 2000;
-        float elapsed_time = benchmark_kernel(
-                repeat_times,
-                layernorm_forward, // kernel
-                // kernel params
-                kernel_num, q, d_out, d_mean, d_rstd, d_inp, d_weight, d_bias,
-                B, T, C, block_size
-        );
+      float elapsed_time = benchmark_kernel(
+              repeat,
+              layernorm_forward, // kernel
+              // kernel params
+              kernel_num, q, d_out, d_mean, d_rstd, d_inp, d_weight, d_bias,
+              B, T, C, block_size
+      );
 
-        // napkin math: estimate the memory bandwidth achieved
-        long memory_ops = (2 * B * T * C) * 4; // *4 for float
-        float memory_bandwidth = memory_ops / elapsed_time / 1e6;
+      // napkin math: estimate the memory bandwidth achieved
+      long memory_ops = (2 * B * T * C) * 4; // *4 for float
+      float memory_bandwidth = memory_ops / elapsed_time / 1e6;
 
-        std::cout << "block_size " << block_size << " | time " << elapsed_time << " ms | bandwidth " << memory_bandwidth << " GB/s" << std::endl;
+      std::cout << "block_size " << block_size << " | time " << elapsed_time << " ms | bandwidth " << memory_bandwidth << " GB/s" << std::endl;
     }
+  }
 
-    // free memory
-    free(out);
-    free(mean);
-    free(rstd);
-    free(inp);
-    free(weight);
-    free(bias);
+  // free memory
+  free(out);
+  free(mean);
+  free(rstd);
+  free(inp);
+  free(weight);
+  free(bias);
 
-    sycl::free(d_out, q);
-    sycl::free(d_mean, q);
-    sycl::free(d_rstd, q);
-    sycl::free(d_inp, q);
-    sycl::free(d_weight, q);
-    sycl::free(d_bias, q);
+  sycl::free(d_out, q);
+  sycl::free(d_mean, q);
+  sycl::free(d_rstd, q);
+  sycl::free(d_inp, q);
+  sycl::free(d_weight, q);
+  sycl::free(d_bias, q);
 
-    return 0;
+  return 0;
 }

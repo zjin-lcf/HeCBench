@@ -53,13 +53,18 @@ void layernorm_forward_kernel(float*__restrict out,
 
 
 int main(int argc, char **argv) {
-  srand(0);
 
-  int B = 8;
-  int T = 1024;
-  int C = 768;
+  if (argc != 5) {
+    printf("Usage: %s <batch size> <sequence length> <channel length> <repeat>\n", argv[0]);
+    return 1;
+  }
+  const size_t B = atoi(argv[1]);
+  const size_t T = atoi(argv[2]);
+  const size_t C = atoi(argv[3]);
+  const int repeat = atoi(argv[4]);
 
   // create host memory of random numbers
+  srand(0);
   float* out = (float*)malloc(B * T * C * sizeof(float));
   float* d_out = (float*)malloc(B * T * C * sizeof(float));
   float* mean = (float*)malloc(B * T * sizeof(float));
@@ -95,18 +100,16 @@ int main(int argc, char **argv) {
     // time the kernel at different block sizes
     for (int block_size : block_sizes) {
 
-        int repeat_times = 2000;
-
         auto start = std::chrono::high_resolution_clock::now();
 
-        for (int i = 0; i < repeat_times; i++) {
+        for (int i = 0; i < repeat; i++) {
           layernorm_forward_kernel(d_out, d_mean, d_rstd, inp, weight, bias, B, T, C, block_size);
         }
 
         auto stop = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float, std::milli> duration = stop - start;
         float elapsed_time = duration.count();
-        elapsed_time = elapsed_time / repeat_times;
+        elapsed_time = elapsed_time / repeat;
 
         // estimate the memory bandwidth achieved
         // e.g. A100 40GB PCIe is advertised at 1,555GB/s

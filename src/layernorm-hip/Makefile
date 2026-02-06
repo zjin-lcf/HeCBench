@@ -23,7 +23,7 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../layernorm-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../layernorm-cuda -I../rmsnorm-hip
 
 # Linker Flags
 LDFLAGS = 
@@ -46,12 +46,13 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu common.h ../layernorm-cuda/reference.h Makefile
+%.o: %.cu common.h ../layernorm-cuda/reference.h \
+          ../rmsnorm-hip/utils.cuh ../rmsnorm-hip/reduce.cuh Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 1
-	$(LAUNCHER) ./$(program) 2
+	$(LAUNCHER) ./$(program) 8 1024 768 2000
+	$(LAUNCHER) ./$(program) 8 1024 12288 2000
