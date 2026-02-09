@@ -1,0 +1,5 @@
+outs:
+- md5: 8cd52d0395bc0f76df02e438a4fa673d
+  size: 1251585
+  hash: md5
+  path: genome.tar.bz

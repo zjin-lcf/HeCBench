@@ -4,4 +4,5 @@ https://github.com/oneapi-src/oneDPL
 https://github.com/oneapi-src/oneTBB
 
 
+Extract the dataset genome.tar.bz in `sa-cuda` before running the program.
 The dataset is available at https://github.com/gmzang/Parallel-Suffix-Array-on-GPU/tree/master/dc3_gpu
