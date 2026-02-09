@@ -79,4 +79,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) genome.txt 1000000 100 
+	$(LAUNCHER) ./$(program) ../sa-cuda/genome.txt 1000000 100 
