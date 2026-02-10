@@ -144,7 +144,7 @@ function(add_hecbench_benchmark)
     set(TARGET_NAME "${BENCH_NAME}-${BENCH_MODEL_LOWER}")
 
     if(${TARGET_NAME} IN_LIST DEPEND_ON_NCCL)
-        if(NOT _FOUND)
+        if(NOT NCCL_FOUND)
             message(STATUS "Skipping ${TARGET_NAME} (NCCL not found)")
             return()
         endif()
