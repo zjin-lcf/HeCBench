@@ -12,7 +12,7 @@ void rmsnorm_forward_kernel (const float* __restrict inp, const float* __restric
     float m = 0.0f;
     #pragma omp parallel for reduction(+:m) num_threads(block_size)
     for (int i = 0; i < H; i++) {
-    	m += x[i] * x[i];
+      m += x[i] * x[i];
     }
     m = m/H;
     float s = 1.0f / sqrtf(m + eps);
@@ -22,6 +22,27 @@ void rmsnorm_forward_kernel (const float* __restrict inp, const float* __restric
     for (int64_t i = 0; i < H; i++) {
       float o = x[i] * s * gamma[i];
       out_t[i] = o;
+    }
+  }
+}
+
+void rmsnorm_forward_kernel2 (const float* __restrict inp, const float* __restrict gamma, float* out, 
+                              int64_t N, int64_t H, float eps, int block_size)
+{
+  #pragma omp target teams distribute num_teams(N)
+  for (int64_t t = 0; t < N; t++) {
+    // RMS
+    float m = 0.0f;
+    #pragma omp parallel for reduction(+:m) num_threads(block_size)
+    for (int i = 0; i < H; i++) {
+      m += inp[t * H + i] * inp[t * H + i];
+    }
+
+    float s = 1.0f / sqrtf(m / H + eps);
+    
+    #pragma omp parallel for num_threads(block_size)
+    for (int64_t i = 0; i < H; i++) {
+      out[t * H + i] = inp[t * H + i] * s * gamma[i];
     }
   }
 }
@@ -56,23 +77,46 @@ int main(int argc, char **argv) {
     rmsnorm_forward_cpu(out, inp, gamma, N, H);
 
     // check the correctness of the kernel at all block sizes
-  for (int block_size : block_sizes) {
-        printf("Checking block size %d.\n", block_size);
+    for (int block_size : block_sizes) {
+          printf("Checking block size %d.\n", block_size);
 
-        rmsnorm_forward_kernel(inp, gamma, d_out, N, H, 1e-5f, block_size);
+          rmsnorm_forward_kernel(inp, gamma, d_out, N, H, 1e-5f, block_size);
+          validate_result(d_out, out, "out", size, 1e-5f);
 
-        validate_result(d_out, out, "out", size, 1e-5f);
+          rmsnorm_forward_kernel2(inp, gamma, d_out, N, H, 1e-5f, block_size);
+          validate_result(d_out, out, "out", size, 1e-5f);
     }
 
     printf("All results match. Starting benchmarks.\n\n");
 
     // time the kernel at different block sizes
-  for (int block_size : block_sizes) {
+    for (int block_size : block_sizes) {
 
       auto start = std::chrono::high_resolution_clock::now();
 
       for (int i = 0; i < repeat; i++) {
         rmsnorm_forward_kernel(inp, gamma, d_out, N, H, 1e-5f, block_size);
+      }
+
+      auto stop = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<float, std::milli> duration = stop - start;
+      float elapsed_time = duration.count();
+      elapsed_time = elapsed_time / repeat;
+
+      // estimate the memory bandwidth achieved
+      size_t memory_ops = (2 * size + H) * 4; // *4 for float
+      float memory_bandwidth = memory_ops / elapsed_time / 1e6;
+      printf("block_size %4d | time %.4f ms | bandwidth %.2f GB/s\n", block_size, elapsed_time, memory_bandwidth);
+    }
+
+    // time the kernel at different block sizes
+    printf("\n");
+    for (int block_size : block_sizes) {
+
+      auto start = std::chrono::high_resolution_clock::now();
+
+      for (int i = 0; i < repeat; i++) {
+        rmsnorm_forward_kernel2(inp, gamma, d_out, N, H, 1e-5f, block_size);
       }
 
       auto stop = std::chrono::high_resolution_clock::now();
