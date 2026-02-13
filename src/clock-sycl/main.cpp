@@ -34,7 +34,7 @@ static void timedReduction(const float *input, float *output, uint64_t *timer,
     const int tid = item.get_local_id(0);
     const int bid = item.get_group(0);
 
-    if (tid == 0) timer[bid] = syclex::clock<syclex::clock_scope::device>();
+    if (tid == 0) timer[bid] = syclex::clock<syclex::clock_scope::work_group>();
 
     // Copy input.
     shared[tid] = input[tid];
@@ -62,7 +62,7 @@ static void timedReduction(const float *input, float *output, uint64_t *timer,
 
     item.barrier(sycl::access::fence_space::local_space);
 
-    if (tid == 0) timer[bid + item.get_group_range(0)] = syclex::clock<syclex::clock_scope::device>();
+    if (tid == 0) timer[bid + item.get_group_range(0)] = syclex::clock<syclex::clock_scope::work_group>();
 }
 
 
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
             [=](sycl::nd_item<1> item) {
                 timedReduction(dinput, doutput, dtimer,
                                smem.get_multi_ptr<sycl::access::decorated::no>().get(), item);
-            });
+        });
     });
 
     q.memcpy(timer, dtimer, sizeof(uint64_t) * NUM_BLOCKS * 2).wait();
