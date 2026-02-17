@@ -477,6 +477,7 @@ set(HECBENCH_POC_BENCHMARKS
     blas-gemmStridedBatched
     blockAccess
     blockexchange
+    blockScan
     bm3d
     bn
     bonds
