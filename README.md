@@ -52,7 +52,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, floydwarshall2, gc, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    adjacent, aligned-types, asta, blockAccess, blockexchange, collision, concurrentKernels, conversion, dispatch, graphExecution, ert, interleave, intrinsics-cast, kernelLaunch, layout, mallocFree, maxFlops, mixbench, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamCreateCopyDestroy, streamOrderedAllocation, streamPriority, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy 
+    adjacent, aligned-types, asta, blockAccess, blockexchange, blockScan, collision, concurrentKernels, conversion, dispatch, graphExecution, ert, interleave, intrinsics-cast, kernelLaunch, layout, mallocFree, maxFlops, mixbench, nosync, openmp, overlap, p2p, pad, pitch, popcount, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamCreateCopyDestroy, streamOrderedAllocation, streamPriority, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy 
 
 ### Machine learning  
     accuracy, adam, adamw, addBiasQKV, addBiasResidualLayerNorm, attention, attention-paged, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, dwconv1d, expdist, flip, gd, gelu, ge-spmm, geglu, glu, gmm, gru, kalman, kmc, kmeans, knn, layernorm, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mf-sgd, mmcsf, mnist, moe, moe-align, moe-sum, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, permute, perplexity, pointwise, pool, qkv, qtclustering, remap, relu, resnet-kernels, rmsnorm, rowwiseMoments, rotary, sampling, scel, snicit, softmax, softmax-fused, softmax-online, stddev, streamcluster, swish, tsne, unfold, vol2col, wedford, winograd, word2vec
@@ -384,6 +384,9 @@ Early results are shown [here](results/README.md)
 
 ### blockexchange (cuda)
   Rearrange data partitioned across a thread block (https://github.com/NVIDIA/cub)
+
+### blockScan (cuda)
+  Block scans from the CUB's collective primitives (https://github.com/NVIDIA/cub)
 
 ### bm3d (cuda)
   Block-matching and 3D filtering method for image denoising (https://github.com/DawyD/bm3d-gpu)
