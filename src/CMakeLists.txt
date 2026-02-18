@@ -527,6 +527,7 @@ set(HECBENCH_POC_BENCHMARKS
     softmax-fused
     softmax-online
     tridiagonal
+    topk
 )
 
 # Include benchmark subdirectories
