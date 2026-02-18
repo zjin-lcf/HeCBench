@@ -25,7 +25,7 @@ Each benchmark falls into a single category. While such classification is not ac
     daphne
 
 ### Bandwidth
-    allreduce, cmembench, babelstream, ccl, memcpy, memtest, pingpong, randomAccess, shmembench, triad 
+    allreduce, cmembench, babelstream, ccl, memcpy, memtest, pingpong, randomAccess, shmembench, threadcpy, triad
 
 ### Bioinformatics
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, local-ht, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
@@ -1049,7 +1049,7 @@ Early results are shown [here](results/README.md)
   Merkle tree construction using rescue prime hash (https://github.com/itzmeanjan/ff-gpu)
   
 ### memcpy (cuda)
-  A benchmark for memory copy between a host and a device
+  Evaluate bandwidth of memory copy between a host and a device
 
 ### memtest (cuda)
   Selected memory tests (https://github.com/ComputationalRadiationPhysics/cuda_memtest)
@@ -1627,6 +1627,9 @@ Early results are shown [here](results/README.md)
 
 ### tqs (cuda)
   Simulation of a task queue system (https://github.com/chai-benchmarks/chai)
+
+### threadcpy (hip)
+  Evaluate bandwidth of data copy by GPU threads (https://github.com/xytpai/gpuk)
 
 ### triad (opencl)
   Triad in the SHOC benchmark suite(https://github.com/vetter/shoc/)
