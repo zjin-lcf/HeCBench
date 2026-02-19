@@ -107,27 +107,27 @@ int main(int argc, char* argv[])
     sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-    std::cout << "float1: ";
-    test_threads_copy<1, float>(q, numel, repeat);
-    std::cout << "float2: ";
-    test_threads_copy<2, float>(q, numel, repeat);
-    std::cout << "float4: ";
-    test_threads_copy<4, float>(q, numel, repeat);
-    std::cout << "float8: ";
-    test_threads_copy<8, float>(q, numel, repeat);
-    std::cout << "float16: ";
-    test_threads_copy<16, float>(q, numel, repeat);
+    std::cout << "int1: ";
+    test_threads_copy<1, int>(q, numel, repeat);
+    std::cout << "int2: ";
+    test_threads_copy<2, int>(q, numel, repeat);
+    std::cout << "int4: ";
+    test_threads_copy<4, int>(q, numel, repeat);
+    std::cout << "int8: ";
+    test_threads_copy<8, int>(q, numel, repeat);
+    std::cout << "int16: ";
+    test_threads_copy<16, int>(q, numel, repeat);
 
-    std::cout << "half1: ";
-    test_threads_copy<1, sycl::half>(q, numel * 2, repeat);
-    std::cout << "half2: ";
-    test_threads_copy<2, sycl::half>(q, numel * 2, repeat);
-    std::cout << "half4: ";
-    test_threads_copy<4, sycl::half>(q, numel * 2, repeat);
-    std::cout << "half8: ";
-    test_threads_copy<8, sycl::half>(q, numel * 2, repeat);
-    std::cout << "half16: ";
-    test_threads_copy<16, sycl::half>(q, numel * 2, repeat);
+    std::cout << "short1: ";
+    test_threads_copy<1, short>(q, numel * 2, repeat);
+    std::cout << "short2: ";
+    test_threads_copy<2, short>(q, numel * 2, repeat);
+    std::cout << "short4: ";
+    test_threads_copy<4, short>(q, numel * 2, repeat);
+    std::cout << "short8: ";
+    test_threads_copy<8, short>(q, numel * 2, repeat);
+    std::cout << "short16: ";
+    test_threads_copy<16, short>(q, numel * 2, repeat);
 
     std::cout << "char1: ";
     test_threads_copy<1, char>(q, numel * 4, repeat);
