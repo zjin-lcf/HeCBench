@@ -22,7 +22,7 @@ Depending on which programming models you want to build:
 - **SYCL**: Intel oneAPI DPC++ or hipSYCL
 - **OpenMP**: Intel oneAPI, NVIDIA HPC SDK, or AOMP
 - **CMake**: 3.21 or later
-- **Ninja** (recommended) or Make
+- **Ninja** (at least 1.10) or Make
 
 ### Build with a Preset
 
