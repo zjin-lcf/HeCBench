@@ -2,7 +2,6 @@
 #include <chrono>
 #include <cstring>
 #include <hip/hip_runtime.h>
-#include <hip/hip_fp16.h>
 
 #define GPU_CHECK(x) do { \
   hipError_t err = x; \
@@ -94,27 +93,27 @@ int main(int argc, char* argv[])
     const size_t numel = 1024 * 1024 * 256 + 2;
     srand(19937);
 
-    std::cout << "float1: ";
-    test_threads_copy<1, float>(numel, repeat);
-    std::cout << "float2: ";
-    test_threads_copy<2, float>(numel, repeat);
-    std::cout << "float4: ";
-    test_threads_copy<4, float>(numel, repeat);
-    std::cout << "float8: ";
-    test_threads_copy<8, float>(numel, repeat);
-    std::cout << "float16: ";
-    test_threads_copy<16, float>(numel, repeat);
+    std::cout << "int1: ";
+    test_threads_copy<1, int>(numel, repeat);
+    std::cout << "int2: ";
+    test_threads_copy<2, int>(numel, repeat);
+    std::cout << "int4: ";
+    test_threads_copy<4, int>(numel, repeat);
+    std::cout << "int8: ";
+    test_threads_copy<8, int>(numel, repeat);
+    std::cout << "int16: ";
+    test_threads_copy<16, int>(numel, repeat);
 
-    std::cout << "half1: ";
-    test_threads_copy<1, __half>(numel * 2, repeat);
-    std::cout << "half2: ";
-    test_threads_copy<2, __half>(numel * 2, repeat);
-    std::cout << "half4: ";
-    test_threads_copy<4, __half>(numel * 2, repeat);
-    std::cout << "half8: ";
-    test_threads_copy<8, __half>(numel * 2, repeat);
-    std::cout << "half16: ";
-    test_threads_copy<16, __half>(numel * 2, repeat);
+    std::cout << "short1: ";
+    test_threads_copy<1, short>(numel * 2, repeat);
+    std::cout << "short2: ";
+    test_threads_copy<2, short>(numel * 2, repeat);
+    std::cout << "short4: ";
+    test_threads_copy<4, short>(numel * 2, repeat);
+    std::cout << "short8: ";
+    test_threads_copy<8, short>(numel * 2, repeat);
+    std::cout << "short16: ";
+    test_threads_copy<16, short>(numel * 2, repeat);
 
     std::cout << "char1: ";
     test_threads_copy<1, char>(numel * 4, repeat);
