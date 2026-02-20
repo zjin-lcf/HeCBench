@@ -129,24 +129,24 @@ namespace miniFE {
   //
   // w - output vector
   //
-  template <typename VectorType> 
+  template <typename VectorType>
     __global__  void waxby_kernel(
         const int n,
-        const typename VectorType::ScalarType alpha, 
-        const typename VectorType::ScalarType *xcoefs, 
+        const typename VectorType::ScalarType alpha,
+        const typename VectorType::ScalarType *xcoefs,
         const typename VectorType::ScalarType beta,
-        const typename VectorType::ScalarType *ycoefs, 
-        typename VectorType::ScalarType *wcoefs) 
+        const typename VectorType::ScalarType *ycoefs,
+        typename VectorType::ScalarType *wcoefs)
     {
       int idx=blockIdx.x*blockDim.x+threadIdx.x;
       if (idx<n) wcoefs[idx] = alpha * xcoefs[idx] + beta * ycoefs[idx];
     }
 
-  template <typename VectorType> 
+  template <typename VectorType>
     __global__  void yaxby_kernel(
         const int n,
-        const typename VectorType::ScalarType alpha, 
-        const typename VectorType::ScalarType *xcoefs, 
+        const typename VectorType::ScalarType alpha,
+        const typename VectorType::ScalarType *xcoefs,
         const typename VectorType::ScalarType beta,
         typename VectorType::ScalarType *ycoefs )
     {
@@ -154,22 +154,22 @@ namespace miniFE {
       if (idx<n) ycoefs[idx] = alpha * xcoefs[idx] + beta * ycoefs[idx];
     }
 
-  template <typename VectorType> 
+  template <typename VectorType>
     __global__  void wxby_kernel(
         const int n,
-        const typename VectorType::ScalarType *xcoefs, 
+        const typename VectorType::ScalarType *xcoefs,
         const typename VectorType::ScalarType beta,
-        const typename VectorType::ScalarType *ycoefs, 
-        typename VectorType::ScalarType *wcoefs) 
+        const typename VectorType::ScalarType *ycoefs,
+        typename VectorType::ScalarType *wcoefs)
     {
       int idx=blockIdx.x*blockDim.x+threadIdx.x;
       if (idx<n) wcoefs[idx] = xcoefs[idx] + beta * ycoefs[idx];
     }
 
-  template <typename VectorType> 
+  template <typename VectorType>
     __global__  void yxby_kernel(
         const int n,
-        const typename VectorType::ScalarType *xcoefs, 
+        const typename VectorType::ScalarType *xcoefs,
         const typename VectorType::ScalarType beta,
         typename VectorType::ScalarType *ycoefs)
     {
@@ -177,46 +177,46 @@ namespace miniFE {
       if (idx<n) ycoefs[idx] = xcoefs[idx] + beta * ycoefs[idx];
     }
 
-  template <typename VectorType> 
+  template <typename VectorType>
     __global__  void wx_kernel(
         const int n,
-        const typename VectorType::ScalarType *xcoefs, 
-        typename VectorType::ScalarType *wcoefs) 
+        const typename VectorType::ScalarType *xcoefs,
+        typename VectorType::ScalarType *wcoefs)
     {
 
       int idx=blockIdx.x*blockDim.x+threadIdx.x;
       if (idx<n) wcoefs[idx] = xcoefs[idx];
     }
 
-  template <typename VectorType> 
+  template <typename VectorType>
     __global__  void dyx_kernel(
         const int n,
-        const typename VectorType::ScalarType *xcoefs, 
-        typename VectorType::ScalarType *ycoefs) 
+        const typename VectorType::ScalarType *xcoefs,
+        typename VectorType::ScalarType *ycoefs)
     {
 
       int idx=blockIdx.x*blockDim.x+threadIdx.x;
       if (idx<n) ycoefs[idx] += xcoefs[idx];
     }
 
-  template <typename VectorType> 
+  template <typename VectorType>
     __global__  void wax_kernel(
         const int n,
-        const typename VectorType::ScalarType alpha, 
-        const typename VectorType::ScalarType *xcoefs, 
-        typename VectorType::ScalarType *wcoefs) 
+        const typename VectorType::ScalarType alpha,
+        const typename VectorType::ScalarType *xcoefs,
+        typename VectorType::ScalarType *wcoefs)
     {
 
       int idx=blockIdx.x*blockDim.x+threadIdx.x;
       if (idx<n) wcoefs[idx] = alpha * xcoefs[idx];
     }
 
-  template <typename VectorType> 
+  template <typename VectorType>
     __global__  void dyax_kernel(
         const int n,
-        const typename VectorType::ScalarType alpha, 
-        const typename VectorType::ScalarType *xcoefs, 
-        typename VectorType::ScalarType *ycoefs) 
+        const typename VectorType::ScalarType alpha,
+        const typename VectorType::ScalarType *xcoefs,
+        typename VectorType::ScalarType *ycoefs)
     {
 
       int idx=blockIdx.x*blockDim.x+threadIdx.x;
@@ -279,9 +279,9 @@ namespace miniFE {
 
   template<typename VectorType>
     void
-    daxpby(const MINIFE_SCALAR alpha, 
+    daxpby(const MINIFE_SCALAR alpha,
         const VectorType& x,
-        const MINIFE_SCALAR beta, 
+        const MINIFE_SCALAR beta,
         VectorType& y,
         MINIFE_SCALAR *d_xcoefs,
         MINIFE_SCALAR *d_ycoefs)
@@ -306,11 +306,11 @@ namespace miniFE {
 
     }
 
-  template<typename Scalar>
-    __global__ void dot_kernel(const MINIFE_LOCAL_ORDINAL n, 
-        const Scalar* x, 
-        const Scalar* y, 
-              Scalar* d) 
+  template<typename Scalar, int BLOCK_SIZE>
+    __global__ void dot_kernel(const MINIFE_LOCAL_ORDINAL n,
+        const Scalar* x,
+        const Scalar* y,
+              Scalar* d)
     {
       Scalar sum=0;
       for(int idx=blockIdx.x*blockDim.x+threadIdx.x;idx<n;idx+=gridDim.x*blockDim.x) {
@@ -318,10 +318,10 @@ namespace miniFE {
       }
 
       //Do a shared memory reduction on the dot product
-      __shared__ Scalar red[256];
+      __shared__ Scalar red[BLOCK_SIZE];
       red[threadIdx.x]=sum;
 #pragma unroll
-      for (int n = 128; n > 0; n = n/2) {
+      for (int n = BLOCK_SIZE / 2; n > 0; n = n/2) {
         __syncthreads();
         if(threadIdx.x<n)  {sum+=red[threadIdx.x+n]; red[threadIdx.x]=sum;}
       }
@@ -330,14 +330,14 @@ namespace miniFE {
       if(threadIdx.x==0) d[blockIdx.x]=sum;
     }
 
-  template<typename Scalar>
+  template<typename Scalar, int BLOCK_SIZE>
     __global__ void final_reduce(Scalar *d) {
       Scalar sum = d[threadIdx.x];
-      __shared__ Scalar red[256];
+      __shared__ Scalar red[BLOCK_SIZE];
 
       red[threadIdx.x]=sum;
 #pragma unroll
-      for (int n = 128; n > 0; n = n/2) {
+      for (int n = BLOCK_SIZE / 2; n > 0; n = n/2) {
         __syncthreads();
         if(threadIdx.x<n)  {sum+=red[threadIdx.x+n]; red[threadIdx.x]=sum;}
       }
@@ -363,22 +363,23 @@ namespace miniFE {
       const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
       typedef typename Vector::ScalarType Scalar;
       Scalar result = 0;
-      int BLOCK_SIZE = 256;
-      int NUM_BLOCKS = std::min(1024,(n+BLOCK_SIZE-1)/BLOCK_SIZE);
+      const int BLOCK_SIZE = 256;
+      const int MAX_NUM_BLOCKS = 256;
+      const int NUM_BLOCKS = std::min(MAX_NUM_BLOCKS, (n+BLOCK_SIZE-1)/BLOCK_SIZE);
       dim3 grids (NUM_BLOCKS);
       dim3 threads (BLOCK_SIZE);
       Scalar* d;
-      cudaMalloc((void**)&d, sizeof(Scalar)*1024);
-      cudaMemset(d, 0, sizeof(Scalar)*1024);
-      dot_kernel<Scalar><<<grids, threads>>>(n, d_xcoefs, d_ycoefs, d);
-      final_reduce<Scalar><<<1, 256>>>(d);
+      cudaMalloc((void**)&d, sizeof(Scalar)*MAX_NUM_BLOCKS);
+      cudaMemset(d, 0, sizeof(Scalar)*MAX_NUM_BLOCKS);
+      dot_kernel<Scalar, BLOCK_SIZE><<<grids, threads>>>(n, d_xcoefs, d_ycoefs, d);
+      final_reduce<Scalar, MAX_NUM_BLOCKS><<<1, MAX_NUM_BLOCKS>>>(d);
       cudaMemcpy(&result, d, sizeof(Scalar), cudaMemcpyDeviceToHost);
       cudaFree(d);
 
 #ifdef HAVE_MPI
       typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
       magnitude local_dot = result, global_dot = 0;
-      MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
+      MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();
       MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
       return global_dot;
 #else
@@ -401,22 +402,23 @@ namespace miniFE {
       const MINIFE_LOCAL_ORDINAL n = x.coefs.size();
       typedef typename Vector::ScalarType Scalar;
       Scalar result = 0;
-      int BLOCK_SIZE = 256;
-      int NUM_BLOCKS = std::min(1024,(n+BLOCK_SIZE-1)/BLOCK_SIZE);
+      const int BLOCK_SIZE = 256;
+      const int MAX_NUM_BLOCKS = 256;
+      int NUM_BLOCKS = std::min(MAX_NUM_BLOCKS,(n+BLOCK_SIZE-1)/BLOCK_SIZE);
       dim3 grids (NUM_BLOCKS);
       dim3 threads (BLOCK_SIZE);
       Scalar* d;
-      cudaMalloc((void**)&d, sizeof(Scalar)*1024);
-      cudaMemset(d, 0, sizeof(Scalar)*1024);
-      dot_kernel<Scalar><<<grids, threads>>>(n, d_xcoefs, d_xcoefs, d);
-      final_reduce<Scalar><<<1, 256>>>(d);
+      cudaMalloc((void**)&d, sizeof(Scalar)*MAX_NUM_BLOCKS);
+      cudaMemset(d, 0, sizeof(Scalar)*MAX_NUM_BLOCKS);
+      dot_kernel<Scalar, BLOCK_SIZE><<<grids, threads>>>(n, d_xcoefs, d_xcoefs, d);
+      final_reduce<Scalar, MAX_NUM_BLOCKS><<<1, MAX_NUM_BLOCKS>>>(d);
       cudaMemcpy(&result, d, sizeof(Scalar), cudaMemcpyDeviceToHost);
       cudaFree(d);
 
 #ifdef HAVE_MPI
       typedef typename TypeTraits<typename Vector::ScalarType>::magnitude_type magnitude;
       magnitude local_dot = result, global_dot = 0;
-      MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();  
+      MPI_Datatype mpi_dtype = TypeTraits<magnitude>::mpi_type();
       MPI_Allreduce(&local_dot, &global_dot, 1, mpi_dtype, MPI_SUM, MPI_COMM_WORLD);
 
 #ifdef MINIFE_DEBUG
