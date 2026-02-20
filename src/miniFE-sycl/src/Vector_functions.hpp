@@ -263,6 +263,47 @@ daxpby(const MINIFE_SCALAR alpha,
 //
 // result - return-value
 //
+
+#ifndef ONEAPI_REDUCTION
+template<typename Scalar, int BLOCK_SIZE>
+void dot_kernel(sycl::nd_item<1> &item, Scalar *red,
+                const MINIFE_LOCAL_ORDINAL n, const Scalar* x, const Scalar* y, Scalar* d)
+{
+      Scalar sum = 0;
+      int lid = item.get_local_id(0);
+      for(int idx=item.get_global_id(0);idx<n;
+          idx+=item.get_group_range(0) * item.get_local_range(0)) {
+        sum+=x[idx] * y[idx];
+      }
+
+      //Do a shared memory reduction on the dot product
+      red[lid]=sum;
+#pragma unroll
+      for (int n = BLOCK_SIZE / 2; n > 0; n = n/2) {
+        item.barrier(sycl::access::fence_space::local_space);
+        if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
+      }
+
+      //save partial dot products
+      if(lid==0) d[item.get_group(0)]=sum;
+}
+
+template<typename Scalar, int BLOCK_SIZE>
+void final_reduce(sycl::nd_item<1> &item, Scalar *red, Scalar *d) {
+      int lid = item.get_local_id(0);
+      MINIFE_SCALAR sum = d[lid];
+      red[lid]=sum;
+#pragma unroll
+      for (int n = BLOCK_SIZE / 2; n > 0; n = n/2) {
+        item.barrier(sycl::access::fence_space::local_space);
+        if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
+      }
+        //save final dot product at the front
+      if(lid==0) d[0]=sum;
+}
+
+#endif
+
 template<typename Vector>
 typename TypeTraits<typename Vector::ScalarType>::magnitude_type
 dot(const Vector& x,
@@ -301,52 +342,34 @@ dot(const Vector& x,
 #else
 
   // consistent with the reduction in the miniFE-cuda
-  int NWI = std::min(1024, (n+255)/256) * 256;
-  sycl::range<1> gws (NWI);
-  sycl::range<1> lws (256);
+  const int BLOCK_SIZE = 256;
+  const int MAX_NUM_BLOCKS = 256;
+  const int NUM_BLOCKS = std::min(MAX_NUM_BLOCKS, (n+BLOCK_SIZE-1)/BLOCK_SIZE);
+  sycl::range<1> gws (NUM_BLOCKS * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
 
   // sum-of-product
-  MINIFE_SCALAR *d_sop = sycl::malloc_device<MINIFE_SCALAR>(1024, q);
-  q.memset(d_sop, 0, sizeof(MINIFE_SCALAR)*1024);
+  MINIFE_SCALAR *d_sop = sycl::malloc_device<MINIFE_SCALAR>(MAX_NUM_BLOCKS, q);
+  q.memset(d_sop, 0, sizeof(MINIFE_SCALAR)*MAX_NUM_BLOCKS);
 
   q.submit([&] (sycl::handler &h) {
     sycl::local_accessor<MINIFE_SCALAR, 1> red(lws, h);
-    h.parallel_for<class xy_dot_kernel>(
+    h.parallel_for(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-      MINIFE_SCALAR sum = 0;
-      int lid = item.get_local_id(0);
-      for(int idx=item.get_global_id(0);idx<n;
-          idx+=item.get_group_range(0) * item.get_local_range(0)) {
-        sum+=d_xcoefs[idx] * d_ycoefs[idx];
-      }
+        dot_kernel<MINIFE_SCALAR, BLOCK_SIZE>(item,
+                   red.get_multi_ptr<sycl::access::decorated::no>().get(),
+                   n, d_xcoefs, d_ycoefs, d_sop);
 
-      //Do a shared memory reduction on the dot product
-      red[lid]=sum;
-#pragma unroll
-      for (int n = 128; n > 0; n = n/2) {
-        item.barrier(sycl::access::fence_space::local_space);
-        if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
-      }
-
-      //save partial dot products
-      if(lid==0) d_sop[item.get_group(0)]=sum;
     });
   });
 
   q.submit([&] (sycl::handler &h) {
     sycl::local_accessor<MINIFE_SCALAR, 1> red(lws, h);
-    h.parallel_for<class final_reduce>(
+    h.parallel_for(
       sycl::nd_range<1>(lws, lws), [=] (sycl::nd_item<1> item) {
-      int lid = item.get_local_id(0);
-      MINIFE_SCALAR sum = d_sop[lid];
-      red[lid]=sum;
-#pragma unroll
-      for (int n = 128; n > 0; n = n/2) {
-        item.barrier(sycl::access::fence_space::local_space);
-        if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
-      }
-      //save final dot product at the front
-      if(lid==0) d_sop[0]=sum;
+      final_reduce<MINIFE_SCALAR, MAX_NUM_BLOCKS>(item,
+                   red.get_multi_ptr<sycl::access::decorated::no>().get(),
+                   d_sop);
     });
   });
 
@@ -408,49 +431,32 @@ dot_r2(const Vector& x, sycl::queue &q, const typename Vector::ScalarType *d_xco
 #else
 
   // consistent with the reduction in the miniFE-cuda
-  int NWI = std::min(1024, (n+255)/256) * 256;
-  sycl::range<1> gws (NWI);
-  sycl::range<1> lws (256);
-  MINIFE_SCALAR *d_sop = sycl::malloc_device<MINIFE_SCALAR>(1024, q);
-  q.memset(d_sop, 0, sizeof(MINIFE_SCALAR)*1024);
+  const int BLOCK_SIZE = 256;
+  const int MAX_NUM_BLOCKS = 256;
+  const int NUM_BLOCKS = std::min(MAX_NUM_BLOCKS, (n+BLOCK_SIZE-1)/BLOCK_SIZE);
+  sycl::range<1> gws (NUM_BLOCKS * BLOCK_SIZE);
+  sycl::range<1> lws (BLOCK_SIZE);
+
+  MINIFE_SCALAR *d_sop = sycl::malloc_device<MINIFE_SCALAR>(MAX_NUM_BLOCKS, q);
+  q.memset(d_sop, 0, sizeof(MINIFE_SCALAR)*MAX_NUM_BLOCKS);
 
   q.submit([&] (sycl::handler &h) {
     sycl::local_accessor<MINIFE_SCALAR, 1> red(lws, h);
-    h.parallel_for<class xx_dot_kernel>(
+    h.parallel_for(
       sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-      MINIFE_SCALAR sum = 0;
-      int lid = item.get_local_id(0);
-      for(int idx=item.get_global_id(0);idx<n;idx+=item.get_group_range(0) * item.get_local_range(0)) {
-        sum+=d_xcoefs[idx] * d_xcoefs[idx];
-      }
-
-      //Do a shared memory reduction on the dot product
-      red[lid]=sum;
-#pragma unroll
-      for (int n = 128; n > 0; n = n/2) {
-        item.barrier(sycl::access::fence_space::local_space);
-        if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
-      }
-
-      //save partial dot products
-      if(lid==0) d_sop[item.get_group(0)]=sum;
+        dot_kernel<MINIFE_SCALAR, BLOCK_SIZE>(item,
+                   red.get_multi_ptr<sycl::access::decorated::no>().get(),
+                   n, d_xcoefs, d_xcoefs, d_sop);
     });
   });
 
   q.submit([&] (sycl::handler &h) {
     sycl::local_accessor<MINIFE_SCALAR, 1> red(lws, h);
-    h.parallel_for<class final_reduce2>(
+    h.parallel_for(
       sycl::nd_range<1>(lws, lws), [=] (sycl::nd_item<1> item) {
-      int lid = item.get_local_id(0);
-      MINIFE_SCALAR sum = d_sop[lid];
-      red[lid]=sum;
-#pragma unroll
-      for (int n = 128; n > 0; n = n/2) {
-        item.barrier(sycl::access::fence_space::local_space);
-        if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
-      }
-        //save final dot product at the front
-      if(lid==0) d_sop[0]=sum;
+      final_reduce<MINIFE_SCALAR, MAX_NUM_BLOCKS>(item,
+                   red.get_multi_ptr<sycl::access::decorated::no>().get(),
+                   d_sop);
     });
   });
 
