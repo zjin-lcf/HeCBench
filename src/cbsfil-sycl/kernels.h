@@ -21,7 +21,7 @@ float InitialCausalCoefficient(
   for (uint n = 0; n < Horizon; n++) {
     Sum += zn * *c;
     zn *= POLE;
-    c = (float*)((sycl::uchar*)c + step);
+    c = (float*)((unsigned char*)c + step);
   }
   return(Sum);
 }
@@ -49,14 +49,14 @@ void ConvertToInterpolationCoefficients(
   *c = previous_c = Lambda * InitialCausalCoefficient(c, DataLength, step);
   // causal recursion
   for (uint n = 1; n < DataLength; n++) {
-    c = (float*)((sycl::uchar*)c + step);
+    c = (float*)((unsigned char*)c + step);
     *c = previous_c = Lambda * *c + POLE * previous_c;
   }
   // anticausal initialization
   *c = previous_c = InitialAntiCausalCoefficient(c, DataLength, step);
   // anticausal recursion
   for (int n = DataLength - 2; 0 <= n; n--) {
-    c = (float*)((sycl::uchar*)c - step);
+    c = (float*)((unsigned char*)c - step);
     *c = previous_c = POLE * (previous_c - *c);
   }
 }
@@ -71,7 +71,7 @@ void toCoef2DX(
   // process lines horizontally
   const uint y = item.get_global_id(0);
   if (y < height) {
-    float* line = (float*)((sycl::uchar*)image + y * pitch);  //direct access
+    float* line = (float*)((unsigned char*)image + y * pitch);  //direct access
     ConvertToInterpolationCoefficients(line, width, sizeof(float));
   }
 }

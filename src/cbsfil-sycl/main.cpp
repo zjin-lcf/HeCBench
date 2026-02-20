@@ -2,8 +2,11 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <random>
 #include <sycl/sycl.hpp>
 #include "kernels.h"
+#include "reference.h"
 
 int PowTwoDivider(int n)
 {
@@ -28,15 +31,16 @@ int main(int argc, char* argv[]) {
   const int image_size = numPix * sizeof(float);
 
   float *image = (float*) malloc (image_size);
+  float *image_ref = (float*) malloc (image_size);
 
-  // image image with random values
-  srand(123);
-  for (int i = 0; i < numPix; i++) {
-    uint x = rand() % 256;
-    uint y = rand() % 256;
-    uint z = rand() % 256;
-    uint w = rand() % 256;
-    *(uint*)(&image[i]) = (w << 24) | (z << 16) | (y << 8) | x;
+  // image with random values
+  std::mt19937 gen{ 123 };
+  std::normal_distribution<float> d{0.f, 1.f};
+
+  for (int h = 0; h < height; h++) {
+    for (int w = 0; w < width; w++) {
+      image_ref[h * width + w] = image[h * width + w] = d(gen);
+    }
   }
 
 #ifdef USE_GPU
@@ -55,43 +59,59 @@ int main(int argc, char* argv[]) {
   sycl::range<1> lwsY (blocks);
   sycl::range<1> gwsY ((width + blocks-1) / blocks * blocks);
 
-  long total_time = 0;
+  q.memcpy(d_image, image, image_size);
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(
+      sycl::nd_range<1>(gwsX, lwsX), [=] (sycl::nd_item<1> item) {
+      toCoef2DX(item, d_image, image_pitch, width, height);
+    });
+  });
+
+  q.submit([&] (sycl::handler &cgh) {
+    cgh.parallel_for(
+      sycl::nd_range<1>(gwsY, lwsY), [=] (sycl::nd_item<1> item) {
+      toCoef2DY(item, d_image, image_pitch, width, height);
+    });
+  });
+
+  toCoef2DX_ref(image_ref, image_pitch, width, height);
+  toCoef2DY_ref(image_ref, image_pitch, width, height);
+  q.memcpy(image, d_image, image_size).wait();
+
+  bool ok = true;
+  for (int h = 0; h < height; h++) {
+    for (int w = 0; w < width; w++) {
+      if (std::fabs(image_ref[h * width + w] - image[h * width + w]) > 1e-3f) {
+        ok = false;
+        break;
+      }
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
+
+  auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
-    q.memcpy(d_image, image, image_size).wait();
-
-    auto start = std::chrono::steady_clock::now();
-
     q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class convertX>(
+      cgh.parallel_for(
         sycl::nd_range<1>(gwsX, lwsX), [=] (sycl::nd_item<1> item) {
         toCoef2DX(item, d_image, image_pitch, width, height);
       });
     });
 
     q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class convertY>(
+      cgh.parallel_for(
         sycl::nd_range<1>(gwsY, lwsY), [=] (sycl::nd_item<1> item) {
         toCoef2DY(item, d_image, image_pitch, width, height);
       });
     });
-
-    q.wait();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    total_time += time;
   }
-  printf("Average kernel execution time %f (s)\n", total_time * 1e-9f / repeat);
+  q.wait();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", time * 1e-9f / repeat);
 
-  q.memcpy(image, d_image, image_size).wait();
   sycl::free(d_image, q);
-
-  float sum = 0.f;
-  for (int i = 0; i < numPix; i++) {
-    const sycl::uchar *t = (const sycl::uchar*)(&image[i]);
-    sum += (t[0] + t[1] + t[2] + t[3]) / 4;
-  }
-  printf("Checksum: %f\n", sum / numPix);
-
   free(image);
+  free(image_ref);
   return 0;
 }
