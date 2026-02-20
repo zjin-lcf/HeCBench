@@ -50,6 +50,7 @@ __device__ void ConvertToInterpolationCoefficients(
   float* c = coeffs;
   float previous_c;  //cache the previously calculated c rather than look it up again (faster!)
   *c = previous_c = Lambda * InitialCausalCoefficient(c, DataLength, step);
+
   // causal recursion
   for (uint n = 1; n < DataLength; n++) {
     c = (float*)((uchar*)c + step);

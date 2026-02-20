@@ -2,8 +2,11 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <random>
 #include <cuda.h>
 #include "kernels.h"
+#include "reference.h"
 
 int PowTwoDivider(int n)
 {
@@ -28,15 +31,16 @@ int main(int argc, char* argv[]) {
   const int image_size = numPix * sizeof(float);
 
   float *image = (float*) malloc (image_size);
+  float *image_ref = (float*) malloc (image_size);
 
-  // image image with random values
-  srand(123);
-  for (int i = 0; i < numPix; i++) {
-    uint x = rand() % 256;
-    uint y = rand() % 256;
-    uint z = rand() % 256;
-    uint w = rand() % 256;
-    *(uint*)(&image[i]) = (w << 24) | (z << 16) | (y << 8) | x;
+  // image with random values
+  std::mt19937 gen{ 123 };
+  std::normal_distribution<float> d{0.f, 1.f};
+
+  for (int h = 0; h < height; h++) {
+    for (int w = 0; w < width; w++) {
+      image_ref[h * width + w] = image[h * width + w] = d(gen);
+    }
   }
 
   float *d_image;
@@ -50,31 +54,38 @@ int main(int argc, char* argv[]) {
   dim3 dimBlockY (blocks);
   dim3 dimGridY ((width  + blocks - 1) / blocks);
 
-  long total_time = 0;
-  for (int i = 0; i < repeat; i++) {
-    cudaMemcpy(d_image, image, image_size, cudaMemcpyHostToDevice);
-    auto start = std::chrono::steady_clock::now();
+  cudaMemcpy(d_image, image, image_size, cudaMemcpyHostToDevice);
+  toCoef2DX<<<dimGridX, dimBlockX>>>(d_image, image_pitch, width, height);
+  toCoef2DY<<<dimGridY, dimBlockY>>>(d_image, image_pitch, width, height);
 
-    toCoef2DX<<<dimGridX, dimBlockX>>>(d_image, image_pitch, width, height);
-    toCoef2DY<<<dimGridY, dimBlockY>>>(d_image, image_pitch, width, height);
-
-    cudaDeviceSynchronize();
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    total_time += time;
-  }
-  printf("Average kernel execution time %f (s)\n", total_time * 1e-9f / repeat);
+  toCoef2DX_ref(image_ref, image_pitch, width, height);
+  toCoef2DY_ref(image_ref, image_pitch, width, height);
 
   cudaMemcpy(image, d_image, image_size, cudaMemcpyDeviceToHost);
-  cudaFree(d_image);
 
-  float sum = 0.f;
-  for (int i = 0; i < numPix; i++) {
-    const uchar *t = (const uchar*)(&image[i]);
-    sum += (t[0] + t[1] + t[2] + t[3]) / 4;
+  bool ok = true;
+  for (int h = 0; h < height; h++) {
+    for (int w = 0; w < width; w++) {
+      if (std::fabs(image_ref[h * width + w] - image[h * width + w]) > 1e-3f) {
+        ok = false;
+        break;
+      }
+    }
   }
-  printf("Checksum: %f\n", sum / numPix);
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
+  auto start = std::chrono::steady_clock::now();
+  for (int i = 0; i < repeat; i++) {
+    toCoef2DX<<<dimGridX, dimBlockX>>>(d_image, image_pitch, width, height);
+    toCoef2DY<<<dimGridY, dimBlockY>>>(d_image, image_pitch, width, height);
+  }
+  cudaDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average kernel execution time %f (s)\n", time * 1e-9f / repeat);
+
+  cudaFree(d_image);
   free(image);
+  free(image_ref);
   return 0;
 }
