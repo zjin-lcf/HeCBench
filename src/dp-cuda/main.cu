@@ -80,8 +80,7 @@ void dot (const size_t iNumElements, const int iNumIterations)
   const size_t src_size = szGlobalWorkSize;
   const size_t src_size_bytes = src_size * sizeof(T);
 
-  const size_t grid_size = shrRoundUp(szLocalWorkSize,
-                                      szGlobalWorkSize / (szLocalWorkSize * 4));
+  const size_t grid_size = shrRoundUp(1, szGlobalWorkSize / (szLocalWorkSize * 4));
 
   // Allocate and initialize host arrays
   T* srcA = (T*) malloc (src_size_bytes);
