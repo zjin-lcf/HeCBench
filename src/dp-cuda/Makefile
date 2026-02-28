@@ -25,8 +25,7 @@ obj = $(source:.cu=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -stdpar=gpu -std=c++17 -Wall \
-          -cudalib=cublas -gpu=$(ARCH) \
-          --diag_suppress cuda_compile
+          -cudalib=cublas -gpu=$(ARCH)
 
 # Linker Flags
 LDFLAGS =
