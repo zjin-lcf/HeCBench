@@ -58,7 +58,7 @@ void dot_product(const T *__restrict__ a,
       sum += a[iInOffset + i] * b[iInOffset + i];
   }
 
-  using BlockReduce = cub::BlockReduce<T, 256>;
+  using BlockReduce = cub::BlockReduce<T, 1024>;
   __shared__ typename BlockReduce::TempStorage temp_storage;
   T aggregate = BlockReduce(temp_storage).Sum(sum);
   if (threadIdx.x == 0) {
@@ -70,7 +70,7 @@ template <typename T>
 void dot (const size_t iNumElements, const int iNumIterations)
 {
   // set and log Global and Local work size dimensions
-  int szLocalWorkSize = 256;
+  int szLocalWorkSize = 1024;
   // rounded up to the nearest multiple of the LocalWorkSize
   size_t szGlobalWorkSize = shrRoundUp(szLocalWorkSize, iNumElements);
 
