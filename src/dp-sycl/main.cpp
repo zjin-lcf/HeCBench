@@ -22,13 +22,13 @@
 #include <stdlib.h>
 #include <chrono>
 #include <cmath>
+#include <random>
 #include <sycl/sycl.hpp>
 #include <oneapi/mkl.hpp>
 #include "shrUtils.h"
 
 template <typename T>
-void dot (const size_t iNumElements, const int iNumIterations)
-{
+void dot (const size_t iNumElements, const int iNumIterations) try {
   // set and log Global and Local work size dimensions
   int szLocalWorkSize = 256;
   // rounded up to the nearest multiple of the LocalWorkSize
@@ -46,14 +46,17 @@ void dot (const size_t iNumElements, const int iNumIterations)
   // Allocate and initialize host arrays
   T* srcA = (T*) malloc (src_size_bytes);
   T* srcB = (T*) malloc (src_size_bytes);
-  T  dst;
+  T  dst, dst_ref = 0;
 
   size_t i;
-  srand(123);
+  std::mt19937 engine(19937);
+  std::uniform_int_distribution<int> dis (-32, 32);
+
   for (i = 0; i < iNumElements ; ++i)
   {
-    srcA[i] = (i < iNumElements / 2) ? -1 : 1;
-    srcB[i] = -1;
+    srcA[i] = dis(engine);
+    srcB[i] = dis(engine);
+    dst_ref += srcA[i] * srcB[i];
   }
   for (i = iNumElements; i < src_size ; ++i) {
     srcA[i] = srcB[i] = 0;
@@ -76,33 +79,36 @@ void dot (const size_t iNumElements, const int iNumIterations)
   sycl::range<1> gws (grid_size * szLocalWorkSize);
   sycl::range<1> lws (szLocalWorkSize);
 
+  auto dot_kernel = [&] (sycl::handler &cgh) {
+    cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+      size_t iGID = item.get_global_id(0);
+      T sum = 0;
+      for(size_t idx = iGID; idx < src_size / 4;
+          idx += item.get_local_range(0) * item.get_group_range(0)) {
+        size_t iInOffset = idx * 4;
+        #pragma unroll
+        for (int i = 0; i < 4; i++)
+          sum += d_srcA[iInOffset + i] * d_srcB[iInOffset + i];
+      }
+      T aggregate = sycl::reduce_over_group(item.get_group(), sum, std::plus<T>());
+      if (item.get_local_id(0) == 0) {
+        sycl::atomic_ref<T, sycl::memory_order::relaxed,
+                         sycl::memory_scope::device,
+                         sycl::access::address_space::global_space> ao (d_dst[0]);
+        ao.fetch_add(aggregate);
+      }
+    });
+  };
+  // warmup
+  for (i = 0; i < 100; i++)
+    q.submit(dot_kernel);
+
   q.wait();
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < iNumIterations; i++) {
+  for (i = 0; i < (size_t)iNumIterations; i++) {
     q.memset(d_dst, 0, sizeof(T));
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        size_t iGID = item.get_global_id(0);
-        T sum = 0;
-        for(size_t idx = iGID; idx < src_size / 4;
-            idx += item.get_local_range(0) * item.get_group_range(0)) {
-          size_t iInOffset = idx * 4;
-          sum += d_srcA[iInOffset    ] * d_srcB[iInOffset    ] +
-                 d_srcA[iInOffset + 1] * d_srcB[iInOffset + 1] +
-                 d_srcA[iInOffset + 2] * d_srcB[iInOffset + 2] +
-                 d_srcA[iInOffset + 3] * d_srcB[iInOffset + 3];
-        }
-        T aggregate = sycl::reduce_over_group(item.get_group(), sum, std::plus<>());
-        if (item.get_local_id(0) == 0) {
-           sycl::atomic_ref<T, sycl::memory_order::relaxed,
-                            sycl::memory_scope::device,
-                            sycl::access::address_space::global_space> ao (d_dst[0]);
-           ao.fetch_add(aggregate);
-        }
-      });
-    });
+    q.submit(dot_kernel);
   }
 
   q.wait();
@@ -110,11 +116,17 @@ void dot (const size_t iNumElements, const int iNumIterations)
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
   q.memcpy(&dst, d_dst, sizeof(T)).wait();
-  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
+  printf("%s\n\n", dst == dst_ref ? "PASS" : "FAIL");
+
+  // warmup
+  for (i = 0; i < 100; i++) {
+    oneapi::mkl::blas::dot(q, iNumElements, d_srcA, 1, d_srcB, 1, d_dst);
+  }
+  q.wait();
 
   start = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < iNumIterations; i++) {
+  for (i = 0; i < (size_t)iNumIterations; i++) {
     oneapi::mkl::blas::dot(q, iNumElements, d_srcA, 1, d_srcB, 1, d_dst);
   }
 
@@ -123,19 +135,24 @@ void dot (const size_t iNumElements, const int iNumIterations)
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average oneMKL::dot execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
   q.memcpy(&dst, d_dst, sizeof(T)).wait();
-  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
+  printf("%s\n\n", dst == dst_ref ? "PASS" : "FAIL");
+
+  // warmup
+  for (i = 0; i < 100; i++)
+    dst = std::transform_reduce(oneapi::dpl::execution::make_device_policy(q),
+                                d_srcA, d_srcA + iNumElements, d_srcB, T(0));
 
   start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < iNumIterations; i++) {
     dst = std::transform_reduce(oneapi::dpl::execution::make_device_policy(q),
-                                d_srcA, d_srcA + iNumElements, d_srcB, .0);
+                                d_srcA, d_srcA + iNumElements, d_srcB, T(0));
   }
 
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average std::transform_reduce execution time %f (ms)\n", (time * 1e-6f) / iNumIterations);
-  printf("%s\n\n", dst == T(0) ? "PASS" : "FAIL");
+  printf("%s\n\n", dst == dst_ref ? "PASS" : "FAIL");
 
   sycl::free(d_dst, q);
   sycl::free(d_srcA, q);
@@ -143,6 +160,11 @@ void dot (const size_t iNumElements, const int iNumIterations)
 
   free(srcA);
   free(srcB);
+}
+catch (sycl::exception const &exc) {
+  std::cerr << exc.what() << "Exception caught at file:" << __FILE__
+            << ", line:" << __LINE__ << std::endl;
+  std::exit(1);
 }
 
 int main(int argc, char **argv)
@@ -154,7 +176,9 @@ int main(int argc, char **argv)
   const size_t iNumElements = atol(argv[1]);
   const int iNumIterations = atoi(argv[2]);
 
+  printf("------------- Data type is Float32 ---------------\n");
   dot<float>(iNumElements, iNumIterations);
+  printf("------------- Data type is Float64 ---------------\n");
   dot<double>(iNumElements, iNumIterations);
   return EXIT_SUCCESS;
 }
