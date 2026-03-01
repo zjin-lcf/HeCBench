@@ -517,6 +517,7 @@ set(HECBENCH_POC_BENCHMARKS
     cross
     crossEntropy
     daphne
+    dp4a
     gerbil
     hadamard
     halo-finder
