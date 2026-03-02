@@ -12,10 +12,9 @@
 #include <omp.h>
 
 #define MAX_MASK_WIDTH 10
-#define BLOCK_SIZE 256
-#define TILE_SIZE BLOCK_SIZE
+#define MAX_BLOCK_SIZE 1024
 
-template<typename T>
+template<typename T, int BLOCK_SIZE>
 void conv1d(const T * __restrict__ mask,
             const T * __restrict__ in,
                   T * __restrict__ out,
@@ -24,8 +23,8 @@ void conv1d(const T * __restrict__ mask,
 {
   #pragma omp target teams distribute parallel for num_threads(BLOCK_SIZE)
   for (int i = 0; i < input_width; i++) {
-    T s = 0;
     int start = i - mask_width / 2;
+    T s = 0;
     for (int j = 0; j < mask_width; j++) {
       if (start + j >= 0 && start + j < input_width) {
         s += in[start + j] * mask[j];
@@ -35,17 +34,17 @@ void conv1d(const T * __restrict__ mask,
   }
 }
 
-template<typename T>
+template<typename T, int BLOCK_SIZE>
 void conv1d_tiled(const T *__restrict__ mask,
                   const T *__restrict__ in,
                         T *__restrict__ out,
                   const int input_width,
                   const int mask_width)
 {
-  #pragma omp target teams num_teams(input_width/BLOCK_SIZE) thread_limit(BLOCK_SIZE)
+  #pragma omp target teams num_teams(input_width/BLOCK_SIZE)
   {
-    T tile[TILE_SIZE + MAX_MASK_WIDTH - 1];
-    #pragma omp parallel 
+    T tile[BLOCK_SIZE + MAX_MASK_WIDTH - 1];
+    #pragma omp parallel num_threads(BLOCK_SIZE)
     {
       int bid = omp_get_team_num();
       int lid = omp_get_thread_num();
@@ -78,17 +77,17 @@ void conv1d_tiled(const T *__restrict__ mask,
   }
 }
 
-template<typename T>
+template<typename T, int BLOCK_SIZE>
 void conv1d_tiled_caching(const T *__restrict__ mask,
                           const T *__restrict__ in,
                                 T *__restrict__ out,
                           const int input_width,
                           const int mask_width)
 {
-  #pragma omp target teams num_teams(input_width/BLOCK_SIZE) thread_limit(BLOCK_SIZE)
+  #pragma omp target teams num_teams(input_width/BLOCK_SIZE)
   {
-    T tile[TILE_SIZE];
-    #pragma omp parallel 
+    T tile[BLOCK_SIZE];
+    #pragma omp parallel num_threads(BLOCK_SIZE)
     {
       int bid = omp_get_team_num();
       int lid = omp_get_thread_num();
@@ -165,40 +164,64 @@ void conv1D(const int input_width, const int mask_width, const int repeat)
                           map(alloc: b[0:input_width])
   {
     // conv1D basic
-    auto start = std::chrono::steady_clock::now();
-    for (int i = 0; i < repeat; i++) {
-      conv1d(mask, a, b, input_width, mask_width);
+    for (int bs = 64; bs <= MAX_BLOCK_SIZE; bs = bs * 2) {
+      auto start = std::chrono::steady_clock::now();
+      for (int i = 0; i < repeat; i++) {
+        switch(bs) {
+          case   64: {conv1d<T, 64>(mask, a, b, input_width, mask_width); break;}
+          case  128: {conv1d<T, 128>(mask, a, b, input_width, mask_width); break;}
+          case  256: {conv1d<T, 256>(mask, a, b, input_width, mask_width); break;}
+          case  512: {conv1d<T, 512>(mask, a, b, input_width, mask_width); break;}
+          case 1024: {conv1d<T, 1024>(mask, a, b, input_width, mask_width); break;}
+        }
+      }
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average kernel execution time of conv1d kernel: %f (us)\n",
+             (time * 1e-3f) / repeat);
+      #pragma omp target update from (b[0:input_width])
+      reference(a, b, mask, input_width, mask_width);
     }
-    auto end = std::chrono::steady_clock::now();
-    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time of conv1d kernel: %f (us)\n",
-           (time * 1e-3f) / repeat);
-    #pragma omp target update from (b[0:input_width])
-    reference(a, b, mask, input_width, mask_width);
 
     // conv1D tiling
-    start = std::chrono::steady_clock::now();
-    for (int i = 0; i < repeat; i++) {
-      conv1d_tiled(mask, a, b, input_width, mask_width);
+    for (int bs = 64; bs <= MAX_BLOCK_SIZE; bs = bs * 2) {
+      auto start = std::chrono::steady_clock::now();
+      for (int i = 0; i < repeat; i++) {
+        switch(bs) {
+          case   64: {conv1d_tiled<T, 64>(mask, a, b, input_width, mask_width); break;}
+          case  128: {conv1d_tiled<T, 128>(mask, a, b, input_width, mask_width); break;}
+          case  256: {conv1d_tiled<T, 256>(mask, a, b, input_width, mask_width); break;}
+          case  512: {conv1d_tiled<T, 512>(mask, a, b, input_width, mask_width); break;}
+          case 1024: {conv1d_tiled<T, 1024>(mask, a, b, input_width, mask_width); break;}
+        }
+      }
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average kernel execution time of conv1d-tiled kernel: %f (us)\n",
+             (time * 1e-3f) / repeat);
+      #pragma omp target update from (b[0:input_width])
+      reference(a, b, mask, input_width, mask_width);
     }
-    end = std::chrono::steady_clock::now();
-    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time of conv1d-tiled kernel: %f (us)\n",
-           (time * 1e-3f) / repeat);
-    #pragma omp target update from (b[0:input_width])
-    reference(a, b, mask, input_width, mask_width);
 
     // conv1D tiling and caching
-    start = std::chrono::steady_clock::now();
-    for (int i = 0; i < repeat; i++) {
-      conv1d_tiled_caching(mask, a, b, input_width, mask_width);
+    for (int bs = 64; bs <= MAX_BLOCK_SIZE; bs = bs * 2) {
+      auto start = std::chrono::steady_clock::now();
+      for (int i = 0; i < repeat; i++) {
+        switch(bs) {
+          case   64: {conv1d_tiled_caching<T, 64>(mask, a, b, input_width, mask_width); break;}
+          case  128: {conv1d_tiled_caching<T, 128>(mask, a, b, input_width, mask_width); break;}
+          case  256: {conv1d_tiled_caching<T, 256>(mask, a, b, input_width, mask_width); break;}
+          case  512: {conv1d_tiled_caching<T, 512>(mask, a, b, input_width, mask_width); break;}
+          case 1024: {conv1d_tiled_caching<T, 1024>(mask, a, b, input_width, mask_width); break;}
+        }
+      }
+      auto end = std::chrono::steady_clock::now();
+      auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+      printf("Average kernel execution time of conv1d-tiled-caching kernel: %f (us)\n",
+             (time * 1e-3f) / repeat);
+      #pragma omp target update from (b[0:input_width])
+      reference(a, b, mask, input_width, mask_width);
     }
-    end = std::chrono::steady_clock::now();
-    time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    printf("Average kernel execution time of conv1d-tiled-caching kernel: %f (us)\n",
-           (time * 1e-3f) / repeat);
-    #pragma omp target update from (b[0:input_width])
-    reference(a, b, mask, input_width, mask_width);
   }
 
   free(a);
@@ -213,7 +236,7 @@ int main(int argc, char* argv[]) {
 
   int input_width = atoi(argv[1]);
   // a multiple of BLOCK_SIZE
-  input_width = (input_width + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
+  input_width = (input_width + MAX_BLOCK_SIZE - 1) / MAX_BLOCK_SIZE * MAX_BLOCK_SIZE;
 
   const int repeat = atoi(argv[2]);
 
