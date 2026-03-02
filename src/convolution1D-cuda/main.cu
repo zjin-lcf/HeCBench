@@ -9,11 +9,18 @@
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
-#include <cuda.h>
+#include <cuda_runtime.h>
+
+#define GPU_CHECK(x) do { \
+    cudaError_t err = x; \
+    if (err != cudaSuccess) { \
+        printf("CUDA error %s:%d: %s\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
+        exit(1); \
+    } \
+} while (0)
 
 #define MAX_MASK_WIDTH 10
-#define BLOCK_SIZE 256
-#define TILE_SIZE BLOCK_SIZE
+#define MAX_BLOCK_SIZE 1024
 
 template<typename T>
 __constant__ T mask [MAX_MASK_WIDTH];
@@ -43,7 +50,8 @@ void conv1d_tiled(const T *__restrict__ in,
                   const int input_width,
                   const int mask_width)
 {
-  __shared__ T tile[TILE_SIZE + MAX_MASK_WIDTH - 1];
+  extern __shared__ unsigned char smem[]; // TILE_SIZE + MAX_MASK_WIDTH - 1;
+  T *tile = reinterpret_cast<T*>(smem);
   int i = threadIdx.x + blockIdx.x * blockDim.x;
 
   int n = mask_width / 2;  // last n cells of the previous tile
@@ -77,7 +85,8 @@ void conv1d_tiled_caching(const T *__restrict__ in,
                           const int input_width,
                           const int mask_width)
 {
-  __shared__ T tile[TILE_SIZE];
+  extern __shared__ unsigned char smem[]; // TILE_SIZE
+  T *tile = reinterpret_cast<T*>(smem);
 
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   tile[threadIdx.x] = in[i];
@@ -145,60 +154,71 @@ void conv1D(const int input_width, const int mask_width, const int repeat)
   }
 
   T *d_a, *d_b;
-  cudaMalloc((void **)&d_a, size_bytes);
-  cudaMalloc((void **)&d_b, size_bytes);
+  GPU_CHECK(cudaMalloc((void **)&d_a, size_bytes));
+  GPU_CHECK(cudaMalloc((void **)&d_b, size_bytes));
 
-  cudaMemcpy(d_a, a, size_bytes, cudaMemcpyHostToDevice);
-  cudaMemcpyToSymbol(mask<T>, h_mask, mask_width * sizeof(T));
+  GPU_CHECK(cudaMemcpy(d_a, a, size_bytes, cudaMemcpyHostToDevice));
+  GPU_CHECK(cudaMemcpyToSymbol(mask<T>, h_mask, mask_width * sizeof(T)));
 
-  dim3 grids (input_width / BLOCK_SIZE);
-  dim3 blocks (BLOCK_SIZE);
-
-  cudaDeviceSynchronize();
+  GPU_CHECK(cudaDeviceSynchronize());
 
   // conv1D basic
-  auto start = std::chrono::steady_clock::now();
-  for (int i = 0; i < repeat; i++) {
-    conv1d <<< grids, blocks >>> (d_a, d_b, input_width, mask_width);
+  for (int bs = 64; bs <= MAX_BLOCK_SIZE; bs = bs * 2) {
+    dim3 grids (input_width / bs);
+    dim3 blocks (bs);
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < repeat; i++) {
+      conv1d <<< grids, blocks >>> (d_a, d_b, input_width, mask_width);
+    }
+    GPU_CHECK(cudaDeviceSynchronize());
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time of conv1d kernel (block size %d): %f (us)\n",
+           bs, (time * 1e-3f) / repeat);
+    GPU_CHECK(cudaMemcpy(b, d_b, size_bytes, cudaMemcpyDeviceToHost));
+    reference(a, b, h_mask, input_width, mask_width);
   }
-  cudaDeviceSynchronize();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time of conv1d kernel: %f (us)\n",
-         (time * 1e-3f) / repeat);
-  cudaMemcpy(b, d_b, size_bytes, cudaMemcpyDeviceToHost);
-  reference(a, b, h_mask, input_width, mask_width);
 
   // conv1D tiling
-  start = std::chrono::steady_clock::now();
-  for (int i = 0; i < repeat; i++) {
-    conv1d_tiled <<< grids, blocks >>> (d_a, d_b, input_width, mask_width);
+  for (int bs = 64; bs <= MAX_BLOCK_SIZE; bs = bs * 2) {
+    dim3 grids (input_width / bs);
+    dim3 blocks (bs);
+    size_t sm_bytes = (bs + MAX_MASK_WIDTH - 1) * sizeof(T);
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < repeat; i++) {
+      conv1d_tiled <<< grids, blocks, sm_bytes, 0 >>> (d_a, d_b, input_width, mask_width);
+    }
+    GPU_CHECK(cudaDeviceSynchronize());
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time of conv1d-tiled kernel (block size %d): %f (us)\n",
+           bs, (time * 1e-3f) / repeat);
+    GPU_CHECK(cudaMemcpy(b, d_b, size_bytes, cudaMemcpyDeviceToHost));
+    reference(a, b, h_mask, input_width, mask_width);
   }
-  cudaDeviceSynchronize();
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time of conv1d-tiled kernel: %f (us)\n",
-         (time * 1e-3f) / repeat);
-  cudaMemcpy(b, d_b, size_bytes, cudaMemcpyDeviceToHost);
-  reference(a, b, h_mask, input_width, mask_width);
 
   // conv1D tiling and caching
-  start = std::chrono::steady_clock::now();
-  for (int i = 0; i < repeat; i++) {
-    conv1d_tiled_caching <<< grids, blocks >>> (d_a, d_b, input_width, mask_width);
+  for (int bs = 64; bs <= MAX_BLOCK_SIZE; bs = bs * 2) {
+    dim3 grids (input_width / bs);
+    dim3 blocks (bs);
+    size_t sm_bytes = bs * sizeof(T);
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < repeat; i++) {
+      conv1d_tiled_caching <<< grids, blocks, sm_bytes, 0 >>> (d_a, d_b, input_width, mask_width);
+    }
+    GPU_CHECK(cudaDeviceSynchronize());
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time of conv1d-tiled-caching kernel (block size %d): %f (us)\n",
+           bs, (time * 1e-3f) / repeat);
+    GPU_CHECK(cudaMemcpy(b, d_b, size_bytes, cudaMemcpyDeviceToHost));
+    reference(a, b, h_mask, input_width, mask_width);
   }
-  cudaDeviceSynchronize();
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time of conv1d-tiled-caching kernel: %f (us)\n",
-         (time * 1e-3f) / repeat);
-  cudaMemcpy(b, d_b, size_bytes, cudaMemcpyDeviceToHost);
-  reference(a, b, h_mask, input_width, mask_width);
 
   free(a);
   free(b);
-  cudaFree(d_a);
-  cudaFree(d_b);
+  GPU_CHECK(cudaFree(d_a));
+  GPU_CHECK(cudaFree(d_b));
 }
 
 int main(int argc, char* argv[]) {
@@ -208,8 +228,8 @@ int main(int argc, char* argv[]) {
   }
 
   int input_width = atoi(argv[1]);
-  // a multiple of BLOCK_SIZE
-  input_width = (input_width + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
+  // a multiple of MAX BLOCK_SIZE
+  input_width = (input_width + MAX_BLOCK_SIZE - 1) / MAX_BLOCK_SIZE * MAX_BLOCK_SIZE;
 
   const int repeat = atoi(argv[2]);
 
