@@ -19,17 +19,7 @@
 #endif
 
 #define MAX_MASK_WIDTH 10
-#define BLOCK_SIZE 256
-#define TILE_SIZE BLOCK_SIZE
-
-template<typename T>
-class k1;
-
-template<typename T>
-class k2;
-
-template<typename T>
-class k3;
+#define MAX_BLOCK_SIZE 1024
 
 template<typename T>
 void conv1d(sycl::nd_item<1> &item,
@@ -174,68 +164,77 @@ void conv1D(sycl::queue &q, const int input_width, const int mask_width, const i
   q.memcpy(d_a, a, size_bytes);
   q.memcpy(mask, h_mask, mask_width * sizeof(T));
 
-  sycl::range<1> gws (input_width);
-  sycl::range<1> lws (BLOCK_SIZE);
-
   q.wait();
 
   // conv1D basic
-  auto start = std::chrono::steady_clock::now();
-  for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      cgh.parallel_for<class k1<T>>(
-        sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        conv1d(item, mask, d_a, d_b, input_width, mask_width);
+  for (int bs = 64; bs <= MAX_BLOCK_SIZE; bs = bs * 2) {
+    sycl::range<1> gws (input_width);
+    sycl::range<1> lws (bs);
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < repeat; i++) {
+      q.submit([&] (sycl::handler &cgh) {
+        cgh.parallel_for(
+          sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          conv1d(item, mask, d_a, d_b, input_width, mask_width);
+        });
       });
-    });
+    }
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time of conv1d kernel: %f (us)\n",
+           (time * 1e-3f) / repeat);
+    q.memcpy(b, d_b, size_bytes).wait();
+    reference(a, b, h_mask, input_width, mask_width);
   }
-  q.wait();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time of conv1d kernel: %f (us)\n",
-         (time * 1e-3f) / repeat);
-  q.memcpy(b, d_b, size_bytes).wait();
-  reference(a, b, h_mask, input_width, mask_width);
 
   // conv1D tiling
-  start = std::chrono::steady_clock::now();
-  for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      sycl::local_accessor<T, 1> tile (sycl::range<1>(TILE_SIZE + MAX_MASK_WIDTH - 1), cgh);
-      cgh.parallel_for<class k2<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        conv1d_tiled(item,
-                     tile.template get_multi_ptr<sycl::access::decorated::no>().get(),
-                     mask, d_a, d_b, input_width, mask_width);
+  for (int bs = 64; bs <= MAX_BLOCK_SIZE; bs = bs * 2) {
+    sycl::range<1> gws (input_width);
+    sycl::range<1> lws (bs);
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < repeat; i++) {
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<T, 1> tile (sycl::range<1>(bs + MAX_MASK_WIDTH - 1), cgh);
+        cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          conv1d_tiled(item,
+                       tile.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                       mask, d_a, d_b, input_width, mask_width);
+        });
       });
-    });
+    }
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time of conv1d-tiled kernel: %f (us)\n",
+           (time * 1e-3f) / repeat);
+    q.memcpy(b, d_b, size_bytes).wait();
+    reference(a, b, h_mask, input_width, mask_width);
   }
-  q.wait();
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time of conv1d-tiled kernel: %f (us)\n",
-         (time * 1e-3f) / repeat);
-  q.memcpy(b, d_b, size_bytes).wait();
-  reference(a, b, h_mask, input_width, mask_width);
 
   // conv1D tiling and caching
-  start = std::chrono::steady_clock::now();
-  for (int i = 0; i < repeat; i++) {
-    q.submit([&] (sycl::handler &cgh) {
-      sycl::local_accessor<T, 1> tile (sycl::range<1>(TILE_SIZE), cgh);
-      cgh.parallel_for<class k3<T>>(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
-        conv1d_tiled_caching(item,
-                             tile.template get_multi_ptr<sycl::access::decorated::no>().get(),
-                             mask, d_a, d_b, input_width, mask_width);
+  for (int bs = 64; bs <= MAX_BLOCK_SIZE; bs = bs * 2) {
+    sycl::range<1> gws (input_width);
+    sycl::range<1> lws (bs);
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < repeat; i++) {
+      q.submit([&] (sycl::handler &cgh) {
+        sycl::local_accessor<T, 1> tile (sycl::range<1>(bs), cgh);
+        cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=] (sycl::nd_item<1> item) {
+          conv1d_tiled_caching(item,
+                               tile.template get_multi_ptr<sycl::access::decorated::no>().get(),
+                               mask, d_a, d_b, input_width, mask_width);
+        });
       });
-    });
+    }
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Average kernel execution time of conv1d-tiled-caching kernel: %f (us)\n",
+           (time * 1e-3f) / repeat);
+    q.memcpy(b, d_b, size_bytes).wait();
+    reference(a, b, h_mask, input_width, mask_width);
   }
-  q.wait();
-  end = std::chrono::steady_clock::now();
-  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average kernel execution time of conv1d-tiled-caching kernel: %f (us)\n",
-         (time * 1e-3f) / repeat);
-  q.memcpy(b, d_b, size_bytes).wait();
-  reference(a, b, h_mask, input_width, mask_width);
 
   free(a);
   free(b);
@@ -251,8 +250,8 @@ int main(int argc, char* argv[]) {
   }
 
   int input_width = atoi(argv[1]);
-  // a multiple of BLOCK_SIZE
-  input_width = (input_width + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
+  // a multiple of MAX BLOCK_SIZE
+  input_width = (input_width + MAX_BLOCK_SIZE - 1) / MAX_BLOCK_SIZE * MAX_BLOCK_SIZE;
 
   const int repeat = atoi(argv[2]);
 
