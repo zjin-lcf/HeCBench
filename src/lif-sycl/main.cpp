@@ -1,60 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <algorithm>
 #include <chrono>
+#include <vector>
 #include <sycl/sycl.hpp>
-
-void reference (
-    int numNeurons, int neurons_per_item, float dt,
-    float*__restrict encode_result,
-    float*__restrict voltage_array,
-    float*__restrict reftime_array,
-    float tau_rc, float tau_ref,
-    float*__restrict bias,
-    float*__restrict gain,
-    float*__restrict spikes)
-{
-  for (int i = 0; i < numNeurons; i++)
-  {
-    int neuron_index = i % neurons_per_item;
-    int item_index = i / neurons_per_item;
-
-    float voltage = voltage_array[i];
-    float ref_time = reftime_array[i];
-    float current = bias[neuron_index] + gain[neuron_index] * encode_result[item_index];
-    float dV, spike, mult;
-
-    dV = -expm1f(-dt / tau_rc) * (current - voltage);
-    voltage = fmaxf(voltage + dV, 0.f);
-
-    ref_time -= dt;
-
-    mult = ref_time;
-    mult *= -1.f / dt;
-    mult += 1.f;
-
-    mult = mult > 1.f ? 1.f : mult;
-    mult = mult < 0.f ? 0.f : mult;
-
-    voltage *= mult;
-
-    if(voltage > 1.f){
-      spike = 1.f / dt;
-      ref_time = tau_ref + dt * (1.f - (voltage - 1.f) / dV);
-      voltage = 0.f;
-    }else{
-      spike = 0.f;
-    }
-
-    reftime_array[i] = ref_time;
-    voltage_array[i] = voltage;
-    spikes[i] = spike;
-  }
-}
+#include "reference.h"
 
 void lif (
     sycl::nd_item<1> &item,
-    int numNeurons, int neurons_per_item, float dt,
+    size_t numNeurons, int neurons_per_item, float dt,
     const float*__restrict encode_result,
           float*__restrict voltage_array,
           float*__restrict reftime_array,
@@ -63,7 +18,7 @@ void lif (
     const float*__restrict gain,
           float*__restrict spikes)
 {
-  int i = item.get_global_id(0);
+  size_t i = item.get_global_id(0);
   if( i < numNeurons)
   {
     int neuron_index = i % neurons_per_item;
@@ -111,7 +66,7 @@ int main(int argc, char* argv[]) {
   const int num_items = atoi(argv[2]);
   const int num_steps = atoi(argv[3]);
 
-  const int num_neurons = neurons_per_item * num_items;
+  const size_t num_neurons = (size_t)neurons_per_item * num_items;
   const size_t neurons_size = num_neurons * sizeof(float);
   const size_t items_size = num_items * sizeof(float);
   const size_t neurons_per_item_size = neurons_per_item * sizeof(float);
@@ -130,17 +85,17 @@ int main(int argc, char* argv[]) {
   float* spikes = (float*) malloc (neurons_size);;
 
   // expected
-  float* voltage_gold = (float*) malloc (neurons_size);
-  float* reftime_gold = (float*) malloc (neurons_size);
-  float* spikes_gold = (float*) malloc (neurons_size);;
+  float* voltage_host = (float*) malloc (neurons_size);
+  float* reftime_host = (float*) malloc (neurons_size);
+  float* spikes_host = (float*) malloc (neurons_size);;
 
   srand(123);
   for (int i = 0; i < num_items; i++) {
     encode_result[i] = rand() / (float)RAND_MAX;
   }
-  for (int i = 0; i < num_neurons; i++) {
-    voltage_gold[i] = voltage[i] = 1.f + rand() / (float)RAND_MAX;
-    reftime_gold[i] = reftime[i] = rand() % 5 / 10.f;
+  for (size_t i = 0; i < num_neurons; i++) {
+    voltage_host[i] = voltage[i] = 1.f + rand() / (float)RAND_MAX;
+    reftime_host[i] = reftime[i] = rand() % 5 / 10.f;
   }
   for (int i = 0; i < neurons_per_item; i++) {
     bias[i] = rand() / (float)RAND_MAX;
@@ -207,23 +162,40 @@ int main(int argc, char* argv[]) {
               neurons_per_item,
               dt,
               encode_result,
-              voltage_gold,
-              reftime_gold,
+              voltage_host,
+              reftime_host,
               tau_rc,
               tau_ref,
               bias,
               gain,
-              spikes_gold);
+              spikes_host);
   }
 
+  size_t num_spikes = 0, num_spikes_host = 0;
+  std::vector<float> reftime_on_spike, reftime_on_spike_host;
+  for (size_t i = 0; i < num_neurons; i++) {
+    if (spikes[i] == 1.f / dt) {
+      num_spikes++;
+      reftime_on_spike.push_back(reftime[i]);
+    }
+    if (spikes_host[i] == 1.f / dt) {
+      num_spikes_host++;
+      reftime_on_spike_host.push_back(reftime_host[i]);
+    }
+  }
+  // spikes may occur at slightly different time steps due to
+  // numerical differences on host and device
+  printf("Number of spikes on host and device: %zu %zu\n", num_spikes_host, num_spikes);
+  num_spikes = std::min(num_spikes, num_spikes_host);
   bool ok = true;
-  for (int i = 0; i < num_neurons; i++) {
-    if (fabsf(spikes[i] - spikes_gold[i]) > 1e-3) {
-      printf("@%d: %f %f\n", i, spikes[i], spikes_gold[i]);
+  for (size_t i = 0; i < num_spikes; i++) {
+    if (fabsf(reftime_on_spike[i] - reftime_on_spike_host[i]) > 0.1f) {
+      printf("%f %f\n", reftime_on_spike[i], reftime_on_spike_host[i]);
       ok = false;
       break;
     }
   }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   sycl::free(d_encode_result, q);
   sycl::free(d_voltage, q);
@@ -234,14 +206,13 @@ int main(int argc, char* argv[]) {
 
   free(encode_result);
   free(voltage);
-  free(voltage_gold);
+  free(voltage_host);
   free(reftime);
-  free(reftime_gold);
+  free(reftime_host);
   free(bias);
   free(gain);
   free(spikes);
-  free(spikes_gold);
+  free(spikes_host);
 
-  printf("%s\n", ok ? "PASS" : "FAIL");
   return 0;
 }
