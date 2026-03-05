@@ -14,22 +14,24 @@ template <typename T> void store_kv_cache(sycl::queue &q, int32_t repeat) try {
    const auto elem_size = sizeof(uint64_t);
 
    uint64_t *k, *v, *k_cache, *v_cache;
+   uint64_t *h_k, *h_v, *h_k_cache, *h_v_cache;
+   uint64_t *r_k_cache, *r_v_cache;
    T *indices;
 
    T *h_indices = (T*) malloc (cache_size * sizeof(T));
 
    auto sg_sizes = q.get_device().get_info<sycl::info::device::sub_group_sizes>();
    auto r = std::max_element(sg_sizes.begin(), sg_sizes.end());
-   int warpSize = *r;
+   const int warpSize = *r;
 
    // D is item_size
    for (int32_t item_size = warpSize/2/num_layers; item_size <= 1024; item_size *= 2) {
 
      uint64_t kvc_size = (uint64_t)num_layers * cache_size * item_size;
-     uint64_t *h_k_cache = (uint64_t*) malloc (kvc_size * elem_size);
-     uint64_t *h_v_cache = (uint64_t*) malloc (kvc_size * elem_size);
-     uint64_t *r_k_cache = (uint64_t*) malloc (kvc_size * elem_size);
-     uint64_t *r_v_cache = (uint64_t*) malloc (kvc_size * elem_size);
+     h_k_cache = (uint64_t*) malloc (kvc_size * elem_size);
+     h_v_cache = (uint64_t*) malloc (kvc_size * elem_size);
+     r_k_cache = (uint64_t*) malloc (kvc_size * elem_size);
+     r_v_cache = (uint64_t*) malloc (kvc_size * elem_size);
 
      k_cache = (uint64_t *)sycl::malloc_device(kvc_size * elem_size, q);
      v_cache = (uint64_t *)sycl::malloc_device(kvc_size * elem_size, q);
@@ -42,8 +44,8 @@ template <typename T> void store_kv_cache(sycl::queue &q, int32_t repeat) try {
        }
 
        uint64_t kv_size = (uint64_t)num_layers * batch_size * item_size;
-       uint64_t *h_k = (uint64_t*) malloc (kv_size * elem_size);
-       uint64_t *h_v = (uint64_t*) malloc (kv_size * elem_size);
+       h_k = (uint64_t*) malloc (kv_size * elem_size);
+       h_v = (uint64_t*) malloc (kv_size * elem_size);
 
        k = (uint64_t *)sycl::malloc_device(kv_size * elem_size, q);
        v = (uint64_t *)sycl::malloc_device(kv_size * elem_size, q);
@@ -72,6 +74,10 @@ template <typename T> void store_kv_cache(sycl::queue &q, int32_t repeat) try {
          h_k[i] = d(gen) * kv_size;
          h_v[i] = d(gen) * kv_size;
        }
+
+       q.memcpy(k, h_k, elem_size * kv_size);
+       q.memcpy(v, h_v, elem_size * kv_size);
+
        // reference
        #pragma omp parallel for collapse(2)
        for (uint32_t i = 0; i < batch_size; i++) {
@@ -80,9 +86,6 @@ template <typename T> void store_kv_cache(sycl::queue &q, int32_t repeat) try {
            r_v_cache[h_indices[i] * kv_cache_stride + j] = h_v[i * kv_input_stride + j];
          }
        }
-
-       q.memcpy(k, h_k, elem_size * kv_size).wait();
-       q.memcpy(v, h_v, elem_size * kv_size).wait();
 
        const auto num_threads = 256;
        const auto num_warps = num_threads / warpSize;
@@ -99,60 +102,60 @@ template <typename T> void store_kv_cache(sycl::queue &q, int32_t repeat) try {
            const auto items_per_warp = row_size_bytes / (elem_size * warpSize * 4);
            if (warpSize == 64)  
              q.parallel_for(nr, [=](sycl::nd_item<1> item) {
-                  store_kv_cache_256x1_v4<uint64_t, 64>(k_cache, v_cache, indices, batch_size,
-                                          k, v, kv_cache_stride, kv_input_stride,
-                                          items_per_warp, item);
-                });
+               store_kv_cache_256x1_v4<uint64_t, 64>(k_cache, v_cache, indices, batch_size,
+                                       k, v, kv_cache_stride, kv_input_stride,
+                                       items_per_warp, item);
+             });
            else
              q.parallel_for(nr, [=](sycl::nd_item<1> item) {
-                  store_kv_cache_256x1_v4(k_cache, v_cache, indices, batch_size,
-                                          k, v, kv_cache_stride, kv_input_stride,
-                                          items_per_warp, item);
-                });
+               store_kv_cache_256x1_v4(k_cache, v_cache, indices, batch_size,
+                                       k, v, kv_cache_stride, kv_input_stride,
+                                       items_per_warp, item);
+             });
          }
          else if (row_size_bytes % (elem_size * warpSize * 2) == 0) {
            const auto items_per_warp = row_size_bytes / (elem_size * warpSize * 2);
            if (warpSize == 64)  
              q.parallel_for(nr, [=](sycl::nd_item<1> item) {
-                store_kv_cache_256x1_v2<uint64_t, 64>(k_cache, v_cache, indices, batch_size,
-                                        k, v, kv_cache_stride, kv_input_stride,
-                                        items_per_warp, item);
-              });
+               store_kv_cache_256x1_v2<uint64_t, 64>(k_cache, v_cache, indices, batch_size,
+                                       k, v, kv_cache_stride, kv_input_stride,
+                                       items_per_warp, item);
+             });
            else
              q.parallel_for(nr, [=](sycl::nd_item<1> item) {
-                store_kv_cache_256x1_v2(k_cache, v_cache, indices, batch_size,
-                                        k, v, kv_cache_stride, kv_input_stride,
-                                        items_per_warp, item);
-              });
+               store_kv_cache_256x1_v2(k_cache, v_cache, indices, batch_size,
+                                       k, v, kv_cache_stride, kv_input_stride,
+                                       items_per_warp, item);
+             });
          }
          else if (row_size_bytes % (elem_size * warpSize) == 0) {
            const auto items_per_warp = row_size_bytes / (elem_size * warpSize);
            if (warpSize == 64)  
              q.parallel_for(nr, [=](sycl::nd_item<1> item) {
-                store_kv_cache_256x1<uint64_t, 64>(k_cache, v_cache, indices, batch_size, k,
-                                     v, kv_cache_stride, kv_input_stride,
-                                     items_per_warp, item);
-              });
+               store_kv_cache_256x1<uint64_t, 64>(k_cache, v_cache, indices, batch_size, k,
+                                    v, kv_cache_stride, kv_input_stride,
+                                    items_per_warp, item);
+             });
            else
              q.parallel_for(nr, [=](sycl::nd_item<1> item) {
-                store_kv_cache_256x1(k_cache, v_cache, indices, batch_size, k,
-                                     v, kv_cache_stride, kv_input_stride,
-                                     items_per_warp, item);
-              });
+               store_kv_cache_256x1(k_cache, v_cache, indices, batch_size, k,
+                                    v, kv_cache_stride, kv_input_stride,
+                                    items_per_warp, item);
+             });
          } else if (row_size_bytes % (elem_size * warpSize / 2) == 0) {
            const auto items_per_warp = row_size_bytes / (elem_size * warpSize / 2);
            if (warpSize == 64)  
              q.parallel_for(nr, [=](sycl::nd_item<1> item) {
-                store_kv_cache_128x2<uint64_t, 64>(k_cache, v_cache, indices, batch_size, k,
-                                     v, kv_cache_stride, kv_input_stride,
-                                     items_per_warp, item);
-              });
+               store_kv_cache_128x2<uint64_t, 64>(k_cache, v_cache, indices, batch_size, k,
+                                    v, kv_cache_stride, kv_input_stride,
+                                    items_per_warp, item);
+             });
            else
              q.parallel_for(nr, [=](sycl::nd_item<1> item) {
-                store_kv_cache_128x2(k_cache, v_cache, indices, batch_size, k,
-                                     v, kv_cache_stride, kv_input_stride,
-                                     items_per_warp, item);
-              });
+               store_kv_cache_128x2(k_cache, v_cache, indices, batch_size, k,
+                                    v, kv_cache_stride, kv_input_stride,
+                                    items_per_warp, item);
+             });
          } else {
            printf("The last dimension size bytes of k and v must be divisible by %lu at least, got: %lu\n",
                   elem_size * warpSize / 2, row_size_bytes);
