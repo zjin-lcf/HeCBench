@@ -141,7 +141,6 @@ int main(int argc, char* argv[])
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
-  if (!ok) exit(1);
 
   ok = true;
   q.memcpy(d_output, input, src_size_bytes).wait();
@@ -163,7 +162,6 @@ int main(int argc, char* argv[])
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
-  if (!ok) exit(1);
 
   q.wait(); 
   auto start = std::chrono::steady_clock::now();
@@ -205,5 +203,7 @@ int main(int argc, char* argv[])
   free(output_ref);
   free(bias);
 
+  if (!ok) return 1;
+  if (!ok) return 1;
   return 0;
 }

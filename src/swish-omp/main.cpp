@@ -82,7 +82,6 @@ void eval_swish (const int N, const int repeat) {
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
-  if (!ok) exit(1);
 
   free(h_X);
   free(h_Y);
@@ -104,5 +103,6 @@ int main(int argc, char* argv[])
 
   eval_swish<float>(N, repeat);
 
+  if (!ok) return 1;
   return 0;
 }
