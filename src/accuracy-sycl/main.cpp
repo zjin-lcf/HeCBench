@@ -123,6 +123,7 @@ int main(int argc, char* argv[])
     q.memcpy(&count, d_count, sizeof(int)).wait();
     bool ok = (count == count_ref);
     printf("%s\n", ok ? "PASS" : "FAIL");
+    if (!ok) exit(1);
     // printf("Accuracy = %f\n", (float)count / nrows);
   }
 

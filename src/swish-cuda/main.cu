@@ -104,6 +104,7 @@ void eval_swish (const int N, const int repeat) {
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
+  if (!ok) exit(1);
 
   cudaFree(d_X);
   cudaFree(d_Y);

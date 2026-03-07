@@ -114,6 +114,7 @@ int main(int argc, char* argv[])
     cudaMemcpy(&count, d_count, sizeof(int), cudaMemcpyDeviceToHost);
     bool ok = (count == count_ref);
     printf("%s\n", ok ? "PASS" : "FAIL");
+    if (!ok) exit(1);
     // printf("Accuracy = %f\n", (float)count / nrows);
   }
 

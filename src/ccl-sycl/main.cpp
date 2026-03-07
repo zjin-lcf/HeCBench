@@ -141,6 +141,7 @@ int main(int argc, char *argv[]) {
     free(h_recvbuff);
 
     printf("MPI Rank %d: %s\n", myRank, ok ? "PASS" : "FAIL");
+    if (!ok) exit(1);
   }
 
   //finalizing MPI

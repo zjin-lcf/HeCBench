@@ -114,6 +114,7 @@ int main(int argc, char* argv[])
     hipMemcpy(&count, d_count, sizeof(int), hipMemcpyDeviceToHost);
     bool ok = (count == count_ref);
     printf("%s\n", ok ? "PASS" : "FAIL");
+    if (!ok) exit(1);
     // printf("Accuracy = %f\n", (float)count / nrows);
   }
 
