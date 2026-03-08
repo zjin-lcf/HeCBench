@@ -227,14 +227,14 @@ int main(int argc, char **argv) {
         q.memcpy(d_model_candidate, h_model_candidate, p.max_iter * sizeof(int));
         q.memcpy(d_outliers_candidate, h_outliers_candidate, p.max_iter * sizeof(int));
         q.memcpy(d_model_param_local, h_model_param_local, 4 * p.max_iter * sizeof(float));
-        q.memcpy(d_g_out_id, h_g_out_id, sizeof(int));
+        q.memcpy(d_g_out_id, h_g_out_id, sizeof(int)).wait();
 
         // Launch CPU threads
         std::thread main_thread(run_cpu_threads, h_model_param_local, h_flow_vector_array, n_flow_vectors,
             h_random_numbers, p.max_iter, p.error_threshold, p.convergence_threshold, h_g_out_id, p.n_threads);
         main_thread.join();
 
-        q.memcpy(d_model_param_local, h_model_param_local, 4 * p.max_iter * sizeof(float));
+        q.memcpy(d_model_param_local, h_model_param_local, 4 * p.max_iter * sizeof(float)).wait();
 
         // Launch GPU threads
         // Kernel launch
