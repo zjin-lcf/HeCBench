@@ -1,12 +1,13 @@
 #include "../main.h"                // (in main directory)            needed to recognized input parameters
 #include "../util/avi/avilib.h"          // (in directory)              needed by avi functions
 #include "../util/avi/avimod.h"          // (in directory)              needed by avi functions
+#include "../util/timer/timer.h"
 #include <iostream>
 #include <omp.h>
 #include <math.h>
 
 
-void 
+uint64_t 
 kernel_gpu_wrapper(  params_common common,
     int* endoRow,
     int* endoCol,
@@ -406,6 +407,8 @@ kernel_gpu_wrapper(  params_common common,
 #pragma omp target data map(alloc: checksum[0:CHECK])
 #endif
 
+  uint64_t start_time = get_time();
+
   for(frame_no=0; frame_no<common.frames_processed; frame_no++){
 
     //==================================================50
@@ -517,7 +520,8 @@ kernel_gpu_wrapper(  params_common common,
     //==================================================50
 
   }
-}
+  uint64_t end_time = get_time();
+  }
 
 #ifdef TEST_CHECKSUM
   free(checksum);
@@ -549,6 +553,7 @@ kernel_gpu_wrapper(  params_common common,
 
   printf("\n");
   fflush(NULL);
+  return end_time - start_time;
 }
 
 //========================================================================================================================================================================================================200
