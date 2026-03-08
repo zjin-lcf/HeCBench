@@ -58,7 +58,6 @@ float4 firstEigenVector( float* matrix )
     // 8 iterations seems to be more than enough.
 
     float4 v = {1.0f, 1.0f, 1.0f, 0.0f};
-    #pragma unroll
     for(int i = 0; i < 8; i++) {
       float x = v.x * matrix[0] + v.y * matrix[1] + v.z * matrix[2];
       float y = v.x * matrix[1] + v.y * matrix[3] + v.z * matrix[4];
@@ -101,7 +100,6 @@ float4 bestFitLine( const float4 * colors, float4 color_sum,  float* covariance)
     covariance[6 * idx + 4] = diff.y * diff.z;
     covariance[6 * idx + 5] = diff.z * diff.z;
 
-    #pragma unroll
     for(int d = 8; d > 0; d >>= 1)
     {
         if (idx < d)
@@ -128,7 +126,6 @@ void sortColors( const float * values,  int * ranks)
 
     int rank = 0;
 
-    #pragma unroll
     for (int i = 0; i < 16; i++)
     {
         rank += (values[i] < values[tid]);
@@ -137,7 +134,6 @@ void sortColors( const float * values,  int * ranks)
     ranks[tid] = rank;
 
     // Resolve elements with the same index.
-    #pragma unroll
     for (int i = 0; i < 15; i++)
     {
         if (tid > i && ranks[tid] == ranks[i]) ++ranks[tid];
@@ -205,7 +201,6 @@ float evalPermutation( const float4* colors, uint permutation, ushort* start, us
     int akku = 0;
 
     // Compute alpha & beta for this permutation.
-    #pragma unroll
     for (int i = 0; i < 16; i++)
     {
         const uint bits = permutation >> (2*i);
@@ -244,7 +239,6 @@ float evalPermutation3(const float4 * colors, uint permutation, ushort * start, 
     int akku = 0;
 
     // Compute alpha & beta for this permutation.
-    #pragma unroll
     for (int i = 0; i < 16; i++)
     {
         const uint bits = permutation >> (2*i);
@@ -288,7 +282,6 @@ uint4 evalAllPermutations(const float4 * colors,  const unsigned int * permutati
   
     float bestError = FLT_MAX;
     
-    #pragma unroll
     for(int i = 0; i < 16; i++)
     {
       int pidx = idx + NUM_THREADS * i;
@@ -317,7 +310,6 @@ uint4 evalAllPermutations(const float4 * colors,  const unsigned int * permutati
         bestPermutation ^= 0x55555555;    // Flip indices.
     }
 
-    #pragma unroll
     for(int i = 0; i < 3; i++)
     {
         int pidx = idx + NUM_THREADS * i;
@@ -392,7 +384,6 @@ void saveBlockDXT1(uint start, uint end, uint permutation,  int* xrefs,  uint* r
     
     // Reorder permutation.
     uint indices = 0;
-    #pragma unroll
     for(int i = 0; i < 16; i++)
     {
         int ref = xrefs[i];

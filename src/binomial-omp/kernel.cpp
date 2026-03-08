@@ -111,7 +111,6 @@ extern "C" void binomialOptionsGPU(
           const real pdByDf = d_OptionData[bid].pdByDf;
   
           real call[ELEMS_PER_THREAD + 1];
-          #pragma unroll
           for(int i = 0; i < ELEMS_PER_THREAD; ++i)
             call[i] = expiryCallValue(S, X, vDt, tid * ELEMS_PER_THREAD + i);
   
@@ -120,7 +119,6 @@ extern "C" void binomialOptionsGPU(
   
           int final_it = max(0, tid * ELEMS_PER_THREAD - 1);
   
-          #pragma unroll 16
           for(int i = NUM_STEPS; i > 0; --i)
           {
             call_exchange[tid] = call[0];
@@ -130,7 +128,6 @@ extern "C" void binomialOptionsGPU(
   
             if (i > final_it)
             {
-              #pragma unroll
               for(int j = 0; j < ELEMS_PER_THREAD; ++j)
                 call[j] = puByDf * call[j + 1] + pdByDf * call[j];
             }

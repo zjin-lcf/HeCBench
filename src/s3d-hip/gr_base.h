@@ -64,7 +64,6 @@ gr_base(const real* P, const real* T, const real* Y, real* C, real TCONV,
 
     SUM = DIV (PRES, (SUM * (TEMP) * (real)8.314510e7));
 
-#pragma unroll 22
     for (unsigned k=1; k<=22; k++) {
         C(k) = MAX(C(k), SMALL) * SUM;
     }

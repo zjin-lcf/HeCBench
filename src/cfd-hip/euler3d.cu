@@ -239,7 +239,6 @@ compute_flux(
   Float3 flux_contribution_nb_density_energy;  
   float speed_sqd_nb, speed_of_sound_nb, pressure_nb;
 
-#pragma unroll
   for(j = 0; j < NNB; j++)
   {
     nb = elements_surrounding_elements[i + j*nelr];

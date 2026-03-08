@@ -31,9 +31,7 @@ void compute_sad_array(
   if (row < image_height && col < image_width) {
     const int overlap_width = min(image_width - col, kernel_width);
     const int overlap_height = min(image_height - row, kernel_height);
-    #pragma unroll 4
     for (int kr = 0; kr < overlap_height; kr++) {
-      #pragma unroll 4
       for (int kc = 0; kc < overlap_width; kc++) {
         const int image_addr = ((row + kr) * image_width + (col + kc)) * 3;
         const int kernel_addr = (kr * kernel_width + kc) * 3;

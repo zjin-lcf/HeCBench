@@ -48,7 +48,6 @@ ThreadReduce(T *input,                 ///< [in] Input array
 {
     AccumT retval = prefix;
 
-    #pragma unroll
     for (int i = 0; i < LENGTH; ++i)
         retval = reduction_op(retval, input[i]);
 

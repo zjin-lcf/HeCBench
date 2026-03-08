@@ -125,7 +125,6 @@ __global__ void resize_bilinear(
         int in_offset_r1 = c_start * in_image_size + in_y2 * in_width;
         int out_idx = c_start * out_image_size + y * out_width + x;
 
-        #pragma unroll 1 /* disable unrolling to reduce register pressure; not sure how but it works */
         for (auto c = c_start; c < c_end; c++) {
             auto v_00 = input[in_offset_r0 + in_x0],
                  v_01 = input[in_offset_r0 + in_x1],

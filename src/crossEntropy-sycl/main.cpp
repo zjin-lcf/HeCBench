@@ -84,7 +84,6 @@ float loss_bwd_kernel(
 
       float sum_value = tmp_grad * log_softmax[sum_offset];
 
-      #pragma unroll
       for (int i = 0; i < W; ++i) {
         int in_offset = group_id_bs * W * H + i * H + linear_x_id;
         float tmp_sfm = sycl::exp(log_softmax[in_offset]) * sum_value;

@@ -629,7 +629,6 @@ void delete_unit_bulk(uint32_t &laneId, KeyT &myKey,
   uint32_t rootAddress = *d_root;
   auto sg = item.get_sub_group();
 
-#pragma unroll
   for (int src_lane = 0; src_lane < WARP_WIDTH; src_lane++) {
     KeyT src_key = sycl::select_from_group(sg, myKey, src_lane);
     KeyT next = rootAddress;

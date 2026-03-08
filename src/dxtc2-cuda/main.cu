@@ -427,7 +427,6 @@ __global__ void compress(const uint *permutations, const uint *image,
 
   if (idx < 16) {
     int rank = 0;
-    #pragma unroll
     for (int i = 0; i < 16; i++) {
       rank += (dps[i] < dps[idx]);
     }

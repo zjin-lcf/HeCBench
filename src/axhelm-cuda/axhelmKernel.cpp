@@ -27,7 +27,6 @@ __global__ void axhelm(const int Nelements,
     r_q[k] = Q[base + k * 8 * 8];
     r_Aq[k] = 0;
   }
-#pragma unroll 8
   for (int k = 0; k < 8; ++k) {
     const int id = e * 512 + k * 8 * 8 + j * 8 + i;
     const int gbase = e * p_Nggeo * 512 + k * 8 * 8 + j * 8 + i;
@@ -43,14 +42,12 @@ __global__ void axhelm(const int Nelements,
     __syncthreads();
     s_q[j*8+i] = r_q[k];
     r_qt = 0;
-#pragma unroll 8
     for (int m = 0; m < 8; ++m) {
       r_qt += s_D[k*8+m] * r_q[m];
     }
     __syncthreads();
     dfloat qr = 0;
     dfloat qs = 0;
-#pragma unroll 8
     for (int m = 0; m < 8; ++m) {
       qr += s_D[i*8+m] * s_q[j*8+m];
       qs += s_D[j*8+m] * s_q[m*8+i];
@@ -60,7 +57,6 @@ __global__ void axhelm(const int Nelements,
     r_Gqt = r_lam0 * (r_G02 * qr + r_G12 * qs + r_G22 * r_qt);
     r_Auk = r_GwJ * r_lam1 * r_q[k];
     __syncthreads();
-#pragma unroll 8
     for (int m = 0; m < 8; ++m) {
       r_Auk += s_D[m*8+j] * s_Gqs[m*8+i];
       r_Aq[m] += s_D[k*8+m] * r_Gqt;
@@ -69,7 +65,6 @@ __global__ void axhelm(const int Nelements,
     r_Aq[k] += r_Auk;
     __syncthreads();
   }
-#pragma unroll 8
   for (int k = 0; k < 8; ++k) {
     const int id = e * 512 + k * 8 * 8 + j * 8 + i;
     Aq[id] = r_Aq[k];
@@ -113,7 +108,6 @@ __global__ void axhelm_n3(const int Nelements,
     r_AV[k] = 0;
     r_AW[k] = 0;
   }
-#pragma unroll 8
   for (int k = 0; k < 8; ++k) {
     const int id = e * 512 + k * 8 * 8 + j * 8 + i;
     const int gbase = e * p_Nggeo * 512 + k * 8 * 8 + j * 8 + i;
@@ -133,7 +127,6 @@ __global__ void axhelm_n3(const int Nelements,
     r_Ut = 0;
     r_Vt = 0;
     r_Wt = 0;
-#pragma unroll 8
     for (int m = 0; m < 8; m++) {
       dfloat Dkm = s_D[k*8+m];
       r_Ut += Dkm * r_U[m];
@@ -144,7 +137,6 @@ __global__ void axhelm_n3(const int Nelements,
     dfloat Ur = 0, Us = 0;
     dfloat Vr = 0, Vs = 0;
     dfloat Wr = 0, Ws = 0;
-#pragma unroll 8
     for (int m = 0; m < 8; m++) {
       dfloat Dim = s_D[i*8+m];
       dfloat Djm = s_D[j*8+m];
@@ -169,7 +161,6 @@ __global__ void axhelm_n3(const int Nelements,
     r_AW[k] += r_GwJ * r_lam1 * r_W[k];
     __syncthreads();
     dfloat AUtmp = 0, AVtmp = 0, AWtmp = 0;
-#pragma unroll 8
     for (int m = 0; m < 8; m++) {
       dfloat Dmi = s_D[m*8+i];
       dfloat Dmj = s_D[m*8+j];
@@ -188,7 +179,6 @@ __global__ void axhelm_n3(const int Nelements,
     r_AV[k] += AVtmp;
     r_AW[k] += AWtmp;
   }
-#pragma unroll 8
   for (int k = 0; k < 8; k++) {
     const int id = e * 512 + k * 8 * 8 + j * 8 + i;
     Aq[id + 0 * offset] = r_AU[k];

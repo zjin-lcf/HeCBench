@@ -54,17 +54,13 @@ void set_BCs_host (Real* u, Real* v, Real &max_u, Real &max_v)
   } // end for
 
   // get max velocity for initial values (including BCs)
-  #pragma unroll
   for (int col = 0; col < NUM + 2; ++col) {
-    #pragma unroll
     for (int row = 1; row < NUM + 2; ++row) {
       max_u = FMAX(max_u, FABS( u(col, row) ));
     }
   }
 
-  #pragma unroll
   for (int col = 1; col < NUM + 2; ++col) {
-    #pragma unroll
     for (int row = 0; row < NUM + 2; ++row) {
       max_v = FMAX(max_v, FABS( v(col, row) ));
     }

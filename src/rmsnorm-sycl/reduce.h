@@ -19,7 +19,6 @@ template <typename T> struct SumOp {
 template <template <class> class Func, typename T, int THREADS_PER_WARP>
 T WarpReduce(T val, sycl::nd_item<3> &item) {
     auto sg = item.get_sub_group();
-#pragma unroll
     for (int offset = THREADS_PER_WARP >> 1; offset > 0; offset >>= 1) {
         T tmp = sycl::permute_group_by_xor(sg, val, offset);
         val   = Func<T>::op(tmp, val);

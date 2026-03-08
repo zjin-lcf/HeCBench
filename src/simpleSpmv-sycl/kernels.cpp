@@ -55,7 +55,6 @@ void vector_mv_csr(sycl::nd_item<2> &item,
          n += BS) {
       temp += values[n] * x[col_indices[n]];
     }
-    #pragma unroll
     for (int i = BS >> 1; i > 0; i >>= 1)
       temp += shift_sub_group_left(item.get_sub_group(), temp, i, BS);
 

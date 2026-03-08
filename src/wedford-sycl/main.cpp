@@ -25,7 +25,6 @@ template<typename T>
 inline
 void warp_reduce_mean_m2n(sycl::sub_group &sg, T &mean, T &m2n, int &num)
 {
-  #pragma unroll
   for(int i = sg.get_max_local_range()[0] / 2; i > 0; i >>= 1) {
     auto num_new = sycl::shift_group_left(sg, num, i);
     auto mean_new = sycl::shift_group_left(sg, mean, i);

@@ -18,9 +18,7 @@ void reference(
       float normalization = 0;
 
       // window centered at the coordinate (idx, idy)
-      #pragma unroll
       for(int i = -R; i <= R; i++)
-      #pragma unroll
         for(int j = -R; j <= R; j++) {
 
           int idk = idx+i;

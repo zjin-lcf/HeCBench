@@ -127,7 +127,6 @@ struct multi_outputs_unroll {
   inline void load(args_t *args, int idx, const sycl::nd_item<3> &item) {
     constexpr int arity = std::tuple_size<args_t>::value;
     int thread_idx = item.get_local_id(2);
-#pragma unroll
     for (int i = 0; i < thread_work_size(); i++) {
       if (thread_idx >= remaining) {
         return;
@@ -142,7 +141,6 @@ struct multi_outputs_unroll {
   template <typename return_t>
   inline void store(return_t *from, int idx, const sycl::nd_item<3> &item) {
     int thread_idx = item.get_local_id(2);
-#pragma unroll
     for (int i = 0; i < thread_work_size(); i++) {
       if (thread_idx >= this->remaining) {
         return;
@@ -191,7 +189,6 @@ inline void elementwise_kernel_helper(func_t f, policy_t policy,
   policy.load(args, idx, item);
 
   // compute
-  #pragma unroll
   for (int i = 0; i < thread_work_size(); i++) {
     if (policy.check_inbounds(i, item)) {
       results[i] = guts_apply(f, args[i]);
@@ -238,7 +235,6 @@ struct TrivialOffsetCalculator {
 
   offset_type get(index_t linear_idx) const {
     offset_type offsets;
-    #pragma unroll
     for (int arg = 0; arg < NARGS; arg++) {
       offsets[arg] = linear_idx;
     }

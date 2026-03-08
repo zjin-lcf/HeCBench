@@ -66,7 +66,6 @@ __global__ void binomialOptionsKernel(const __TOptionData *__restrict d_OptionDa
   const real pdByDf = d_OptionData[blockIdx.x].pdByDf;
 
   real call[ELEMS_PER_THREAD + 1];
-#pragma unroll
   for(int i = 0; i < ELEMS_PER_THREAD; ++i)
     call[i] = expiryCallValue(S, X, vDt, tid * ELEMS_PER_THREAD + i);
 
@@ -75,7 +74,6 @@ __global__ void binomialOptionsKernel(const __TOptionData *__restrict d_OptionDa
 
   int final_it = max(0, tid * ELEMS_PER_THREAD - 1);
 
-#pragma unroll 16
   for(int i = NUM_STEPS; i > 0; --i)
   {
     call_exchange[tid] = call[0];
@@ -85,7 +83,6 @@ __global__ void binomialOptionsKernel(const __TOptionData *__restrict d_OptionDa
 
     if (i > final_it)
     {
-#pragma unroll
       for(int j = 0; j < ELEMS_PER_THREAD; ++j)
         call[j] = puByDf * call[j + 1] + pdByDf * call[j];
     }

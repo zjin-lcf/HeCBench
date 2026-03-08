@@ -140,7 +140,6 @@ void StreamCompaction (sycl::nd_item<1> &item,
     int pos = (my_s - p.cut) * REGS * localSize + tid;
 #endif
     // Load in on-chip memory
-#pragma unroll
     for(int j = 0; j < REGS; j++) {
       if(pos < size) {
         reg[j] = input[pos];
@@ -170,7 +169,6 @@ void StreamCompaction (sycl::nd_item<1> &item,
     item.barrier(sycl::access::fence_space::local_space);
 
     // Store to global memory
-#pragma unroll
     for(int j = 0; j < REGS; j++) {
       pos = block_binary_prefix_sums(item, &l_count[0], (int)((reg[j] != value) ? 1 : 0), &l_data[0]);
       if(reg[j] != value) {

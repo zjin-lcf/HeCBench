@@ -61,7 +61,6 @@ void convolutionRows(
 #endif
 
         //Load main data
-        #pragma unroll
         for(int i = ROWS_HALO_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i++)
 #if 1
             l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = src_new[i * ROWS_BLOCKDIM_X];
@@ -70,7 +69,6 @@ void convolutionRows(
 #endif
 
         //Load left halo
-        #pragma unroll
         for(int i = 0; i < ROWS_HALO_STEPS; i++)
 #if 1
             l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = (baseX + i * ROWS_BLOCKDIM_X >= 0) ? src_new[i * ROWS_BLOCKDIM_X] : 0;
@@ -79,7 +77,6 @@ void convolutionRows(
 #endif
 
         //Load right halo
-        #pragma unroll
         for(int i = ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS + ROWS_HALO_STEPS; i++)
 #if 1
             l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = (baseX + i * ROWS_BLOCKDIM_X < imageW) ? src_new[i * ROWS_BLOCKDIM_X] : 0;
@@ -90,11 +87,9 @@ void convolutionRows(
         //Compute and store results
         #pragma omp barrier
 
-        #pragma unroll
         for(int i = ROWS_HALO_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i++) {
             float sum = 0;
 
-            #pragma unroll
             for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
                 sum += kernel[KERNEL_RADIUS - j] * l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X + j];
 
@@ -147,7 +142,6 @@ void convolutionColumns(
 #endif
 
         //Load main data
-        #pragma unroll
         for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++)
 #if 1
             l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = src_new[i * COLUMNS_BLOCKDIM_Y * pitch];
@@ -156,7 +150,6 @@ void convolutionColumns(
 #endif
 
         //Load upper halo
-        #pragma unroll
         for(int i = 0; i < COLUMNS_HALO_STEPS; i++)
 #if 1
             l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y >= 0) ? src_new[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
@@ -165,7 +158,6 @@ void convolutionColumns(
 #endif
 
         //Load lower halo
-        #pragma unroll
         for(int i = COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS + COLUMNS_HALO_STEPS; i++)
 #if 1
             l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y < imageH) ? src_new[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
@@ -176,11 +168,9 @@ void convolutionColumns(
         //Compute and store results
         #pragma omp barrier
 
-        #pragma unroll
         for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++) {
             float sum = 0;
 
-            #pragma unroll
             for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
                 sum += kernel[KERNEL_RADIUS - j] * l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y + j];
 

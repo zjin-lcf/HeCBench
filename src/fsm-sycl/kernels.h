@@ -87,7 +87,6 @@ void FSMKernel(
     misses = 0;
 
     // evaluate FSM
-#pragma unroll
     for (i = 0; i < length; i++) {
       d = (int)data[i];
       pc = (d >> 1) & (TABSIZE - 1);

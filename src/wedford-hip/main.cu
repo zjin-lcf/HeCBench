@@ -24,7 +24,6 @@ template<typename T>
 __device__ __forceinline__
 void warp_reduce_mean_m2n(T &mean, T &m2n, int &num)
 {
-  #pragma unroll
   for(int i = warpSize/2; i > 0; i >>= 1) {
     auto num_new = __shfl_down(num, i);
     auto mean_new = __shfl_down(mean, i);

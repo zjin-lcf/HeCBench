@@ -380,7 +380,6 @@ int main(int argc, char** argv)
         uint end = info & 0xFFFFFFFF;
 
         ulong total = 0;
-        #pragma unroll 2
         for (uint i=start; i<=end; i++) {
            ulong upper = d_partialSums_dimm1[i];
            ulong lower = d_partialSums_dimm2[i];

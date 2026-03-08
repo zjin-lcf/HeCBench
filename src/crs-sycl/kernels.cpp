@@ -38,7 +38,6 @@ void gcrs_m_1_w_4_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result = result ^ ( (((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -91,7 +90,6 @@ void gcrs_m_1_w_5_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result = result ^ ( (((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -144,7 +142,6 @@ void gcrs_m_1_w_6_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result = result ^ ( (((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -197,7 +194,6 @@ void gcrs_m_1_w_7_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result = result ^ ( (((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -250,7 +246,6 @@ void gcrs_m_1_w_8_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result = result ^ ( (((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -306,7 +301,6 @@ void gcrs_m_2_w_4_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -365,7 +359,6 @@ void gcrs_m_2_w_5_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -424,7 +417,6 @@ void gcrs_m_2_w_6_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -483,7 +475,6 @@ void gcrs_m_2_w_7_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -542,7 +533,6 @@ void gcrs_m_2_w_8_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -603,7 +593,6 @@ void gcrs_m_3_w_4_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -666,7 +655,6 @@ void gcrs_m_3_w_5_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -729,7 +717,6 @@ void gcrs_m_3_w_6_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -792,7 +779,6 @@ void gcrs_m_3_w_7_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -855,7 +841,6 @@ void gcrs_m_3_w_8_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -918,7 +903,6 @@ void gcrs_m_4_w_4_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -983,7 +967,6 @@ void gcrs_m_4_w_5_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -1048,7 +1031,6 @@ void gcrs_m_4_w_6_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -1113,7 +1095,6 @@ void gcrs_m_4_w_7_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);
@@ -1178,7 +1159,6 @@ void gcrs_m_4_w_8_coding_dotprod(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
     for ( j = 0; j < w; j++ ) {
       matrixInt = bm[index];
       result[0] = result[0] ^ ((((matrixInt & (bitInt<< group_inner_offset)) >> group_inner_offset) * fullOneBit) & shared_data[group_offset + j]);

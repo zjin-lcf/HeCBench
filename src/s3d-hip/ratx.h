@@ -18,7 +18,6 @@ ratx_kernel(const real* RESTRICT T, const real* RESTRICT C, real* RESTRICT RF,
     real SQR;
     const real SMALL = FLT_MIN;
 
-    #pragma unroll 22
     for (unsigned int k=1; k<=22; k++) {
         CTOT += C(k);
     }
@@ -217,7 +216,6 @@ ratxb_kernel(const real* RESTRICT T, const real* RESTRICT C, real* RESTRICT RF,
     real CPRLOG, FLOG, FC, SQR;
     const real SMALL = FLT_MIN;
 
-    #pragma unroll 22
     for (unsigned int k=1; k<=22; k++)
     {
         CTOT += C(k);

@@ -278,7 +278,6 @@ void dot_kernel(sycl::nd_item<1> &item, Scalar *red,
 
       //Do a shared memory reduction on the dot product
       red[lid]=sum;
-#pragma unroll
       for (int n = BLOCK_SIZE / 2; n > 0; n = n/2) {
         item.barrier(sycl::access::fence_space::local_space);
         if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}
@@ -293,7 +292,6 @@ void final_reduce(sycl::nd_item<1> &item, Scalar *red, Scalar *d) {
       int lid = item.get_local_id(0);
       MINIFE_SCALAR sum = d[lid];
       red[lid]=sum;
-#pragma unroll
       for (int n = BLOCK_SIZE / 2; n > 0; n = n/2) {
         item.barrier(sycl::access::fence_space::local_space);
         if(lid<n)  {sum+=red[lid+n]; red[lid]=sum;}

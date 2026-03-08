@@ -82,7 +82,6 @@ double run_gmem_atomics(
             unsigned int bins[ACTIVE_CHANNELS];
             DecodePixel<NUM_BINS>(pixel, bins);
 
-#pragma unroll
             for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
 #pragma omp atomic update
               out[(NUM_BINS * CHANNEL) + bins[CHANNEL]]++;

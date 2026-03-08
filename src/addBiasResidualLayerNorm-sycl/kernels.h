@@ -132,7 +132,6 @@ void addBiasResidualPostLayerNormV2(
   const T2* beta_ptr  = (const T2*)beta;
 
   T2 sum = floatToType2<T2>(0.0f);
-#pragma unroll
   for (int i = 0; i < ite; i++) {
     int col_id = i * dim + lid;
     int id             = bid * n / 2 + col_id;
@@ -148,7 +147,6 @@ void addBiasResidualPostLayerNormV2(
 
   float var      = 0.0f;
   T2    s_mean_2 = floatToType2<T2>(s_mean);
-#pragma unroll
   for (int i = 0; i < ite; i++) {
     local_out_half2[i] = sub(local_out_half2[i], s_mean_2);
     float v1 = (float)local_out_half2[i][0];
@@ -163,7 +161,6 @@ void addBiasResidualPostLayerNormV2(
   item.barrier(sycl::access::fence_space::local_space);
 
   T2 s_var_2 = floatToType2<T2>(s_variance);
-#pragma unroll
   for (int i = 0; i < ite; i++) {
     int col_id = i * dim + lid;
     int id      = bid * n / 2 + col_id;
@@ -194,7 +191,6 @@ void addBiasResidualPostLayerNorm(
   const int bid = item.get_group(0);
   auto g = item.get_group();
 
-#pragma unroll N
   for (int idx = lid, i = 0; idx < n && i < N; ++i) {
     float local_out = (float)(add(out[bid * n + idx],
                       input[bid * n + idx], ldg(&bias[idx])));
@@ -210,7 +206,6 @@ void addBiasResidualPostLayerNorm(
   }
   item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll N
   for (int idx = lid, i = 0; idx < n && i < N; ++i) {
     float local_out = local_out_cache[i];
     variance += (local_out - s_mean) * (local_out - s_mean);
@@ -222,7 +217,6 @@ void addBiasResidualPostLayerNorm(
   }
   item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll N
   for (int idx = lid, i = 0; idx < n && i < N; ++i) {
     float local_out = local_out_cache[i];
     out[bid * n + idx] =

@@ -26,7 +26,6 @@ struct RegisterUtils {
     // e.g., N = 5, Shift = 2:
     // 0 1 2 3 4 becomes =>
     // 2 3 4 3 4 (last are unchanged)
-#pragma unroll
     for (int i = 0; i < N - Shift; ++i) {
       arr[i] = arr[i + Shift];
     }
@@ -40,7 +39,6 @@ struct RegisterUtils {
     // e.g., N = 5, Shift = 2:
     // 0 1 2 3 4 becomes =>
     // 0 1 0 1 2 (first are unchanged)
-#pragma unroll
     for (int i = N - 1; i >= Shift; --i) {
       arr[i] = arr[i - Shift];
     }
@@ -55,21 +53,18 @@ struct RegisterUtils {
     // 2 3 4 0 1
 
     // copy 0 1
-#pragma unroll
     for (int i = 0; i < Rotate; ++i) {
       tmp[i] = arr[i];
     }
 
     // 0 1 2 x x =>
     // 2 3 4 x x
-#pragma unroll
     for (int i = 0; i < N - Rotate; ++i) {
       arr[i] = arr[i + Rotate];
     }
 
     // x x x 3 4 =>
     // x x x 0 1
-#pragma unroll
     for (int i = 0; i < Rotate; ++i) {
       arr[N - Rotate + i] = tmp[i];
     }
@@ -84,21 +79,18 @@ struct RegisterUtils {
     // 3 4 0 1 2
 
     // copy 3 4
-#pragma unroll
     for (int i = 0; i < Rotate; ++i) {
       tmp[i] = arr[N - Rotate + i];
     }
 
     // x x 2 3 4 =>
     // x x 0 1 2
-#pragma unroll
     for (int i = N - 1; i >= Rotate; --i) {
       arr[i] = arr[i - Rotate];
     }
 
     // 0 1 x x x =>
     // 3 4 x x x
-#pragma unroll
     for (int i = 0; i < Rotate; ++i) {
       arr[i] = tmp[i];
     }
@@ -123,7 +115,6 @@ struct RegisterUtils {
    example:
 
    ~~~{.cpp}
-   #pragma unroll
    for (int i = 0; i < 6; ++i) { arr[i] = foo; }
    ~~~
    

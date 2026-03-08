@@ -34,7 +34,6 @@ void rng_wallace(unsigned m_seed,
   const unsigned gid = item.get_group(0);
   const unsigned offset = mul24(WALLACE_POOL_SIZE, gid);
 
-  #pragma unroll
   for (unsigned i = 0; i < 8; i++)
     pool[lid + WALLACE_NUM_THREADS * i] = d_Pool[offset + lid + WALLACE_NUM_THREADS * i];
 
@@ -97,7 +96,6 @@ void rng_wallace(unsigned m_seed,
     }
   }
 
-  #pragma unroll
   for (unsigned i = 0; i < 8; i++)
     d_Pool[offset + lid + WALLACE_NUM_THREADS * i] = pool[lid + WALLACE_NUM_THREADS * i];
 }

@@ -12,12 +12,10 @@ float warp_reduce_sum(float val) {
   #if __CUDACC_VER_MAJOR__ >= 9
   // __shfl_down is deprecated with cuda 9+
   unsigned int active = __activemask();
-  #pragma unroll
   for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
       val += __shfl_down_sync(active, val, offset);
   }
   #else
-  #pragma unroll
   for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
     val += __shfl_down(val, offset);
   }

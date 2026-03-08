@@ -25,7 +25,6 @@ __global__ void benchmark_func(float *g_data,
 
   float tmps[granularity];
   for(int k=0; k<fusion_degree; k++) {
-    #pragma unroll
     for(int j=0; j<granularity; j++) {
       // Load elements (memory intensive part)
       tmps[j] = g_data[idx+j*stride+k*big_stride];
@@ -37,11 +36,9 @@ __global__ void benchmark_func(float *g_data,
 
     // Multiply add reduction
     float sum = 0.f;
-    #pragma unroll
     for(int j=0; j<granularity; j+=2)
       sum += tmps[j]*tmps[j+1];
 
-    #pragma unroll
     for(int j=0; j<granularity; j++)
       g_data[idx+k*big_stride] = sum;
   }

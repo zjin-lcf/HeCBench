@@ -205,7 +205,6 @@ void FWrowcol_64(mtype* const __restrict AdjMat, const int upper,
     const mtype orig_ba = ij_ba;
     const mtype orig_bb = ij_bb;
 
-    #pragma unroll 64
     for (int k = 0; k < tile; k++) {
       if (warp_a == k) krow[idx2_a] = ij_aa;
       if (warp_a == k) krow[idx2_b] = ij_ab;
@@ -272,7 +271,6 @@ void FWrowcol_64(mtype* const __restrict AdjMat, const int upper,
 
     auto sg = item.get_sub_group();
 
-    #pragma unroll 64
     for (int k = 0; k < tile; k++) {
       mtype ik_a, ik_b;
       if (k < ws) {
@@ -370,7 +368,6 @@ void FWrem_64(mtype* const __restrict AdjMat,
   int idx2_a = lane_a;
   int idx2_b = lane_b;
 
-  #pragma unroll 64
   for (int k = 0; k < tile; k++) {
     const mtype sk_a = s_kj[idx2_a];
     const mtype sk_b = s_kj[idx2_b];
@@ -396,7 +393,6 @@ void FWrem_64(mtype* const __restrict AdjMat,
     int idx2_a = lane_a;
     int idx2_b = lane_b;
 
-    #pragma unroll 64
     for (int k = 0; k < tile; k++) {
       if (warp_a == k) s_kj[idx2_a] = ij_aa;
       if (warp_a == k) s_kj[idx2_b] = ij_ab;

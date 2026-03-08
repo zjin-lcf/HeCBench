@@ -69,7 +69,6 @@
                 unsigned int bins[ACTIVE_CHANNELS];
                 DecodePixel<NUM_BINS>(pixel, bins);
 
-                #pragma unroll
                 for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
                     atomicAdd(&smem[(NUM_BINS * CHANNEL) + bins[CHANNEL] + CHANNEL], 1);
             }
@@ -83,7 +82,6 @@
         // store local output to global
         for (int i = t; i < NUM_BINS; i += nt)
         {
-            #pragma unroll
             for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
                 out[i + NUM_BINS * CHANNEL] = smem[i + NUM_BINS * CHANNEL + CHANNEL];
         }

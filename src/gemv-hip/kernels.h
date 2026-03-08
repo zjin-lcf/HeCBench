@@ -73,7 +73,6 @@ __global__ void gemv_fp16(__half* mat, __half* vec, __half* res, unsigned int n,
   float4* mat4 = reinterpret_cast<float4*>(mat);
   float4* vec4 = reinterpret_cast<float4*>(vec);
 
-#pragma unroll
   for (int iter = 0; iter < num_per_thread >> 3; iter++) {
     unsigned int j = start_idx + iter * blockDim.x;
     if (j < n >> 3) {
@@ -141,7 +140,6 @@ __global__ void gemv_quantized_int8(int8_t* mat, __half* vec, __half* res,
   float zero_point_f = static_cast<float>(zero_point);
   float scale_f = static_cast<float>(scale);
 
-#pragma unroll
   for (int iter = 0; iter < num_per_thread >> 3; iter++) {
     unsigned int j = start_idx + iter * blockDim.x;
     if (j < n >> 3) {
@@ -220,7 +218,6 @@ __global__ void gemv_quantized_int4(uint4_2* mat, __half* vec, __half* res,
   float zero_point_f = static_cast<float>(zero_point);
   float scale_f = static_cast<float>(scale);
 
-#pragma unroll
   for (int iter = 0; iter < num_per_thread >> 4; iter++) {
     unsigned int j = 2 * (start_idx + iter * blockDim.x);
     if (j < n >> 3) {

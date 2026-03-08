@@ -52,7 +52,6 @@ inline void LoadDirectWarpStriped(
     int warp_offset        = wid * PTX_WARP_THREADS * ITEMS_PER_THREAD;
 
     // Load directly in warp-striped order
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         //new(&items[ITEM]) InputT(block_itr[warp_offset + tid + (ITEM * WARP_THREADS)]);
@@ -88,7 +87,6 @@ inline void LoadDirectWarpStriped(
     int warp_offset        = wid * PTX_WARP_THREADS * ITEMS_PER_THREAD;
 
     // Load directly in warp-striped order
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         if (warp_offset + tid + (ITEM * PTX_WARP_THREADS) < valid_items)
@@ -125,7 +123,6 @@ inline void LoadDirectWarpStriped(
     DefaultT        oob_default)                ///< [in] Default value to assign out-of-bound items
 {
     // Load directly in warp-striped order
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         items[ITEM] = oob_default;
 
@@ -138,7 +135,6 @@ template <typename InputT, int ITEMS_PER_THREAD, typename InputIteratorT>
 inline void LoadDirectBlocked(int linear_tid, InputIteratorT block_itr,
                                        InputT (&items)[ITEMS_PER_THREAD])
 {
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         items[ITEM] = block_itr[(linear_tid * ITEMS_PER_THREAD) + ITEM];
@@ -152,7 +148,6 @@ LoadDirectBlocked(int linear_tid, InputIteratorT block_itr,
                   int valid_items) ///< [in] Number of valid items to load
 {
 
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         if ((linear_tid * ITEMS_PER_THREAD) + ITEM < valid_items)
@@ -168,7 +163,6 @@ inline void LoadDirectBlocked(int linear_tid, InputIteratorT block_itr,
                                        InputT (&items)[ITEMS_PER_THREAD],
                                        int valid_items, DefaultT oob_default)
 {
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         items[ITEM] = oob_default;
 

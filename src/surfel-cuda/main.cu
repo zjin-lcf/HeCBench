@@ -82,7 +82,6 @@ __global__ void surfel_render_tile(
 
         int tid = threadIdx.y * blockDim.x + threadIdx.x;
         if (tid < TILE && base + tid < N) {
-            #pragma unroll
             for (int k = 0; k < COL_DIM; ++k) {
                 sh[tid * COL_DIM + k] = s[(base + tid) * COL_DIM + k];
             }
@@ -91,7 +90,6 @@ __global__ void surfel_render_tile(
 
         int tileCount = min(TILE, N - base);
 
-        #pragma unroll
         for (int i = 0; i < tileCount; ++i) {
 
             T px = sh[i * COL_DIM + COL_P_X];

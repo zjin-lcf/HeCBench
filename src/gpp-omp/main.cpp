@@ -177,7 +177,6 @@ int main(int argc, char **argv) {
           int igp = indinv[indigp];
 
           dataType achtemp_re_loc[nend - nstart], achtemp_im_loc[nend - nstart];
-          #pragma unroll
           for (size_t iw = nstart; iw < nend; ++iw) {
             achtemp_re_loc[iw] = 0.0;
             achtemp_im_loc[iw] = 0.0;
@@ -189,7 +188,6 @@ int main(int argc, char **argv) {
 
           for (size_t ig = 0; ig < ncouls; ++ig) // 32768
           {
-            #pragma unroll
             for (size_t iw = nstart; iw < nend; ++iw) // 3
             {
               CustomComplex<dataType> wdiff =

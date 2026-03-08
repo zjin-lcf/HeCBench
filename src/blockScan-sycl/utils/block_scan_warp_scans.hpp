@@ -166,7 +166,6 @@ struct BlockScanWarpScans
         // Use template unrolling (since the PTX backend can't handle unrolling it for SM1x)
         ApplyWarpAggregates(warp_prefix, scan_op, block_aggregate, Int2Type<1>());
 /*
-        #pragma unroll
         for (int WARP = 1; WARP < WARPS; ++WARP)
         {
             if (warp_id == WARP)

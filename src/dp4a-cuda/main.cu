@@ -37,7 +37,6 @@ void dot_product(const T *__restrict__ a,
   for(size_t idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
              idx < n; idx += gridDim.x * blockDim.x) {
     size_t iInOffset = idx * 4;
-    #pragma unroll
     for (int i = 0; i < 4; i++) {
       if constexpr (std::is_same_v<T, unsigned>) {
         const uint8_t * a8 = (const uint8_t *) &a[iInOffset + i];
@@ -72,7 +71,6 @@ void dot_product2(const T *__restrict__ a,
   for(size_t idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
              idx < n; idx += gridDim.x * blockDim.x) {
     size_t iInOffset = idx * 4;
-    #pragma unroll
     for (int i = 0; i < 4; i++) {
       for (int k = 0; k < M; k++) 
         sum = __dp4a(a[iInOffset + i], b[iInOffset + i], sum);

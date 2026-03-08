@@ -340,7 +340,6 @@ reduction( const ulong* __restrict__ docInfo,
   unsigned end = info & 0xFFFFFFFF;
 
   ulong total = 0;
-  #pragma unroll 2
   for (unsigned i=start; i<=end; i++) {
     ulong upper = partial_highbits_dimm1[i];
     ulong lower = partial_lowbits_dimm2[i];

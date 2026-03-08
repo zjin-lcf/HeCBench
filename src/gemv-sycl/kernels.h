@@ -76,7 +76,6 @@ void gemv_fp16(
   sycl::float4 *mat4 = reinterpret_cast<sycl::float4 *>(mat);
   sycl::float4 *vec4 = reinterpret_cast<sycl::float4 *>(vec);
 
-#pragma unroll
   for (int iter = 0; iter < num_per_thread >> 3; iter++) {
     unsigned int j = start_idx + iter * item.get_local_range(2);
     if (j < n >> 3) {
@@ -149,7 +148,6 @@ void gemv_quantized_int8(
   float zero_point_f = static_cast<float>(zero_point);
   float scale_f = static_cast<float>(scale);
 
-#pragma unroll
   for (int iter = 0; iter < num_per_thread >> 3; iter++) {
     unsigned int j = start_idx + iter * item.get_local_range(2);
     if (j < n >> 3) {
@@ -233,7 +231,6 @@ void gemv_quantized_int4(
   float zero_point_f = static_cast<float>(zero_point);
   float scale_f = static_cast<float>(scale);
 
-#pragma unroll
   for (int iter = 0; iter < num_per_thread >> 4; iter++) {
     unsigned int j = 2 * (start_idx + iter * item.get_local_range(2));
     if (j < n >> 3) {

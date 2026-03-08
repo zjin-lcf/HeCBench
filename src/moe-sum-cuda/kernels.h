@@ -9,7 +9,6 @@ __global__ void moe_sum_kernel(
   const int64_t input_base = output_base * TOPK;
   for (int64_t idx = threadIdx.x; idx < d; idx += blockDim.x) {
     scalar_t x = 0.0;
-    #pragma unroll
     for (int k = 0; k < TOPK; ++k) {
       x += __ldg(&input[input_base + k * d + idx]);
     }
@@ -33,7 +32,6 @@ __global__ void moe_sum_kernel_vec4(
   for (int idx = threadIdx.x; idx < d4; idx += blockDim.x) {
     float4 acc = make_float4(0.f, 0.f, 0.f, 0.f);
 
-    #pragma unroll
     for (int k = 0; k < TOPK; ++k) {
       float4 v = input4[input_base4 + k * d4 + idx];
       acc.x += v.x;

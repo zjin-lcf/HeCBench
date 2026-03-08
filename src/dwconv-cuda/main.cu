@@ -56,9 +56,7 @@ __global__ void conv_depthwise2d_forward_kernel(
 
     acc_t value = biasEnabled ? static_cast<acc_t>(bias.data()[c]) : acc_t(0);
     const index_t offset0 = (n * inputChannels + inputChannel) * inputHeight * inputWidth;
-    #pragma unroll
     for (int kH = 0; kH < KH_LIMIT; ++kH) {
-      #pragma unroll
       for (int kW = 0; kW < KW_LIMIT; ++kW) {
         const int h_in = -padHeight + h * strideHeight + kH * dilationHeight;
         const int w_in = -padWidth + w * strideWidth + kW * dilationWidth;

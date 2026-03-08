@@ -61,7 +61,6 @@ __global__ void loss_bwd (
 
   float sum_value = tmp_grad * log_softmax[sum_offset];
 
-  #pragma unroll
   for (int i = 0; i < W; ++i) {
     int in_offset = group_id_bs * W * H + i * H + linear_x_id;
     float tmp_sfm = exponent(log_softmax[in_offset]) * sum_value;
@@ -108,7 +107,6 @@ __global__ void loss_bwd<__half, __half> (
 
   float sum_value = h2f(__hmul(tmp_grad , log_softmax[sum_offset]));
 
-  #pragma unroll
   for (int i = 0; i < W; ++i) {
     int in_offset = group_id_bs * W * H + i * H + linear_x_id;
     float tmp_sfm = h2f(hexp(log_softmax[in_offset])) * sum_value;

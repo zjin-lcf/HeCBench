@@ -6,7 +6,6 @@ __forceinline__ __device__
 void reduceInShared_intrinsics(half2 * const v)
 {
   int lid = threadIdx.x;
-  #pragma unroll
   for (int i = NUM_OF_THREADS/2; i >= 1; i = i / 2) {
     if(lid<i) v[lid] = __hadd2(v[lid], v[lid+i]);
     __syncthreads();
@@ -18,7 +17,6 @@ __forceinline__ __device__
 void reduceInShared_native(float2 * const v)
 {
   int lid = threadIdx.x;
-  #pragma unroll
   for (int i = NUM_OF_THREADS/2; i >= 1; i = i / 2) {
     if(lid<i) {
       v[lid].x += v[lid+i].x;

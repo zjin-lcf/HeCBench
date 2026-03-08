@@ -186,7 +186,6 @@ int main(int argc, char **argv)
             // Phenotype 0
             SNPi = (unsigned int*) &dev_data_zeros[i * 2];
             SNPj = (unsigned int*) &dev_data_zeros[j * 2];
-            #pragma unroll 1
             for (int p = 0; p < 2 * PP_zeros * num_snp - 2 * num_snp; p += 2 * num_snp) {
               di2 = ~(SNPi[p] | SNPi[p + 1]);
               dj2 = ~(SNPj[p] | SNPj[p + 1]);
@@ -242,7 +241,6 @@ int main(int argc, char **argv)
             // Phenotype 1
             SNPi = (unsigned int*) &dev_data_ones[i * 2];
             SNPj = (unsigned int*) &dev_data_ones[j * 2];
-            #pragma unroll 1
             for(p = 0; p < 2 * PP_ones * num_snp - 2 * num_snp; p += 2 * num_snp)
             {
               di2 = ~(SNPi[p] | SNPi[p + 1]);
@@ -296,7 +294,6 @@ int main(int argc, char **argv)
 
             // compute score
             score = 0.0f;
-            #pragma unroll
             for(int k = 0; k < 9; k++)
               score += gammafunction(ft[k] + ft[9 + k] + 1) - gammafunction(ft[k]) - gammafunction(ft[9 + k]);
             score = fabs((float) score);

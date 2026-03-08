@@ -253,17 +253,13 @@ int main (int argc, char *argv[])
   Real max_u = SMALL;
   Real max_v = SMALL;
   // get max velocity for initial values (including BCs)
-  #pragma unroll
   for (int col = 0; col < NUM + 2; ++col) {
-    #pragma unroll
     for (int row = 1; row < NUM + 2; ++row) {
       max_u = fmax(max_u, fabs( u(col, row) ));
     }
   }
 
-  #pragma unroll
   for (int col = 1; col < NUM + 2; ++col) {
-    #pragma unroll
     for (int row = 0; row < NUM + 2; ++row) {
       max_v = fmax(max_v, fabs( v(col, row) ));
     }
@@ -312,7 +308,6 @@ int main (int argc, char *argv[])
       #pragma omp target update from(pres_sum[0:size_res])
 
       Real p0_norm = ZERO;
-      #pragma unroll
       for (int i = 0; i < size_res; ++i) {
         p0_norm += pres_sum[i];
       }
@@ -354,7 +349,6 @@ int main (int argc, char *argv[])
 
         norm_L2 = ZERO;
 
-        #pragma unroll
         for (int i = 0; i < size_res; ++i) {
           norm_L2 += res_arr[i];
         }
@@ -390,7 +384,6 @@ int main (int argc, char *argv[])
       max_v = SMALL;
       max_u = SMALL;
 
-      #pragma unroll
       for (int i = 0; i < size_max; ++i) {
         Real test_u = max_u_arr[i];
         max_u = fmax(max_u, test_u);

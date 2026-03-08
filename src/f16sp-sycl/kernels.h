@@ -5,7 +5,6 @@ inline
 void reduceInShared_native(sycl::half2 *const v, sycl::nd_item<1> &item)
 {
   int lid = item.get_local_id(0);
-  #pragma unroll
   for (int i = NUM_OF_THREADS/2; i >= 1; i = i / 2) {
     if(lid<i) v[lid] = v[lid] + v[lid+i];
     item.barrier(sycl::access::fence_space::local_space);
@@ -16,7 +15,6 @@ inline
 void reduceInShared_native(sycl::float2 *const v, sycl::nd_item<1> &item)
 {
   int lid = item.get_local_id(0);
-  #pragma unroll
   for (int i = NUM_OF_THREADS/2; i >= 1; i = i / 2) {
     if(lid<i) v[lid] = v[lid] + v[lid+i];
     item.barrier(sycl::access::fence_space::local_space);

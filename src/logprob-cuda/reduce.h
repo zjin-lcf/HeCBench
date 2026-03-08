@@ -3,7 +3,6 @@
 template<typename T>
 __inline__ __device__ T warpReduceSum(T val)
 {
-#pragma unroll
   for (int mask = 16; mask > 0; mask >>= 1)
     val += __shfl_xor_sync(FINAL_MASK, val, mask, 32);
   return val;
@@ -35,7 +34,6 @@ __inline__ __device__ T blockReduceSum(T val)
 template<typename T>
 __inline__ __device__ T warpReduceMax(T val)
 {
-  #pragma unroll
   for (int mask = 16; mask > 0; mask >>= 1)
     val = max(val, __shfl_xor_sync(FINAL_MASK, val, mask, 32));
   return val;

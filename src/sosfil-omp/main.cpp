@@ -57,7 +57,6 @@ void sosfilt(
       }
 
       // Load SOS
-      #pragma unroll 
       for ( int i = 0; i < sos_width; i++ ) {
         s_sos[tx * sos_width + i] = sos[tx * sos_width + i];
       }

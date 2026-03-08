@@ -73,7 +73,6 @@ void run_cpu_threads(DATA_TYPE *matrix_out, DATA_TYPE *matrix, std::atomic_int *
                 int my_x     = pos % (n + pad);
                 int pos2     = my_s_row * n + my_x;
 // Load in on-chip memory
-#pragma unroll
                 for(int j = 0; j < REGS_CPU; j++) {
                     if(pos2 >= 0 && my_x < n && pos2 < matrix_size)
                         reg[j] = matrix[pos2];
@@ -92,7 +91,6 @@ void run_cpu_threads(DATA_TYPE *matrix_out, DATA_TYPE *matrix, std::atomic_int *
 
                 // Store to global memory
                 pos = matrix_size_align - 1 - (my_s * REGS_CPU);
-#pragma unroll
                 for(int j = 0; j < REGS_CPU; j++) {
                     if(pos >= 0 && pos < matrix_size)
                         matrix_out[pos] = reg[j];

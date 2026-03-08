@@ -45,7 +45,6 @@ inline void StoreDirectBlocked(int linear_tid,
     OutputIteratorT thread_itr = block_itr + (linear_tid * ITEMS_PER_THREAD);
 
     // Store directly in thread-blocked order
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         thread_itr[ITEM] = items[ITEM];
@@ -60,7 +59,6 @@ StoreDirectBlocked(int linear_tid, OutputIteratorT block_itr,
     OutputIteratorT thread_itr = block_itr + (linear_tid * ITEMS_PER_THREAD);
 
     // Store directly in thread-blocked order
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         if (ITEM + (linear_tid * ITEMS_PER_THREAD) < valid_items)

@@ -629,14 +629,11 @@ __global__ void Match10(const float *__restrict d_pts1,
       if (idx<M7W*M7H/M7R/NRX) {
 	for (int d=0;d<NUM;d++) {
 	  float4 v1[NRX];
-#pragma unroll
 	  for (int i=0;i<NRX;i++) 
 	    v1[i] = buffer1[(((M7W/NRX)*i + ix)<<5) + ((dp + d + (M7W/NRX)*i + ix)&31)];
 	  //v1[i] = buffer1[((M7W/NRX)*i + ix)*NDIM/4 + (dp + d + (M7W/NRX)*i + ix)%(NDIM/4)];
-#pragma unroll
 	  for (int dy=0;dy<M7R;dy++) {
 	    float4 v2 = buffer2[(M7R*iy + dy)*NUM + d];    
-#pragma unroll
 	    for (int i=0;i<NRX;i++) {
 	      score[dy][i] += v1[i].x*v2.x;
 	      score[dy][i] += v1[i].y*v2.y;

@@ -173,7 +173,6 @@ inline __device__ __hip_bfloat162 fma(__hip_bfloat162 a, __hip_bfloat162 b, __hi
 template<typename T, int WarpSize>
 __inline__ __device__ T warpReduceSum(T val)
 {
-#pragma unroll
     for (int mask = WarpSize/2; mask > 0; mask >>= 1)
         val = add(val, __shfl_xor(val, mask, WarpSize));
     return val;
@@ -232,7 +231,6 @@ __global__ void addBiasResidualPostLayerNormV2(
   // When n = 1024, blockDim.x = 128
   // col_id range: [0-127], [128-255], [256-383], [384-511]
   // block stride = n / 2 = 512
-#pragma unroll
   for (int i = 0; i < ite; i++) {
     int col_id         = i * blockDim.x + tid;
     int id             = bid * n / 2 + col_id;
@@ -249,7 +247,6 @@ __global__ void addBiasResidualPostLayerNormV2(
   float var      = 0.0f;
   T2    s_mean_2 = floatToType2<T2>(s_mean);
 
-#pragma unroll
   for (int i = 0; i < ite; i++) {
     local_out_half2[i] = sub(local_out_half2[i], s_mean_2);
     float v1           = typeToFloat(local_out_half2[i].x);
@@ -264,7 +261,6 @@ __global__ void addBiasResidualPostLayerNormV2(
   __syncthreads();
 
   T2 s_var_2 = floatToType2<T2>(s_variance);
-#pragma unroll
   for (int i = 0; i < ite; i++) {
     int col_id  = i * blockDim.x + tid;
     int id      = bid * n / 2 + col_id;
@@ -289,7 +285,6 @@ __global__ void addBiasResidualPostLayerNorm(
   float            variance = 0.0f;
   float            local_out_cache[N];
 
-#pragma unroll N
   for (int idx = threadIdx.x, i = 0; idx < n && i < N; ++i) {
     float local_out = typeToFloat(add(out[blockIdx.x * n + idx], input[blockIdx.x * n + idx], bias[idx]));
     mean += local_out;
@@ -304,7 +299,6 @@ __global__ void addBiasResidualPostLayerNorm(
   }
   __syncthreads();
 
-#pragma unroll N
   for (int idx = threadIdx.x, i = 0; idx < n && i < N; ++i) {
     float local_out = local_out_cache[i];
     variance += (local_out - s_mean) * (local_out - s_mean);
@@ -316,7 +310,6 @@ __global__ void addBiasResidualPostLayerNorm(
   }
   __syncthreads();
 
-#pragma unroll N
   for (int idx = threadIdx.x, i = 0; idx < n && i < N; ++i) {
     float local_out = local_out_cache[i];
     out[blockIdx.x * n + idx] =

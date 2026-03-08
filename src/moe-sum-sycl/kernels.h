@@ -10,7 +10,6 @@ void moe_sum_kernel(
   for (int64_t idx = item.get_local_id(1); idx < d;
        idx += item.get_local_range(1)) {
     scalar_t x = 0.0;
-    #pragma unroll
     for (int k = 0; k < TOPK; ++k) {
       x += input[input_base + k * d + idx];
     }
@@ -35,7 +34,6 @@ void moe_sum_kernel_vec4(
   for (int idx = item.get_local_id(1); idx < d4;
        idx += item.get_local_range(1)) {
     sycl::float4 acc = sycl::float4(0.f);
-    #pragma unroll
     for (int k = 0; k < TOPK; ++k) {
       sycl::float4 v = input4[input_base4 + k * d4 + idx];
       acc += v;

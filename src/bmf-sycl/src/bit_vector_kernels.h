@@ -102,7 +102,6 @@ void computeDistanceRowsShared(
     __syncthread();
 
     if(i < height) {
-      #pragma unroll
       for(index_t w = 0; w < WARPSPERBLOCK; ++w) {
         const bit_factor_t B_j =
             B_block[w * sub_group_size + warpLane];
@@ -183,7 +182,6 @@ void vectorMatrixMultCompareRowWarpShared(
     __syncthread();
 
     if(i < height) {
-      #pragma unroll
       for(index_t w = 0; w < WARPSPERBLOCK; ++w) {
         const bit_factor_t B_j = B_block[w * sub_group_size + warpLane];
         const int C_ij = (C_block[w * sub_group_size + col_in_tile] >> vecLane) & 1;
@@ -268,7 +266,6 @@ void vectorMatrixMultCompareColWarpShared(
     __syncthread();
 
     if (j < width) {
-      #pragma unroll
       for(index_t w = 0; w < WARPSPERBLOCK; ++w) {
         const bit_factor_t A_i = A_block[w * sub_group_size + warpLane];
         const int C_ij = (C_block[w * sub_group_size + col_in_tile] >> vecLane) & 1;
