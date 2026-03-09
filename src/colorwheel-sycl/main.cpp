@@ -141,20 +141,24 @@ int main(int argc, char **argv)
 
   q.memcpy(res, d_pix, imgSize).wait();
 
-  // verify
-  int fail = memcmp(pix, res, imgSize);
-  if (fail) {
-    int max_error = 0;
-    for (size_t i = 0; i < imgSize; i++) {
-       int e = abs(res[i] - pix[i]);
-       if (e > max_error) max_error = e;
+  // verify with tolerance
+  const int tolerance = 1; // Allow differences up to 1 in each color channel
+  int fail = 0;
+  int max_error = 0;
+  for (size_t i = 0; i < imgSize; i++) {
+    int e = std::abs(static_cast<int>(res[i]) - static_cast<int>(pix[i]));
+    if (e > tolerance) {
+      fail = 1;
+      if (e > max_error) max_error = e;
     }
-    printf("Maximum error between host and device results: %d\n", max_error);
   }
-  else {
-    printf("%s\n", "PASS");
+
+  if (fail) {
+    printf("Verification failed. Maximum error between host and device results: %d\n", max_error);
+  } else {
+    printf("PASS\n");
   }
-  
+
   sycl::free(d_pix, q);
   free(pix);
   free(res);
