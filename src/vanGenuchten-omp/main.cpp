@@ -116,5 +116,6 @@ int main(int argc, char* argv[])
   delete[] theta_ref;
   delete[] K_ref;
 
+  if (!ok) return 1;
   return 0;
 }

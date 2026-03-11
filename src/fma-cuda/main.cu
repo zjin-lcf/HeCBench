@@ -154,5 +154,6 @@ int main(int argc, char* argv[])
     fma<double>(NA, NC, C, num_ops, repeat);
   }
 
+  if (!ok) return 1;
   return 0;
 }

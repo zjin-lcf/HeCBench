@@ -245,5 +245,7 @@ int main(int argc, char **argv)
   printf("------------- Data type is uint32 ---------------\n");
   dot<unsigned>(iNumElements, iNumIterations);
 
+  if (dst_dev != M * dst_ref) return 1;
+  if (dst_dev != M * dst_ref) return 1;
   return EXIT_SUCCESS;
 }

@@ -5,6 +5,7 @@
 #include <sycl/sycl.hpp>
 #include "kernels.h"
 #include "utils.h"
+#include <cstdlib>
 
 template <typename Td, typename Ts>
 void convert(sycl::queue &q, bool isE4M3, int nelems, int niters)
@@ -138,5 +139,6 @@ int main(int argc, char* argv[]) {
   printf("float -> fp8 E5M2\n");
   convert<uint8_t, float>(q, false, nelems, niters); 
 
+  if (!ok) return 1;
   return 0;
 }

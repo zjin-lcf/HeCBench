@@ -255,5 +255,6 @@ int main(int argc, const char **argv) {
 
   wkf_timer_destroy(timer);
 
+  if (!ok) return 1;
   return 0;
 }

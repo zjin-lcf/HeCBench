@@ -33,6 +33,7 @@
 #include <sycl/sycl.hpp>
 
 #include "reference.h"
+#include <cstdlib>
 
 #define TCRIT    2.26918531421f
 #define THREADS  128
@@ -354,5 +355,6 @@ int main(int argc, char **argv) {
   sycl::free(d_lattice_w, q);
   sycl::free(d_randvals, q);
 
+  if (!ok) return 1;
   return 0;
 }

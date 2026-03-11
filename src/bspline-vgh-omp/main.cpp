@@ -299,5 +299,6 @@ int main(int argc, char ** argv) {
   free(walkers_z);
   free(spline_coefs);
 
+  if (!ok) return 1;
   return 0;
 }

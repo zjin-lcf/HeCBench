@@ -224,5 +224,6 @@ int main(int argc, char** argv) {
   sycl::free(d_ctprev, q);
   sycl::free(d_qt, q);
 
+  if (!ok) return 1;
   return 0;
 }

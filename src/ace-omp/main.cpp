@@ -427,5 +427,6 @@ int main(int argc, char *argv[])
   free(d_Fx);
   free(d_Fy);
   free(d_Fz);
+  if (!ok) return 1;
   return 0;
 }

@@ -17,6 +17,7 @@
 #include <chrono>
 #include <omp.h>
 #include "scan.h"
+#include <cstdlib>
 
 void bScan(const unsigned int blockSize,
            const unsigned int len,
@@ -302,5 +303,6 @@ int main(int argc, char * argv[])
   free(blockSumBufferSizeOffset);
   free(outputBuffer);
   free(outputBufferSizeOffset);
+  if (!(compare<float>(outputBuffer, verificationOutput, length, (float)0.001))) return 1;
   return 0;
 }

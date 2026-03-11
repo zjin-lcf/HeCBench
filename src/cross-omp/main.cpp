@@ -191,5 +191,6 @@ int main(int argc, char* argv[])
   printf("=========== Data type is FP64 ==========\n");
   eval<double>(nrows, repeat);
 
+  if (!ok) return 1;
   return 0;
 }

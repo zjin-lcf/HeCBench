@@ -228,5 +228,6 @@ int main(int argc, char* argv[])
   cudaFree(d_out);
   cudaFree(d_out2);
   cudaFree(d_out4);
+  if (error) return 1;
   return 0;
 }

@@ -89,5 +89,6 @@ int main(int argc, char* argv[]) {
   // Cleanup
   free(a);
   free(b); 
+  if (!ok) return 1;
   return 0;
 }

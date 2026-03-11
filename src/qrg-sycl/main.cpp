@@ -262,5 +262,6 @@ int main(int argc, const char **argv)
   free(h_OutputGPU);
   sycl::free(d_Output, q);
   sycl::free(d_Table, q);
+  if (!bPassFlag) return 1;
   return 0;
 }

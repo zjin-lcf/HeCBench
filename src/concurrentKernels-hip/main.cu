@@ -166,5 +166,6 @@ int main(int argc, char **argv) {
   hipHostFree(a);
   hipFree(d_a);
 
+  if (a[0] != nkernels * sum) return 1;
   return 0;
 }

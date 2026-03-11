@@ -126,5 +126,6 @@ int main(int argc, char* argv[])
   cudaFree(d_result);
   cudaFree(d_char_to_uint);
 
+  if (error) return 1;
   return 0;
 }

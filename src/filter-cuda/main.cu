@@ -179,5 +179,7 @@ int main(int argc, char **argv) {
   cudaFree(d_output);
   cudaFree(d_nres);
 
+  if (!match) return 1;
+  if (!match) return 1;
   return 0;
 }

@@ -353,5 +353,6 @@ int main(int argc, char ** argv) {
   sycl::free(d_d2a, q);
   sycl::free(d_d2b, q);
   sycl::free(d_d2c, q);
+  if (!ok) return 1;
   return 0;
 }

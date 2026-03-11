@@ -187,5 +187,6 @@ int main(int argc, char *argv[]) {
   free(h_src);
   cudaFree(d_dst);
   cudaFree(d_src);
+  if (!ok) return 1;
   return 0;
 }

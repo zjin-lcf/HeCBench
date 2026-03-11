@@ -791,5 +791,6 @@ int main(int argc, char **argv) {
   cudaFree(d_recvbuf_l);
   cudaFree(d_recvbuf_r);
 
+  if (!ok) return 1;
   return 0;
 }

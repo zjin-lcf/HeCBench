@@ -140,5 +140,6 @@ int main(int argc, char* argv[]) {
   printf("\n========== Warmup done ==========\n");
   conv3D<float>(N, C, M, W, H, K, repeat);
 
+  if (!ok) return 1;
   return 0;
 }

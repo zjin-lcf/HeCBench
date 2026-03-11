@@ -203,5 +203,6 @@ int main(int argc, char* argv[]) {
   hipFree(d_gain);
   hipFree(d_spikes);
 
+  if (!ok) return 1;
   return 0;
 }

@@ -107,5 +107,6 @@ int main(int argc, char* argv[])
   free(raw_key);
   free(raw_nonce);
 
+  if (error) return 1;
   return 0;
 }

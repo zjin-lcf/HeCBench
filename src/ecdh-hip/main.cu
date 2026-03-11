@@ -78,5 +78,6 @@ int main(int argc, char **argv)
   free(pk_slow_y);
   free(pk_fast_x);
   free(pk_fast_y);
+  if ((fail_pk_x || fail_pk_y)) return 1;
   return 0;
 }

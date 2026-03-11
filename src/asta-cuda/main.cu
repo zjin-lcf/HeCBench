@@ -43,6 +43,7 @@
 
 #include "support/common.h"
 #include "support/verify.h"
+#include <cstdlib>
 
 // GPU kernel 
 __global__ void PTTWAC_soa_asta(const int A, 
@@ -294,5 +295,6 @@ int main(int argc, char **argv) {
   cudaFree(d_finished);
   cudaFree(d_head);
 
+  if (!(status == 0)) return 1;
   return 0;
 }

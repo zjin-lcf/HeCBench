@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cuda.h>
 #include "tables.h"
+#include <cstdlib>
 
 // problem size
 constexpr unsigned int N(1024);
@@ -570,5 +571,6 @@ int main(int argc, char* argv[])
   cudaFree(coordYDevice);
   cudaFree(coordZDevice);
   cudaFree(coordZPDevice);
+  if (!ok) return 1;
   return 0;
 }

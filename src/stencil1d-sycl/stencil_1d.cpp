@@ -120,5 +120,6 @@ int main(int argc, char* argv[]) {
   free(b);
   sycl::free(d_in, q);
   sycl::free(d_out, q);
+  if (!ok) return 1;
   return 0;
 }

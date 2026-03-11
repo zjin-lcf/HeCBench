@@ -186,5 +186,6 @@ int main(int argc, char* argv[])
   free(v);
   free(g);
   free(r);
+  if (absmax_error > 1e-3f) return 1;
   return 0;
 }

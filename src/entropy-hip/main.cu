@@ -167,5 +167,6 @@ int main(int argc, char* argv[]) {
   free(input);
   free(output);
   free(output_ref);
+  if (!ok) return 1;
   return 0;
 }

@@ -228,5 +228,6 @@ int main(int argc, char* argv[]) {
   sycl::free(d_Mp, q);
   sycl::free(d_Bn, q);
 
+  if (max_error) return 1;
   return 0;
 }

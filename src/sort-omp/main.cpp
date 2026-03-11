@@ -167,5 +167,6 @@ int main(int argc, char** argv)
   free(idata);
   free(isums);
   free(odata);
+  if (!passed) return 1;
   return 0;
 }

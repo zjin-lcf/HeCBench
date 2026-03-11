@@ -201,5 +201,6 @@ int main(int argc, char* argv[])
   free(u_new);
   free(v_new);
 
+  if (!ok) return 1;
   return 0;
 }

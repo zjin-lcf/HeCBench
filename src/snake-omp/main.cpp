@@ -217,5 +217,6 @@ int main(int argc, const char * const argv[])
   free(RefSeq);
   free(DFinal_Results);
   free(HFinal_Results);
+  if (error) return 1;
   return 0;
 }

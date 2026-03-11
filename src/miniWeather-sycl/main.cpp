@@ -1024,5 +1024,6 @@ int main(int argc, char **argv) {
   sycl::free(d_recvbuf_l, q);
   sycl::free(d_recvbuf_r, q);
 
+  if (!ok) return 1;
   return 0;
 }

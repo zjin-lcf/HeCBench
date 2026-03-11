@@ -209,5 +209,6 @@ int main(int argc, char **argv) {
   bPinGenericMemory = true;
   eval(true, bPinGenericMemory, repeat); 
   eval(false, bPinGenericMemory, repeat); 
+  if (!(errorNorm / refNorm < 1.e-6f)) return 1;
   return 0;
 }

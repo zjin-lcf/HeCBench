@@ -96,6 +96,7 @@ class hist_smem_accum;
 
 #include "histogram_gmem_atomics.hpp"
 #include "histogram_smem_atomics.hpp"
+#include <cstdlib>
 
 struct less_than_value
 {
@@ -686,5 +687,6 @@ int main(int argc, char **argv)
 
     printf("\n\n");
 
+    if (compare) return 1;
     return 0;
 }

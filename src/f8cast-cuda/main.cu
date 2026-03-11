@@ -6,6 +6,7 @@
 #include <cuda_fp8.h>
 #include "kernels.h"
 #include "utils.h"
+#include <cstdlib>
 
 #define CUDA_CHECK(ans)                                                                  \
     {                                                                                    \
@@ -133,5 +134,6 @@ int main(int argc, char* argv[]) {
   printf("float -> fp8 E5M2\n");
   convert<uint8_t, float>(false, nelems, niters); 
 
+  if (!ok) return 1;
   return 0;
 }

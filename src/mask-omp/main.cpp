@@ -348,5 +348,6 @@ int main(int argc, char* argv[])
 
   eval_mask<int>(M, N, B, repeat);
 
+  if ((error) return 1;
   return 0;
 }

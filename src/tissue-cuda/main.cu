@@ -202,5 +202,6 @@ int main(int argc, char** argv) {
   cudaFree(d_ctprev);
   cudaFree(d_qt);
 
+  if (!ok) return 1;
   return 0;
 }

@@ -171,5 +171,6 @@ int main(int argc, char **argv) {
 
   delete [] input;
   delete [] output;
+  if (error) return 1;
   return 0;
 }

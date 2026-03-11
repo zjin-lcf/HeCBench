@@ -174,5 +174,6 @@ int main (int argc, char ** argv) {
   std::cout << "\tRunning with double precision data type:" << std::endl;
   run_gemm_example<double>(m, k, n, repeat);
 
+  if (error) return 1;
   return 0;
 }

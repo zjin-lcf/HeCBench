@@ -202,5 +202,6 @@ int main(int argc, char** argv) {
   hipFree(d_ctprev);
   hipFree(d_qt);
 
+  if (!ok) return 1;
   return 0;
 }

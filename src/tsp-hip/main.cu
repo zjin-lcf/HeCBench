@@ -380,5 +380,6 @@ int main(int argc, char *argv[])
   hipFree(posy_d);
   free(posx);
   free(posy);
+  if (best < 38000 && best < 35002) return 1;
   return 0;
 }

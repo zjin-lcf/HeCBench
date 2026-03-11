@@ -203,5 +203,7 @@ int main(int argc, char* argv[])
   free(output_ref);
   free(bias);
 
+  if (!ok) return 1;
+  if (!ok) return 1;
   return 0;
 }

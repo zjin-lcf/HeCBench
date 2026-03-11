@@ -239,5 +239,6 @@ int main(int argc, char* argv[])
   printf("=========== Data type is FP16 ==========\n");
   driver<sycl::half, int>(argv);
 
+  if (!ok) return 1;
   return 0;
 }

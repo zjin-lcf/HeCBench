@@ -178,5 +178,7 @@ int main(int argc, char **argv) {
   hipFree(d_output);
   hipFree(d_nres);
 
+  if (!match) return 1;
+  if (!match) return 1;
   return 0;
 }

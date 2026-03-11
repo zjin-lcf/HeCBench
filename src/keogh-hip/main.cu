@@ -138,5 +138,6 @@ int main(int argc, char* argv[]) {
   free(subject);
   free(lower);
   free(upper);
+  if (!ok) return 1;
   return 0;
 }

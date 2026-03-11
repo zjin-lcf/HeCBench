@@ -121,5 +121,6 @@ int main(int argc, char* argv[]) {
   cudaFree(d_distance);
   cudaFree(d_Apoints);
   cudaFree(d_Bpoints);
+  if (error) return 1;
   return 0;
 }

@@ -153,5 +153,6 @@ int main(int argc, char* argv[]) {
   free(output);
   free(ref_output);
   free(detections);
+  if (!ok) return 1;
   return 0;
 }

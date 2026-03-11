@@ -27,6 +27,7 @@ class MaxPoolGrad {
 };
 
 #include "reference.h"
+#include <cstdlib>
 
 template <typename PoolProcess, typename T,
           int ksize_height,
@@ -226,5 +227,6 @@ int main(int argc, char* argv[])
   cudaFree(input_grad_data);
   cudaFree(output_data);
   cudaFree(output_grad_data);
+  if (!ok) return 1;
   return 0;
 }

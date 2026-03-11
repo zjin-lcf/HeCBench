@@ -113,5 +113,6 @@ int main(int argc, char* argv[]) {
   sycl::free(d_image, q);
   free(image);
   free(image_ref);
+  if (!ok) return 1;
   return 0;
 }

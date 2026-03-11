@@ -5,6 +5,7 @@
 #include <vector>
 #include <hip/hip_runtime.h>
 #include "topk_per_row_kernels.h"
+#include <cstdlib>
 
 __device__ __forceinline__ uint32_t xorshift32(uint32_t& state) {
   state ^= state << 13;
@@ -145,5 +146,6 @@ int32_t main(int32_t argc, char* argv[])
     }
   }
 
+  if (!ok) return 1;
   return 0;
 }

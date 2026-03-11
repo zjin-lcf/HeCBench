@@ -4,6 +4,7 @@
 #include <numeric>  // iota
 #include <vector>
 #include <sycl/sycl.hpp>
+#include <cstdlib>
 
 // Send data in a circular manner in all GPU devices (non-P2P)
 // Original author: Thomas Applencourt
@@ -89,5 +90,6 @@ int main(int argc, char* argv[])
       free(device_ptr[i], queues[i]);
     }
   }
+  if (!ok) return 1;
   return 0;
 }

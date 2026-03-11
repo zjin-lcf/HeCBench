@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstring>
 #include <hip/hip_runtime.h>
+#include <cstdlib>
 
 #define GPU_CHECK(x) do { \
   hipError_t err = x; \
@@ -125,5 +126,6 @@ int main(int argc, char* argv[])
     test_threads_copy<8, char>(numel * 4, repeat);
     std::cout << "char16: ";
     test_threads_copy<16, char>(numel * 4, repeat);
+    if (s) return 1;
     return 0;
 }

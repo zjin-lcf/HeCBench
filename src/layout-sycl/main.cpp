@@ -205,5 +205,7 @@ int main(int argc, char * argv[])
   free(deviceResult);
   free(reference);
   free(data);
+  if (fail) return 1;
+  if (fail) return 1;
   return 0;
 }

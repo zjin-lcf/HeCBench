@@ -338,5 +338,6 @@ int main(int argc, char** argv) {
 
   free(values);
   free(cbuffer);
+  if (!ok) return 1;
   return 0;
 }

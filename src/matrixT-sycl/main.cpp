@@ -665,5 +665,6 @@ int main(int argc, char **argv)
   sycl::free(d_idata, q);
   sycl::free(d_odata, q);
 
+  if (!success) return 1;
   return 0;
 }

@@ -388,5 +388,9 @@ int main(int argc, char* argv[])
   free(h_backprop);
   free(r_backprop);
 
+  if (fail) return 1;
+  if (fail) return 1;
+  if (fail) return 1;
+  if (fail) return 1;
   return 0;
 }

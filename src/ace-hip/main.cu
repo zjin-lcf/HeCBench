@@ -444,5 +444,6 @@ int main(int argc, char *argv[])
 
   free(phi_host);
   free(u_host);
+  if (!ok) return 1;
   return 0;
 }

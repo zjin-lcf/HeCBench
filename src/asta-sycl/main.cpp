@@ -43,6 +43,7 @@
 
 #include "support/common.h"
 #include "support/verify.h"
+#include <cstdlib>
 
 
 // Params ---------------------------------------------------------------------
@@ -308,5 +309,6 @@ int main(int argc, char **argv) {
   sycl::free(d_in_out, q);
   sycl::free(d_finished, q);
   sycl::free(d_head, q);
+  if (!(status == 0)) return 1;
   return 0;
 }

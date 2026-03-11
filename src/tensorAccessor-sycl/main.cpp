@@ -182,5 +182,6 @@ int main(int argc, char* argv[])
   free(r);
   free(r_ref);
 
+  if (!ok) return 1;
   return 0;
 }

@@ -157,5 +157,6 @@ int main(int argc, char *argv[]) {
   free(h_out);
   free(h_in);
   free(d_res);
+  if (!ok) return 1;
   return 0;
 }

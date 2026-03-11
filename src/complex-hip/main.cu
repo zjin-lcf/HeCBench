@@ -107,5 +107,6 @@ int main(int argc, char* argv[]) {
   hipFree(d_cs);
   free(cs);
 
+  if (!(complex_float_check && complex_double_check)) return 1;
   return 0;
 }

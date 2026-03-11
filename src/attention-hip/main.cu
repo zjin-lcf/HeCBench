@@ -184,5 +184,6 @@ int main(int argc, char* argv[]) {
   free(query);
   free(dout);
   free(hout);
+  if (!ok) return 1;
   return 0;
 }

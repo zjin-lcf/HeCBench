@@ -277,5 +277,7 @@ int main(int argc, char *argv[])
   cudaFree(d_iy);
   cudaFree(d_iz);
   cudaFree(d_avg_dist);
+  if (!ok) return 1;
+  if (!ok) return 1;
   return 0;
 }

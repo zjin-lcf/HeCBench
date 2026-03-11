@@ -236,5 +236,6 @@ int main(int argc, const char **argv)
 
     free(output);
   }
+  if (!bPassFlag) return 1;
   return 0;
 }

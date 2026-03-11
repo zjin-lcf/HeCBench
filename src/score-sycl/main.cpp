@@ -315,5 +315,6 @@ int main(int argc, char* argv[])
   free(count_ref);
   free(scores);
 
+  if (checksum != 0) return 1;
   return 0;
 }

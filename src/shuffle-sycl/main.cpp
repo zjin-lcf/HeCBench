@@ -371,5 +371,7 @@ int main(int argc, char* argv[]) {
   free(TransposeMatrix);
   free(cpuTransposeMatrix);
 
+  if (errors != 0) return 1;
+  if (errors != 0) return 1;
   return 0;
 }

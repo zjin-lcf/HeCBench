@@ -182,5 +182,6 @@ int main(int argc, char* argv[])
   free(var);
   free(r_mean);
   free(r_var);
+  if (!ok) return 1;
   return 0;
 }

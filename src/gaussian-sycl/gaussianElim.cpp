@@ -2,6 +2,7 @@
 #include <sys/time.h>
 #include <sycl/sycl.hpp>
 #include "gaussianElim.h"
+#include <cstdlib>
 
 #define BLOCK_SIZE_0 256
 #define BLOCK_SIZE_1_X 16
@@ -292,6 +293,7 @@ int parseCommandline(int argc, char *argv[], char* filename,
       }
     }
   }
+  if (!ok) return 1;
   return 0;
 }
 

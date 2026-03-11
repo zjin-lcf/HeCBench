@@ -4,6 +4,7 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 #include "sptrsv.h"
+#include <cstdlib>
 
 int atomicLoad(const int *addr)
 {
@@ -222,6 +223,7 @@ int sptrsv_syncfree (
   sycl::free(d_x, q);
   sycl::free(d_warp_num, q);
 
+  if (!(res < accuracy)) return 1;
   return 0;
 }
 

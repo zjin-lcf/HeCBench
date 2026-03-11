@@ -218,5 +218,8 @@ int main(int argc, char **argv)
   printf("------------- Data type is Float64 ---------------\n");
   dot<double>(iNumElements, iNumIterations);
 
+  if (dst != dst_ref) return 1;
+  if (dst != dst_ref) return 1;
+  if (dst != dst_ref) return 1;
   return EXIT_SUCCESS;
 }

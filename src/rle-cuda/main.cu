@@ -37,6 +37,7 @@
 #include <chrono>
 #include <cstdio>
 #include "test_util.h"
+#include <cstdlib>
 
 using namespace cub;
 
@@ -502,5 +503,8 @@ int main(int argc, char **argv)
   // TestSize<float, int, int>(num_items);
   // TestSize<double, int, int>(num_items);
 
+  if (compare0) return 1;
+  if (compare1) return 1;
+  if (compare2) return 1;
   return 0;
 }

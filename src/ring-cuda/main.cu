@@ -4,6 +4,7 @@
 #include <numeric>  // iota
 #include <vector>
 #include <cuda.h>
+#include <cstdlib>
 
 // Send data in a circular manner in all GPU devices (non-P2P)
 // Original author: Thomas Applencourt
@@ -87,5 +88,6 @@ int main(int argc, char* argv[])
       cudaFree(device_ptr[i]);
     }
   }
+  if (!ok) return 1;
   return 0;
 }

@@ -194,5 +194,6 @@ int main(int argc, char* argv[])
   printf("=========== Data type is FP32 ==========\n");
   driver<float, int>(argv);
 
+  if (!ok) return 1;
   return 0;
 }

@@ -175,6 +175,7 @@ int main(int argc, char* argv[]) {
 
   sycl::free(d_distance, q);
   sycl::free(d_data, q);
+  if (!ok) return 1;
   return 0;
 }
 

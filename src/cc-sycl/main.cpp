@@ -511,5 +511,6 @@ int main(int argc, char* argv[])
   free(nodestatus);
   freeECLgraph(g);
 
+  if (!ok) return 1;
   return 0;
 }

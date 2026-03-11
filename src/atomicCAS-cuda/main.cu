@@ -129,5 +129,6 @@ int main(int argc, char** argv) {
   cudaFree(d_res_u64);
   cudaFree(d_res_s64);
   cudaFree(d_res_f64);
+  if (error) return 1;
   return 0;
 }

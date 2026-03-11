@@ -189,5 +189,6 @@ int main(int argc, char **argv) {
   bGenericSharedMemory = false;
   eval(q, true, bGenericSharedMemory, repeat); 
   eval(q, false, bGenericSharedMemory, repeat); 
+  if (!(errorNorm / refNorm < 1.e-6f)) return 1;
   return 0;
 }

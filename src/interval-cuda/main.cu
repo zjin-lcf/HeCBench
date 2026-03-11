@@ -40,6 +40,7 @@
 #include "interval.h"
 #include "gpu_interval.h"
 #include "cpu_interval.h"
+#include <cstdlib>
 
 int main(int argc, char *argv[]) {
   if (argc != 3) {
@@ -125,5 +126,6 @@ int main(int argc, char *argv[]) {
   delete[] h_result;
   delete[] h_nresults;
 
+  if (!bTestResult) return 1;
   return 0;
 }

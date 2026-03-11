@@ -135,5 +135,6 @@ int main(void) {
   free(img);
   free(gcf);
 
+  if (!ok) return 1;
   return 0;
 }

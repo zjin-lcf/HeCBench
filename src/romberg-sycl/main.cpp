@@ -136,5 +136,6 @@ int main( int argc, char** argv)
 
   free(h_result);
   sycl::free(d_result, q);
+  if ((fabs(sum - ref_sum) > EPS)) return 1;
   return 0;
 }

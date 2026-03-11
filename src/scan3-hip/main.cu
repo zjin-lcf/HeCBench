@@ -4,6 +4,7 @@
 #include <thrust/device_vector.h>
 #include <hipcub/hipcub.hpp>
 #include "scan.h"
+#include <cstdlib>
 
 /*
  * Scan for verification
@@ -138,5 +139,7 @@ int main(int argc, char * argv[])
   free(input);
   free(output);
   free(verificationOutput);
+  if (!(compare<float>(output, verificationOutput, length, (float)0.001))) return 1;
+  if (!(compare<float>(output, verificationOutput, length, (float)0.001))) return 1;
   return 0;
 }

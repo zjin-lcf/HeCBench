@@ -375,6 +375,7 @@ int main(int argc, char **argv){
   free(reference);
   free(input_itemsets);
   free(h_input_itemsets);
+  if (err) return 1;
   return 0;
 }
 

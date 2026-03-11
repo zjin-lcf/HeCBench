@@ -291,5 +291,6 @@ int main(int argc, char ** argv) {
   cudaFree(d_d2a);
   cudaFree(d_d2b);
   cudaFree(d_d2c);
+  if (!ok) return 1;
   return 0;
 }

@@ -240,5 +240,6 @@ int main(int argc, char* argv[])
   run<1024>(n, repeat);
   run<2048>(n, repeat);
 
+  if (error) return 1;
   return 0;
 }

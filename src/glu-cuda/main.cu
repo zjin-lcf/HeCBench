@@ -124,5 +124,6 @@ int main(int argc, char* argv[])
   cudaFree(d_X);
   cudaFree(d_Y);
 
+  if (!ok) return 1;
   return 0;
 }

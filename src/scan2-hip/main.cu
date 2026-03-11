@@ -17,6 +17,7 @@
 #include <chrono>
 #include <hip/hip_runtime.h>
 #include "scan.h"
+#include <cstdlib>
 
 /*
  * ScanLargeArrays : Scan is done for each block and the sum of each
@@ -352,5 +353,6 @@ int main(int argc, char * argv[])
   free(input);
   free(output);
   free(verificationOutput);
+  if (!(compare<float>(output, verificationOutput, length, (float)0.001))) return 1;
   return 0;
 }

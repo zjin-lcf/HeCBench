@@ -292,5 +292,6 @@ int main(int argc, char ** argv) {
   hipFree(d_d2a);
   hipFree(d_d2b);
   hipFree(d_d2c);
+  if (!ok) return 1;
   return 0;
 }

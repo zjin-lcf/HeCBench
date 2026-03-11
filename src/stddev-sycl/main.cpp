@@ -190,6 +190,7 @@ int main(int argc, char* argv[]) {
   free(data);
   sycl::free(d_std, q);
   sycl::free(d_data, q);
+  if (!ok) return 1;
   return 0;
 }
 

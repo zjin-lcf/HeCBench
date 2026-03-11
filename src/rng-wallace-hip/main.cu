@@ -103,5 +103,6 @@ int main(int argc, char* argv[]) {
   hipFree(devicerngChi2Corrections);
   hipFree(device_randomNumbers);
   hipFree(devPool);
+  if (!ok) return 1;
   return 0;
 }

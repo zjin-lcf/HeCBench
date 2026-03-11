@@ -203,5 +203,6 @@ int main(int argc, char* argv[]) {
   cudaFree(d_gain);
   cudaFree(d_spikes);
 
+  if (!ok) return 1;
   return 0;
 }

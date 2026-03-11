@@ -114,5 +114,6 @@ int main(int argc, char* argv[])
   printf("\nFP32 atomic add\n");
   atomicCost<float>(length, nelems, repeat);
 
+  if (diff) return 1;
   return 0;
 }

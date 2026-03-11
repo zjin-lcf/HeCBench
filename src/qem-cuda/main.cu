@@ -5,6 +5,7 @@
 
 #include "reference.h"
 #include "gpu_solver.h"
+#include <cstdlib>
 
 void generate_data(int size, int min, int max, float *data) {
   std::mt19937_64 generator{1993764};
@@ -135,5 +136,7 @@ int main(int argc, char* argv[]) {
   checkCuda(cudaFreeHost(minimum_ref));
   checkCuda(cudaFreeHost(minimum));
 
+  if (!ok) return 1;
+  if (!ok) return 1;
   return 0;
 }

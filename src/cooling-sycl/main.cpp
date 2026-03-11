@@ -226,5 +226,6 @@ int main(int argc, char* argv[])
   free(T);
   free(r);
   free(h_r);
+  if (error) return 1;
   return 0;
 }

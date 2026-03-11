@@ -73,6 +73,7 @@ __device__ __forceinline__ void DecodePixel(uchar1 pixel, unsigned int (&bins)[A
 
 #include "histogram_gmem_atomics.h"
 #include "histogram_smem_atomics.h"
+#include <cstdlib>
 //---------------------------------------------------------------------
 // Globals, constants, and type declarations
 //---------------------------------------------------------------------
@@ -660,5 +661,6 @@ int main(int argc, char **argv)
     cudaDeviceSynchronize();
     printf("\n\n");
 
+    if (compare) return 1;
     return 0;
 }

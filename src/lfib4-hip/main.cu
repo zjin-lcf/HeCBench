@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <hip/hip_runtime.h>
 #include <chrono>
+#include <cstdlib>
 
 #define P1 55
 #define P2 119
@@ -264,5 +265,6 @@ int main(int argc, char**argv) {
   }
 
   free(x);
+  if (!ok) return 1;
   return 0;
 }

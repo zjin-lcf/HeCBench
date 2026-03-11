@@ -300,5 +300,6 @@ int main(int argc, char **argv) {
   }
 
   free(x);
+  if (!ok) return 1;
   return 0;
 }

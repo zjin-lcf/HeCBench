@@ -1,4 +1,5 @@
 #include "morphology.h"
+#include <cstdlib>
 
 void display(unsigned char *img, const int height, const int width)
 {
@@ -62,5 +63,6 @@ int main(int argc, char* argv[])
   sycl::free(img_d, q);
   sycl::free(tmp_d, q);
   free(srcImg);
+  if (s != WHITE) return 1;
   return 0;
 }

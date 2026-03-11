@@ -103,5 +103,6 @@ int main(int argc, char** argv) {
   free(serial_res);
   free(parallel_res);
   cudaFree(d_parallel_res);
+  if (!ok) return 1;
   return 0;
 }

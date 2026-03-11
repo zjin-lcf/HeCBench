@@ -169,5 +169,6 @@ int main(int argc, char **argv) {
   cudaFreeHost(a);
   cudaFree(d_a);
 
+  if (a[0] != nkernels * sum) return 1;
   return 0;
 }

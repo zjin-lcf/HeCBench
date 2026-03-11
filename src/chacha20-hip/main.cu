@@ -126,5 +126,6 @@ int main(int argc, char* argv[])
   hipFree(d_result);
   hipFree(d_char_to_uint);
 
+  if (error) return 1;
   return 0;
 }

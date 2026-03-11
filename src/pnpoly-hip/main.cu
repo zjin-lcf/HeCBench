@@ -163,5 +163,6 @@ int main(int argc, char* argv[]) {
   free(point);
   free(bitmap_ref);
   free(bitmap_opt);
+  if (error) return 1;
   return 0;
 }

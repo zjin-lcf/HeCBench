@@ -40,6 +40,7 @@
 #include <iostream>
 #include <limits>
 #include <omp.h>
+#include <cstdlib>
 
 void ParallelBitonicSort(int input[], int n) {
 
@@ -216,5 +217,6 @@ int main(int argc, char *argv[]) {
   free(data_cpu);
   free(data_gpu);
 
+  if (unequal) return 1;
   return 0;
 }

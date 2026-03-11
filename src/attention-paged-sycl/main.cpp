@@ -23,6 +23,7 @@
 #include "attention_kernels.h"
 #include "kvcache.h"
 #include "reference.h"
+#include <cstdlib>
 
 // Add a template parameter WARP_SIZE 
 #define LAUNCH_PAGED_ATTENTION_V1(HEAD_SIZE) \
@@ -384,5 +385,6 @@ int main(int argc, char* argv[])
       Q, num_seqs, num_query_heads, num_kv_heads, head_size, max_seq_len,
       num_blocks, repeat);
 
+  if (!ok) return 1;
   return 0;
 }

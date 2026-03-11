@@ -34,6 +34,7 @@
 #endif
 
 #include "cudamacro.h"
+#include <cstdlib>
 
 #define TCRIT 2.26918531421f
 #define THREADS  128
@@ -314,5 +315,6 @@ int main(int argc, char **argv) {
   cudaFree(lattice_w);
   cudaFree(randvals);
 
+  if (!ok) return 1;
   return 0;
 }

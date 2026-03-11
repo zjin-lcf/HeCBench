@@ -162,5 +162,6 @@ int main(int argc, char* argv[])
   free(h_grad_in);
   free(h_grad_out);
 
+  if (!ok) return 1;
   return 0;
 }

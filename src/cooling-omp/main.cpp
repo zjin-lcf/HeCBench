@@ -179,5 +179,6 @@ int main(int argc, char* argv[])
   free(T);
   free(h_r);
   free(d_r);
+  if (error) return 1;
   return 0;
 }

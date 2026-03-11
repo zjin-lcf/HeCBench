@@ -423,5 +423,6 @@ int main( int argc, char** argv )
   free(faceyz);
   free(vslocal);
 
+  if (normsqdiff != (P)0) return 1;
   return 0;
 } /*---main---*/

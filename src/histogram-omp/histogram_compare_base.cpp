@@ -87,6 +87,7 @@ inline void DecodePixel(uchar1 pixel, unsigned int (&bins)[ACTIVE_CHANNELS])
 
 #include "histogram_gmem_atomics.hpp"
 #include "histogram_smem_atomics.hpp"
+#include <cstdlib>
 
 struct less_than_value
 {
@@ -663,5 +664,6 @@ int main(int argc, char **argv)
 
     printf("\n\n");
 
+    if (compare) return 1;
     return 0;
 }

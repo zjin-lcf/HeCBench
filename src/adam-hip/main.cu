@@ -159,5 +159,6 @@ int main(int argc, char* argv[])
   free(v);
   free(g);
   free(r);
+  if (!ok) return 1;
   return 0;
 }

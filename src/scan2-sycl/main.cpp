@@ -18,6 +18,7 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 #include "scan.h"
+#include <cstdlib>
 
 void bScan(sycl::queue &q,
            const unsigned int blockSize,
@@ -319,5 +320,6 @@ int main(int argc, char * argv[])
   free(input);
   free(output);
   free(verificationOutput);
+  if (!(compare<float>(output, verificationOutput, length, (float)0.001))) return 1;
   return 0;
 }

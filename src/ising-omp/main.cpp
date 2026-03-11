@@ -27,6 +27,7 @@
 #include <cstring>
 #include <omp.h>
 #include "reference.h"
+#include <cstdlib>
 
 #define TCRIT 2.26918531421f
 #define THREADS  128
@@ -254,5 +255,6 @@ int main(int argc, char **argv) {
   free(lattice_w);
   free(lattice_b_r);
   free(lattice_w_r);
+  if (!ok) return 1;
   return 0;
 }

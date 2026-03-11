@@ -511,5 +511,6 @@ int main(int argc, char **argv)
   cudaFree(d_idata);
   cudaFree(d_odata);
 
+  if (!success) return 1;
   return 0;
 }

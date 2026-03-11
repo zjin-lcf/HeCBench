@@ -280,5 +280,6 @@ int main(int argc, char** argv)
 
   printf("Double-precision second-order-section filtering of digital signals\n");
   filtering<double> (repeat, numSignals, numSamples, numSections, zi_width);
+  if (!ok) return 1;
   return 0;
 }

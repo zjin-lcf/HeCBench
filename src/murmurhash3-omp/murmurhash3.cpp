@@ -214,5 +214,6 @@ int main(int argc, char** argv)
   free(d_keys);
   free(d_out);
   free(d_length);
+  if (error) return 1;
   return 0;
 }

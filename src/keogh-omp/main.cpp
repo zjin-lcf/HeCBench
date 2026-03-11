@@ -94,5 +94,6 @@ int main(int argc, char* argv[]) {
   free(subject);
   free(lower_bound);
   free(upper_bound);
+  if (!ok) return 1;
   return 0;
 }
