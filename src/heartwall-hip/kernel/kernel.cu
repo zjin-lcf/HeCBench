@@ -2,11 +2,12 @@
 #include "./../main.h"                // (in main directory)            needed to recognized input parameters
 #include "./../util/avi/avilib.h"          // (in directory)              needed by avi functions
 #include "./../util/avi/avimod.h"          // (in directory)              needed by avi functions
+#include "./../util/timer/timer.h"
 
 // CUDA kernel
 #include "kernel.h"
 
-  void 
+  uint64_t 
 kernel_gpu_wrapper(  params_common common,
     int* endoRow,
     int* endoCol,
@@ -410,6 +411,8 @@ kernel_gpu_wrapper(  params_common common,
   fp* d_frame;
   hipMalloc((void**)&d_frame, sizeof(fp)*common.frame_elem);
 
+  uint64_t start_time = get_time();
+
   for(frame_no=0; frame_no<common.frames_processed; frame_no++) {
 
     //==================================================50
@@ -493,6 +496,7 @@ kernel_gpu_wrapper(  params_common common,
 #endif
 
   }
+  uint64_t end_time = get_time();
 
   hipMemcpy(tEndoRowLoc, d_tEndoRowLoc, common.endo_mem * common.no_frames, hipMemcpyDeviceToHost);
   hipMemcpy(tEndoColLoc, d_tEndoColLoc, common.endo_mem * common.no_frames, hipMemcpyDeviceToHost);
@@ -541,6 +545,6 @@ kernel_gpu_wrapper(  params_common common,
 
   printf("\n");
   fflush(NULL);
-
+  return end_time - start_time;
 }
 
