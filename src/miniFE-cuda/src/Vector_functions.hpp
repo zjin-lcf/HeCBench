@@ -320,7 +320,6 @@ namespace miniFE {
       //Do a shared memory reduction on the dot product
       __shared__ Scalar red[BLOCK_SIZE];
       red[threadIdx.x]=sum;
-#pragma unroll
       for (int n = BLOCK_SIZE / 2; n > 0; n = n/2) {
         __syncthreads();
         if(threadIdx.x<n)  {sum+=red[threadIdx.x+n]; red[threadIdx.x]=sum;}
@@ -336,7 +335,6 @@ namespace miniFE {
       __shared__ Scalar red[BLOCK_SIZE];
 
       red[threadIdx.x]=sum;
-#pragma unroll
       for (int n = BLOCK_SIZE / 2; n > 0; n = n/2) {
         __syncthreads();
         if(threadIdx.x<n)  {sum+=red[threadIdx.x+n]; red[threadIdx.x]=sum;}

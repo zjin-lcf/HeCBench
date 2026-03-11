@@ -31,7 +31,6 @@ struct Block1D {
 
 template <typename T, class ReduceOp>
 DEVICE T WarpReduce(T val, const ReduceOp& op) {
-  #pragma unroll
   for (int offset = (WARP_SIZE >> 1); offset > 0; offset >>= 1) {
     val = op.combine(val, op.warp_shfl_down(val, offset));
   }

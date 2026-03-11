@@ -54,7 +54,6 @@ __global__ void rng_wallace(unsigned m_seed,
 
 	unsigned offset = __mul24(WALLACE_POOL_SIZE, blockIdx.x);
 
-  #pragma unroll
 	for (int i = 0; i < 8; i++)
 	  pool[threadIdx.x + WALLACE_NUM_THREADS * i] = globalPool[offset + threadIdx.x + WALLACE_NUM_THREADS * i];
 
@@ -118,7 +117,6 @@ __global__ void rng_wallace(unsigned m_seed,
 		}
 	}
 
-  #pragma unroll
 	for (int i = 0; i < 8; i++)
 	  globalPool[offset + threadIdx.x + WALLACE_NUM_THREADS * i] = pool[threadIdx.x + WALLACE_NUM_THREADS * i];
 }

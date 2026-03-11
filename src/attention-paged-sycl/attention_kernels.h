@@ -40,7 +40,6 @@ inline float block_sum(float* red_smem, float sum, sycl::nd_item<3> &item) {
   int lane = item.get_local_id(2) % WARP_SIZE;
 
   // Compute the sum per warp.
-#pragma unroll
   for (int mask = WARP_SIZE / 2; mask >= 1; mask /= 2) {
     sum += VLLM_SHFL_XOR_SYNC(sum, mask);
   }
@@ -59,7 +58,6 @@ inline float block_sum(float* red_smem, float sum, sycl::nd_item<3> &item) {
   }
 
   // Parallel reduction inside the warp.
-#pragma unroll
   for (int mask = NUM_WARPS / 2; mask >= 1; mask /= 2) {
     sum += VLLM_SHFL_XOR_SYNC(sum, mask);
   }
@@ -175,7 +173,6 @@ void paged_attention_kernel(
         Q_vec[THREAD_GROUP_SIZE][NUM_VECS_PER_THREAD]>(group);
     auto& q_vecs = *q_vecs_ptr;
 
-#pragma unroll
   for (int i = thread_group_idx; i < NUM_VECS_PER_THREAD;
        i += NUM_THREAD_GROUPS) {
     const int vec_idx = thread_group_offset + i * THREAD_GROUP_SIZE;
@@ -257,7 +254,6 @@ void paged_attention_kernel(
       const int token_idx = block_idx * BLOCK_SIZE + physical_block_offset;
       K_vec k_vecs[NUM_VECS_PER_THREAD];
 
-#pragma unroll
       for (int j = 0; j < NUM_VECS_PER_THREAD; j++) {
         const cache_t* k_ptr =
             k_cache + physical_block_number * kv_block_stride +
@@ -291,7 +287,6 @@ void paged_attention_kernel(
   // Perform reduction across the threads in the same warp to get the
   // max qk value for each "warp" (not across the thread block yet).
   // The 0-th thread of each thread group already has its max qk value.
-#pragma unroll
   for (int mask = WARP_SIZE / 2; mask >= THREAD_GROUP_SIZE; mask /= 2) {
     qk_max = sycl::fmax(qk_max, VLLM_SHFL_XOR_SYNC(qk_max, mask));
   }
@@ -303,7 +298,6 @@ void paged_attention_kernel(
   // TODO(woosuk): Refactor this part.
   // Get the max qk value for the sequence.
   qk_max = lane < NUM_WARPS ? red_smem[lane] : -FLT_MAX;
-#pragma unroll
   for (int mask = NUM_WARPS / 2; mask >= 1; mask /= 2) {
     qk_max = sycl::fmax(qk_max, VLLM_SHFL_XOR_SYNC(qk_max, mask));
   }
@@ -350,7 +344,6 @@ void paged_attention_kernel(
 
   // NOTE(woosuk): We use FP32 for the accumulator for better accuracy.
   float accs[NUM_ROWS_PER_THREAD];
-#pragma unroll
   for (int i = 0; i < NUM_ROWS_PER_THREAD; i++) {
     accs[i] = 0.f;
   }
@@ -380,7 +373,6 @@ void paged_attention_kernel(
 
     const cache_t* v_ptr = v_cache + physical_block_number * kv_block_stride +
                            kv_head_idx * kv_head_stride;
-#pragma unroll
     for (int i = 0; i < NUM_ROWS_PER_THREAD; i++) {
       const int row_idx = lane / NUM_V_VECS_PER_ROW + i * NUM_ROWS_PER_ITER;
       if (row_idx < HEAD_SIZE) {
@@ -394,7 +386,6 @@ void paged_attention_kernel(
           // contain NaNs. See
           // https://github.com/vllm-project/vllm/issues/641#issuecomment-1682544472
           scalar_t* v_vec_ptr = reinterpret_cast<scalar_t*>(&v_vec);
-#pragma unroll
           for (int j = 0; j < V_VEC_SIZE; j++) {
             v_vec_ptr[j] = token_idx + j < seq_len ? v_vec_ptr[j] : zero_value;
           }
@@ -405,10 +396,8 @@ void paged_attention_kernel(
   }
 
   // Perform reduction within each warp.
-#pragma unroll
   for (int i = 0; i < NUM_ROWS_PER_THREAD; i++) {
     float acc = accs[i];
-#pragma unroll
     for (int mask = NUM_V_VECS_PER_ROW / 2; mask >= 1; mask /= 2) {
       acc += VLLM_SHFL_XOR_SYNC(acc, mask);
     }
@@ -421,13 +410,11 @@ void paged_attention_kernel(
 
   // Perform reduction across warps.
   float* out_smem = reinterpret_cast<float*>(shared_mem);
-#pragma unroll
   for (int i = NUM_WARPS; i > 1; i /= 2) {
     int mid = i / 2;
     // Upper warps write to shared memory.
     if (warp_idx >= mid && warp_idx < i) {
       float* dst = &out_smem[(warp_idx - mid) * HEAD_SIZE];
-#pragma unroll
       for (int i = 0; i < NUM_ROWS_PER_THREAD; i++) {
         const int row_idx = lane / NUM_V_VECS_PER_ROW + i * NUM_ROWS_PER_ITER;
         if (row_idx < HEAD_SIZE && lane % NUM_V_VECS_PER_ROW == 0) {
@@ -440,7 +427,6 @@ void paged_attention_kernel(
     // Lower warps update the output.
     if (warp_idx < mid) {
       const float* src = &out_smem[warp_idx * HEAD_SIZE];
-#pragma unroll
       for (int i = 0; i < NUM_ROWS_PER_THREAD; i++) {
         const int row_idx = lane / NUM_V_VECS_PER_ROW + i * NUM_ROWS_PER_ITER;
         if (row_idx < HEAD_SIZE && lane % NUM_V_VECS_PER_ROW == 0) {
@@ -456,7 +442,6 @@ void paged_attention_kernel(
     scalar_t* out_ptr =
         out + seq_idx * num_heads * max_num_partitions * HEAD_SIZE +
         head_idx * max_num_partitions * HEAD_SIZE + partition_idx * HEAD_SIZE;
-#pragma unroll
     for (int i = 0; i < NUM_ROWS_PER_THREAD; i++) {
       const int row_idx = lane / NUM_V_VECS_PER_ROW + i * NUM_ROWS_PER_ITER;
       if (row_idx < HEAD_SIZE && lane % NUM_V_VECS_PER_ROW == 0) {

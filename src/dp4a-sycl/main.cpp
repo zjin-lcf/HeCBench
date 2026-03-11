@@ -30,7 +30,6 @@ void dot_product(const T *__restrict__ a,
   for (size_t idx = item.get_global_id(0); idx < n;
        idx += item.get_group_range(0) * item.get_local_range(0)) {
     size_t iInOffset = idx * 4;
-    #pragma unroll
     for (int i = 0; i < 4; i++) {
       if constexpr (std::is_same_v<T, unsigned>) {
         const uint8_t * a8 = (const uint8_t *) &a[iInOffset + i];
@@ -64,7 +63,6 @@ void dot_product2(const T *__restrict__ a,
   for (size_t idx = item.get_global_id(0); idx < n;
        idx += item.get_group_range(0) * item.get_local_range(0)) {
     size_t iInOffset = idx * 4;
-    #pragma unroll
     for (int i = 0; i < 4; i++) {
       for (int k = 0; k < M; k++)
         sum = sycl::ext::oneapi::dot_acc(a[iInOffset + i], b[iInOffset + i], sum);

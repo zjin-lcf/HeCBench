@@ -218,7 +218,6 @@ private:
                                 ///< arrangements.
         Int2Type<false>) /*time_slicing*/
     {
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = (linear_tid * ITEMS_PER_THREAD) + ITEM;
@@ -229,7 +228,6 @@ private:
 
         item.barrier(sycl::access::fence_space::local_space);
 
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = int(ITEM * BLOCK_THREADS) + linear_tid;
@@ -257,7 +255,6 @@ private:
     {
         InputT temp_items[ITEMS_PER_THREAD];
 
-        #pragma unroll
         for (int SLICE = 0; SLICE < TIME_SLICES; SLICE++)
         {
             const int SLICE_OFFSET  = SLICE * TIME_SLICED_ITEMS;
@@ -267,7 +264,6 @@ private:
 
             if (warp_id == SLICE)
             {
-                #pragma unroll
                 for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
                 {
                     int item_offset = (lane_id * ITEMS_PER_THREAD) + ITEM;
@@ -279,7 +275,6 @@ private:
 
             item.barrier(sycl::access::fence_space::local_space);
 
-            #pragma unroll
             for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
             {
                 // Read a strip of items
@@ -299,7 +294,6 @@ private:
         }
 
         // Copy
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             output_items[ITEM] = temp_items[ITEM];
@@ -323,7 +317,6 @@ private:
                                 ///< arrangements.
         Int2Type<false>) /*time_slicing*/
     {
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = warp_offset + ITEM + (lane_id * ITEMS_PER_THREAD);
@@ -334,7 +327,6 @@ private:
 
         WARP_SYNC(0xffffffff, item);
 
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = warp_offset + (ITEM * WARP_TIME_SLICED_THREADS) + lane_id;
@@ -361,7 +353,6 @@ private:
     {
         if (warp_id == 0)
         {
-            #pragma unroll
             for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
             {
                 int item_offset = ITEM + (lane_id * ITEMS_PER_THREAD);
@@ -372,7 +363,6 @@ private:
 
             WARP_SYNC(0xffffffff, item);
 
-            #pragma unroll
             for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
             {
                 int item_offset = (ITEM * WARP_TIME_SLICED_THREADS) + lane_id;
@@ -381,14 +371,12 @@ private:
             }
         }
 
-        #pragma unroll
         for (unsigned int SLICE = 1; SLICE < TIME_SLICES; ++SLICE)
         {
             item.barrier(sycl::access::fence_space::local_space);
 
             if (warp_id == SLICE)
             {
-                #pragma unroll
                 for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
                 {
                     int item_offset = ITEM + (lane_id * ITEMS_PER_THREAD);
@@ -399,7 +387,6 @@ private:
 
                 WARP_SYNC(0xffffffff, item);
 
-                #pragma unroll
                 for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
                 {
                     int item_offset = (ITEM * WARP_TIME_SLICED_THREADS) + lane_id;
@@ -427,7 +414,6 @@ private:
                                 ///< arrangements.
         Int2Type<false>) /*time_slicing*/
     {
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = int(ITEM * BLOCK_THREADS) + linear_tid;
@@ -439,7 +425,6 @@ private:
         item.barrier(sycl::access::fence_space::local_space);
 
         // No timeslicing
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = (linear_tid * ITEMS_PER_THREAD) + ITEM;
@@ -468,7 +453,6 @@ private:
         // Warp time-slicing
         InputT temp_items[ITEMS_PER_THREAD];
 
-        #pragma unroll
         for (int SLICE = 0; SLICE < TIME_SLICES; SLICE++)
         {
             const int SLICE_OFFSET  = SLICE * TIME_SLICED_ITEMS;
@@ -476,7 +460,6 @@ private:
 
             item.barrier(sycl::access::fence_space::local_space);
 
-            #pragma unroll
             for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
             {
                 // Write a strip of items
@@ -499,7 +482,6 @@ private:
 
             if (warp_id == SLICE)
             {
-                #pragma unroll
                 for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
                 {
                     int item_offset = (lane_id * ITEMS_PER_THREAD) + ITEM;
@@ -510,7 +492,6 @@ private:
         }
 
         // Copy
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             output_items[ITEM] = temp_items[ITEM];
@@ -534,7 +515,6 @@ private:
                                 ///< arrangements.
         Int2Type<false>) /*time_slicing*/
     {
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = warp_offset + (ITEM * WARP_TIME_SLICED_THREADS) + lane_id;
@@ -545,7 +525,6 @@ private:
 
         WARP_SYNC(0xffffffff, item);
 
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = warp_offset + ITEM + (lane_id * ITEMS_PER_THREAD);
@@ -572,14 +551,12 @@ private:
                                 ///< arrangements.
         Int2Type<true>) /*time_slicing*/
     {
-        #pragma unroll
         for (unsigned int SLICE = 0; SLICE < TIME_SLICES; ++SLICE)
         {
             item.barrier(sycl::access::fence_space::local_space);
 
             if (warp_id == SLICE)
             {
-                #pragma unroll
                 for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
                 {
                     int item_offset = (ITEM * WARP_TIME_SLICED_THREADS) + lane_id;
@@ -590,7 +567,6 @@ private:
 
                 WARP_SYNC(0xffffffff, item);
 
-                #pragma unroll
                 for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
                 {
                     int item_offset = ITEM + (lane_id * ITEMS_PER_THREAD);
@@ -620,7 +596,6 @@ private:
             &ranks)[ITEMS_PER_THREAD], ///< [in] Corresponding scatter ranks
         Int2Type<false>) /*time_slicing*/
     {
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = ranks[ITEM];
@@ -631,7 +606,6 @@ private:
 
         item.barrier(sycl::access::fence_space::local_space);
 
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = (linear_tid * ITEMS_PER_THREAD) + ITEM;
@@ -659,14 +633,12 @@ private:
     {
         InputT temp_items[ITEMS_PER_THREAD];
 
-        #pragma unroll
         for (int SLICE = 0; SLICE < TIME_SLICES; SLICE++)
         {
             item.barrier(sycl::access::fence_space::local_space);
 
             const int SLICE_OFFSET = TIME_SLICED_ITEMS * SLICE;
 
-            #pragma unroll
             for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
             {
                 int item_offset = ranks[ITEM] - SLICE_OFFSET;
@@ -682,7 +654,6 @@ private:
 
             if (warp_id == SLICE)
             {
-                #pragma unroll
                 for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
                 {
                     int item_offset = (lane_id * ITEMS_PER_THREAD) + ITEM;
@@ -693,7 +664,6 @@ private:
         }
 
         // Copy
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             output_items[ITEM] = temp_items[ITEM];
@@ -719,7 +689,6 @@ private:
             &ranks)[ITEMS_PER_THREAD], ///< [in] Corresponding scatter ranks
         Int2Type<false>) /*time_slicing*/
     {
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = ranks[ITEM];
@@ -730,7 +699,6 @@ private:
 
         item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = int(ITEM * BLOCK_THREADS) + linear_tid;
@@ -760,7 +728,6 @@ private:
     {
         InputT temp_items[ITEMS_PER_THREAD];
 
-        #pragma unroll
         for (int SLICE = 0; SLICE < TIME_SLICES; SLICE++)
         {
             const int SLICE_OFFSET  = SLICE * TIME_SLICED_ITEMS;
@@ -768,7 +735,6 @@ private:
 
             item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
             for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
             {
                 int item_offset = ranks[ITEM] - SLICE_OFFSET;
@@ -782,7 +748,6 @@ private:
 
             item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
             for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
             {
                 // Read a strip of items
@@ -802,7 +767,6 @@ private:
         }
 
         // Copy
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             output_items[ITEM] = temp_items[ITEM];
@@ -1155,7 +1119,6 @@ public:
                                 ///< <em>blocked</em> arrangements.
         OffsetT (&ranks)[ITEMS_PER_THREAD]) ///< [in] Corresponding scatter ranks
     {
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = ranks[ITEM];
@@ -1166,7 +1129,6 @@ public:
 
         item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = int(ITEM * BLOCK_THREADS) + linear_tid;
@@ -1202,7 +1164,6 @@ public:
             &ranks)[ITEMS_PER_THREAD], ///< [in] Corresponding scatter ranks
         ValidFlag (&is_valid)[ITEMS_PER_THREAD]) ///< [in] Corresponding flag denoting item validity
     {
-        #pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = ranks[ITEM];
@@ -1213,7 +1174,6 @@ public:
 
         item.barrier(sycl::access::fence_space::local_space);
 
-#pragma unroll
         for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         {
             int item_offset = int(ITEM * BLOCK_THREADS) + linear_tid;

@@ -54,7 +54,6 @@ __global__ void kernel (const float * __restrict__ A,
       // block_items_end – [in] Number of valid items to load
       LoadFloat(loadf_storage).Load(&(A[i]), vals, valid_items);
 
-      #pragma unroll
       for(int j = 0; j < ITEMS_PER_THREAD; j++)
           qvals[j] = int(vals[j]);
 

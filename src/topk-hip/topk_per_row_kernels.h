@@ -239,7 +239,6 @@ vectorized_process(size_t thread_rank, size_t num_threads, T const* in, IdxT len
         {
             wide.scalar       = in_cast[i];
             const IdxT real_i = skip_cnt + i * items_per_scalar;
-#pragma unroll
             for(int j = 0; j < items_per_scalar; ++j)
             {
                 val = wide.array[j];
@@ -318,7 +317,6 @@ __device__ void vectorized_process(T const* in, IdxT len, Func f, int sync_width
                 wide.scalar = in_cast[i];
             }
             const IdxT real_i = skip_cnt + i * items_per_scalar;
-#pragma unroll
             for(int j = 0; j < items_per_scalar; ++j)
             {
                 f(wide.array[j], real_i + j, valid);

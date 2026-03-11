@@ -53,7 +53,6 @@ struct AxpbyFunctor {
         // load
         load_store(r_x, x, 0, i_start);
         load_store(r_y, y, 0, i_start);
-#pragma unroll
         for (int ii = 0; ii < ILP; ii++) {
           r_out[ii] = a * static_cast<float>(r_x[ii]) + b * static_cast<float>(r_y[ii]);
           if (arg_to_check == -1) finite =
@@ -68,7 +67,6 @@ struct AxpbyFunctor {
       // Non-divergent exit condition for __syncthreads, not necessary here
       for (int i_start = 0; i_start < n && i_start < chunk_size;
            i_start += item.get_local_range(2) * ILP) {
-#pragma unroll
         for (int ii = 0; ii < ILP; ii++) {
           r_x[ii] = 0;
           r_y[ii] = 0;
@@ -79,7 +77,6 @@ struct AxpbyFunctor {
             r_y[ii] = y[i];
           }
         }
-#pragma unroll
         for (int ii = 0; ii < ILP; ii++) {
           r_out[ii] = a * static_cast<float>(r_x[ii]) + b * static_cast<float>(r_y[ii]);
           if (arg_to_check == -1) finite =
@@ -88,7 +85,6 @@ struct AxpbyFunctor {
           if (arg_to_check == 1) finite = finite && sycl::isfinite(r_y[ii]);
         }
         // see note in multi_tensor_scale_kernel.cu
-#pragma unroll
         for (int ii = 0; ii < ILP; ii++) {
           int i = i_start + item.get_local_id(2) +
                   ii * item.get_local_range(2);

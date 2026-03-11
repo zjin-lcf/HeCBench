@@ -79,7 +79,6 @@ double run_gmem_atomics(
                 unsigned int bins[ACTIVE_CHANNELS];
 		DecodePixel<NUM_BINS>(pixel, bins);
 
-                #pragma unroll
                 for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL) {
                    auto ao = sycl::atomic_ref<unsigned int, sycl::memory_order::relaxed, \
                                               sycl::memory_scope::device,\

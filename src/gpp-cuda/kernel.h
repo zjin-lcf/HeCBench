@@ -28,7 +28,6 @@ __global__ void solver(
           vcoul[igp];
 
       for (int ig = threadIdx.x; ig < ncouls; ig += blockDim.x) {
-        #pragma unroll
         for (int iw = nstart; iw < nend; ++iw) // 3 iterations
         {
           CustomComplex<dataType> wdiff =

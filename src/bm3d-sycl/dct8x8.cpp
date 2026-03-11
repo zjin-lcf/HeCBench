@@ -173,7 +173,6 @@ void DCT2D8x8(sycl::nd_item<2> &item,
   
   float *bl_ptr = block + offset;
 
-#pragma unroll
 
   for (unsigned int i = 0; i < BLOCK_SIZE; i++)
     bl_ptr[i * BLOCK_SIZE] = src[i * BLOCK_SIZE]; //Load column to the shared mem
@@ -225,7 +224,6 @@ void IDCT2D8x8(sycl::nd_item<2> &item,
   
   float *bl_ptr = block + offset;
 
-#pragma unroll
 
   for (unsigned int i = 0; i < BLOCK_SIZE; i++)
     bl_ptr[i * BLOCK_SIZE] = src[i * BLOCK_SIZE];

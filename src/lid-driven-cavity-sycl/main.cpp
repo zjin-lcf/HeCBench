@@ -224,7 +224,6 @@ int main (int argc, char *argv[])
     q.memcpy (pres_sum, pres_sum_d, size_res * sizeof(Real)).wait();
 
     Real p0_norm = ZERO;
-    #pragma unroll
     for (int i = 0; i < size_res; ++i) {
       p0_norm += pres_sum[i];
     }
@@ -290,7 +289,6 @@ int main (int argc, char *argv[])
       q.memcpy (res, res_d, size_res * sizeof(Real)).wait();
 
       norm_L2 = ZERO;
-      #pragma unroll
       for (int i = 0; i < size_res; ++i) {
         norm_L2 += res[i];
       }
@@ -335,7 +333,6 @@ int main (int argc, char *argv[])
     max_v = SMALL;
     max_u = SMALL;
 
-    #pragma unroll
     for (int i = 0; i < size_max; ++i) {
       Real test_u = max_u_arr[i];
       max_u = FMAX(max_u, test_u);

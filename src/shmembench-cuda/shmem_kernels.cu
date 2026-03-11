@@ -54,7 +54,6 @@ __global__ void benchmark_shmem(float4 *g_data){
 
   __syncthreads();  // __threadfence_block() is faster though
 
-  #pragma unroll 32
   for(int j=0; j<TOTAL_ITERATIONS; j++){
     shmem_swap(shm_buffer+tid+0*blockDim.x, shm_buffer+tid+1*blockDim.x);
     shmem_swap(shm_buffer+tid+2*blockDim.x, shm_buffer+tid+3*blockDim.x);

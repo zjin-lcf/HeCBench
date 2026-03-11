@@ -274,7 +274,6 @@ struct TxN_t {
    */
   DI void fill(math_t _val)
   {
-#pragma unroll
     for (int i = 0; i < Ratio; ++i) {
       val.data[i] = _val;
     }

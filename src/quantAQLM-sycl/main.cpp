@@ -72,7 +72,6 @@ void Code1x16MatVec(
     int b_sh_rd = F * sg.get_local_linear_id();
     if (pred && a_gl_rd < a_gl_end) {
       const uint16_t* enc = reinterpret_cast<const uint16_t*>(&A[a_gl_rd]);
-#pragma unroll
       for (int i = 0; i < 8; i++) {
         uint32_t dec[4];
         sycl::int4 t = codebook[enc[i]];
@@ -84,7 +83,6 @@ void Code1x16MatVec(
         sycl::half2 *a = reinterpret_cast<sycl::half2 *>(&dec);
         sycl::half2 *b = reinterpret_cast<sycl::half2 *>(&sh_b[b_sh_rd]);
         sycl::half2 res2 = {};
-#pragma unroll
         for (int j = 0; j < 4; j++) res2 = sycl::fma(a[j], b[j], res2);
         res += float(res2.x()) + float(res2.y());
         b_sh_rd++;

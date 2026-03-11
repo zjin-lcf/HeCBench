@@ -26,11 +26,9 @@ void bilateralFilter(
 
       // window centered at the coordinate (idx, idy)
       #ifdef LOOP_UNROLL
-      #pragma unroll
       #endif
       for(int i = -R; i <= R; i++) {
       #ifdef LOOP_UNROLL
-      #pragma unroll
       #endif
         for(int j = -R; j <= R; j++) {
 

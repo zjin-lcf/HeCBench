@@ -51,7 +51,6 @@ inline T ThreadScanExclusive(
     ScanOp scan_op, ///< [in] Binary scan operator
     Int2Type<LENGTH> /*length*/)
 {
-    #pragma unroll
     for (int i = 0; i < LENGTH; ++i)
     {
         inclusive = scan_op(exclusive, input[i]);
@@ -124,7 +123,6 @@ inline T ThreadScanInclusive(
     ScanOp scan_op, ///< [in] Binary scan operator
     Int2Type<LENGTH> /*length*/)
 {
-    #pragma unroll
     for (int i = 0; i < LENGTH; ++i)
     {
         inclusive = scan_op(inclusive, input[i]);

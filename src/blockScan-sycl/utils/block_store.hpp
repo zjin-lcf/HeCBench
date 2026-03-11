@@ -54,7 +54,6 @@ inline void StoreDirectWarpStriped(
     OutputIteratorT thread_itr = block_itr + warp_offset + tid;
 
     // Store directly in warp-striped order
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         thread_itr[(ITEM * PTX_WARP_THREADS)] = items[ITEM];
@@ -91,7 +90,6 @@ inline void StoreDirectWarpStriped(
     OutputIteratorT thread_itr = block_itr + warp_offset + tid;
 
     // Store directly in warp-striped order
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         if (warp_offset + tid + (ITEM * PTX_WARP_THREADS) < valid_items)
@@ -113,7 +111,6 @@ inline void StoreDirectBlocked(
     OutputIteratorT thread_itr = block_itr + (linear_tid * ITEMS_PER_THREAD);
 
     // Store directly in thread-blocked order
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         thread_itr[ITEM] = items[ITEM];
@@ -134,7 +131,6 @@ inline void StoreDirectBlocked(
     OutputIteratorT thread_itr = block_itr + (linear_tid * ITEMS_PER_THREAD);
 
     // Store directly in thread-blocked order
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         if (ITEM + (linear_tid * ITEMS_PER_THREAD) < valid_items)

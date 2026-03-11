@@ -89,7 +89,6 @@ public:
 
       CTA_SYNC();
 
-      #pragma unroll
       for (int item = ITEMS_PER_THREAD - 1; item > 0; item--)
       {
         output[item] = difference_op(input[item], input[item - 1]);
@@ -119,7 +118,6 @@ public:
 
       CTA_SYNC();
 
-      #pragma unroll
       // data overwritten for (int item = ITEMS_PER_THREAD - 2; item >= 0; item--) 
       for (int item = 0; item < ITEMS_PER_THREAD - 1; item++)
       {

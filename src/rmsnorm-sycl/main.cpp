@@ -25,7 +25,6 @@ void rmsnorm_fwd_two_scan_kernel(const T *__restrict__ input,
     float     local_squares_sum = 0.0f;
     for (int64_t offset = start_offset; offset < inner_len; offset += (BLOCKSIZE * UNROLL)) {
         load_data<T, UNROLL>(input_ptr + offset, ld_input_regs);
-        #pragma unroll
         for (int i = 0; i < UNROLL; ++i) {
             const float val = static_cast<float>(ld_input_regs[i]);
             local_squares_sum += (val * val);
@@ -43,7 +42,6 @@ void rmsnorm_fwd_two_scan_kernel(const T *__restrict__ input,
         load_data<T, UNROLL>(input_ptr + offset, ld_input_regs);
         load_data<T, UNROLL>(gamma_ptr + offset, ld_gamma_regs);
 
-        #pragma unroll
         for (int i = 0; i < UNROLL; ++i) {
             float val = static_cast<float>(ld_input_regs[i]) * norm_factor *
                         static_cast<float>(ld_gamma_regs[i]);

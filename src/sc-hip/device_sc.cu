@@ -135,7 +135,6 @@ void StreamCompaction (int size, T value, int n_tasks, float alpha,
     int pos = (my_s - p.cut) * REGS * blockDim.x + threadIdx.x;
 #endif
     // Load in on-chip memory
-#pragma unroll
     for(int j = 0; j < REGS; j++) {
       if(pos < size) {
         reg[j] = input[pos];
@@ -164,7 +163,6 @@ void StreamCompaction (int size, T value, int n_tasks, float alpha,
     __syncthreads();
 
     // Store to global memory
-#pragma unroll
     for(int j = 0; j < REGS; j++) {
       pos = block_binary_prefix_sums(&l_count[0], (int)((reg[j] != value) ? 1 : 0), &l_data[0]);
       if(reg[j] != value) {

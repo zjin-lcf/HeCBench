@@ -70,7 +70,6 @@ __global__ void Code1x16MatVec(
     int b_sh_rd = F * (threadIdx.x % WarpSize);
     if (pred && a_gl_rd < a_gl_end) {
       const uint16_t* enc = reinterpret_cast<const uint16_t*>(&A[a_gl_rd]);
-#pragma unroll
       for (int i = 0; i < 8; i++) {
         uint32_t dec[4];
         int4 t = codebook[enc[i]];
@@ -82,7 +81,6 @@ __global__ void Code1x16MatVec(
         half2* a = reinterpret_cast<half2*>(&dec);
         half2* b = reinterpret_cast<half2*>(&sh_b[b_sh_rd]);
         half2 res2 = {};
-#pragma unroll
         for (int j = 0; j < 4; j++) res2 = __hfma2(a[j], b[j], res2);
         res += __half2float(res2.x) + __half2float(res2.y);
         b_sh_rd++;
@@ -92,7 +90,6 @@ __global__ void Code1x16MatVec(
   }
 
   if (pred) {
-#pragma unroll
     for (int i = WarpSize/2; i > 0; i /= 2) res += __shfl_down(res, i);
     if (threadIdx.x % WarpSize == 0) {
       reinterpret_cast<__half*>(C)[c_gl_wr] = __float2half(res);

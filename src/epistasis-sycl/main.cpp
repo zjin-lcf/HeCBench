@@ -321,7 +321,6 @@ int main(int argc, char **argv)
 
           // compute score
           float score = 0.0f;
-          #pragma unroll
           for(k = 0; k < 9; k++)
             score += gammafunction(ft[k] + ft[9 + k] + 1) -
                      gammafunction(ft[k]) - gammafunction(ft[9 + k]);

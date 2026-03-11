@@ -51,7 +51,6 @@ void benchmark_shmem(float4 *g_data, float4* shm_buffer, sycl::nd_item<1> &item)
 
   item.barrier(sycl::access::fence_space::local_space);
 
-  #pragma unroll 32
   for(int j=0; j<TOTAL_ITERATIONS; j++){
     shmem_swap(shm_buffer+tid+0*blk, shm_buffer+tid+1*blk);
     shmem_swap(shm_buffer+tid+2*blk, shm_buffer+tid+3*blk);

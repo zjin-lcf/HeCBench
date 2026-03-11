@@ -45,7 +45,6 @@ void solver(
           vcoul[igp];
 
       for (int ig = threadIdx_x; ig < ncouls; ig += blockDim_x) {
-        #pragma unroll
         for (int iw = nstart; iw < nend; ++iw) // 3 iterations
         {
           CustomComplex<dataType> wdiff =

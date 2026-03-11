@@ -121,7 +121,6 @@ __global__ void kQuantize(const float *__restrict__ code,
 
       __syncthreads();
 
-      #pragma unroll
       for(int j = 0; j < NUM; j++)
           qvals[j] = dQuantize<0>(smem_code, 0.0f, vals[j]);
 

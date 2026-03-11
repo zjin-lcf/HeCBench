@@ -82,25 +82,21 @@ struct fast_hadamard_transform_kernel_traits {
 
 template <int kNChunks>
 inline void hadamard_mult_thread_chunk_12(float x[kNChunks][12]) {
-#pragma unroll
     for (int c = 0; c < kNChunks; ++c) { hadamard_mult_thread_12(x[c]); }
 }
 
 template <int kNChunks>
 inline void hadamard_mult_thread_chunk_20(float x[kNChunks][20]) {
-#pragma unroll
     for (int c = 0; c < kNChunks; ++c) { hadamard_mult_thread_20(x[c]); }
 }
 
 template <int kNChunks>
 inline void hadamard_mult_thread_chunk_28(float x[kNChunks][28]) {
-#pragma unroll
     for (int c = 0; c < kNChunks; ++c) { hadamard_mult_thread_28(x[c]); }
 }
 
 template <int kNChunks>
 inline void hadamard_mult_thread_chunk_40(float x[kNChunks][40]) {
-#pragma unroll
     for (int c = 0; c < kNChunks; ++c) { hadamard_mult_thread_40(x[c]); }
 }
 
@@ -155,9 +151,7 @@ void fast_hadamard_transform_kernel(HadamardParamsBase params,
 
     if constexpr (kNChunks > 1) {
         float x_vals_transposed[kNElts][kNChunks];
-        #pragma unroll
         for (int c = 0; c < kNChunks; ++c) {
-            #pragma unroll
             for (int i = 0; i < kNElts; ++i) { x_vals_transposed[i][c] = x_vals[c][i]; }
         }
         if constexpr (kNChunks == 12) {
@@ -173,9 +167,7 @@ void fast_hadamard_transform_kernel(HadamardParamsBase params,
             static_assert(1 << kLogNChunks == kNChunks, "kNChunks must be a power of 2");
             hadamard_mult_thread<kLogNChunks, kNElts>(x_vals_transposed);
         }
-        #pragma unroll
         for (int c = 0; c < kNChunks; ++c) {
-            #pragma unroll
             for (int i = 0; i < kNElts; ++i) { x_vals[c][i] = x_vals_transposed[i][c]; }
         }
     }

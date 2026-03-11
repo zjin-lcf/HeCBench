@@ -113,7 +113,6 @@ void bit_rev_permutation_z(fr_t* out, const fr_t* in, uint32_t lg_domain_size,
     auto g = item.get_group();
     auto sg = item.get_sub_group();
 
-#pragma unroll 1
     do {
         index_t group_idx = tid >> LG_Z_COUNT;
         index_t group_rev = bit_rev(group_idx, lg_domain_size - 2*LG_Z_COUNT);
@@ -126,7 +125,6 @@ void bit_rev_permutation_z(fr_t* out, const fr_t* in, uint32_t lg_domain_size,
 
         fr_t regs[Z_COUNT];
 
-        #pragma unroll
         for (uint32_t i = 0; i < Z_COUNT; i++) {
             xchg[gid][i][rev] = (regs[i] = in[i * step + base_idx]);
             if (group_idx != group_rev)
@@ -135,7 +133,6 @@ void bit_rev_permutation_z(fr_t* out, const fr_t* in, uint32_t lg_domain_size,
 
         (Z_COUNT > WARP_SZ) ?  sycl::group_barrier(g) : sycl::group_barrier(sg);
 
-#pragma unroll
         for (uint32_t i = 0; i < Z_COUNT; i++)
             out[i * step + base_rev] = xchg[gid][rev][i];
 
@@ -144,13 +141,11 @@ void bit_rev_permutation_z(fr_t* out, const fr_t* in, uint32_t lg_domain_size,
 
         (Z_COUNT > WARP_SZ) ?  sycl::group_barrier(g) : sycl::group_barrier(sg);
 
-#pragma unroll
         for (uint32_t i = 0; i < Z_COUNT; i++)
             xchg[gid][i][rev] = regs[i];
 
         (Z_COUNT > WARP_SZ) ?  sycl::group_barrier(g) : sycl::group_barrier(sg);
 
-#pragma unroll
         for (uint32_t i = 0; i < Z_COUNT; i++)
             out[i * step + base_idx] = xchg[gid][rev][i];
 

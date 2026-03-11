@@ -11,7 +11,6 @@ __global__ void sneaky_snake(
   uint ReadsPerThread[NBytes];
   uint RefsPerThread[NBytes];
 
-#pragma unroll
   for (int i = 0; i < NBytes; i++)
   {
     ReadsPerThread[i] = F_ReadSeq[tid*8 + i];

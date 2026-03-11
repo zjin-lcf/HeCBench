@@ -204,7 +204,6 @@ void rank_gpu_kernel_1(
    * load into top of array bucket_size  
    * --------------------------------------------------------------------
    */
-#pragma unroll
   for(int i=0; i<TEST_ARRAY_SIZE; i++){
     partial_verify_vals[i] = key_array[test_index_array[i]];
   }

@@ -71,14 +71,12 @@ void BP_queens_root_dfs(
      int depthGlobal = depthPreFixos;
      unsigned long long tree_size = 0ULL;
 
-#pragma unroll 2
     for (i = 0; i < N_l; ++i) {
       vertice[i] = _EMPTY_;
     }
 
     flag = root_prefixes[idx].control;
 
-#pragma unroll 2
     for (i = 0; i < depthGlobal; ++i)
       vertice[i] = root_prefixes[idx].board[i];
 

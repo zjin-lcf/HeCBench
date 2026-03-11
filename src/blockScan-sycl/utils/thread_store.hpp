@@ -189,7 +189,6 @@ inline void ThreadStoreVolatilePtr(T *ptr, T val,
 
     VolatileWord words[VOLATILE_MULTIPLE];
 
-    #pragma unroll
     for (int i = 0; i < SHUFFLE_MULTIPLE; ++i)
         reinterpret_cast<ShuffleWord*>(words)[i] = reinterpret_cast<ShuffleWord*>(&val)[i];
 
@@ -227,7 +226,6 @@ inline void ThreadStore(T *ptr, T val, Int2Type<MODIFIER> /*modifier*/,
 
     DeviceWord words[DEVICE_MULTIPLE];
 
-    #pragma unroll
     for (int i = 0; i < SHUFFLE_MULTIPLE; ++i)
         reinterpret_cast<ShuffleWord*>(words)[i] = reinterpret_cast<ShuffleWord*>(&val)[i];
 

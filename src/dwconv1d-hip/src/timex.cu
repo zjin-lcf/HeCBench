@@ -16,20 +16,17 @@ __global__ void kernel_forward(const F *__restrict__ const __w, const F *__restr
     __shared__ F kk[Tmax * BF];
     F4(ww, t) = F4(__w, t + T * (i % C));
 
-    #pragma unroll
     for (int j = 0; j < BF; j++) {
         F4(kk, t + Tmax * j) = F4(__k, ti + tj * j);
     }
     __syncthreads();
 
     float4 ss[BF];
-    #pragma unroll
     for (int j = 0; j < BF; j++) {
         ss[j] = {eps, eps, eps, eps};
     }
     for (int u = 0; u <= t; u++) {
         const F *__restrict__ const w = ww + T - t + u - 4;
-        #pragma unroll
         for (int j = 0; j < BF; j++) {
             float4 *__restrict__ const s = ss + j;
             const F k = kk[u + Tmax * j];
@@ -39,7 +36,6 @@ __global__ void kernel_forward(const F *__restrict__ const __w, const F *__restr
             s->w += w[0] * k;
         }
     }
-    #pragma unroll
     for (int j = 0; j < BF; j++) {
         float4 *__restrict__ const s = ss + j;
         const F *__restrict__ const w = ww + T - 3;
@@ -68,7 +64,6 @@ __global__ void kernel_backward(const F *__restrict__ const __w, const F *__rest
     __shared__ F gg[Tmax * BB];
     F4(ww, t) = F4(__w, t + T * (i % C));
 
-    #pragma unroll
     for (int j = 0; j < BB; j++) {
         F4(kk, t + Tmax * j) = F4(__k, ti + tj * j);
         F4(gg, t + Tmax * j) = F4(__gwk, ti + tj * j);
@@ -76,12 +71,10 @@ __global__ void kernel_backward(const F *__restrict__ const __w, const F *__rest
     __syncthreads();
 
     float4 ss[BB];
-    #pragma unroll
     for (int j = 0; j < BB; j++) {
         ss[j] = {0, 0, 0, 0};
     }
     for (int u = 0; u <= t; u++) {
-        #pragma unroll
         for (int j = 0; j < BB; j++) {
             float4 *__restrict__ const s = ss + j;
             const F *__restrict__ const g = gg + Tmax * j + T - t + u - 4;
@@ -92,7 +85,6 @@ __global__ void kernel_backward(const F *__restrict__ const __w, const F *__rest
             s->w += g[0] * k;
         }
     }
-    #pragma unroll
     for (int j = 0; j < BB; j++) {
         float4 *__restrict__ const s = ss + j;
         const F *__restrict__ const k = kk + Tmax * j + t + 1;
@@ -106,13 +98,11 @@ __global__ void kernel_backward(const F *__restrict__ const __w, const F *__rest
         F4(gw, ti + tj * j) = *s;
     }
 
-    #pragma unroll
     for (int j = 0; j < BB; j++) {
         ss[j] = {0, 0, 0, 0};
     }
     for (int u = t + 3; u < T; u++) {
         const F w = ww[u];
-        #pragma unroll
         for (int j = 0; j < BB; j++) {
             float4 *__restrict__ const s = ss + j;
             const F *__restrict__ const g = gg + Tmax * j + T + t - u - 1;
@@ -122,7 +112,6 @@ __global__ void kernel_backward(const F *__restrict__ const __w, const F *__rest
             s->w += g[3] * w;
         }        
     }
-    #pragma unroll
     for (int j = 0; j < BB; j++) {
         float4 *__restrict__ const s = ss + j;
         const F *__restrict__ const g = gg + Tmax * j + T - 3;

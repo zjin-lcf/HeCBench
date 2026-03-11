@@ -88,7 +88,6 @@ void reverseKernel(data_t* out,
   b.load(in, dstIdx);
   // while reversing along coalesced dimension, also reverse the elements
   if ((rowMajor && !alongRows) || (!rowMajor && alongRows)) {
-    #pragma unroll
     for (int i = 0; i < VecType::Ratio; ++i) {
       swapVals(a.val.data[i], a.val.data[VecType::Ratio - i - 1]);
       swapVals(b.val.data[i], b.val.data[VecType::Ratio - i - 1]);

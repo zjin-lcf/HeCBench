@@ -493,7 +493,6 @@ public:
                    OutputT (&output_items)[ITEMS_PER_THREAD],
                    OffsetT (&ranks)[ITEMS_PER_THREAD])
   {
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
       if (INSERT_PADDING)
@@ -506,7 +505,6 @@ public:
 
     WARP_SYNC(member_mask);
 
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
       int item_offset = (ITEM * LOGICAL_WARP_THREADS) + lane_id;

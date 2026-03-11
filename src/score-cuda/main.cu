@@ -46,7 +46,6 @@ void findTopK(int*__restrict__ indices_,
 
   __shared__ int bins[BINS];
 
-  #pragma unroll
   for (int unroll = 0; unroll < BINS / BLOCK_SIZE; unroll++)
     bins[unroll * BLOCK_SIZE + threadIdx.x] = 0;
 

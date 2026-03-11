@@ -76,7 +76,6 @@ void shmembenchGPU(double *c, const long size, const int n) {
 
           #pragma omp barrier
 
-          #pragma unroll 32
           for(int j=0; j<TOTAL_ITERATIONS; j++){
             shmem_swap(shm_buffer+tid+0*blk, shm_buffer+tid+1*blk);
             shmem_swap(shm_buffer+tid+2*blk, shm_buffer+tid+3*blk);

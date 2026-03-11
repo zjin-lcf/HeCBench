@@ -82,7 +82,6 @@ double run_smem_atomics(
                 unsigned int bins[ACTIVE_CHANNELS];
 	        DecodePixel<NUM_BINS>(pixel, bins);
 
-                #pragma unroll
                 for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL) {
                    auto ao = sycl::atomic_ref<unsigned int, sycl::memory_order::relaxed, \
                                     sycl::memory_scope::work_group,\
@@ -98,7 +97,6 @@ double run_smem_atomics(
         // store local output to global
         for (int i = t; i < NUM_BINS; i += nt)
         {
-            #pragma unroll
             for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
                 d_part_hist[g*NUM_PARTS + i + NUM_BINS * CHANNEL] = smem[i + NUM_BINS * CHANNEL + CHANNEL];
         }

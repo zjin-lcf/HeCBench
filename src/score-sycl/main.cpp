@@ -43,7 +43,6 @@ void findTopK(int*__restrict indices_,
 
   int threadIdx_x = item.get_local_id(2);
 
-  #pragma unroll
   for (int unroll = 0; unroll < BINS / BLOCK_SIZE; unroll++)
     bins[unroll * BLOCK_SIZE + threadIdx_x] = 0;
 

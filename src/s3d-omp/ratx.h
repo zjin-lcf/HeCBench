@@ -6,7 +6,6 @@
     real SQR;
     const real SMALL = FLT_MIN;
 
-    #pragma unroll 22
     for (unsigned int k=1; k<=22; k++) {
         CTOT += C(k);
     }

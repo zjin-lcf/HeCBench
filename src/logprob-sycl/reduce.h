@@ -2,7 +2,6 @@ template<typename T>
 inline T warpReduceSum(T val, sycl::nd_item<2> &item)
 {
   auto sg = item.get_sub_group();
-  #pragma unroll
   for (int mask = SG/2; mask > 0; mask >>= 1)
     val += sycl::permute_group_by_xor(sg, val, mask);
   return val;
@@ -40,7 +39,6 @@ template<typename T>
 inline T warpReduceMax(T val, sycl::nd_item<2> &item)
 {
   auto sg = item.get_sub_group();
-  #pragma unroll
   for (int mask = SG/2; mask > 0; mask >>= 1)
     val = sycl::max(val, sycl::permute_group_by_xor(sg, val, mask));
   return val;

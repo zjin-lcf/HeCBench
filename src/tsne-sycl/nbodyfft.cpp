@@ -289,7 +289,6 @@ void DFT2D1gpu(float* din, std::complex<float>* dout, int num_rows, int num_cols
     std::complex<float> sum, twiddle;
     angle = -2.0f * PI * ((float)i / (float)num_cols);
     sum = 0.0f;
-#pragma unroll
     for (int k = 0; k < num_cols; ++k) {
         TWIDDLE();
         sum = sum + din[j * num_cols + k] * twiddle;
@@ -311,7 +310,6 @@ void DFT2D2gpu(std::complex<float>* din, std::complex<float>* dout, int num_rows
     std::complex<float> sum, twiddle;
     angle = -2.0f * PI * ((float)i / (float)num_cols);
     sum = 0.0f;
-#pragma unroll
     for (int k = 0; k < num_cols; ++k) {
         TWIDDLE();
         sum = sum + din[j * num_cols + k] * twiddle;
@@ -358,7 +356,6 @@ void iDFT2D2gpu(std::complex<float>* din, float* dout, int num_rows, int num_col
     std::complex<float> twiddle;
     angle = 2.0f * PI * ((float)i / (float)num_cols);
     sum = 0.0f;
-#pragma unroll
     for (int k = 0; k < num_cols; ++k) {
         TWIDDLE();
         sum = sum + (din[j * num_cols + k] * twiddle).real();

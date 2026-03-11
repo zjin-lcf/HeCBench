@@ -53,7 +53,6 @@ inline void zero(T& dst) {
     uint32_t words[WORDS];
   } tmp;
 
-#pragma unroll
   for (int ii = 0; ii < WORDS; ++ii) {
     tmp.words[ii] = 0u;
   }

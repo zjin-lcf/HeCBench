@@ -38,7 +38,6 @@ float ReduceSum(sycl::nd_item<1> &item,
     val += vec[i];
 
   //val = warp_reduce_sum(val);
-  #pragma unroll
   for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
     val += sycl::shift_group_left(sg, val, offset);
   }
@@ -58,7 +57,6 @@ float ReduceSum(sycl::nd_item<1> &item,
   val = (threadIdx_x < blockDim_x / WARP_SIZE) ? shared[lane]: 0.0f;
   if (warp == 0) {
     // val = warp_reduce_sum(val);
-    #pragma unroll
     for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
       val += sycl::shift_group_left(sg, val, offset);
     }

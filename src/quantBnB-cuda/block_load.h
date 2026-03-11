@@ -46,7 +46,6 @@ __device__ __forceinline__ void LoadDirectBlocked(
     InputIteratorT  block_itr,
     InputT          (&items)[ITEMS_PER_THREAD])
 {
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         items[ITEM] = block_itr[(linear_tid * ITEMS_PER_THREAD) + ITEM];
@@ -65,7 +64,6 @@ __device__ __forceinline__ void LoadDirectBlocked(
     int             valid_items)                ///< [in] Number of valid items to load
 {
 
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
         if ((linear_tid * ITEMS_PER_THREAD) + ITEM < valid_items)
@@ -88,7 +86,6 @@ __device__ __forceinline__ void LoadDirectBlocked(
     int             valid_items,
     DefaultT        oob_default)
 {
-    #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
         items[ITEM] = oob_default;
 

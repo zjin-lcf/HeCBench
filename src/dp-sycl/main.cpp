@@ -85,7 +85,6 @@ void dot (const size_t iNumElements, const int iNumIterations) try {
       for(size_t idx = iGID; idx < src_size / 4;
           idx += item.get_local_range(0) * item.get_group_range(0)) {
         size_t iInOffset = idx * 4;
-        #pragma unroll
         for (int i = 0; i < 4; i++)
           sum += d_srcA[iInOffset + i] * d_srcB[iInOffset + i];
       }

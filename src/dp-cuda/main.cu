@@ -53,7 +53,6 @@ void dot_product(const T *__restrict__ a,
   T sum = 0;
   for(size_t idx = iGID; idx < n; idx += gridDim.x * blockDim.x) {
     size_t iInOffset = idx * 4;
-    #pragma unroll
     for (int i = 0; i < 4; i++)
       sum += a[iInOffset + i] * b[iInOffset + i];
   }

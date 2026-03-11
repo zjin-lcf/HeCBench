@@ -29,7 +29,6 @@ u64Int HPCC_starts(s64Int n)
 
   temp = 0x1;
 
-  #pragma unroll
   for (i=0; i<64; i++) {
     m2[i] = temp;
     temp = (temp << 1) ^ ((s64Int) temp < 0 ? POLY : 0);
@@ -43,7 +42,6 @@ u64Int HPCC_starts(s64Int n)
   ran = 0x2;
   while (i > 0) {
     temp = 0;
-    #pragma unroll
     for (j=0; j<64; j++)
       if ((ran >> j) & 1)
         temp ^= m2[j];

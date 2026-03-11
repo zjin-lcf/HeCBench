@@ -50,7 +50,6 @@ void ACFKernelSymm(cartesian g_idata1, unsigned int*__restrict g_odata,
     // All elements computed by block are above the main diagonal
     by <<= (LOG2_GRID_SIZE - 2);
     by += tx;
-#pragma unroll
     for(int i=0; i<128; i+=4) {
       g_odata[by+(i<<(LOG2_GRID_SIZE - 2))] = 2088533116; //  (124<<24) + (124<<16) + (124<<8) + (124);
     }
@@ -73,10 +72,8 @@ void ACFKernelSymm(cartesian g_idata1, unsigned int*__restrict g_odata,
     by <<= (LOG2_GRID_SIZE - 2);
     by += tx;
 
-#pragma unroll
     for(int i=0; i<128; i+=4) {
       temp2 = 0;
-#pragma unroll
       for(int j=0; j<4; j++) {
         vec2 = sdata[i+j];
         temp = vec1.x() * vec2.x() + vec1.y() * vec2.y() + vec1.z() * vec2.z();
@@ -133,10 +130,8 @@ void ACFKernelSymm(cartesian g_idata1, unsigned int*__restrict g_odata,
     by <<= (LOG2_GRID_SIZE - 2);
     by += tx;
 
-#pragma unroll
     for(int i=0; i<128; i+=4) {
       temp2 = 0;
-#pragma unroll
       for(int j=0; j<4; j++) {
         if (item.get_local_id(2) <= i + j) temp2 += (124 << (j << 3));
         else { 
@@ -214,10 +209,8 @@ void ACFKernel(cartesian g_idata1, cartesian g_idata2, unsigned int*__restrict g
   by += tx;
 
   // Unrolling offers significant speed-up
-#pragma unroll
   for(int i=0; i<128; i+=4) {   // Iterate through 128 vectors in sdata
     temp2 = 0;
-#pragma unroll
     for(int j=0; j<4; j++) {    // 4 vectors per 1 int output
       // sdata broadcasts sdata[i+j] to all threads in a block; so unnecessary bank conflicts are avoided.
       vec2 = sdata[i+j];

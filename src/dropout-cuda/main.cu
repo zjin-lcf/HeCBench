@@ -42,7 +42,6 @@ fused_dropout_kernel(
     rand.z = rand.z < p;
     rand.w = rand.w < p;
 
-    #pragma unroll
     for (int ii = 0; ii < UNROLL; ii++) {
       IndexType li = linearIndex + blockDim.x * gridDim.x * ii;
       if (li < totalElements) {
@@ -51,7 +50,6 @@ fused_dropout_kernel(
       }
     }
 
-    #pragma unroll
     for (int ii = 0; ii < UNROLL; ii++) {
       IndexType li = linearIndex + blockDim.x * gridDim.x * ii;
       if (li < totalElements) {
@@ -126,7 +124,6 @@ fused_dropout_kernel_vec(
     mask_t mask[VEC];
 
     // Perform the actual computation
-    #pragma unroll
     for (int ii = 0; ii < VEC; ii++) {
       r[ii] = src[ii]*(&rand.x)[ii]*scale;
       mask[ii] = (mask_t)(&rand.x)[ii];

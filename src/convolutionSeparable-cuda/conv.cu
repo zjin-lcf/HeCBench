@@ -44,28 +44,23 @@ __global__ void conv_rows(
   dst += baseY * pitch + baseX;
 
   //Load main data
-  #pragma unroll
   for(int i = ROWS_HALO_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i++)
     l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = src[i * ROWS_BLOCKDIM_X];
 
   //Load left halo
-  #pragma unroll
   for(int i = 0; i < ROWS_HALO_STEPS; i++)
     l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = (baseX + i * ROWS_BLOCKDIM_X >= 0) ? src[i * ROWS_BLOCKDIM_X] : 0;
 
   //Load right halo
-  #pragma unroll
   for(int i = ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS + ROWS_HALO_STEPS; i++)
     l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X] = (baseX + i * ROWS_BLOCKDIM_X < imageW) ? src[i * ROWS_BLOCKDIM_X] : 0;
 
   //Compute and store results
   __syncthreads();
 
-  #pragma unroll
   for(int i = ROWS_HALO_STEPS; i < ROWS_HALO_STEPS + ROWS_RESULT_STEPS; i++) {
     float sum = 0;
 
-    #pragma unroll
     for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
       sum += kernel[KERNEL_RADIUS - j] * l_Data[lidY][lidX + i * ROWS_BLOCKDIM_X + j];
 
@@ -95,28 +90,23 @@ __global__ void conv_cols(
   dst += baseY * pitch + baseX;
 
   //Load main data
-  #pragma unroll
   for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++)
     l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = src[i * COLUMNS_BLOCKDIM_Y * pitch];
 
   //Load upper halo
-  #pragma unroll
   for(int i = 0; i < COLUMNS_HALO_STEPS; i++)
     l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y >= 0) ? src[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
 
   //Load lower halo
-  #pragma unroll
   for(int i = COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS + COLUMNS_HALO_STEPS; i++)
     l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y] = (baseY + i * COLUMNS_BLOCKDIM_Y < imageH) ? src[i * COLUMNS_BLOCKDIM_Y * pitch] : 0;
 
   //Compute and store results
   __syncthreads();
 
-  #pragma unroll
   for(int i = COLUMNS_HALO_STEPS; i < COLUMNS_HALO_STEPS + COLUMNS_RESULT_STEPS; i++) {
     float sum = 0;
 
-    #pragma unroll
     for(int j = -KERNEL_RADIUS; j <= KERNEL_RADIUS; j++)
       sum += kernel[KERNEL_RADIUS - j] * l_Data[lidX][lidY + i * COLUMNS_BLOCKDIM_Y + j];
 

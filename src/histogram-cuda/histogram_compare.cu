@@ -44,7 +44,6 @@ __device__ __forceinline__ void DecodePixel(float4 &pixel, unsigned int (&bins)[
     samples[2] = pixel.z;
     samples[3] = pixel.w;
 
-    #pragma unroll
     for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
         bins[CHANNEL] = (unsigned int) (samples[CHANNEL] * float(NUM_BINS));
 }
@@ -59,7 +58,6 @@ __device__ __forceinline__ void DecodePixel(uchar4 pixel, unsigned int (&bins)[A
     samples[2] = pixel.z;
     samples[3] = pixel.w;
 
-    #pragma unroll
     for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
         bins[CHANNEL] = (unsigned int) (samples[CHANNEL]);
 }

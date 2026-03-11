@@ -71,9 +71,7 @@ template <typename acc_t, int WARP_BATCH, int WARP_SIZE,
           template <typename> class ReduceOp>
 inline void warp_reduce(acc_t *sum, const sycl::nd_item<3> &item) {
   ReduceOp<acc_t> r;
-#pragma unroll
   for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
-#pragma unroll
     for (int i = 0; i < WARP_BATCH; ++i) {
       acc_t b = WARP_SHFL_XOR_NATIVE(sum[i], offset, item);
       sum[i] = r(sum[i], b);
@@ -135,9 +133,7 @@ void scaled_masked_softmax_warp_forward(output_t *dst, const input_t *src,
   acc_t elements[WARP_BATCH][WARP_ITERATIONS];
   input_t temp_data[ELEMENTS_PER_LDG_STG];
   uint8_t temp_mask[ELEMENTS_PER_LDG_STG];
-#pragma unroll
   for (int i = 0; i < local_batches; ++i) {
-#pragma unroll
     for (int it = 0; it < WARP_ITERATIONS; it += ELEMENTS_PER_LDG_STG) {
       int element_index = ELEMENTS_PER_LDG_STG * local_idx + it * WARP_SIZE;
       if (element_index < element_count) {
@@ -146,7 +142,6 @@ void scaled_masked_softmax_warp_forward(output_t *dst, const input_t *src,
         copy_vector<input_t, ELEMENTS_PER_LDG_STG>(temp_data, src + itr_idx);
         copy_vector<uint8_t, ELEMENTS_PER_LDG_STG>(temp_mask, mask + itr_idx);
 
-#pragma unroll
         for (int element = 0; element < ELEMENTS_PER_LDG_STG; ++element) {
           if (temp_mask[element] != 1) {
             elements[i][it + element] = (acc_t)temp_data[element] * scale;
@@ -155,7 +150,6 @@ void scaled_masked_softmax_warp_forward(output_t *dst, const input_t *src,
           }
         }
       } else {
-#pragma unroll
         for (int element = 0; element < ELEMENTS_PER_LDG_STG; ++element) {
           elements[i][it + element] = -std::numeric_limits<acc_t>::infinity();
         }
@@ -165,10 +159,8 @@ void scaled_masked_softmax_warp_forward(output_t *dst, const input_t *src,
 
   // compute max_value
   acc_t max_value[WARP_BATCH];
-#pragma unroll
   for (int i = 0; i < WARP_BATCH; ++i) {
     max_value[i] = elements[i][0];
-#pragma unroll
     for (int it = 1; it < WARP_ITERATIONS; ++it) {
       max_value[i] =
           (max_value[i] > elements[i][it]) ? max_value[i] : elements[i][it];
@@ -178,15 +170,12 @@ void scaled_masked_softmax_warp_forward(output_t *dst, const input_t *src,
 
   // compute scale value to account for full mask
   acc_t mask_value[WARP_BATCH];
-#pragma unroll
   for (int i = 0; i < WARP_BATCH; ++i) {
     mask_value[i] = (max_value[i] == (acc_t)-10000.0) ? (acc_t)0.0 : (acc_t)1.0;
   }
 
   acc_t sum[WARP_BATCH]{0.0f};
-#pragma unroll
   for (int i = 0; i < WARP_BATCH; ++i) {
-#pragma unroll
     for (int it = 0; it < WARP_ITERATIONS; ++it) {
       elements[i][it] = sycl::exp((elements[i][it] - max_value[i]));
       sum[i] += elements[i][it];
@@ -196,13 +185,10 @@ void scaled_masked_softmax_warp_forward(output_t *dst, const input_t *src,
 
   // store result
   output_t out[ELEMENTS_PER_LDG_STG];
-#pragma unroll
   for (int i = 0; i < local_batches; ++i) {
-#pragma unroll
     for (int it = 0; it < WARP_ITERATIONS; it += ELEMENTS_PER_LDG_STG) {
       int element_index = ELEMENTS_PER_LDG_STG * local_idx + it * WARP_SIZE;
       if (element_index < element_count) {
-#pragma unroll
         for (int element = 0; element < ELEMENTS_PER_LDG_STG; ++element) {
           if (mask_value[i])
             out[element] = elements[i][it + element] / sum[i];

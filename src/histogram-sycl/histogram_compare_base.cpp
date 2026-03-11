@@ -54,7 +54,6 @@ inline void DecodePixel(sycl::float4 &pixel, unsigned int (&bins)[ACTIVE_CHANNEL
     samples[2] = pixel.z();
     samples[3] = pixel.w();
 
-    #pragma unroll
     for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
         bins[CHANNEL] = (unsigned int) (samples[CHANNEL] * float(NUM_BINS));
 }
@@ -69,7 +68,6 @@ inline void DecodePixel(sycl::uchar4 pixel, unsigned int (&bins)[ACTIVE_CHANNELS
     samples[2] = pixel.z();
     samples[3] = pixel.w();
 
-    #pragma unroll
     for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
         bins[CHANNEL] = (unsigned int) (samples[CHANNEL]);
 }

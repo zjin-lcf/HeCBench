@@ -66,7 +66,6 @@ void run_cpu_threads(T *output, T *input, std::atomic_int *flags, int size, int 
                 T   reg[REGS_CPU];
                 int pos = my_s * REGS_CPU;
 // Load in on-chip memory
-#pragma unroll
                 for(int j = 0; j < REGS_CPU; j++) {
                     if(pos < size) {
                         reg[j] = input[pos];
@@ -86,7 +85,6 @@ void run_cpu_threads(T *output, T *input, std::atomic_int *flags, int size, int 
 
                 // Store to global memory
                 pos = l_count;
-#pragma unroll
                 for(int j = 0; j < REGS_CPU; j++) {
                     if(reg[j] != value) {
                         output[pos] = reg[j];

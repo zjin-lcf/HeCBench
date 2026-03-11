@@ -85,7 +85,6 @@ void surfel_render_tile(
         int tid = item.get_local_id(1) * item.get_local_range(2) +
                   item.get_local_id(2);
         if (tid < TILE && base + tid < N) {
-            #pragma unroll
             for (int k = 0; k < COL_DIM; ++k) {
                 sh[tid * COL_DIM + k] = s[(base + tid) * COL_DIM + k];
             }
@@ -94,7 +93,6 @@ void surfel_render_tile(
 
         int tileCount = sycl::min(TILE, N - base);
 
-        #pragma unroll
         for (int i = 0; i < tileCount; ++i) {
 
             T px = sh[i * COL_DIM + COL_P_X];

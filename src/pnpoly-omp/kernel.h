@@ -34,7 +34,6 @@ void pnpoly_opt(
   for (int i = 0; i < n; i++) {
     int c[tile_size];
     float2 lpoint[tile_size];
-    #pragma unroll
     for (int ti=0; ti<tile_size; ti++) {
       c[ti] = 0;
       if (i+BLOCK_SIZE_X*ti < n) {
@@ -50,7 +49,6 @@ void pnpoly_opt(
 
       float slope = (vk.x-vj.x) / (vk.y-vj.y);
 
-      #pragma unroll
       for (int ti=0; ti<tile_size; ti++) {
 
         float2 p = lpoint[ti];
@@ -63,7 +61,6 @@ void pnpoly_opt(
       }
     }
 
-    #pragma unroll
     for (int ti=0; ti<tile_size; ti++) {
       //could do an if statement here if 1s are expected to be rare
       if (i+BLOCK_SIZE_X*ti < n)

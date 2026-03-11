@@ -217,7 +217,6 @@ int main(int argc, char** argv)
 
           if (idx < 16) {
             int rank = 0;
-            #pragma unroll
             for (int i = 0; i < 16; i++) {
               rank += (s_dps[i] < s_dps[idx]);
             }

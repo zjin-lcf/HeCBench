@@ -23,7 +23,6 @@ void fill_shared_mem_tiled_1D(
   const T *__restrict__ d_mem,
   int sh_offset, int d_offset)
 {
-  #pragma unroll
   for (int ti=0; ti<tile_size; ti++) {
     sh_mem[sh_offset+ti*stride] = d_mem[d_offset+ti*stride];
   }
@@ -61,7 +60,6 @@ void distance_tiled(
 
   if (tx == 0 && ty == 0) sum = 0;
 
-  #pragma unroll
   for (int d=0; d<dim; d++) {
     fill_shared_mem_tiled_1D<tile_size_x, block_size_x>(sh_A[d], A+d*m, tx, i);
     fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(sh_B[d], B+d*n, ty, j);
@@ -70,16 +68,13 @@ void distance_tiled(
   fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(sh_scale_B, scale_B, ty, j);
 
   T s_cross_term = 0.0;
-  #pragma unroll
   for (int ti=0; ti<tile_size_x; ti++) {
-    #pragma unroll
     for (int tj=0; tj<tile_size_y; tj++) {
 
       if ((i+ti*block_size_x < m) && (j+tj*block_size_y < n)) {
 
         T dist_ij = 0;
 
-        #pragma unroll
         for (int d=0; d<dim; d++) {
           dist_ij += (sh_A[d][tx+ti*block_size_x]-sh_B[d][ty+tj*block_size_y])*
                      (sh_A[d][tx+ti*block_size_x]-sh_B[d][ty+tj*block_size_y]);

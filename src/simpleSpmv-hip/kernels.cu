@@ -42,7 +42,6 @@ __global__ void vector_mv_csr(const size_t num_rows,
     for(size_t n = row_start + threadIdx.x; n < row_end; n += BS){
       temp += values[n] * x[col_indices[n]];
     }
-    #pragma unroll
     for (int i = BS >> 1; i > 0; i >>= 1)
       temp += __shfl_down(temp, i, BS);
       // temp += __shfl_down_sync(0xFFFFFFFF, temp, i, BS);

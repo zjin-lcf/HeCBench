@@ -178,7 +178,6 @@ inline T ShuffleUp(
                                 first_thread | SHFL_C, member_mask, item);
     output_alias[0] = shuffle_word;
 
-    #pragma unroll
     for (int WORD = 1; WORD < WORDS; ++WORD)
     {
         shuffle_word =
@@ -234,7 +233,6 @@ ShuffleIndex(T input,      ///< [in] The value to broadcast
 
     output_alias[0] = shuffle_word;
 
-    #pragma unroll
     for (int WORD = 1; WORD < WORDS; ++WORD)
     {
         shuffle_word = SHFL_IDX_SYNC((unsigned int)input_alias[WORD], src_lane,
@@ -622,7 +620,6 @@ struct WarpScanShfl
         int segment_first_lane = 0;
 
         // Iterate scan steps
-        #pragma unroll
         for (int STEP = 0; STEP < STEPS; STEP++)
         {
             inclusive_output = InclusiveScanStep(
@@ -653,7 +650,6 @@ struct WarpScanShfl
         int segment_first_lane = MAX(0, 31 - __clz(ballot));
 
         // Iterate scan steps
-        #pragma unroll
         for (int STEP = 0; STEP < STEPS; STEP++)
         {
             inclusive_output.value = InclusiveScanStep(

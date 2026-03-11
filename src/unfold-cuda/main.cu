@@ -8,7 +8,6 @@ __global__
 void unfold_backward_elementwise_kernel(int total_n_elems, func_t f) {
   constexpr int total_work_block = n_threads * n_elems_per_thread;
   int idx = total_work_block * blockIdx.x + threadIdx.x;
-  #pragma unroll
   for (int i = 0; i < n_elems_per_thread; ++i) {
     if (idx < total_n_elems) {
       f(idx);

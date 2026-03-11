@@ -8,7 +8,6 @@ void unfold_backward_elementwise_kernel(int total_n_elems, func_t f,
                                         const sycl::nd_item<1> &item) {
   constexpr int total_work_block = n_threads * n_elems_per_thread;
   int idx = total_work_block * item.get_group(0) + item.get_local_id(0);
-  #pragma unroll
   for (int i = 0; i < n_elems_per_thread; ++i) {
     if (idx < total_n_elems) {
       f(idx);

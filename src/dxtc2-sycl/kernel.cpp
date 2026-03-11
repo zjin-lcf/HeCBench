@@ -18,7 +18,6 @@ sycl::float4 firstEigenVector( sycl::local_ptr<float> matrix )
     // 8 iterations seems to be more than enough.
 
     sycl::float4 v = {1.0f, 1.0f, 1.0f, 0.0f};
-    #pragma unroll
     for(int i = 0; i < 8; i++) {
       float x = v.x() * matrix[0] + v.y() * matrix[1] + v.z() * matrix[2];
       float y = v.x() * matrix[1] + v.y() * matrix[3] + v.z() * matrix[4];
@@ -61,7 +60,6 @@ sycl::float4 bestFitLine(sycl::nd_item<1> &item, sycl::local_ptr<const sycl::flo
     covariance[6 * idx + 4] = diff.y() * diff.z();
     covariance[6 * idx + 5] = diff.z() * diff.z();
 
-    #pragma unroll
     for(int d = 8; d > 0; d >>= 1)
     {
         if (idx < d)
@@ -88,7 +86,6 @@ void sortColors(sycl::nd_item<1> &item, sycl::local_ptr<const float> values, syc
 
     int rank = 0;
 
-    #pragma unroll
     for (int i = 0; i < 16; i++)
     {
         rank += (values[i] < values[tid]);
@@ -97,7 +94,6 @@ void sortColors(sycl::nd_item<1> &item, sycl::local_ptr<const float> values, syc
     ranks[tid] = rank;
 
     // Resolve elements with the same index.
-    #pragma unroll
     for (int i = 0; i < 15; i++)
     {
         if (tid > i && ranks[tid] == ranks[i]) ++ranks[tid];
@@ -170,7 +166,6 @@ float evalPermutation(sycl::local_ptr<const sycl::float4> colors, unsigned int p
     int akku = 0;
 
     // Compute alpha & beta for this permutation.
-    #pragma unroll
     for (int i = 0; i < 16; i++)
     {
         const unsigned int bits = permutation >> (2*i);
@@ -211,7 +206,6 @@ float evalPermutation3(sycl::local_ptr<const sycl::float4> colors, unsigned int 
     int akku = 0;
 
     // Compute alpha & beta for this permutation.
-    #pragma unroll
     for (int i = 0; i < 16; i++)
     {
         const unsigned int bits = permutation >> (2*i);
@@ -257,7 +251,6 @@ sycl::uint4 evalAllPermutations(sycl::nd_item<1> &item, sycl::local_ptr<const sy
   
     float bestError = FLT_MAX;
     
-    #pragma unroll
     for(int i = 0; i < 16; i++)
     {
       int pidx = idx + NUM_THREADS * i;
@@ -286,7 +279,6 @@ sycl::uint4 evalAllPermutations(sycl::nd_item<1> &item, sycl::local_ptr<const sy
         bestPermutation ^= 0x55555555;    // Flip indices.
     }
 
-    #pragma unroll
     for(int i = 0; i < 3; i++)
     {
         int pidx = idx + NUM_THREADS * i;
@@ -363,7 +355,6 @@ void saveBlockDXT1(sycl::nd_item<1> &item, unsigned int start, unsigned int end,
     
     // Reorder permutation.
     unsigned int indices = 0;
-    #pragma unroll
     for(int i = 0; i < 16; i++)
     {
         int ref = xrefs[i];

@@ -67,7 +67,6 @@
                 unsigned int bins[ACTIVE_CHANNELS];
                 DecodePixel<NUM_BINS>(pixel, bins);
 
-                #pragma unroll
                 for (int CHANNEL = 0; CHANNEL < ACTIVE_CHANNELS; ++CHANNEL)
                     atomicAdd(&gmem[(NUM_BINS * CHANNEL) + bins[CHANNEL]], 1);
             }

@@ -24,7 +24,6 @@ void write_indices(int64_t* inp, TensorDims<index_t> dims, int ndim, index_t nze
   if (index < nzero) {
     index_t div = 1;
     int64_t idx_flat = inp[index];
-    #pragma unroll
     for (int dim = MAX_DIMS; dim >= 0; dim--) {
       if (dim > ndim - 1) continue;
       auto dim_size = dims.sizes[dim];

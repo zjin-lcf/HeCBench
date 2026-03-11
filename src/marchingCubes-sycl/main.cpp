@@ -91,7 +91,6 @@ void computeMinMaxLv1(float*__restrict minMax, float *__restrict sminMax, sycl::
     if (v < minV)minV = v;
     if (v > maxV)maxV = v;
   }
-#pragma unroll
   for (int c0(16); c0 > 0; c0 /= 2)
   {
     float t0, t1;
@@ -110,7 +109,6 @@ void computeMinMaxLv1(float*__restrict minMax, float *__restrict sminMax, sycl::
   {
     minV = sminMax[laneid];
     maxV = sminMax[laneid + warpNum];
-#pragma unroll
     for (int c0(warpNum / 2); c0 > 0; c0 /= 2)
     {
       float t0, t1;
@@ -145,7 +143,6 @@ void compactLv1(
   if (minMax[2 * bIdx] <= isoValue && minMax[2 * bIdx + 1] >= isoValue)test = 1;
   else test = 0;
   unsigned int testSum(test);
-#pragma unroll
   for (int c0(1); c0 < 32; c0 *= 2)
   {
     unsigned int tp(sycl::shift_group_right(sg, testSum, c0));
@@ -156,7 +153,6 @@ void compactLv1(
   if (warpid == 0)
   {
     unsigned warpSum = sums[laneid];
-#pragma unroll
     for (int c0(1); c0 < warpNum; c0 *= 2)
     {
       unsigned int tp(sycl::shift_group_right(sg, warpSum, c0));
@@ -201,7 +197,6 @@ void computeMinMaxLv2(
       if (v > maxV)maxV = v;
     }
     z += voxelZLv2 - 1;
-#pragma unroll
     for (int c1(8); c1 > 0; c1 /= 2)
     {
       float t0, t1;
@@ -249,7 +244,6 @@ void compactLv2(
   }
   else test = 0;
   unsigned int testSum(test);
-#pragma unroll
   for (int c0(1); c0 < 32; c0 *= 2)
   {
     unsigned int tp(sycl::shift_group_right(sg, testSum, c0));
@@ -260,7 +254,6 @@ void compactLv2(
   if (warpid == 0)
   {
     unsigned int warpSum = sums[laneid];
-#pragma unroll
     for (int c0(1); c0 < warpNum; c0 *= 2)
     {
       unsigned int tp(sycl::shift_group_right(sg, warpSum, c0));
@@ -488,7 +481,6 @@ int main(int argc, char* argv[])
         unsigned int sumVertices(numVertices);
         unsigned int sumTriangles(numTriangles);
 
-        #pragma unroll
         for (int c0(1); c0 < 32; c0 *= 2)
         {
           unsigned int tp0(sycl::shift_group_right(sg, sumVertices, c0));
@@ -509,7 +501,6 @@ int main(int argc, char* argv[])
         {
           unsigned warpSumVertices = sumsVertices[laneid];
           unsigned warpSumTriangles = sumsTriangles[laneid];
-          #pragma unroll
           for (int c0(1); c0 < warpNum; c0 *= 2)
           {
             unsigned int tp0(sycl::shift_group_right(sg, warpSumVertices, c0));
@@ -543,7 +534,6 @@ int main(int argc, char* argv[])
 
         for (unsigned int c0(0); c0 < numTriangles; ++c0)
         {
-          #pragma unroll
           for (unsigned int c1(0); c1 < 3; ++c1)
           {
             int edgeID(triTableDevice[16 * cubeCase + 3 * c0 + c1]);

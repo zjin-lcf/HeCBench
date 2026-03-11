@@ -263,7 +263,6 @@ if (k == two_n) {
   if (cnt < kLimit) {
     constexpr int kAlignedCnt = (n + 7) / 8;
     int64_t* dst = p_result + kAlignedCnt * cnt;
-#pragma unroll
     for (int i=0; i<kAlignedCnt; ++i) {
       dst[i] = pgpualigned[i];
     }

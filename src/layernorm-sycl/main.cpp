@@ -30,7 +30,6 @@ void layernorm_forward_kernel0(sycl::nd_item<1> &item,
     float     local_sum = 0.0f;
     for (int64_t offset = start_offset; offset < C; offset += (BLOCKSIZE * UNROLL)) {
         load_data<float, UNROLL>(input_ptr + offset, ld_input_regs);
-#pragma unroll
         for (int i = 0; i < UNROLL; ++i) {
             const float val = static_cast<float>(ld_input_regs[i]);
             local_sum += val;
@@ -46,7 +45,6 @@ void layernorm_forward_kernel0(sycl::nd_item<1> &item,
     local_sum = 0.0f;
     for (int64_t offset = start_offset; offset < C; offset += (BLOCKSIZE * UNROLL)) {
         load_data<float, UNROLL>(input_ptr + offset, ld_input_regs);
-#pragma unroll
         for (int i = 0; i < UNROLL; ++i) {
             const float diff = static_cast<float>(ld_input_regs[i]) - mean_sum;
             local_sum += diff * diff;
@@ -67,7 +65,6 @@ void layernorm_forward_kernel0(sycl::nd_item<1> &item,
         load_data<float, UNROLL>(weight_ptr + offset, ld_weight_regs);
         load_data<float, UNROLL>(bias_ptr + offset, ld_bias_regs);
 
-#pragma unroll
         for (int i = 0; i < UNROLL; ++i) {
             float n = (static_cast<float>(ld_input_regs[i]) - mean_sum) * s;
             st_regs[i] = n * static_cast<float>(ld_weight_regs[i]) +
