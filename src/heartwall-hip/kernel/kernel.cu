@@ -7,7 +7,7 @@
 // CUDA kernel
 #include "kernel.h"
 
-  uint64_t 
+uint64_t 
 kernel_gpu_wrapper(  params_common common,
     int* endoRow,
     int* endoCol,
@@ -411,7 +411,7 @@ kernel_gpu_wrapper(  params_common common,
   fp* d_frame;
   hipMalloc((void**)&d_frame, sizeof(fp)*common.frame_elem);
 
-  uint64_t start_time = get_time();
+  uint64_t kernel_time = 0;
 
   for(frame_no=0; frame_no<common.frames_processed; frame_no++) {
 
@@ -432,7 +432,9 @@ kernel_gpu_wrapper(  params_common common,
     //==================================================50
     //  launch kernel
     //==================================================50
-    hipLaunchKernelGGL(hw, grids, threads, 0, 0, 
+    uint64_t start_time = get_time();
+
+    hw<<<grids, threads>>>(
         frame_no,
         common,
         d_frame, 
@@ -471,6 +473,10 @@ kernel_gpu_wrapper(  params_common common,
 #endif
           );
 
+    hipDeviceSynchronize();
+    uint64_t end_time = get_time();
+    kernel_time += end_time - start_time;
+
     // free frame after each loop iteration, since AVI library allocates memory for every frame fetched
     free(frame);
 
@@ -496,7 +502,6 @@ kernel_gpu_wrapper(  params_common common,
 #endif
 
   }
-  uint64_t end_time = get_time();
 
   hipMemcpy(tEndoRowLoc, d_tEndoRowLoc, common.endo_mem * common.no_frames, hipMemcpyDeviceToHost);
   hipMemcpy(tEndoColLoc, d_tEndoColLoc, common.endo_mem * common.no_frames, hipMemcpyDeviceToHost);
@@ -545,6 +550,6 @@ kernel_gpu_wrapper(  params_common common,
 
   printf("\n");
   fflush(NULL);
-  return end_time - start_time;
+  return kernel_time;
 }
 
