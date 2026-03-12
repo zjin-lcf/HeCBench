@@ -120,5 +120,6 @@ int main(int argc, char* argv[])
   hipFree(d_target);
   hipFree(d_query);
   hipFree(d_batch_result);
+  if (error) return 1;
   return 0;
 }

@@ -1,6 +1,7 @@
 #include <chrono>
 #include <hip/hip_runtime.h>
 #include "utils.h"
+#include <cstdlib>
 
 __global__ void winograd_conv2d(
     const DATA_TYPE *__restrict__ input,
@@ -193,5 +194,6 @@ int main(int argc, char* argv[]) {
   printf("Ratio of co-execution time to total time: %.2lf%%\n",
          100.0 * co_time / (end - start));
 
+  if (!pass) return 1;
   return 0;
 }

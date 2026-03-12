@@ -161,5 +161,6 @@ int main(int argc, char* argv[]) {
   free(output_gpu);
   hipFree(d_input);
   hipFree(d_output);
+  if (!ok) return 1;
   return 0;
 }

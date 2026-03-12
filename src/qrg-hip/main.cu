@@ -262,5 +262,6 @@ int main(int argc, const char **argv)
   free(h_OutputGPU);
   hipFree(d_Output);
   hipFree(d_Table);
+  if (!bPassFlag) return 1;
   return 0;
 }

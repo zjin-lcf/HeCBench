@@ -9,6 +9,7 @@
 
 using uchar4 = sycl::uchar4;
 #include "tables.h"
+#include <cstdlib>
 
 // problem size
 constexpr unsigned int N(1024);
@@ -620,5 +621,6 @@ int main(int argc, char* argv[])
   sycl::free(coordYDevice, q);
   sycl::free(coordZDevice, q);
   sycl::free(coordZPDevice, q);
+  if (!ok) return 1;
   return 0;
 }

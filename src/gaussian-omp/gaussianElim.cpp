@@ -1,6 +1,7 @@
 #include <math.h>
 #include <sys/time.h>
 #include "gaussianElim.h"
+#include <cstdlib>
 
 #define BLOCK_SIZE_0 256
 
@@ -240,6 +241,7 @@ int parseCommandline(int argc, char *argv[], char* filename,
       }
     }
   }
+  if (!ok) return 1;
   return 0;
 }
 

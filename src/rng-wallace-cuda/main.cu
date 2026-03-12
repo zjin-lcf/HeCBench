@@ -103,5 +103,6 @@ int main(int argc, char* argv[]) {
   cudaFree(devicerngChi2Corrections);
   cudaFree(device_randomNumbers);
   cudaFree(devPool);
+  if (!ok) return 1;
   return 0;
 }

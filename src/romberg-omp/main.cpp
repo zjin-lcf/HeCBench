@@ -120,5 +120,6 @@ int main( int argc, char** argv)
   printf("%s\n", (fabs(d_sum - ref_sum) > EPS) ? "FAIL" : "PASS");
 
   free(result);
+  if ((fabs(d_sum - ref_sum) > EPS)) return 1;
   return 0;
 }

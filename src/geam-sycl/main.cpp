@@ -114,5 +114,6 @@ int main(int argc, char* argv[]) {
          nrow, ncol);
   transpose<double>(q, nrow, ncol, repeat);
 
+  if (error) return 1;
   return 0;
 }

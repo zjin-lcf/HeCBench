@@ -400,5 +400,6 @@ int main(int argc, char *argv[])
   sycl::free(posx_d, q);
   free(posx);
   free(posy);
+  if (best < 38000 && best < 35002) return 1;
   return 0;
 }

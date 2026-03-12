@@ -209,5 +209,6 @@ int main(int argc, char* argv[])
   sycl::free(d_A, q);
   sycl::free(d_code, q);
   sycl::free(d_out, q);
+  if (out != ref) return 1;
   return 0;
 }

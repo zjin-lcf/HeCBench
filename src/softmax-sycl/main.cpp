@@ -153,5 +153,6 @@ int main(int argc, char* argv[]) {
   free(output_gpu);
   sycl::free(d_input, q);
   sycl::free(d_output, q);
+  if (!ok) return 1;
   return 0;
 }

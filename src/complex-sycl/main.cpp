@@ -140,5 +140,6 @@ int main(int argc, char* argv[]) {
   sycl::free(d_cs, q);
   free(cs);
 
+  if (!(complex_float_check && complex_double_check)) return 1;
   return 0;
 }

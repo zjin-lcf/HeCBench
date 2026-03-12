@@ -10,6 +10,7 @@
 #include <cstring>
 #include <chrono>
 #include <cuda.h>
+#include <cstdlib>
 
 __device__ __inline__ int warp_scan(int val, volatile int *s_data)
 {
@@ -183,5 +184,6 @@ int main(int argc, char* argv[])
   bscan<512>(repeat);
   bscan<1024>(repeat);
 
+  if (!ok) return 1;
   return 0; 
 }

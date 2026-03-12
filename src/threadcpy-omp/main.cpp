@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstring>
 #include <omp.h>
+#include <cstdlib>
 
 template <typename T, int VEC_SIZE>
 struct alignas(sizeof(T) * VEC_SIZE) data_t {
@@ -135,5 +136,6 @@ int main(int argc, char* argv[])
     test_threads_copy<8, char>(numel * 4, repeat);
     std::cout << "char16: ";
     test_threads_copy<16, char>(numel * 4, repeat);
+    if (s) return 1;
     return 0;
 }

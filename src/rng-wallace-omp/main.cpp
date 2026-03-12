@@ -87,5 +87,6 @@ int main(int argc, char* argv[]) {
   free(randomNumbers_ref);
   free(globalPool);
   free(Pool_ref);
+  if (!ok) return 1;
   return 0;
 }

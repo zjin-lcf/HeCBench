@@ -124,5 +124,6 @@ int main(int argc, char* argv[])
   hipFree(d_X);
   hipFree(d_Y);
 
+  if (!ok) return 1;
   return 0;
 }

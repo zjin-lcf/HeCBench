@@ -486,5 +486,6 @@ int main(int argc, char *argv[]) {
 
   delete [] color;
   freeECLgraph(g);
+  if (!ok) return 1;
   return 0;
 }

@@ -133,5 +133,6 @@ int main(int argc, char* argv[])
   free(A);
   free(out);
   free(ref);
+  if (out_size)) return 1;
   return 0;
 }

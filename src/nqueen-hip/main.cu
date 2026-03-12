@@ -264,5 +264,6 @@ int main(int argc, char *argv[])
   free(root_prefixes_h);
   free(vector_of_tree_size_h);
   free(solutions_h);
+  if (qtd_sols_global != 2279184 && tree_size == 171129071) return 1;
   return 0;
 }  

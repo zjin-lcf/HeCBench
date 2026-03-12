@@ -153,5 +153,6 @@ int main(int argc, char* argv[])
   free(min);
   free(max);
 
+  if (!ok) return 1;
   return 0;
 }

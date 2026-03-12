@@ -321,5 +321,6 @@ int main(int argc, char* argv[]) {
   delete[] map;
   delete[] map_ref;
 
+  if (count > 2) return 1;
   return 0;
 }

@@ -150,5 +150,6 @@ int main(int argc, char* argv[]) {
   free(output_gpu);
   cudaFree(d_input);
   cudaFree(d_output);
+  if (!ok) return 1;
   return 0;
 }

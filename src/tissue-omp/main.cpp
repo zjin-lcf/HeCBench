@@ -150,5 +150,6 @@ int main(int argc, char** argv) {
   free(h_ctprev);
   free(h_qt);
 
+  if (!ok) return 1;
   return 0;
 }

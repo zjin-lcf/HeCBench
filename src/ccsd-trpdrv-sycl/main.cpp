@@ -242,5 +242,6 @@ maxed_out:
   free(t1v1  );
   free(t1v2  );
 
+  if (!ok) return 1;
   return 0;
 }

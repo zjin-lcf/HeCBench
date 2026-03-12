@@ -216,5 +216,6 @@ int main(int argc, char *argv[]) {
   free(page_ranks);
   free(noutlinks);
   free(diffs);
+  if (!ok) return 1;
   return 0;
 }

@@ -34,6 +34,7 @@
 #endif
 
 #include "hipmacro.h"
+#include <cstdlib>
 
 #define TCRIT 2.26918531421f
 #define THREADS  128
@@ -314,5 +315,6 @@ int main(int argc, char **argv) {
   hipFree(lattice_w);
   hipFree(randvals);
 
+  if (!ok) return 1;
   return 0;
 }

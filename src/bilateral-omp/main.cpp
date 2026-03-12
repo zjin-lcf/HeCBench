@@ -171,5 +171,6 @@ int main(int argc, char *argv[]) {
   free(h_dst);
   free(r_dst);
   free(h_src);
+  if (!ok) return 1;
   return 0;
 }

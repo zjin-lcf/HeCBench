@@ -6,6 +6,7 @@
 #include <omp.h>
 #include "kernels.h"
 #include "reference.h"
+#include <cstdlib>
 
 template <typename T>
 static void init_p(T *p_real, T *p_imag, int width, int height) {
@@ -133,5 +134,6 @@ int main(int argc, char** argv) {
 
   printf("TSA in float64\n");
   tsa<double>(width, height, repeat);
+  if (!ok) return 1;
   return 0;
 }

@@ -275,5 +275,6 @@ int main(int argc, char* argv[]) {
     conv1D<int16_t>(q, input_width, mask_width, repeat);
   }
 
+  if (!ok) return 1;
   return 0;
 }

@@ -397,5 +397,6 @@ int main(int argc, char* argv[])
   delete [] posscol2;
   delete [] wl;
   freeECLgraph(g);
+  if (!ok) return 1;
   return 0;
 }

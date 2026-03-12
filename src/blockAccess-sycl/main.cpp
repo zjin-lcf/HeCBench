@@ -248,5 +248,6 @@ int main(int argc, char* argv[])
   free(out);
   free(out2);
   free(out_ref);
+  if (error) return 1;
   return 0;
 }

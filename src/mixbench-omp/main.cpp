@@ -109,5 +109,6 @@ int main(int argc, char* argv[]) {
 
   mixbenchGPU(VECTOR_SIZE, compute_iterations, repeat);
 
+  if (!ok) return 1;
   return 0;
 }

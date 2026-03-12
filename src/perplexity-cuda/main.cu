@@ -163,5 +163,6 @@ int main(int argc, char* argv[]) {
   
   cudaFree(d_distance);
   cudaFree(d_data);
+  if (!ok) return 1;
   return 0;
 }

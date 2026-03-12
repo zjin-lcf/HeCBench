@@ -180,5 +180,6 @@ int main(int argc, char* argv[]) {
   free(Bn_ref);
   free(Mp);
 
+  if (max_error) return 1;
   return 0;
 }

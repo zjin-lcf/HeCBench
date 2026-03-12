@@ -228,5 +228,6 @@ int main(int argc, char* argv[])
   hipFree(d_out);
   hipFree(d_out2);
   hipFree(d_out4);
+  if (error) return 1;
   return 0;
 }

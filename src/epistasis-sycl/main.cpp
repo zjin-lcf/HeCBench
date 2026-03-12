@@ -4,6 +4,7 @@
 #include <chrono>
 #include <sycl/sycl.hpp>
 #include "reference.h"
+#include <cstdlib>
 
 using namespace std::chrono;
 typedef high_resolution_clock myclock;
@@ -366,5 +367,6 @@ int main(int argc, char **argv)
   mem_free(SNP_Data);
   mem_free(SNP_Data_trans);
   mem_free(Ph_Data);
+  if (!ok) return 1;
   return 0;
 }

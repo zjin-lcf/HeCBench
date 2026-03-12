@@ -133,5 +133,6 @@ int main(int argc, char *argv[])
   set_nintegers();
   run_benchmark(repeat);
 
+  if (!ok) return 1;
   return 0;
 }

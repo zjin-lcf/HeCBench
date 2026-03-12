@@ -252,5 +252,6 @@ int main(int argc, char* argv[])
   sycl::free(d_u_new, q);
   sycl::free(d_v_new, q);
 
+  if (!ok) return 1;
   return 0;
 }

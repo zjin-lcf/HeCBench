@@ -144,5 +144,6 @@ int main(int argc, char **argv) {
   sycl::free(a, q);
   sycl::free(d_a, q);
 
+  if (a[0] != nkernels * sum) return 1;
   return 0;
 }

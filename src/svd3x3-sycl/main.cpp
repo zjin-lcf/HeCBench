@@ -125,5 +125,6 @@ int main(int argc, char* argv[])
   free(input);
   free(result);
   free(result_h);
+  if (!ok) return 1;
   return 0;
 }

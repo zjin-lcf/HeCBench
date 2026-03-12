@@ -531,5 +531,14 @@ int main (int argc, char* argv[] )
     timestamp ( );
   }
 
+  if (!ok) return 1;
+  if (!ok) return 1;
+  if (!ok) return 1;
+  if (!ok) return 1;
+  if (!ok) return 1;
+  if (!ok) return 1;
+  if (!ok) return 1;
+  if (!ok) return 1;
+  if (!ok) return 1;
   return 0;
 }

@@ -258,5 +258,6 @@ int main(int argc, char *argv[]) {
   printf("-------------------------------------\n");
   surfelRenderTest<float>(q, n, w, h, repeat);
 
+  if (!ok) return 1;
   return 0;
 }

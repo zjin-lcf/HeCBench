@@ -148,5 +148,7 @@ int main(int argc, char* argv[])
   free(h_scale);
   free(h_bias);
   free(h_output);
+  if (!ok) return 1;
+  if (!ok) return 1;
   return 0;
 }

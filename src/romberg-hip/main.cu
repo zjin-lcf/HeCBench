@@ -121,5 +121,6 @@ int main( int argc, char** argv)
 
   hipFree(d_result);
   free(h_result);
+  if ((fabs(sum - ref_sum) > EPS)) return 1;
   return 0;
 }

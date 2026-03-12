@@ -4,6 +4,7 @@
 #include <hip/hip_runtime.h>
 #include "utils.h"
 #include "constants.h"
+#include <cstdlib>
 
 namespace mean_shift::gpu {
   __global__ void mean_shift(const float *data, float *data_next) {
@@ -168,5 +169,7 @@ int main(int argc, char* argv[]) {
 
   hipFree(d_data);
   hipFree(d_data_next);
+  if (centroids.size() != M && are_close) return 1;
+  if (centroids.size() != M && are_close) return 1;
   return 0;
 }

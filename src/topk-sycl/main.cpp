@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <vector>
 #include "topk_per_row_kernels.h"
+#include <cstdlib>
 
 inline uint32_t xorshift32(uint32_t &state) {
   state ^= state << 13;
@@ -156,6 +157,7 @@ int32_t main(int32_t argc, char *argv[]) try {
     }
   }
 
+  if (!ok) return 1;
   return 0;
 }
 catch (sycl::exception const &exc) {

@@ -308,5 +308,6 @@ int main (void) {
   free(temp_black_ref);
   free(bl_norm_L2);
 
+  if (count != 0) return 1;
   return 0;
 }

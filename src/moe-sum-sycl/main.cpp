@@ -195,5 +195,6 @@ int main(int argc, char* argv[])
   sycl::free(d_output, q);
   free(output);
   free(output_vec4);
+  if (rc) return 1;
   return 0;
 }

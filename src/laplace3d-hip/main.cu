@@ -133,6 +133,7 @@ int main(int argc, char **argv){
   free(h_u2);
   free(h_u3);
 
+  if (!ok) return 1;
   return 0;
 }
 

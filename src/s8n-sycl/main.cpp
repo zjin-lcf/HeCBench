@@ -247,5 +247,6 @@ int main(int argc, char* argv[])
   sycl::free(d_out, q);
   sycl::free(d_out2, q);
   sycl::free(d_out4, q);
+  if (error) return 1;
   return 0;
 }

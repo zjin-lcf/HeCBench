@@ -159,5 +159,6 @@ int main(int argc, char* argv[]) {
 
   free(v);
 
+  if (!(c == VECTOR_SIZE)) return 1;
   return 0;
 }

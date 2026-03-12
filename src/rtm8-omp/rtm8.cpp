@@ -205,5 +205,6 @@ int main(int argc, char *argv[]) {
   free(image_cpu);
   free(image_gpu);
 
+  if (!ok) return 1;
   return 0;
 }

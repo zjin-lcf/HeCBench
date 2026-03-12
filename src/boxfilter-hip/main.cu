@@ -14,6 +14,7 @@
 #include <iostream>
 #include <hip/hip_runtime.h>
 #include "shrUtils.h"
+#include <cstdlib>
 
 extern void BoxFilterHost(unsigned int* uiInputImage, unsigned int* uiTempImage, unsigned int* uiOutputImage,
                           int uiWidth, int uiHeight, int iRadius, float fScale );
@@ -288,5 +289,6 @@ int main(int argc, char** argv)
   free(uiTmp);
   free(uiDevOutput);
   free(uiHostOutput);
+  if (error) return 1;
   return 0;
 }

@@ -30,6 +30,7 @@
 #include <cstring>
 #include <iostream>
 #include <cub/cub.cuh>
+#include <cstdlib>
 
 //---------------------------------------------------------------------
 // Kernels
@@ -184,5 +185,7 @@ int main(int argc, char** argv)
   Test< 512>(nelems, repeat);
   Test<1024>(nelems, repeat);
 
+  if (compare) return 1;
+  if (compare) return 1;
   return 0;
 }

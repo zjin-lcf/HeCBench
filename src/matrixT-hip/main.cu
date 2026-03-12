@@ -511,5 +511,6 @@ int main(int argc, char **argv)
   hipFree(d_idata);
   hipFree(d_odata);
 
+  if (!success) return 1;
   return 0;
 }

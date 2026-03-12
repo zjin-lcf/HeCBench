@@ -7,6 +7,7 @@
 #include <chrono>
 #include <hip/hip_runtime.h>
 #include "tables.h"
+#include <cstdlib>
 
 // problem size
 constexpr unsigned int N(1024);
@@ -570,5 +571,6 @@ int main(int argc, char* argv[])
   hipFree(coordYDevice);
   hipFree(coordZDevice);
   hipFree(coordZPDevice);
+  if (!ok) return 1;
   return 0;
 }

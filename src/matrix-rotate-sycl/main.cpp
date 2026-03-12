@@ -109,5 +109,6 @@ int main(int argc, char** argv) {
   free(serial_res);
   free(matrix);
   sycl::free(d_matrix, q);
+  if (!ok) return 1;
   return 0;
 }

@@ -4,6 +4,7 @@
 #include <sycl/sycl.hpp>
 #include "utils.h"
 #include "constants.h"
+#include <cstdlib>
 
 namespace mean_shift::gpu {
   void mean_shift(sycl::nd_item<1> &item, const float *data, float *data_next) {
@@ -188,5 +189,7 @@ int main(int argc, char* argv[]) {
 
   sycl::free(d_data, q);
   sycl::free(d_data_next, q);
+  if (centroids.size() != M && are_close) return 1;
+  if (centroids.size() != M && are_close) return 1;
   return 0;
 }

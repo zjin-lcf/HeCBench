@@ -5,6 +5,7 @@
 
 #include "gpu_solver.h"
 #include "reference.h"
+#include <cstdlib>
 
 void generate_data(int size, int min, int max, float *data) {
   std::mt19937_64 generator{1993764};
@@ -140,5 +141,7 @@ int main(int argc, char *argv[]) {
   sycl::free(minimum_ref, q);
   sycl::free(minimum, q);
 
+  if (!ok) return 1;
+  if (!ok) return 1;
   return 0;
 }

@@ -8,6 +8,7 @@
 #include <vector>
 #include <chrono>
 #include "linearprobing.h"
+#include <cstdlib>
 
 // Create random keys/values in the range [0, kEmpty)
 // kEmpty is used to indicate an empty slot
@@ -181,5 +182,6 @@ int main(int argc, char* argv[])
   free(iter_kvs);
 
 
+  if (!ok) return 1;
   return 0;
 }

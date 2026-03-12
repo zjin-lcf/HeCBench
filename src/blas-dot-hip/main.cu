@@ -107,5 +107,6 @@ int main(int argc, char **argv)
   printf("\nBF16 Dot\n");
   dot<__hip_bfloat16>(iNumElements, iNumIterations);
 
+  if (!(fabs(double(dst) - sum) < 1e-1)) return 1;
   return EXIT_SUCCESS;
 }

@@ -1,4 +1,5 @@
 #include "kernel.h"
+#include <cstdlib>
 
 int main(int argc, char* argv[])
 {
@@ -63,5 +64,6 @@ int main(int argc, char* argv[])
   free(pBests);
   free(pBests_ref);
   free(gBest);
+  if (!ok) return 1;
   return 0;
 }

@@ -177,5 +177,6 @@ int main(int argc, char* argv[])
   printf("vector_dimension: %d\n", vector_dim);
 
   index_accumulate (batch_size, output_size, vector_dim, repeat) ;
+  if (!ok) return 1;
   return 0;
 }

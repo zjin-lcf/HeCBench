@@ -189,5 +189,6 @@ int main(int argc, char* argv[])
   hipFree(d_A);
   hipFree(d_code);
   hipFree(d_out);
+  if (out != ref) return 1;
   return 0;
 }

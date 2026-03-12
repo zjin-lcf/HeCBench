@@ -152,5 +152,6 @@ int main(int argc, char* argv[]) {
   free(std_ref);
   free(std);
   free(data);
+  if (!ok) return 1;
   return 0;
 }

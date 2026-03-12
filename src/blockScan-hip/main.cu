@@ -32,6 +32,7 @@
 #include <hipcub/block/block_load.hpp>
 #include <hipcub/block/block_store.hpp>
 #include <hipcub/block/block_scan.hpp>
+#include <cstdlib>
 
 using namespace hipcub;
 
@@ -269,5 +270,7 @@ int main(int argc, char** argv)
   Test<64, 16, BLOCK_SCAN_WARP_SCANS>();
   Test<32, 32, BLOCK_SCAN_WARP_SCANS>();
 
+  if (compare) return 1;
+  if (compare) return 1;
   return 0;
 }

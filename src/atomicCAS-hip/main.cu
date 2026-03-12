@@ -129,5 +129,6 @@ int main(int argc, char** argv) {
   hipFree(d_res_u64);
   hipFree(d_res_s64);
   hipFree(d_res_f64);
+  if (error) return 1;
   return 0;
 }

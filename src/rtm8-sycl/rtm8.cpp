@@ -241,5 +241,6 @@ int main(int argc, char *argv[]) {
   sycl::free(image_d, q);
   sycl::free(a_d, q);
 
+  if (!ok) return 1;
   return 0;
 }

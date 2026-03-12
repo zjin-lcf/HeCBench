@@ -164,5 +164,6 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   free(input_weights_one_dim);
   free(input_weights_one_dim_r);
 
+  if (!ok) return 1;
   return 0;
 }

@@ -79,5 +79,6 @@ int main(int argc, char* argv[]) {
   printf("%s\n", error ? "FAIL" : "PASS");
 
   hipFree(d_test);
+  if (error) return 1;
   return 0;
 }

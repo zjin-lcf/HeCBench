@@ -675,5 +675,6 @@ int main(int argc, char* argv[])
        }
      }
    }
+   if (!ok) return 1;
    return 0;
 }

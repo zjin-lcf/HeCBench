@@ -21,6 +21,7 @@
 #include <math.h>
 #include <chrono>
 #include <cuda_runtime.h>
+#include <cstdlib>
 
 #define CUDACHECK(error)                                                                       \
 {                                                                                              \
@@ -137,6 +138,7 @@ void naive (const int numElements, const int repeat)
 
   bool testResult = (maxError == 0.0f);
   printf("%s\n", testResult ? "PASS" : "FAIL");
+  if (!testResult) exit(1);
 }
 
 int main(int argc, char *argv[])
@@ -169,5 +171,6 @@ int main(int argc, char *argv[])
   for (int i = 0; i < 10; i++) {
     naive(numElements, repeat);
   }
+  if (!testResult) return 1;
   return 0;
 }

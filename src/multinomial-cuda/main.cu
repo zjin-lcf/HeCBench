@@ -229,5 +229,6 @@ int main(int argc, char* argv[])
   free(sample);
   free(distr);
 
+  if (error) return 1;
   return 0;
 }

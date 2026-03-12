@@ -43,6 +43,7 @@
 
 #include "support/common.h"
 #include "support/verify.h"
+#include <cstdlib>
 
 
 // Params ---------------------------------------------------------------------
@@ -293,5 +294,6 @@ int main(int argc, char **argv) {
   free(h_head);
   free(h_in_backup);
 
+  if (!(status == 0)) return 1;
   return 0;
 }

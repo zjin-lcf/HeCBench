@@ -309,5 +309,6 @@ int main(void) {
   free(temp_red_ref);
   free(temp_black_ref);
 
+  if (count != 0) return 1;
   return 0;
 }

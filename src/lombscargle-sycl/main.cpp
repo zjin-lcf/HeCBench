@@ -206,5 +206,6 @@ int main(int argc, char* argv[]) {
   free(f);
   free(p);
   free(p2);
+  if (error) return 1;
   return 0;
 }

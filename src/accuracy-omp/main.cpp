@@ -87,5 +87,6 @@ int main(int argc, char* argv[])
   free(label);
   free(data);
 
+  if (!ok) return 1;
   return 0;
 }

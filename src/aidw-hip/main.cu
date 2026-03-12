@@ -277,5 +277,7 @@ int main(int argc, char *argv[])
   hipFree(d_iy);
   hipFree(d_iz);
   hipFree(d_avg_dist);
+  if (!ok) return 1;
+  if (!ok) return 1;
   return 0;
 }

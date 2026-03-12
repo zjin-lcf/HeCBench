@@ -178,6 +178,8 @@ int main(int argc, char * argv[])
   free(output);
   free(reference);
   free(data);
+  if (fail) return 1;
+  if (fail) return 1;
   return 0;
 }
 

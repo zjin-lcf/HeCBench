@@ -96,5 +96,6 @@ int main(int argc, char *argv[]) {
   printf("Runtime overhead of first run is %f seconds\n", overhead);
 
   free(a);
+  if (!bResult) return 1;
   return 0;
 }

@@ -222,5 +222,6 @@ int main(int argc, char* argv[])
   free(r_out);
   free(r_out2);
   free(r_out4);
+  if (error) return 1;
   return 0;
 }

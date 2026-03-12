@@ -181,5 +181,6 @@ int main(int argc, char** argv)
 
   free(h_idata);
   free(h_odata);
+  if (!passed) return 1;
   return 0;
 }

@@ -327,5 +327,7 @@ int main(int argc, char* argv[])
                  dilation_t, dilation_h, dilation_w);
   }
 
+  if (error) return 1;
+  if (error) return 1;
   return 0;
 }

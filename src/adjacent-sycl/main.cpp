@@ -31,6 +31,7 @@
 #include <iostream>
 #include <sycl/sycl.hpp>
 #include "block.h"
+#include <cstdlib>
 
 //---------------------------------------------------------------------
 // Kernels
@@ -205,5 +206,7 @@ int main(int argc, char** argv)
   Test< 512>(q, nelems, repeat);
   Test<1024>(q, nelems, repeat);
 
+  if (compare) return 1;
+  if (compare) return 1;
   return 0;
 }

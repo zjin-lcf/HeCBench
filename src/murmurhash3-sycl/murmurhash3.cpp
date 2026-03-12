@@ -234,5 +234,6 @@ int main(int argc, char** argv)
   sycl::free(dev_out, q);
   sycl::free(dev_length, q);
   sycl::free(key_length, q);
+  if (error) return 1;
   return 0;
 }

@@ -312,5 +312,6 @@ int main(int argc, char** argv) {
   free(initvals);
   free(out);
 
+  if (error) return 1;
   return 0;
 }

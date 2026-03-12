@@ -412,6 +412,7 @@ int main(int argc, char **argv){
   free(output_itemsets);
   cudaFree(d_input_itemsets);
   cudaFree(d_reference);
+  if (err) return 1;
   return 0;
 }
 

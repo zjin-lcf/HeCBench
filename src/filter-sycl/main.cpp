@@ -207,5 +207,7 @@ int main(int argc, char **argv) {
   sycl::free(d_output, q);
   sycl::free(d_nres, q);
 
+  if (!match) return 1;
+  if (!match) return 1;
   return 0;
 }

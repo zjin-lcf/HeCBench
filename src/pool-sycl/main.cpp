@@ -25,6 +25,7 @@ class MaxPoolGrad {
 };
 
 #include "reference.h"
+#include <cstdlib>
 
 // forward declaration
 template <typename T>
@@ -242,5 +243,6 @@ int main(int argc, char* argv[])
   sycl::free(d_input_grad, q);
   sycl::free(d_output, q);
   sycl::free(d_output_grad, q);
+  if (!ok) return 1;
   return 0;
 }

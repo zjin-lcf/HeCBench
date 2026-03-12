@@ -355,5 +355,7 @@ int main(int argc, char *argv[])
   sycl::free(d_iz, q);
   sycl::free(d_avg_dist, q);
 
+  if (!ok) return 1;
+  if (!ok) return 1;
   return 0;
 }

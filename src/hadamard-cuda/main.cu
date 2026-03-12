@@ -318,5 +318,6 @@ int main(int argc, char* argv[])
     hadamard_transform<__half>(batch_size, dim, repeat);
     hadamard_transform<__nv_bfloat16>(batch_size, dim, repeat);
   }
+  if (!ok) return 1;
   return 0;
 }

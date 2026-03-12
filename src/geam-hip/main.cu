@@ -186,5 +186,7 @@ int main(int argc, char* argv[]) {
          nrow, ncol);
   transpose_f64<double>(nrow, ncol, repeat);
 
+  if (error) return 1;
+  if (error) return 1;
   return 0;
 }

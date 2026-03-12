@@ -264,5 +264,6 @@ int main(int argc, char* argv[])
   run<1024>(q, n, repeat);
   run<2048>(q, n, repeat);
 
+  if (error) return 1;
   return 0;
 }

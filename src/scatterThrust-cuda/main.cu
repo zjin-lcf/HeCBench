@@ -94,5 +94,6 @@ int main(int argc, char* argv[])
   scatter<float>(num_elements, repeat);
   printf("FP64 scatter\n");
   scatter<double>(num_elements, repeat);
+  if (!ok) return 1;
   return 0;
 }

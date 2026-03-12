@@ -25,6 +25,7 @@ class MaxPoolGrad {
 };
 
 #include "reference.h"
+#include <cstdlib>
 
 template <typename PoolProcess, typename T>
 void KernelPool2DGrad(
@@ -208,5 +209,6 @@ int main(int argc, char* argv[])
   delete[] input_grad;
   delete[] input_grad_ref;
   delete[] output_grad;
+  if (!ok) return 1;
   return 0;
 }

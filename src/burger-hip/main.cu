@@ -199,5 +199,6 @@ int main(int argc, char* argv[])
   hipFree(d_u_new);
   hipFree(d_v_new);
 
+  if (!ok) return 1;
   return 0;
 }

@@ -198,5 +198,6 @@ int main(int argc, char* argv[]) {
   cudaFree(d_Mp);
   cudaFree(d_Bn);
 
+  if (max_error) return 1;
   return 0;
 }

@@ -32,6 +32,7 @@
 #include "block_load.hpp"
 #include "block_store.hpp"
 #include "block_scan.hpp"
+#include <cstdlib>
 
 int grid_size = 1;
 int repeat = 100;
@@ -269,5 +270,7 @@ int main(int argc, char** argv)
   Test<64, 16, BLOCK_SCAN_WARP_SCANS>(q);
   Test<32, 32, BLOCK_SCAN_WARP_SCANS>(q);
 
+  if (compare) return 1;
+  if (compare) return 1;
   return 0;
 }

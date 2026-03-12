@@ -156,5 +156,6 @@ int main(int argc, char* argv[])
 
   eval_swish<float>(N, repeat);
 
+  if (!ok) return 1;
   return 0;
 }

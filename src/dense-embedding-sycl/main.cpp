@@ -261,5 +261,6 @@ int main(int argc, char* argv[])
     free(input_offset);
   }
 
+  if (!ok) return 1;
   return 0;
 }

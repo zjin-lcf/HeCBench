@@ -120,5 +120,6 @@ int main(int argc, char* argv[])
   cudaFree(d_target);
   cudaFree(d_query);
   cudaFree(d_batch_result);
+  if (error) return 1;
   return 0;
 }

@@ -252,5 +252,11 @@ int main(int argc, char* argv[])
   printf("\nFP32 atomic add\n");
   atomicPerf<float>(n, len, repeat); 
 
+  if (fail) return 1;
+  if (fail) return 1;
+  if (fail) return 1;
+  if (fail) return 1;
+  if (fail) return 1;
+  if (fail) return 1;
   return 0;
 }

@@ -206,5 +206,6 @@ int main(int argc, char* argv[])
   free(targets);
   free(result);
   free(result_ref);
+  if (!ok) return 1;
   return 0;
 }

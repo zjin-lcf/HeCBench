@@ -133,5 +133,6 @@ int main(int argc, char* argv[])
   sycl::free(d_X, q);
   sycl::free(d_Y, q);
 
+  if (!ok) return 1;
   return 0;
 }

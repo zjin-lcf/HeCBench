@@ -39,6 +39,7 @@
 #include <unistd.h>
 #include <chrono>
 #include <iostream>
+#include <cstdlib>
 
 
 #if DOUBLE_PRECISION
@@ -289,5 +290,6 @@ int main(int argc, char **argv) {
   run(h_in, p.in_size_i, p.in_size_j, p.out_size_i, p.out_size_j, p);
 
   free(h_in);
+  if (!(status == 0)) return 1;
   return 0;
 }

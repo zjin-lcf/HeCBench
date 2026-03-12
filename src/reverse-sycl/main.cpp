@@ -87,5 +87,6 @@ int main(int argc, char* argv[]) {
 
   free(d_test, q);
 
+  if (error) return 1;
   return 0;
 }

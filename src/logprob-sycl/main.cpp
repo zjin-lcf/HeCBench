@@ -366,5 +366,6 @@ int main(int argc, char* argv[])
   free(h_ids);
   free(h_lengths);
 
+  if (error) return 1;
   return 0;
 }

@@ -340,5 +340,6 @@ int main(int argc, char* argv[])
     hadamard_transform<sycl::half>(q, batch_size, dim, repeat);
     hadamard_transform<sycl::ext::oneapi::bfloat16>(q, batch_size, dim, repeat);
   }
+  if (!ok) return 1;
   return 0;
 }

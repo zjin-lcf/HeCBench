@@ -5,6 +5,7 @@
 #include <omp.h>
 #include "utils.h"
 #include "constants.h"
+#include <cstdlib>
 
 namespace mean_shift::gpu {
   void mean_shift(const float *data, float *data_next,
@@ -172,5 +173,7 @@ int main(int argc, char* argv[]) {
   }
 
   free(d_data_next);
+  if (centroids.size() != M && are_close) return 1;
+  if (centroids.size() != M && are_close) return 1;
   return 0;
 }

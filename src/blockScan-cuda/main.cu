@@ -31,6 +31,7 @@
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_store.cuh>
 #include <cub/block/block_scan.cuh>
+#include <cstdlib>
 
 using namespace cub;
 
@@ -268,5 +269,7 @@ int main(int argc, char** argv)
   Test<64, 16, BLOCK_SCAN_WARP_SCANS>();
   Test<32, 32, BLOCK_SCAN_WARP_SCANS>();
 
+  if (compare) return 1;
+  if (compare) return 1;
   return 0;
 }

@@ -201,5 +201,6 @@ int main(int argc, char* argv[])
   printf("=========== Data type is FP64 ==========\n");
   flip<double>(num_dims, num_flip_dims, dim_size, repeat);
 
+  if (error) return 1;
   return 0;
 }

@@ -87,5 +87,6 @@ int main(int argc, char* argv[]) {
   hipFree(d_image);
   free(image);
   free(image_ref);
+  if (!ok) return 1;
   return 0;
 }

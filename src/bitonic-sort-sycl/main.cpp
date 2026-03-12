@@ -40,6 +40,7 @@
 #include <iostream>
 #include <limits>
 #include <sycl/sycl.hpp>
+#include <cstdlib>
 
 #define BLOCK_SIZE 256
 
@@ -234,5 +235,6 @@ int main(int argc, char *argv[]) {
   free(data_cpu);
   free(data_gpu);
 
+  if (unequal) return 1;
   return 0;
 }

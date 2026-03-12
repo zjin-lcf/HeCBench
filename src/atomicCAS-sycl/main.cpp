@@ -218,5 +218,6 @@ int main(int argc, char** argv) {
   sycl::free(d_res_s64, q);
   sycl::free(d_res_f64, q);
 
+  if (error) return 1;
   return 0;
 }

@@ -205,5 +205,7 @@ int main(int argc, char *argv[])
   free(b);
   free(r);
 
+  if (!ok) return 1;
+  if (!ok) return 1;
   return EXIT_SUCCESS;
 }

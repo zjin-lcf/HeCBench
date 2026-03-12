@@ -191,5 +191,6 @@ int main(int argc, char* argv[])
     free(offset);
   }
 
+  if (!ok) return 1;
   return 0;
 }

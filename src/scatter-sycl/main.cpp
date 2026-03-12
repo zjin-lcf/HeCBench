@@ -149,5 +149,6 @@ int main(int argc, char* argv[])
   scatter<double, SUM>(q, num_elements, repeat);
   scatter<double, MIN>(q, num_elements, repeat);
   scatter<double, MAX>(q, num_elements, repeat);
+  if (!ok) return 1;
   return 0;
 }

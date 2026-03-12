@@ -147,5 +147,6 @@ int main(int argc, char **argv) {
   verify(input, output);
   delete [] input;
   delete [] output;
+  if (error) return 1;
   return 0;
 }

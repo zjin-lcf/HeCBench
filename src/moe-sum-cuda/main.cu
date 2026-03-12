@@ -183,5 +183,6 @@ int main(int argc, char* argv[])
   GPU_CHECK(cudaFree(d_output));
   free(output);
   free(output_vec4);
+  if (rc) return 1;
   return 0;
 }

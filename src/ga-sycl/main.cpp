@@ -137,5 +137,6 @@ int main(int argc, char* argv[])
   sycl::free(d_target, q);
   sycl::free(d_query, q);
   sycl::free(d_batch_result, q);
+  if (error) return 1;
   return 0;
 }

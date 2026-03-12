@@ -152,5 +152,6 @@ int main(int argc, char* argv[])
   sycl::free(d_out, q);
   free(A);
   free(out);
+  if (!ok) return 1;
   return 0;
 }

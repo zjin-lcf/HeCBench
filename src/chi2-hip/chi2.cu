@@ -158,5 +158,6 @@ int main(int argc, char* argv[]) {
   free(h_results);
   free(cpu_results);
 
+  if (error) return 1;
   return 0;
 }

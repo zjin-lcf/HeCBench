@@ -30,6 +30,7 @@
 #include <cstring>
 #include <iostream>
 #include <omp.h>
+#include <cstdlib>
 
 /**
  * Simple kernel for performing a block-wide adjacent difference.
@@ -149,5 +150,7 @@ int main(int argc, char** argv)
   Test< 512>(nelems, repeat);
   Test<1024>(nelems, repeat);
 
+  if (compare) return 1;
+  if (compare) return 1;
   return 0;
 }

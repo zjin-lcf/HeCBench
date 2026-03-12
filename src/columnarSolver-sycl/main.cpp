@@ -163,5 +163,6 @@ int main(int argc, char* argv[]) {
   sycl::free(d_states, q);
   delete[] decrypted;
   delete[] scoreHistory;
+  if (!pass) return 1;
   return 0;
 }
