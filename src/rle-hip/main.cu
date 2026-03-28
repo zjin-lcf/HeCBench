@@ -33,9 +33,10 @@
 // Ensure printing of HIP runtime errors to console
 #define HIPCUB_STDERR
 
-#include <hipcub/hipcub.hpp>
 #include <chrono>
 #include <cstdio>
+#include <random>
+#include <hipcub/hipcub.hpp>
 #include "test_util.h"
 
 using namespace hipcub;
@@ -112,7 +113,12 @@ void Initialize(int entropy_reduction, T *h_in, int num_items, int max_segment)
     }
     else
     {
-      RandomBits(repeat, entropy_reduction);
+      std::mt19937 mt(19937+i);
+      std::uniform_int_distribution<int> dist(0, std::numeric_limits<int>::max());
+      repeat = dist(mt);
+      for (int n = 1; n <= entropy_reduction; n++) {
+        repeat &= dist(mt);
+      }
       repeat = (int)((double(repeat) * double(max_segment)) / double(max_int));
       repeat = CUB_MAX(1, repeat);
     }

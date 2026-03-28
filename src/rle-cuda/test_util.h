@@ -47,8 +47,6 @@
 #include <iostream>
 #include <limits>
 
-#include "mersenne.h"
-
 #include <cub/util_debug.cuh>
 #include <cub/util_macro.cuh>
 
@@ -128,10 +126,6 @@ struct CommandLineArgs
         values(10)
     {
         using namespace std;
-
-        // Initialize mersenne generator
-        unsigned int mersenne_init[4]=  {0x123, 0x234, 0x345, 0x456};
-        mersenne::init_by_array(mersenne_init, 4);
 
         for (int i = 1; i < argc; i++)
         {
@@ -273,115 +267,6 @@ struct CommandLineArgs
         return (int) keys.size();
     }
 };
-
-/******************************************************************************
- * Random bits generator
- ******************************************************************************/
-
-int g_num_rand_samples = 0;
-
-
-template <typename T>
-bool IsNaN(T /* val */) { return false; }
-
-template<>
-__noinline__ bool IsNaN<float>(float val)
-{
-  return std::isnan(val);
-}
-
-template<>
-__noinline__ bool IsNaN<double>(double val)
-{
-  return std::isnan(val);
-}
-
-/**
- * Generates random keys.
- *
- * We always take the second-order byte from rand() because the higher-order
- * bits returned by rand() are commonly considered more uniformly distributed
- * than the lower-order bits.
- *
- * We can decrease the entropy level of keys by adopting the technique
- * of Thearling and Smith in which keys are computed from the bitwise AND of
- * multiple random samples:
- *
- * entropy_reduction    | Effectively-unique bits per key
- * -----------------------------------------------------
- * -1                   | 0
- * 0                    | 32
- * 1                    | 25.95 (81%)
- * 2                    | 17.41 (54%)
- * 3                    | 10.78 (34%)
- * 4                    | 6.42 (20%)
- * ...                  | ...
- *
- */
-template <typename K>
-void RandomBits(
-    K &key,
-    int entropy_reduction = 0,
-    int begin_bit = 0,
-    int end_bit = sizeof(K) * 8)
-{
-    const int NUM_BYTES = sizeof(K);
-    const int WORD_BYTES = sizeof(unsigned int);
-    const int NUM_WORDS = (NUM_BYTES + WORD_BYTES - 1) / WORD_BYTES;
-
-    unsigned int word_buff[NUM_WORDS];
-
-    if (entropy_reduction == -1)
-    {
-        memset((void *) &key, 0, sizeof(key));
-        return;
-    }
-
-    if (end_bit < 0)
-        end_bit = sizeof(K) * 8;
-
-    while (true)
-    {
-        // Generate random word_buff
-        for (int j = 0; j < NUM_WORDS; j++)
-        {
-            int current_bit = j * WORD_BYTES * 8;
-
-            unsigned int word = 0xffffffff;
-            word &= 0xffffffff << max(0, begin_bit - current_bit);
-            word &= 0xffffffff >> max(0, (current_bit + (WORD_BYTES * 8)) - end_bit);
-
-            for (int i = 0; i <= entropy_reduction; i++)
-            {
-                // Grab some of the higher bits from rand (better entropy, supposedly)
-                word &= mersenne::genrand_int32();
-                g_num_rand_samples++;
-            }
-
-            word_buff[j] = word;
-        }
-
-        memcpy(&key, word_buff, sizeof(K));
-
-        K copy = key;
-        if (!IsNaN(copy))
-            break;          // avoids NaNs when generating random floating point numbers
-    }
-}
-
-/// Randomly select number between [0:max)
-template <typename T>
-T RandomValue(T max)
-{
-    unsigned int bits;
-    unsigned int max_int = (unsigned int) -1;
-    do {
-        RandomBits(bits);
-    } while (bits == max_int);
-
-    return (T) ((double(bits) / double(max_int)) * double(max));
-}
-
 
 /******************************************************************************
  * Comparison and ostream operators
