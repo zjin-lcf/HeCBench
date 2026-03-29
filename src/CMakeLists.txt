@@ -525,6 +525,7 @@ set(HECBENCH_POC_BENCHMARKS
     miniFE
     rmsnorm
     saxpy-ompt
+    silu
     softmax-fused
     softmax-online
     ssm
