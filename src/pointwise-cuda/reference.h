@@ -1,3 +1,4 @@
+#include <string.h>
 
 static float LCG_random_ref(unsigned int *seed) {
     const unsigned int m = 2147483648u;
