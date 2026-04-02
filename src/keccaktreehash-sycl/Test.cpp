@@ -174,15 +174,15 @@ void TestGPU()
 
 void Print_Param(void)
 {
-   printf("\n");
-   printf("Numbers of Threads PER BLOCK            NB_THREADS           %u \n", NB_THREADS);
-   printf("Numbers of Threads Blocks               NB_THREADS_BLOCKS    %u \n", NB_THREADS_BLOCKS);
-   printf("\n");
-   printf("Input block size of Keccak (in Byte)    INPUT_BLOCK_SIZE_B   %u \n", INPUT_BLOCK_SIZE_B);
-   printf("Output block size of Keccak (in Byte)   OUTPUT_BLOCK_SIZE_B  %u \n", OUTPUT_BLOCK_SIZE_B);
-   printf("\n");
-   printf("NB of input blocks in by Threads        NB_INPUT_BLOCK       %u \n", NB_INPUT_BLOCK );
-   printf("\n");
+  printf("\n");
+  printf("Number of threads per block             NB_THREADS           %u \n", NB_THREADS);
+  printf("Number of thread blocks                 NB_THREADS_BLOCKS    %u \n", NB_THREADS_BLOCKS);
+  printf("\n");
+  printf("Input block size of Keccak (in Byte)    INPUT_BLOCK_SIZE_B   %u \n", INPUT_BLOCK_SIZE_B);
+  printf("Output block size of Keccak (in Byte)   OUTPUT_BLOCK_SIZE_B  %u \n", OUTPUT_BLOCK_SIZE_B);
+  printf("\n");
+  printf("Number of input blocks                  NB_INPUT_BLOCK       %u \n", NB_INPUT_BLOCK );
+  printf("\n");
 }
 
 void Verify_results(void)

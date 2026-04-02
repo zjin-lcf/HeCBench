@@ -16,7 +16,7 @@
 #include "KeccakTreeCPU.h"
 #include "KeccakTreeGPU.h"
 
-// choose 8 for fast execution 
+// choose 8 for fast execution
 #define IMAX 8 // 1600 //2400 // 1600 for high speed mesures // iteration for speed mesure loops
 
 tKeccakLane Kstate_cpu[25];
@@ -36,15 +36,15 @@ void TestCPU(int reduc)
   int i;
 
   tKeccakLane *h_inBuffer;// Host in buffer for data to be hashed
-  tKeccakLane *h_outBuffer;// Host out buffer 
+  tKeccakLane *h_outBuffer;// Host out buffer
 
   memset(Kstate_cpu, 0, 25 * sizeof(tKeccakLane));
 
-  //init host inBuffer 
+  //init host inBuffer
   h_inBuffer=(tKeccakLane *) malloc( INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK );
   memset(h_inBuffer, 0, INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK);
 
-  //init host outBuffer  
+  //init host outBuffer
   h_outBuffer=(tKeccakLane *) malloc( OUTPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS );
   memset(h_outBuffer, 0, OUTPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS );
 
@@ -53,7 +53,7 @@ void TestCPU(int reduc)
   for(i=0;i<INPUT_BLOCK_SIZE_B/4 * NB_INPUT_BLOCK * NB_THREADS*NB_THREADS_BLOCKS;i++) h_inBuffer[i]=i;
 
   //CPU computation *******************************
-  printf("CPU speed test started \n");  
+  printf("CPU speed test started \n");
 
   auto t1 = std::chrono::steady_clock::now();
 
@@ -76,7 +76,7 @@ void TestCPU(int reduc)
 
   //free all buffer host and device
   free(h_inBuffer);
-  free(h_outBuffer);   
+  free(h_outBuffer);
 }
 
 void TestGPU()
@@ -111,19 +111,19 @@ void TestGPU()
   };
 
   tKeccakLane *h_inBuffer;// Host in buffer for data to be hashed
-  tKeccakLane *h_outBuffer;// Host out buffer 
+  tKeccakLane *h_outBuffer;// Host out buffer
 
   tKeccakLane *d_inBuffer; // device in buffer
-  tKeccakLane *d_outBuffer;// device out buffer 
+  tKeccakLane *d_outBuffer;// device out buffer
   tKeccakLane* d_KeccakF_RoundConstants;
 
   memset(Kstate_gpu, 0, 25 * sizeof(tKeccakLane));
 
-  //init host inBuffer 
+  //init host inBuffer
   h_inBuffer=(tKeccakLane *) malloc( INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK );
   memset(h_inBuffer, 0, INPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS * NB_INPUT_BLOCK);
 
-  //init host outBuffer  
+  //init host outBuffer
   h_outBuffer=(tKeccakLane *) malloc( OUTPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS );
   memset(h_outBuffer, 0, OUTPUT_BLOCK_SIZE_B * NB_THREADS*NB_THREADS_BLOCKS );
 
@@ -144,7 +144,7 @@ void TestGPU()
   for(i=0;i<INPUT_BLOCK_SIZE_B/4 * NB_INPUT_BLOCK * NB_THREADS*NB_THREADS_BLOCKS;i++) h_inBuffer[i]=i;
 
   cudaMalloc((void **)&d_KeccakF_RoundConstants, sizeof(KeccakF_RoundConstants));
-  cudaMemcpy(d_KeccakF_RoundConstants,KeccakF_RoundConstants, sizeof(KeccakF_RoundConstants), cudaMemcpyHostToDevice);    
+  cudaMemcpy(d_KeccakF_RoundConstants,KeccakF_RoundConstants, sizeof(KeccakF_RoundConstants), cudaMemcpyHostToDevice);
   checkCUDAError(" Memcpy KeccakF_RoundConstants");
 
   //GPU computation *******************************
@@ -172,7 +172,7 @@ void TestGPU()
 
   //free all buffer host and device
   free(h_inBuffer);
-  free(h_outBuffer);   
+  free(h_outBuffer);
 
   cudaFree(d_inBuffer);
   cudaFree(d_outBuffer);
@@ -181,17 +181,17 @@ void TestGPU()
 void Print_Param(void)
 {
   printf("\n");
-  printf("Numbers of Threads PER BLOCK            NB_THREADS           %u \n", NB_THREADS);
-  printf("Numbers of Threads Blocks               NB_THREADS_BLOCKS    %u \n", NB_THREADS_BLOCKS);
+  printf("Number of threads per block             NB_THREADS           %u \n", NB_THREADS);
+  printf("Number of thread blocks                 NB_THREADS_BLOCKS    %u \n", NB_THREADS_BLOCKS);
   printf("\n");
   printf("Input block size of Keccak (in Byte)    INPUT_BLOCK_SIZE_B   %u \n", INPUT_BLOCK_SIZE_B);
   printf("Output block size of Keccak (in Byte)   OUTPUT_BLOCK_SIZE_B  %u \n", OUTPUT_BLOCK_SIZE_B);
   printf("\n");
-  printf("NB of input blocks in by Threads        NB_INPUT_BLOCK       %u \n", NB_INPUT_BLOCK );
+  printf("Number of input blocks                  NB_INPUT_BLOCK       %u \n", NB_INPUT_BLOCK );
   printf("\n");
 }
 
-void verify_results(void)
+void Verify_results(void)
 {
-  printf("%s\n", isequal_ks(kstate_cpu, kstate_gpu) ? "pass" : "fail");
+  printf("%s\n", isEqual_KS(Kstate_cpu, Kstate_gpu) ? "PASS" : "FAIL");
 }
