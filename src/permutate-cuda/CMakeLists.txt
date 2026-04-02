@@ -1,6 +1,6 @@
 # permutate-cuda/CMakeLists.txt
 
-UNZIPFILE("${CMAKE_CURRENT_LIST_DIR}/test_data.tar.bz")
+UNZIPFILE("${CMAKE_CURRENT_LIST_DIR}/dataset.tar.bz")
 
 add_hecbench_benchmark(
     NAME permutate
