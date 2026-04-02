@@ -1,5 +1,7 @@
 # slu-cuda/CMakeLists.txt
 
+UNZIPFILE("${CMAKE_CURRENT_LIST_DIR}/src/nicslu.tar.bz2")
+
 FILE(GLOB NICSLU_LIB "${CMAKE_CURRENT_LIST_DIR}/src/nicslu/source/*.c")
 add_library(nicslu_cuda STATIC ${NICSLU_LIB})
 
