@@ -2,6 +2,7 @@
 // Copyright (C) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <cfloat>
+#include <type_traits>
 #include "utils.h"
 
 using fp32x1 = __attribute__((__ext_vector_type__(1))) float;
@@ -659,6 +660,28 @@ __device__ void set_buf_pointers(T const* in,
     }
 }
 
+struct Max
+{
+  template <typename T, typename U>
+  __device__ __forceinline__
+  typename std::common_type<T, U>::type
+    operator()(T &&t, U &&u) const
+  {
+    return ((t) > (u)) ? (t) : (u);
+  }
+};
+
+struct Min
+{
+  template <typename T, typename U>
+  __device__ __forceinline__
+  typename std::common_type<T, U>::type
+    operator()(T &&t, U &&u) const
+  {
+    return ((t) < (u)) ? (t) : (u);
+  }
+};
+
 // The following a few functions are for the one-block version, which uses
 // single thread block for each row of a batch.
 template <typename T, typename IdxT, int BitsPerPass, bool WRITE_TOPK_VALUES, int BlockSize>
@@ -733,8 +756,8 @@ __device__ bool filter_and_histogram_for_one_block(T const* in_buf,
         __shared__ typename BlockReduceT::TempStorage temp_storage;
         __shared__ bool use_one_pass;
 
-        T global_min = BlockReduceT(temp_storage).Reduce(local_min, cub::Min());
-        T global_max = BlockReduceT(temp_storage).Reduce(local_max, cub::Max());
+        T global_min = BlockReduceT(temp_storage).Reduce(local_min, Min());
+        T global_max = BlockReduceT(temp_storage).Reduce(local_max, Max());
 
         if(threadIdx.x == 0)
         {
