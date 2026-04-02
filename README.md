@@ -18,6 +18,20 @@ GSL:   sss, xlqc<br>
 GDAL:  stsg<br>
 BZip2: gerbil
 
+# DVC (Data Version Control)
+
+[DVC](https://dvc.org/) (Data Version Control) is used to store the dataset archives used by HeCBench.
+
+## Quickstart
+
+This quick start uses [uv](https://docs.astral.sh/uv/) to install [DVC](https://dvc.org/) with [s3](https://aws.amazon.com/s3/) remote storage support. After installation, the data is pulled and checked out using the `dvc pull` command.
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv tool install dvc[s3]
+dvc pull
+```
+
 # Benchmark categories
 Each benchmark falls into a single category. While such classification is not accurate, the arrangement serves as a starting point for users of the benchmark suite. Please see the Reference for more information about each benchmark. 
 
