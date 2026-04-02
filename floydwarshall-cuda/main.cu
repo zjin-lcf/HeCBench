@@ -110,18 +110,18 @@ void floydWarshallCPUReference(unsigned int * pathDistanceMatrix,
  */
 
 __global__ void floydWarshallPass(
-    unsigned int * pathDistanceBuffer,
-    unsigned int * pathBuffer        ,
-    const unsigned int numNodes      ,
+    unsigned int *__restrict__ pathDistanceBuffer,
+    unsigned int *__restrict__ pathBuffer,
+    const unsigned int numNodes,
     const unsigned int pass)
 {
-  int xValue = threadIdx.x+blockIdx.x*blockDim.x;
-  int yValue = threadIdx.y+blockIdx.y*blockDim.y;
+  int xValue = threadIdx.x + blockIdx.x * blockDim.x;
+  int yValue = threadIdx.y + blockIdx.y * blockDim.y;
 
   int k = pass;
   int oldWeight = pathDistanceBuffer[yValue * numNodes + xValue];
   int tempWeight = pathDistanceBuffer[yValue * numNodes + k] + 
-    pathDistanceBuffer[k * numNodes + xValue];
+                   pathDistanceBuffer[k * numNodes + xValue];
 
   if (tempWeight < oldWeight)
   {

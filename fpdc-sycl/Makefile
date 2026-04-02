@@ -70,8 +70,7 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) README*
+	rm -rf $(program) $(obj) *.bin
 
 run: $(program)
-	./$(program) 255 8 100 2 < ../README.md > README.fpc
-	./$(program) 100 < README.fpc > README
+	./$(program) 255 8 100 2
