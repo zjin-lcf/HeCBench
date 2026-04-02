@@ -14,7 +14,7 @@ void mtf(sycl::queue &q, std::vector<char> &word, bool output)
   std::vector<char> d_list(256);
 
   std::vector<char> list(256);
-  
+
   std::vector<char> d_word (word.size());
 
   size_t counter;
