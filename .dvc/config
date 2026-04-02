@@ -1,2 +1,6 @@
 [core]
     autostage = true
+    remote = geekdude-aws
+['remote "geekdude-aws"']
+    url = s3://hecbench-geekdude/
+    allow_anonymous_login = true
