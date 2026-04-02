@@ -6,7 +6,16 @@
 #define cimg_display 0
 #include "CImg.h"
 
+// Repeat the execution of kernels 100 times
 #define REPEAT 100
+
+// Adjust the size of the total shared local memory for different GPUs
+// e.g. 48KB on P100
+#define TOTAL_SLM     48*1024
+
+// Adjust the thread block size of the block matching kernel for different GPUs.
+// The maximum thread block size is 32 * MAX_NUM_WARPS
+#define MAX_NUM_WARPS 16u
 
 using namespace cimg_library;
 
@@ -17,7 +26,7 @@ int main(int argc, char** argv)
     std::cerr << "Usage: " << argv[0]
       << " NosiyImage DenoisedImage sigma [color] [ReferenceImage]\n"
       << "   color - color image denoising (experimental only)\n"
-      << "   ReferenceImage - if provided, computes and prints PSNR " 
+      << "   ReferenceImage - if provided, computes and prints PSNR "
       << "between the reference image and denoised image\n";
     return 1;
   }
@@ -57,7 +66,7 @@ int main(int argc, char** argv)
   std::cout << std::endl;
 
   // Check for invalid input
-  if(! image.data() )              
+  if(! image.data() )
   {
     std::cerr << "Could not open or find the image" << std::endl;
     return 1;
@@ -72,7 +81,7 @@ int main(int argc, char** argv)
   std::vector<buffer<uchar, 1>> d_noisy_image;
   std::vector<buffer<uchar, 1>> d_denoised_image;
   //Numerator and denominator used for aggregation
-  std::vector<buffer<float, 1>> d_numerator;  
+  std::vector<buffer<float, 1>> d_numerator;
   std::vector<buffer<float, 1>> d_denominator;
 
   uint2 h_batch_size (256, 128);         //h_batch_size.x() has to be divisible by properties.warpSize
@@ -103,7 +112,7 @@ int main(int argc, char** argv)
   }
 
   //Addresses of similar patches to each reference patch of a batch
-  buffer<ushort, 1> d_stacks (h_batch_size.x() * h_batch_size.y() * N); 
+  buffer<ushort, 1> d_stacks (h_batch_size.x() * h_batch_size.y() * N);
 
   //Number of similar patches for each referenca patch of a batch that are stored in d_stacks
   buffer<uint, 1> d_num_patches_in_stack (h_batch_size.x() * h_batch_size.y());
@@ -127,18 +136,17 @@ int main(int argc, char** argv)
   const uint s_image_p_size = p_block_width * k * sizeof(uchar);
 
   // e.g. 48KB on P100
-  //const uint shared_mem_available = 16384 - s_image_p_size;
-  const uint shared_mem_available = 48*1024 - s_image_p_size;
+  const uint shared_mem_available = TOTAL_SLM - s_image_p_size;
 
   //Block-matching shared memory sizes per warp
   const uint s_diff_size = p_block_width * sizeof(uint);
   const uint s_patches_in_stack_size = warpSize * sizeof(uchar);
   const uint s_patch_stacks_size = N * warpSize * sizeof(uint);
 
-  const uint num_warps = std::min(shared_mem_available / 
-    (s_diff_size + s_patches_in_stack_size + s_patch_stacks_size), 16u);
-  uint lmem_size_bm = ((s_diff_size + s_patches_in_stack_size + s_patch_stacks_size) * num_warps) + 
-    s_image_p_size;    
+  const uint num_warps = std::min(shared_mem_available /
+    (s_diff_size + s_patches_in_stack_size + s_patch_stacks_size), MAX_NUM_WARPS);
+  uint lmem_size_bm = ((s_diff_size + s_patches_in_stack_size + s_patch_stacks_size) * num_warps) +
+    s_image_p_size;
 
   //Determine launch parameteres for the block match kernel
   const range<2> lws_bm (1, warpSize*num_warps);
@@ -163,7 +171,7 @@ int main(int argc, char** argv)
   std::vector<float> kaiserWindow(k*k);
   if (k == 8) {
     // First quarter of the matrix
-    kaiserWindow[0 + k * 0] = 0.1924f; 
+    kaiserWindow[0 + k * 0] = 0.1924f;
     kaiserWindow[0 + k * 1] = 0.2989f;
     kaiserWindow[0 + k * 2] = 0.3846f;
     kaiserWindow[0 + k * 3] = 0.4325f;
@@ -177,7 +185,7 @@ int main(int argc, char** argv)
     kaiserWindow[2 + k * 3] = 0.8644f;
     kaiserWindow[3 + k * 0] = 0.4325f;
     kaiserWindow[3 + k * 1] = 0.6717f;
-    kaiserWindow[3 + k * 2] = 0.8644f; 
+    kaiserWindow[3 + k * 2] = 0.8644f;
     kaiserWindow[3 + k * 3] = 0.9718f;
 
     // Fill the rest of the matrix by symmetry
@@ -214,23 +222,23 @@ int main(int argc, char** argv)
     });
   }
 
-  //Batch processing: in each iteration only the batch_size reference patches are processed. 
+  //Batch processing: in each iteration only the batch_size reference patches are processed.
   uint2 start_point;
-  for(start_point.y() = 0; start_point.y() < stacks_dim.y() + p - 1; 
+  for(start_point.y() = 0; start_point.y() < stacks_dim.y() + p - 1;
       start_point.y() += (h_batch_size.y()*p))
   {
-    for(start_point.x() = 0; start_point.x() < stacks_dim.x() + p - 1; 
+    for(start_point.x() = 0; start_point.x() < stacks_dim.x() + p - 1;
         start_point.x() += (h_batch_size.x()*p))
     {
       //Finds similar patches for each reference patch of a batch and stores them in d_stacks array
       run_block_matching(
           q,
-          d_noisy_image[0],      // IN: Image  
+          d_noisy_image[0],      // IN: Image
           d_stacks,              // OUT: Array of adresses of similar patches
           d_num_patches_in_stack,// OUT: Array containing numbers of these addresses
           image_dim,             // IN: Image dimensions
           stacks_dim,            // IN: Dimensions limiting addresses of reference patches
-          h_hard_params,         // IN: Denoising parameters 
+          h_hard_params,         // IN: Denoising parameters
           start_point,           // IN: Address of the top-left reference patch of a batch
           lws_bm,                // Local work size
           gws_bm,                // Global work size
@@ -255,10 +263,10 @@ int main(int argc, char** argv)
                );
 
         //Apply the 2D DCT transform to each layer of 3D group
-        run_DCT2D8x8(q, d_gathered_stacks, d_gathered_stacks, trans_size, 
+        run_DCT2D8x8(q, d_gathered_stacks, d_gathered_stacks, trans_size,
                      lws_tr, gws_tr);
 
-        // 1) 1D Walsh-Hadamard transform of proper size on the 3rd dimension of each 
+        // 1) 1D Walsh-Hadamard transform of proper size on the 3rd dimension of each
         //      3D group of a batch to complete the 3D transform.
         // 2) Hard thresholding
         // 3) Inverse 1D Walsh-Hadamard trannsform.
@@ -318,7 +326,7 @@ int main(int argc, char** argv)
 
     q.submit([&](handler &cgh) {
       auto acc = d_denoised_image[channel].get_access<sycl_read>(cgh);
-      cgh.copy(acc, dst_image.data() + channel * image_size); 
+      cgh.copy(acc, dst_image.data() + channel * image_size);
     });
   }
   q.wait();
@@ -331,7 +339,7 @@ int main(int argc, char** argv)
   std::cout << "Total time (s):" << gpuTime << std::endl;
 
 
-  if (channels == 3) 
+  if (channels == 3)
     dst_image = dst_image.get_channels(0,2).YCbCrtoRGB();
   else
     dst_image = dst_image.get_channel(0);
