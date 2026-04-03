@@ -33,7 +33,8 @@ The simplest way to build is using a CMake preset:
 cmake --list-presets
 
 # Configure for NVIDIA Hopper GPUs with NVIDIA HPC SDK (version 25.7)
-cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
       -DMPI_C_COMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/comm_libs/mpi/bin/mpicc \
       -DMPI_CXX_COMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/comm_libs/mpi/bin/mpicxx \
       -DCUDAToolkit_ROOT=/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/cuda/12.9/ \
@@ -90,7 +91,7 @@ cmake --build build/cuda-sm90 --parallel
 ### Build a Single Benchmark (All Models)
 
 ```bash
-cmake --preset all-models
+cmake -DCMAKE_BUILD_TYPE=Release --preset all-models
 cmake --build build/all-models --target jacobi-all
 ```
 
@@ -100,16 +101,16 @@ This builds jacobi for all enabled models (if you used `all-models` preset).
 
 ```bash
 # Build only CUDA version of jacobi
-cmake --preset cuda-sm80
+cmake -DCMAKE_BUILD_TYPE=Release --preset cuda-sm80
 cmake --build build/cuda-sm80 --target jacobi-cuda
 
 # Build only HIP version of attention
-cmake --preset hip-gfx90a
+cmake -DCMAKE_BUILD_TYPE=Release --preset hip-gfx90a
 cmake --build build/hip-gfx90a --target attention-hip
 
 # Build only SYCL XPU version of attention
 source /opt/intel/oneapi/setvars.sh
-cmake --preset sycl-xpu
+cmake -DCMAKE_BUILD_TYPE=Release --preset sycl-xpu
 cmake --build build/sycl-xpu --target attention-sycl
 ```
 
@@ -164,15 +165,15 @@ To build for multiple GPU architectures, use multiple configure+build cycles:
 
 ```bash
 # Build for A100
-cmake --preset cuda-sm80
+cmake -DCMAKE_BUILD_TYPE=Release --preset cuda-sm80
 cmake --build build/cuda-sm80
 
 # Build for V100
-cmake --preset cuda-sm70
+cmake -DCMAKE_BUILD_TYPE=Release --preset cuda-sm70
 cmake --build build/cuda-sm70
 
 # Build for MI250X
-cmake --preset hip-gfx90a
+cmake -DCMAKE_BUILD_TYPE=Release --preset hip-gfx90a
 cmake --build build/hip-gfx90a
 ```
 
@@ -258,7 +259,7 @@ CMake Error: Could not find CUDA/HIP/SYCL compiler
 
 **Solution**: Install the required compiler or disable that model:
 ```bash
-cmake --preset cuda-sm80 -DHECBENCH_ENABLE_HIP=OFF
+cmake -DCMAKE_BUILD_TYPE=Release --preset cuda-sm80 -DHECBENCH_ENABLE_HIP=OFF
 ```
 
 ### Architecture Mismatch
@@ -269,7 +270,7 @@ Error: Unsupported architecture sm_XX
 
 **Solution**: Use a preset matching your GPU or set the architecture manually:
 ```bash
-cmake --preset cuda-sm80 -DHECBENCH_CUDA_ARCH=86
+cmake -DCMAKE_BUILD_TYPE=Release --preset cuda-sm80 -DHECBENCH_CUDA_ARCH=86
 ```
 
 ### Missing Dependencies
