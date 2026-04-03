@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <utility>
 #include <sycl/sycl.hpp>
 #include "reference.h"
 #include "common.h"
@@ -33,6 +34,7 @@ void validate_result(sycl::queue &q,
         nfaults++;
         if (nfaults >= max_int(10, n_print)) {
           free(out_gpu);
+          return;
         }
       }
     }
@@ -279,8 +281,8 @@ int main(int argc, char **argv) {
 
     auto elapsed_time = benchmark_kernel(q, repeat, upsample_forward1, q, d_out, d_x, B, C, H, W, block_size);
 
-    float tflops = (float)S / elapsed_time * 1e3f / 1e12f;
-    printf("block_size %4d | time %.4f ms | tflops %.2f\n", block_size, elapsed_time, tflops);
+    float gflops = (float)S / elapsed_time * 1e3f / 1e9f;
+    printf("block_size %4d | time %.4f ms | gflops %.2f\n", block_size, elapsed_time, gflops);
   }
 
   printf("\n─────────────────────────────────────────────────────\n");
@@ -296,8 +298,8 @@ int main(int argc, char **argv) {
 
     auto elapsed_time = benchmark_kernel(q, repeat, upsample_forward2, q, d_out, d_x, B, C, H, W, block_size, block_size);
 
-    float tflops = (float)S / elapsed_time * 1e3f / 1e12f;
-    printf("block2D_size %4d | time %.4f ms | tflops %.2f\n", block_size, elapsed_time, tflops);
+    float gflops = (float)S / elapsed_time * 1e3f / 1e9f;
+    printf("block2D_size %4d | time %.4f ms | gflops %.2f\n", block_size, elapsed_time, gflops);
   }
 
   printf("\n─────────────────────────────────────────────────────\n");
@@ -316,8 +318,8 @@ int main(int argc, char **argv) {
 
     auto elapsed_time = benchmark_kernel(q, repeat, upsample_backward1, q, d_dx, d_dout, B, C, H, W, block_size);
 
-    float tflops = (float)S / elapsed_time * 1e3f / 1e12f;
-    printf("block_size %4d | time %.4f ms | tflops %.2f\n", block_size, elapsed_time, tflops);
+    float gflops = (float)S / elapsed_time * 1e3f / 1e9f;
+    printf("block_size %4d | time %.4f ms | gflops %.2f\n", block_size, elapsed_time, gflops);
   }
 
   printf("\n─────────────────────────────────────────────────────\n");
@@ -335,8 +337,8 @@ int main(int argc, char **argv) {
 
     auto elapsed_time = benchmark_kernel(q, repeat, upsample_backward2, q, d_dx, d_dout, B, C, H, W, block_size, block_size);
 
-    float tflops = (float)S / elapsed_time * 1e3f / 1e12f;
-    printf("block2D_size %4d | time %.4f ms | tflops %.2f\n", block_size, elapsed_time, tflops);
+    float gflops = (float)S / elapsed_time * 1e3f / 1e9f;
+    printf("block2D_size %4d | time %.4f ms | gflops %.2f\n", block_size, elapsed_time, gflops);
   }
 
   sycl::free(d_x, q);
