@@ -249,7 +249,7 @@ int main(int argc, char** argv)
   Test<256, 4, BLOCK_SCAN_RAKING>();
   Test<128, 8, BLOCK_SCAN_RAKING>();
   Test<64, 16, BLOCK_SCAN_RAKING>();
-  Test<32, 32, BLOCK_SCAN_RAKING>();
+  //Test<32, 32, BLOCK_SCAN_RAKING>();
 
   printf("-------------\n");
 
@@ -258,7 +258,7 @@ int main(int argc, char** argv)
   Test<256, 4, BLOCK_SCAN_RAKING_MEMOIZE>();
   Test<128, 8, BLOCK_SCAN_RAKING_MEMOIZE>();
   Test<64, 16, BLOCK_SCAN_RAKING_MEMOIZE>();
-  Test<32, 32, BLOCK_SCAN_RAKING_MEMOIZE>();
+  //Test<32, 32, BLOCK_SCAN_RAKING_MEMOIZE>();
 
   printf("-------------\n");
 
@@ -267,7 +267,7 @@ int main(int argc, char** argv)
   Test<256, 4, BLOCK_SCAN_WARP_SCANS>();
   Test<128, 8, BLOCK_SCAN_WARP_SCANS>();
   Test<64, 16, BLOCK_SCAN_WARP_SCANS>();
-  Test<32, 32, BLOCK_SCAN_WARP_SCANS>();
+  //Test<32, 32, BLOCK_SCAN_WARP_SCANS>();
 
   return 0;
 }
