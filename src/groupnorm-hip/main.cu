@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <utility>
 #include <hip/hip_runtime.h>
 #include <hip/hip_cooperative_groups.h>
 #include "reference.h"
