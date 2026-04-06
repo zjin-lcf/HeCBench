@@ -46,11 +46,11 @@ void convert(bool isE4M3, int nelems, int niters)
   // Warm-up run
   for (int i = 0; i < 30; i++) {
     if (isE4M3) {
-      ref_fp32_cvt_e4m3<Td, Ts> <<<grid, block>>> (dst, src, nelems);
+      ref_fp32_cvt_e4m3fnuz<Td, Ts> <<<grid, block>>> (dst, src, nelems);
       fp32_cvt_e4m3<Td, Ts> <<<grid, block>>> (dst, src, nelems);
     }
     else {
-      ref_fp32_cvt_e5m2<Td, Ts> <<<grid, block>>> (dst, src, nelems);
+      ref_fp32_cvt_e5m2fnuz<Td, Ts> <<<grid, block>>> (dst, src, nelems);
       fp32_cvt_e5m2<Td, Ts> <<<grid, block>>> (dst, src, nelems);
     }
   }
@@ -60,9 +60,9 @@ void convert(bool isE4M3, int nelems, int niters)
   auto start = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < niters; i++) {
     if (isE4M3)
-      ref_fp32_cvt_e4m3<Td, Ts> <<<grid, block>>> (dst, src, nelems);
+      ref_fp32_cvt_e4m3fnuz<Td, Ts> <<<grid, block>>> (dst, src, nelems);
     else
-      ref_fp32_cvt_e5m2<Td, Ts> <<<grid, block>>> (dst, src, nelems);
+      ref_fp32_cvt_e5m2fnuz<Td, Ts> <<<grid, block>>> (dst, src, nelems);
   }
   HIP_CHECK(hipDeviceSynchronize());
   auto end = std::chrono::high_resolution_clock::now();
@@ -127,10 +127,10 @@ int main(int argc, char* argv[]) {
   const int nelems = atoi(argv[1]);
   const int niters = atoi(argv[2]);
 
-  printf("float -> fp8 E4M3\n");
+  printf("float -> fp8 E4M3FNUZ\n");
   convert<uint8_t, float>(true, nelems, niters); 
 
-  printf("float -> fp8 E5M2\n");
+  printf("float -> fp8 E5M2FNUZ\n");
   convert<uint8_t, float>(false, nelems, niters); 
 
   return 0;
