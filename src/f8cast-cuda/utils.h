@@ -2,8 +2,8 @@ void init (bool isE4M3, float *src, int nelems) {
   std::mt19937 gen(19937);
 
   float min = isE4M3 ? -448 : -57344;
-  float max = isE4M3 ?  449 :  57345;
-  std::uniform_real_distribution<float> dis(min, max); 
+  float max = isE4M3 ?  448 :  57344;
+  std::uniform_real_distribution<float> dis(min, max+1); 
 
   // specific values
   if (isE4M3) {
@@ -20,7 +20,10 @@ void init (bool isE4M3, float *src, int nelems) {
     src[3] = 57344; // 7B
     src[4] = 57345;
   }
-  for (int i = 5; i < nelems; i++) {
+  src[5] = INFINITY;
+  src[6] = -INFINITY;
+  src[7] = NAN;
+  for (int i = 8; i < nelems; i++) {
     src[i] = dis(gen); 
   }
 }
