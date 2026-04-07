@@ -672,7 +672,7 @@ Early results are shown [here](results/README.md)
   Half-precision scalar product (https://docs.nvidia.com/cuda/cuda-samples/index.html)
 
 ### f8cast (cuda)
-  Cast floating-point numbers from FP32 to FP8 (https://www.xyzzhangfan.tech/blog/2025/)
+  Cast floating-point numbers from FP32 to FP8 (https://www.xyzzhangfan.tech/blog/2025/, https://pytorch.org/)
 
 ### face (cuda)
   Face detection using the Viola-Jones algorithm (https://sites.google.com/site/5kk73gpu2012/assignment/viola-jones-face-detection)
