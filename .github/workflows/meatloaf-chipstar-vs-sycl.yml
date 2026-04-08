@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   chipstar-vs-sycl:
-    runs-on: [self-hosted, meatloaf]
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
