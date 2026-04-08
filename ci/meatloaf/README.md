@@ -2,28 +2,68 @@
 
 GitHub Actions workflow at
 [`.github/workflows/meatloaf-chipstar-vs-sycl.yml`](../../.github/workflows/meatloaf-chipstar-vs-sycl.yml)
-that runs a curated benchmark subset twice on the meatloaf self-hosted
+that runs the **full** HeCBench HIP+SYCL set on the meatloaf self-hosted
 runner — once with chipStar's `hipcc` (HIP-on-SPIR-V) and once with oneAPI
-`icpx` (SYCL on Level Zero) — and publishes a side-by-side comparison
-table to the job step summary.
+`icpx` (SYCL on Level Zero) — and diffs the results against a checked-in
+baseline. The job goes red if any benchmark regresses in correctness or
+performance vs the baseline.
 
 ## Files in this directory
 
 | File | Purpose |
 |------|---------|
-| [`run-comparison.sh`](run-comparison.sh) | The bash entrypoint the workflow calls. Loads modules, runs `src/scripts/autohecbench.py` twice, then renders the table. Idempotent. |
-| [`build-table.py`](build-table.py) | Reads the two CSV/JSON outputs of `autohecbench.py` and emits a markdown comparison table. Always exits 0. |
-| [`benchmarks-subset.txt`](benchmarks-subset.txt) | Curated list of benchmark base names (one per line, `#` comments allowed). v1 contains a single benchmark (`ace`); expand in follow-up PRs once the workflow is stable. |
+| [`run-comparison.sh`](run-comparison.sh) | Bash entrypoint the workflow calls. Loads modules, runs `src/scripts/autohecbench.py` twice (full HIP and full SYCL sweep), then renders the table. Idempotent. Exits non-zero on regression. |
+| [`build-table.py`](build-table.py) | Reads the two `autohecbench.py` outputs, compares against `baseline.json`, emits a Markdown report with **🚨 Regressions** / **📈 Improvements** sections plus a full per-benchmark table. Always writes a `baseline-candidate.json` describing the current run. |
+| [`baseline.json`](baseline.json) | The expected per-benchmark state: compile/run status and timing for each `(benchmark, backend)` pair. Committed to the repo so every PR is compared against the same anchor. |
 
-## How to add a benchmark to the subset
+## How regression detection works
 
-1. Confirm the benchmark exists in **both** `src/<name>-hip/` and
-   `src/<name>-sycl/`, and that `<name>` has an entry in
-   `src/scripts/benchmarks/subset.json` (it provides the regex used to
-   scrape kernel time from stdout).
-2. Append `<name>` on its own line to
-   [`benchmarks-subset.txt`](benchmarks-subset.txt).
-3. Open a PR. The next CI run will pick it up automatically.
+For each `(benchmark, backend)` pair the diff against the baseline yields
+one of:
+
+| Category | Trigger | CI effect |
+|----------|---------|-----------|
+| **Regression — correctness** | Was `pass` in baseline, now `fail-build` or `fail-run`. | Job goes red. |
+| **Regression — performance** | Was `pass` in baseline, still passes, but current time is **slower by more than `perf_tolerance_pct`** (default 15%). | Job goes red. |
+| **Improvement — correctness** | Was failing in baseline, now `pass`. | Job stays green; listed in the **📈 Improvements** section. |
+| **Improvement — performance** | Both pass; current time is **faster by more than tolerance**. | Job stays green; listed in **📈 Improvements**. |
+| **Unchanged** | Same status, timing within tolerance. | Job stays green; listed only in the full table. |
+
+Both `🚨 Regressions` and `📈 Improvements` sections also appear at the
+top of the workflow's step summary, so a glance at the run page tells you
+what moved.
+
+## Updating the baseline
+
+When a PR introduces an intentional change (a fix that turns failures into
+passes, or a chipStar update that legitimately changes timings), the
+expected baseline must be updated **in the same PR** so the next CI run
+has a consistent anchor.
+
+The CI run always uploads the new baseline candidate as part of the
+`meatloaf-results` artifact:
+
+1. Open the workflow run page → **Artifacts** → download
+   `meatloaf-results.zip`.
+2. Inside it, copy `baseline-candidate.json` over
+   `ci/meatloaf/baseline.json` in your branch.
+3. Inspect the diff (`git diff ci/meatloaf/baseline.json`) — every change
+   should be intentional and explainable in the PR description.
+4. Commit and push. The next CI run sees zero regressions (because the
+   baseline matches the current state) and goes green.
+
+> Do **not** update the baseline to silence a regression you don't
+> understand. The whole point is that surprising changes show up as red
+> CI.
+
+## How to add or remove a benchmark from the sweep
+
+The sweep is the full set of HeCBench benchmarks listed in
+[`src/scripts/benchmarks/subset.json`](../../src/scripts/benchmarks/subset.json),
+filtered to those with both `*-hip` and `*-sycl` directories. **No file
+in this directory** controls the list — adding/removing a benchmark from
+the CI sweep means adding/removing it from `subset.json` (and shipping
+both implementations).
 
 ## One-time runner setup
 
@@ -67,21 +107,19 @@ Confirm the modules appeared:
 module avail HIP   # expect chipStar, H4I-HipBLAS, H4I-HipFFT, ... at <date>
 ```
 
-### 3. GitHub Actions self-hosted runner registration
+When you re-run `install_chipstar.py`, the new modules are written under
+a fresh datestamp (e.g. `H4I-HipBLAS/2026.04.08` → `H4I-HipBLAS/2026.05.12`).
+Bump the `module load` lines in [`run-comparison.sh`](run-comparison.sh) to
+match the new datestamps.
 
-Register the runner against the upstream HeCBench repo with label
-`meatloaf` so the workflow's `runs-on: [self-hosted, meatloaf]` matches:
+### 3. GitHub Actions self-hosted runner
 
-```bash
-# Download from GitHub Settings → Actions → Runners → New self-hosted runner
-cd ~/actions-runner
-./config.sh \
-    --url https://github.com/zjin-lcf/HeCBench \
-    --token <REGISTRATION_TOKEN> \
-    --labels meatloaf \
-    --name meatloaf
-sudo ./svc.sh install && sudo ./svc.sh start
-```
+The workflow's `runs-on:` is `[self-hosted, Linux, X64]` so it lands on the
+single self-hosted runner registered against `zjin-lcf/HeCBench`. If you
+add more self-hosted runners later, re-pin to a unique label by:
+
+1. Re-registering the runner with `--labels meatloaf` (or another tag).
+2. Changing `runs-on:` in the workflow to match.
 
 ### 4. Smoke test the workflow locally
 
@@ -98,16 +136,5 @@ bash ci/meatloaf/run-comparison.sh
 cat ci/meatloaf/results/comparison.md
 ```
 
-Expected: `comparison.md` exists and contains one row per benchmark in the
-subset, with both HIP and SYCL columns showing `✓` and a millisecond value.
-
-## Module pinning policy
-
-The workflow loads dated module names (e.g.
-`HIP/H4I-HipBLAS/2026.04.08`) for the H4I libraries so the timing
-results are reproducible across re-runs. The `HIP/chipStar/main` module is
-deliberately left as the rolling pointer so chipStar regressions land in
-the comparison table immediately. When the runner is re-installed via
-`install_chipstar.py --all`, bump the dated module strings in
-[`run-comparison.sh`](run-comparison.sh) to match the new datestamp in
-`~/modulefiles/HIP/`.
+Expected on a clean baseline run: `Regressions: 0`, full table populated,
+exit code 0.
