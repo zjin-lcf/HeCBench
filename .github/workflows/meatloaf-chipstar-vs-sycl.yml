@@ -1,0 +1,53 @@
+name: chipStar vs SYCL (meatloaf)
+
+# Self-hosted Intel-GPU CI on the `meatloaf` runner. Builds the curated
+# benchmark subset twice -- once with chipStar's `hipcc` (HIP-on-SPIR-V) and
+# once with oneAPI `icpx` (SYCL) -- and publishes a side-by-side performance
+# table to the job step summary.
+#
+# One-time setup on the runner is documented in ci/meatloaf/README.md.
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: meatloaf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chipstar-vs-sycl:
+    runs-on: [self-hosted, meatloaf]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show environment
+        run: |
+          set +e
+          uname -a
+          lscpu | head -20
+          source /etc/profile.d/modules.sh || true
+          module use "$HOME/modulefiles" || true
+          module avail HIP 2>&1 | sed -n '1,40p'
+          which clinfo && clinfo -l || true
+
+      - name: Run chipStar-vs-SYCL comparison
+        run: bash ci/meatloaf/run-comparison.sh
+
+      - name: Publish comparison table to step summary
+        if: always()
+        run: |
+          if [ -f ci/meatloaf/results/comparison.md ]; then
+            cat ci/meatloaf/results/comparison.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "comparison.md not produced" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload raw results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meatloaf-results
+          path: ci/meatloaf/results/
