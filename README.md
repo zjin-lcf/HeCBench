@@ -183,9 +183,9 @@ Not all programs automate the verification of host and device results
 Not all CUDA programs have SYCL, HIP or OpenMP equivalents  
 Raw performance of any program may be suboptimal  
 Some programs may take long to complete on an integrated GPU  
-Some host programs contain platform-specific intrinsics, so they may cause compile error on a PowerPC platform
-Some programs may fail to complete due to limited GPU device memory (4, 8, 12, 16, 24, 32, 40 GB)
-Image/texture APIs are not supported on AMD CDNA-based devices (e.g., MI300)
+Some host programs contain platform-specific intrinsics, so they may cause compile error on a PowerPC platform  
+Some programs may fail to complete due to limited GPU device memory (4, 8, 12, 16, 24, 32, 40 GB)  
+Image/texture APIs are not supported on AMD CDNA-based devices (e.g., MI300)  
 Program hang: bh-hip, mpc-sycl 
 
 # Emulation
