@@ -7,7 +7,7 @@ void moe_sum_kernel(
 {
   const int64_t output_base = item.get_group(0) * d;
   const int64_t input_base = output_base * TOPK;
-  for (int64_t idx = item.get_local_id(0); idx < d;
+  for (int idx = item.get_local_id(0); idx < d;
        idx += item.get_local_range(0)) {
     scalar_t x = 0.0;
     #pragma unroll
