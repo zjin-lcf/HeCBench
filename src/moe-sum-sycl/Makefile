@@ -30,7 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl -I../moe-sum-cuda \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
@@ -72,7 +72,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp kernels.h
+%.o: %.cpp kernels.h ../moe-sum-cuda/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

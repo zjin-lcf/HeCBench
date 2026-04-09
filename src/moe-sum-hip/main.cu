@@ -5,6 +5,7 @@
 #include <random>
 #include <hip/hip_runtime.h>
 #include "kernels.h"
+#include "reference.h"
 
 #define GPU_CHECK(ans)                                                                   \
     {                                                                                    \
@@ -22,7 +23,7 @@ gpuAssert(hipError_t code, const char* file, int line, bool abort = true)
 
 template <typename scalar_t>
 int64_t moe_sum(const scalar_t* input,   // [num_tokens, topk, hidden_size]
-                     scalar_t* output,  // [num_tokens, hidden_size]
+                      scalar_t* output,  // [num_tokens, hidden_size]
                 const int hidden_size,
                 const int num_tokens,
                 const int topk,
@@ -32,14 +33,14 @@ int64_t moe_sum(const scalar_t* input,   // [num_tokens, topk, hidden_size]
   dim3 block(std::min(hidden_size, 1024));
 
   // warmup
-  for (int i = 0; i < 30; i++) {
+  for (int i = 0; i < 100; i++) {
     moe_sum_kernel<scalar_t, 2><<<grid, block>>>(
         output, input, hidden_size);
   }
   GPU_CHECK(hipDeviceSynchronize());
 
   auto start = std::chrono::steady_clock::now();
-  
+
   switch (topk) {
     case 2:
       for (int i = 0; i < repeat; i++)
@@ -83,14 +84,14 @@ int64_t moe_sum_vec4(const float* input,
   dim3 block(std::min(hidden_size/4, 1024));
 
   // warmup
-  for (int i = 0; i < 30; i++) {
+  for (int i = 0; i < 100; i++) {
     moe_sum_kernel_vec4<2><<<grid, block>>>(
         output, input, hidden_size);
   }
   GPU_CHECK(hipDeviceSynchronize());
 
   auto start = std::chrono::steady_clock::now();
-  
+
   switch (topk) {
     case 2:
       for (int i = 0; i < repeat; i++)
@@ -140,7 +141,10 @@ int main(int argc, char* argv[])
 
   const int64_t output_size_bytes = (int64_t)num_tokens * hidden_size * sizeof(float);
   float *d_output, *output, *output_vec4;
+  float *r_output;
   GPU_CHECK(hipMalloc(&d_output, output_size_bytes));
+
+  r_output = (float*) malloc (output_size_bytes);
   output = (float*) malloc (output_size_bytes);
   output_vec4 = (float*) malloc (output_size_bytes);
 
@@ -156,31 +160,42 @@ int main(int argc, char* argv[])
     for (int64_t i = 0; i < (int64_t)num_tokens * hidden_size * topk; i++) {
       input[i] = dis(gen);
     }
+
+    // reference
+    moe_sum_ref<float>(topk, r_output, input, num_tokens, hidden_size);
+
     GPU_CHECK(hipMemcpy(d_input, input, input_size_bytes, hipMemcpyHostToDevice));
 
+    // base
     int64_t nano_seconds = moe_sum(d_input, d_output, hidden_size, num_tokens, topk, repeat);
-
     GPU_CHECK(hipMemcpy(output, d_output, output_size_bytes, hipMemcpyDeviceToHost));
+    bool ok = true;
+    for (int64_t i = 0; i < (int64_t)num_tokens * hidden_size; i++) {
+      if (fabsf(r_output[i] - output[i]) > 1e-4f) {
+        ok = false; break;
+      }
+    }
+    printf("%s\n", ok ? "PASS" : "FAIL");
 
     float io_bytes = 1.f * repeat * (input_size_bytes + output_size_bytes);
     float bw = io_bytes / nano_seconds;
-
     printf("Kernel bandwidth: %f GB/s \n", bw);
 
+    // vectorized
     nano_seconds = moe_sum_vec4(d_input, d_output, hidden_size, num_tokens, topk, repeat);
+    GPU_CHECK(hipMemcpy(output_vec4, d_output, output_size_bytes, hipMemcpyDeviceToHost));
+    int32_t rc = memcmp(output, output_vec4, output_size_bytes);
+    printf("%s\n", rc ? "FAIL" : "PASS");
+
     float bw_vec4 = io_bytes / nano_seconds;
     printf("Kernel(vec4) bandwidth: %f GB/s (%f%%)\n", bw_vec4, 100 * (bw_vec4 - bw) / bw);
-
-    GPU_CHECK(hipMemcpy(output_vec4, d_output, output_size_bytes, hipMemcpyDeviceToHost));
-
-    int32_t rc = memcmp(output, output_vec4, output_size_bytes);
-
-    printf("%s\n", rc ? "FAIL" : "PASS");
 
     GPU_CHECK(hipFree(d_input));
     free(input);
   }
+
   GPU_CHECK(hipFree(d_output));
+  free(r_output);
   free(output);
   free(output_vec4);
   return 0;

@@ -5,6 +5,7 @@
 #include <random>
 #include <sycl/sycl.hpp>
 #include "kernels.h"
+#include "reference.h"
 
 template <typename scalar_t>
 int64_t moe_sum(sycl::queue &q,
@@ -24,7 +25,7 @@ int64_t moe_sum(sycl::queue &q,
   };
 
   // warmup
-  for (int i = 0; i < 30; i++) {
+  for (int i = 0; i < 100; i++) {
     q.parallel_for(sycl::nd_range<1>(gws, lws), kFn);
   }
   q.wait();
@@ -83,7 +84,7 @@ int64_t moe_sum_vec4(sycl::queue &q,
   };
 
   // warmup
-  for (int i = 0; i < 30; i++) {
+  for (int i = 0; i < 100; i++) {
     q.parallel_for(sycl::nd_range<1>(gws, lws), kFn);
   }
   q.wait();
@@ -148,7 +149,10 @@ int main(int argc, char* argv[])
 
   const int64_t output_size_bytes = (int64_t)num_tokens * hidden_size * sizeof(float);
   float *d_output, *output, *output_vec4;
+  float *r_output;
+
   d_output = (float *)sycl::malloc_device(output_size_bytes, q);
+  r_output = (float*) malloc (output_size_bytes);
   output = (float*) malloc (output_size_bytes);
   output_vec4 = (float*) malloc (output_size_bytes);
 
@@ -164,31 +168,41 @@ int main(int argc, char* argv[])
     for (int64_t i = 0; i < (int64_t)num_tokens * hidden_size * topk; i++) {
       input[i] = dis(gen);
     }
+    // reference
+    moe_sum_ref<float>(topk, r_output, input, num_tokens, hidden_size);
+
     q.memcpy(d_input, input, input_size_bytes).wait();
 
+    // base
     int64_t nano_seconds = moe_sum(q, d_input, d_output, hidden_size, num_tokens, topk, repeat);
-
     q.memcpy(output, d_output, output_size_bytes).wait();
+    bool ok = true;
+    for (int64_t i = 0; i < (int64_t)num_tokens * hidden_size; i++) {
+      if (fabsf(r_output[i] - output[i]) > 1e-4f) {
+        ok = false; break;
+      }
+    }
+    printf("%s\n", ok ? "PASS" : "FAIL");
 
     float io_bytes = 1.f * repeat * (input_size_bytes + output_size_bytes);
     float bw = io_bytes / nano_seconds;
-
     printf("Kernel bandwidth: %f GB/s \n", bw);
 
+    // vectorized
     nano_seconds = moe_sum_vec4(q, d_input, d_output, hidden_size, num_tokens, topk, repeat);
+    q.memcpy(output_vec4, d_output, output_size_bytes).wait();
+    int32_t rc = memcmp(output, output_vec4, output_size_bytes);
+    printf("%s\n", rc ? "FAIL" : "PASS");
+
     float bw_vec4 = io_bytes / nano_seconds;
     printf("Kernel(vec4) bandwidth: %f GB/s (%f%%)\n", bw_vec4, 100 * (bw_vec4 - bw) / bw);
-
-    q.memcpy(output_vec4, d_output, output_size_bytes).wait();
-
-    int32_t rc = memcmp(output, output_vec4, output_size_bytes);
-
-    printf("%s\n", rc ? "FAIL" : "PASS");
 
     sycl::free(d_input, q);
     free(input);
   }
+
   sycl::free(d_output, q);
+  free(r_output);
   free(output);
   free(output_vec4);
   return 0;
