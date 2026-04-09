@@ -5,10 +5,10 @@ void moe_sum_kernel(
     const int d,
     sycl::nd_item<1> &item)
 {
-  const int64_t output_base = item.get_group(1) * d;
+  const int64_t output_base = item.get_group(0) * d;
   const int64_t input_base = output_base * TOPK;
-  for (int64_t idx = item.get_local_id(1); idx < d;
-       idx += item.get_local_range(1)) {
+  for (int64_t idx = item.get_local_id(0); idx < d;
+       idx += item.get_local_range(0)) {
     scalar_t x = 0.0;
     #pragma unroll
     for (int k = 0; k < TOPK; ++k) {
@@ -26,14 +26,14 @@ void moe_sum_kernel_vec4(
     sycl::nd_item<1> &item)
 {
   int d4 = d >> 2; // divisible by 4
-  int output_base4 = (item.get_group(1) * d) >> 2;
-  int input_base4 = (item.get_group(1) * d * TOPK) >> 2;
+  int output_base4 = (item.get_group(0) * d) >> 2;
+  int input_base4 = (item.get_group(0) * d * TOPK) >> 2;
 
   const sycl::float4 *input4 = reinterpret_cast<const sycl::float4 *>(input);
   sycl::float4 *out4 = reinterpret_cast<sycl::float4 *>(out);
 
-  for (int idx = item.get_local_id(1); idx < d4;
-       idx += item.get_local_range(1)) {
+  for (int idx = item.get_local_id(0); idx < d4;
+       idx += item.get_local_range(0)) {
     sycl::float4 acc = sycl::float4(0.f);
     #pragma unroll
     for (int k = 0; k < TOPK; ++k) {
