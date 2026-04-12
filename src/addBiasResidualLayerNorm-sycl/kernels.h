@@ -23,6 +23,10 @@
 
 template <typename T> inline T floatToType2(float a);
 
+template <> inline sycl::float2 floatToType2(float a) {
+  return sycl::float2{a, a};
+}
+
 // Converts input to half precision in round-to-nearest-even mode
 // and populates both halves of half2 with converted value.
 template <> inline sycl::half2 floatToType2(float a) {
@@ -66,16 +70,22 @@ type2ToFloat2(sycl::marray<sycl::ext::oneapi::bfloat16, 2> a) {
 
 // Convert between a vector type and a scalar type
 template <typename T>
-struct TypeConverter {
+struct TypeConverter;
+
+template <>
+struct TypeConverter<float> {
+  using Type = sycl::float2;
+};
+
+template <>
+struct TypeConverter<sycl::half> {
   using Type = sycl::half2;
-}; // keep for generality
+};
 
 template <>
 struct TypeConverter<sycl::ext::oneapi::bfloat16> {
   using Type = sycl::marray<sycl::ext::oneapi::bfloat16, 2>;
 };
-
-template <> struct TypeConverter<sycl::half> { using Type = sycl::half2; };
 
 // general add
 template<typename T>
