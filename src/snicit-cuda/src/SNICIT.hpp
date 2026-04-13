@@ -467,7 +467,7 @@ void SNICIT::_result_alloc_read(const std::string& input_path) {
     }
 
     auto file_size = file.tellg();
-    std::unique_ptr<char[]> buffer(new char[file_size]);
+    auto buffer = std::make_unique<char[]>(file_size);
 
     //Read the entire file at once
     file.seekg(0, std::ios::beg);

@@ -45,7 +45,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ../moe-sum-cuda/kernels.h Makefile   
+%.o: %.cu ../moe-sum-cuda/kernels.h ../moe-sum-cuda/reference.h Makefile   
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

@@ -254,10 +254,11 @@ void gpu_kernel_multiple_outputs_impl(const int repeat, const func_t& f) {
   float *h_o1 = (float*) malloc (size);
   float *h_o2 = (float*) malloc (size);
   for (int64_t i = 0; i < numel; i++) {
-    h_x1[i] = 1.f * (i+1) / numel;
-    h_x2[i] = 1.f * (i+1) / numel;
-    h_cos[i] = cosf(i / powf(10000, i / numel)); 
-    h_sin[i] = sinf(i / powf(10000, i / numel));
+    float fi = i;
+    h_x1[i]  = (fi + 1.f) / numel;
+    h_x2[i]  = (fi + 1.f) / numel;
+    h_cos[i] = cosf(fi / powf(10000.f, fi / numel));
+    h_sin[i] = sinf(fi / powf(10000.f, fi / numel));
   }
   
   float *d_x1, *d_x2, *d_cos, *d_sin, *d_o1, *d_o2;

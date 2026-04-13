@@ -5,9 +5,9 @@ __global__ void moe_sum_kernel(
     const scalar_t* __restrict__ input,  // [..., topk, d]
     const int d)
 {
-  const int64_t output_base = blockIdx.x * d; 
+  const int64_t output_base = (int64_t)blockIdx.x * d;
   const int64_t input_base = output_base * TOPK;
-  for (int64_t idx = threadIdx.x; idx < d; idx += blockDim.x) {
+  for (int idx = threadIdx.x; idx < d; idx += blockDim.x) {
     scalar_t x = 0.0;
     #pragma unroll
     for (int k = 0; k < TOPK; ++k) {
@@ -24,8 +24,8 @@ __global__ void moe_sum_kernel_vec4(
     int d)
 {
   int d4 = d >> 2; // divisible by 4
-  int output_base4 = (blockIdx.x * d) >> 2;
-  int input_base4  = (blockIdx.x * d * TOPK) >> 2;
+  int output_base4 = ((int64_t)blockIdx.x * d) >> 2;
+  int input_base4  = ((int64_t)blockIdx.x * d * TOPK) >> 2;
 
   const float4* input4 = reinterpret_cast<const float4*>(input);
   float4* out4 = reinterpret_cast<float4*>(out);

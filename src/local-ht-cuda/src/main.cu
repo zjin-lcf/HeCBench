@@ -199,25 +199,25 @@ void call_kernel(std::vector<CtgWithReads>& data_in, uint32_t max_ctg_size, uint
   double cpu_mem_aloc_time = 0, gpu_mem_aloc_time = 0, cpu_mem_dealoc_time = 0, gpu_mem_dealoc_time = 0;
 
   mem_timer.timer_start();
-  std::unique_ptr<char[]> ctg_seqs_h{new char[max_ctg_size * slice_size]};
-  std::unique_ptr<uint32_t[]> cid_h{new uint32_t[slice_size]};
-  std::unique_ptr<char[]> ctgs_seqs_rc_h{new char[max_ctg_size * slice_size]};// revcomps not requried on GPU, ctg space will be re-used on GPU, but if we want to do right left extensions in parallel, then we need separate space on GPU
-  std::unique_ptr<uint32_t[]> ctg_seq_offsets_h{new uint32_t[slice_size]};
-  std::unique_ptr<double[]> depth_h{new double[slice_size]};
-  std::unique_ptr<char[]> reads_left_h{new char[max_l_count * max_read_size * slice_size]}; 
-  std::unique_ptr<char[]> reads_right_h{new char[max_r_count * max_read_size * slice_size]};
-  std::unique_ptr<char[]> quals_right_h{new char[max_r_count * max_read_size * slice_size]};
-  std::unique_ptr<char[]> quals_left_h{new char[max_l_count * max_read_size * slice_size]};
-  std::unique_ptr<uint32_t[]> reads_l_offset_h{new uint32_t[max_l_count* slice_size]};
-  std::unique_ptr<uint32_t[]> reads_r_offset_h{new uint32_t[max_r_count * slice_size]};
-  std::unique_ptr<uint32_t[]> rds_l_cnt_offset_h{new uint32_t[slice_size]};
-  std::unique_ptr<uint32_t[]> rds_r_cnt_offset_h{new uint32_t[slice_size]};
-  std::unique_ptr<uint32_t[]> term_counts_h{new uint32_t[3]};
-  std::unique_ptr<char[]> longest_walks_r_h{new char[slice_size * max_walk_len * iterations]};// reserve memory for all the walks
-  std::unique_ptr<char[]> longest_walks_l_h{new char[slice_size * max_walk_len * iterations]}; // not needed on device, will re-use right walk memory
-  std::unique_ptr<uint32_t[]> final_walk_lens_r_h{new uint32_t[slice_size * iterations]}; // reserve memory for all the walks.
-  std::unique_ptr<uint32_t[]> final_walk_lens_l_h{new uint32_t[slice_size * iterations]}; // not needed on device, will re use right walk memory
-  std::unique_ptr<uint32_t[]> prefix_ht_size_h{new uint32_t[slice_size]};
+  auto ctg_seqs_h            = std::make_unique<char[]>(max_ctg_size * slice_size);
+  auto cid_h                 = std::make_unique<uint32_t[]>(slice_size);
+  auto ctgs_seqs_rc_h        = std::make_unique<char[]>(max_ctg_size * slice_size);
+  auto ctg_seq_offsets_h     = std::make_unique<uint32_t[]>(slice_size);
+  auto depth_h               = std::make_unique<double[]>(slice_size);
+  auto reads_left_h          = std::make_unique<char[]>(max_l_count * max_read_size * slice_size);
+  auto reads_right_h         = std::make_unique<char[]>(max_r_count * max_read_size * slice_size);
+  auto quals_right_h         = std::make_unique<char[]>(max_r_count * max_read_size * slice_size);
+  auto quals_left_h          = std::make_unique<char[]>(max_l_count * max_read_size * slice_size);
+  auto reads_l_offset_h      = std::make_unique<uint32_t[]>(max_l_count * slice_size);
+  auto reads_r_offset_h      = std::make_unique<uint32_t[]>(max_r_count * slice_size);
+  auto rds_l_cnt_offset_h    = std::make_unique<uint32_t[]>(slice_size);
+  auto rds_r_cnt_offset_h    = std::make_unique<uint32_t[]>(slice_size);
+  auto term_counts_h         = std::make_unique<uint32_t[]>(3);
+  auto longest_walks_r_h     = std::make_unique<char[]>(slice_size * max_walk_len * iterations);
+  auto longest_walks_l_h     = std::make_unique<char[]>(slice_size * max_walk_len * iterations);
+  auto final_walk_lens_r_h   = std::make_unique<uint32_t[]>(slice_size * iterations);
+  auto final_walk_lens_l_h   = std::make_unique<uint32_t[]>(slice_size * iterations);
+  auto prefix_ht_size_h      = std::make_unique<uint32_t[]>(slice_size);
   mem_timer.timer_end();
   cpu_mem_aloc_time += mem_timer.get_total_time();
   gpu_mem_req = sizeof(int32_t) * slice_size * 6 + sizeof(int32_t) * 3

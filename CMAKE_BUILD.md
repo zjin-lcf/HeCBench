@@ -32,7 +32,7 @@ The simplest way to build is using a CMake preset:
 # List available presets
 cmake --list-presets
 
-# Configure for NVIDIA Hopper GPUs with NVIDIA HPC SDK (version 25.7)
+# Configure for building CUDA programs targeting NVIDIA Hopper GPUs with NVIDIA HPC SDK (version 25.7)
 cmake -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
       -DMPI_C_COMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/25.7/comm_libs/mpi/bin/mpicc \
@@ -45,6 +45,11 @@ cmake --build build/cuda-sm90
 
 # Or build with Ninja in parallel
 cmake --build build/cuda-sm90 --parallel
+
+# Configure for building OpenMP offloading programs targeting AMD GFX942 GPUs with amdclang++
+cmake -DCMAKE_BUILD_TYPE=Release \
+      --preset openmp-amd-gfx942
+
 ```
 
 ### Available Presets

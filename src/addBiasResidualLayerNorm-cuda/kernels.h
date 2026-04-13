@@ -18,6 +18,11 @@ template<typename T>
 inline __host__ __device__ float typeToFloat(T a);
 
 template<>
+inline __host__ __device__ float typeToFloat(float a) {
+  return a;
+}
+
+template<>
 inline __host__ __device__ float typeToFloat(__nv_bfloat16 a) {
   return __bfloat162float(a);
 }
@@ -31,6 +36,11 @@ template<typename T>
 inline __host__ __device__ T floatToType(float a);
 
 template<>
+inline __host__ __device__ float floatToType(float a) {
+  return a;
+}
+
+template<>
 inline __host__ __device__ half floatToType(float a) {
   return __float2half_rn(a);
 }
@@ -42,6 +52,11 @@ inline __host__ __device__ __nv_bfloat16 floatToType(float a) {
 
 template<typename T>
 inline __device__ T floatToType2(float a);
+
+template<>
+inline __device__ float2 floatToType2(float a) {
+  return make_float2(a, a);
+}
 
 // Converts input to half precision in round-to-nearest-even mode
 // and populates both halves of half2 with converted value.
@@ -89,7 +104,13 @@ inline __device__ float2 type2ToFloat2(__nv_bfloat162 a) {
 
 // Convert between a vector type and a scalar type
 template<typename T>
-struct TypeConverter {using Type = half2;}; // keep for generality
+struct TypeConverter;
+
+template<>
+struct TypeConverter<float> {using Type = float2;};
+
+template<>
+struct TypeConverter<__half> {using Type = __half2;};
 
 template<>
 struct TypeConverter<__nv_bfloat16> {using Type = __nv_bfloat162;};
@@ -98,6 +119,11 @@ struct TypeConverter<__nv_bfloat16> {using Type = __nv_bfloat162;};
 template<typename T>
 inline __device__ T add(T a, T b) {
   return a + b;
+}
+
+template<>
+inline __device__ float2 add(float2 a, float2 b) {
+  return make_float2(a.x + b.x, a.y + b.y);
 }
 
 template<>
@@ -126,6 +152,11 @@ inline __device__ T add(T a, T b, T c) {
 }
 
 template<>
+inline __device__ float2 add(float2 a, float2 b, float2 c) {
+  return add(add(a, b), c);
+}
+
+template<>
 inline __device__ __nv_bfloat162 add(__nv_bfloat162 a, __nv_bfloat162 b, __nv_bfloat162 c) {
   return add(add(a, b), c);
 }
@@ -139,6 +170,11 @@ inline __device__ __nv_bfloat16 add(__nv_bfloat16 a, __nv_bfloat16 b, __nv_bfloa
 template<typename T>
 inline __device__ T sub(T a, T b) {
   return a - b;
+}
+
+template<>
+inline __device__ float2 sub(float2 a, float2 b) {
+  return make_float2(a.x - b.x, a.y - b.y);
 }
 
 template<>
@@ -158,6 +194,12 @@ inline __device__ T fma(T a, T b, T c, T d) {
 }
 
 template<>
+inline __device__ float2 fma(float2 a, float2 b, float2 c, float2 d) {
+    return make_float2(a.x * b.x * c.x + d.x,
+                       a.y * b.y * c.y + d.y);
+}
+
+template<>
 inline __device__ half2 fma(half2 a, half2 b, half2 c, half2 d) {
     return __hadd2(__hmul2(__hmul2(a, b), c), d);
 }
@@ -167,7 +209,7 @@ inline __device__ __nv_bfloat162 fma(__nv_bfloat162 a, __nv_bfloat162 b, __nv_bf
     return __hadd2(__hmul2(__hmul2(a, b), c), d);
 }
 
-// reduction 
+// reduction
 template<typename T>
 __inline__ __device__ T warpReduceSum(T val)
 {
@@ -208,12 +250,13 @@ __global__ void addBiasResidualPostLayerNormV2(
     const float layernorm_eps,
     const int n)
 {
+  __shared__ float s_mean;
+  __shared__ float s_variance;
+
   using T2             = typename TypeConverter<T>::Type;
   const int        ite = 4;
   const int        tid = threadIdx.x;
   const int        bid = blockIdx.x;
-  __shared__ float s_mean;
-  __shared__ float s_variance;
   float            mean     = 0.0f;
   float            variance = 0.0f;
   T2               local_out_half2[ite];
@@ -238,7 +281,7 @@ __global__ void addBiasResidualPostLayerNormV2(
     sum                = add(sum, local_out_half2[i]);
   }
 
-  mean = blockReduceSum<float>(typeToFloat(__hadd(sum.x , sum.y)));
+  mean = blockReduceSum<float>(typeToFloat(add(sum.x , sum.y)));
   if (threadIdx.x == 0) {
     s_mean = mean / n;
   }
@@ -266,14 +309,13 @@ __global__ void addBiasResidualPostLayerNormV2(
   for (int i = 0; i < ite; i++) {
     int col_id  = i * blockDim.x + tid;
     int id      = bid * n / 2 + col_id;
-    out_ptr[id] = fma(local_out_half2[i], s_var_2,
-                      gamma_ptr[col_id], beta_ptr[col_id]);
+    out_ptr[id] = fma(local_out_half2[i], s_var_2, gamma_ptr[col_id], beta_ptr[col_id]);
   }
 }
 
 template<typename T, int N>
 __global__ void addBiasResidualPostLayerNorm(
-          T* out, 
+          T* out,
     const T* __restrict__ input,
     const T* __restrict__ bias,
     const T* __restrict__ gamma,
@@ -325,7 +367,7 @@ __global__ void addBiasResidualPostLayerNorm(
 
 template<typename T>
 __global__ void generalAddBiasResidualPostLayerNorm(
-          T* out, 
+          T* out,
     const T* __restrict__ input,
     const T* __restrict__ bias,
     const T* __restrict__ gamma,

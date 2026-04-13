@@ -18,6 +18,11 @@ template<typename T>
 inline __host__ __device__ float typeToFloat(T a);
 
 template<>
+inline __host__ __device__ float typeToFloat(float a) {
+  return a;
+}
+
+template<>
 inline __host__ __device__ float typeToFloat(__hip_bfloat16 a) {
   return __bfloat162float(a);
 }
@@ -31,6 +36,11 @@ template<typename T>
 inline __host__ __device__ T floatToType(float a);
 
 template<>
+inline __host__ __device__ float floatToType(float a) {
+  return a;
+}
+
+template<>
 inline __host__ __device__ half floatToType(float a) {
   return __float2half_rn(a);
 }
@@ -42,6 +52,11 @@ inline __host__ __device__ __hip_bfloat16 floatToType(float a) {
 
 template<typename T>
 inline __device__ T floatToType2(float a);
+
+template<>
+inline __device__ float2 floatToType2(float a) {
+  return make_float2(a, a);
+}
 
 // Converts input to half precision in round-to-nearest-even mode
 // and populates both halves of half2 with converted value.
@@ -89,9 +104,14 @@ inline __device__ float2 type2ToFloat2(__hip_bfloat162 a) {
   return __bfloat1622float2(a);
 }
 
-// Convert between a vector type and a scalar type
 template<typename T>
-struct TypeConverter {using Type = half2;}; // keep for generality
+struct TypeConverter;
+
+template<>
+struct TypeConverter<float> {using Type = float2;};
+
+template<>
+struct TypeConverter<__half> {using Type = __half2;};
 
 template<>
 struct TypeConverter<__hip_bfloat16> {using Type = __hip_bfloat162;};
@@ -240,7 +260,7 @@ __global__ void addBiasResidualPostLayerNormV2(
     sum                = add(sum, local_out_half2[i]);
   }
 
-  mean = blockReduceSum<float, WarpSize>(typeToFloat(__hadd(sum.x , sum.y)));
+  mean = blockReduceSum<float, WarpSize>(typeToFloat(add(sum.x , sum.y)));
   if (threadIdx.x == 0) {
     s_mean = mean / n;
   }
