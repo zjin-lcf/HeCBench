@@ -39,7 +39,7 @@
 #define U133AArrayLength (22283) 
 
 // Queries should be contained within this sub-directory
-#define subDirQueries ("query/")
+#define subDirQueries ("queries/")
 
 // Results should be output within this sub-directory
 #define subDirResults ("Results/")
@@ -86,7 +86,7 @@
 
 // General global variables
 const int threadsPerBlock = 128;
-const bool promptForInput = true; // If false, just use the default input parameters & don't prompt
+const bool promptForInput = false; // If false, just use the default input parameters & don't prompt
 
 // Variables related to user input
 const int minRandomGenerations = 100;
