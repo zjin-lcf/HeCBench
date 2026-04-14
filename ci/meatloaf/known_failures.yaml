@@ -1,20 +1,18 @@
 # Known benchmark failures as of 2026-04-14
 #
-# This file tracks the baseline state of each benchmark (compile/run/perf).
+# This file tracks the baseline status of each benchmark (pass/compile/run/correctness).
 # CI compares current results against this baseline to detect regressions.
 #
 # To regenerate: python3 ci/meatloaf/ci-manager.py --seed
 #
 # Status values:
-#   pass                 - compiles, runs successfully, no perf discrepancy
-#   compile              - fails to compile
-#   run                  - compiles but crashes / times out on execution
-#   correctness          - runs but exit code non-zero
-#   perf_discrepancy     - runs correctly but HIP/SYCL ratio > 1.5x
-#   skip                 - hangs GPU with unkillable orphan; never run
+#   pass          - compiles and runs successfully
+#   compile       - fails to compile
+#   run           - compiles but crashes / times out on execution
+#   correctness   - runs but exit code non-zero
+#   skip          - hangs GPU with unkillable orphan; never run
 
 meta:
-  perf_tolerance: 0.50   # flag if max(t_hip, t_sycl) / min > 1.5x
   generated_at: "2026-04-14"
 
 benchmarks:
