@@ -16,16 +16,17 @@
 
 #include "kernels.h"
 #include "mv_fp16.h"
+#include "utils.h"
 
 /************************** float16 ***********************/
 
 void matmul(void* output, nQWeight_fp16 &nqW, void* input, int n, int algo){
-    hipMemset(output, 0, sizeof(__half) * nqW.mSize);  // 0.007ms 0.04
+    GPU_CHECK(hipMemset(output, 0, sizeof(__half) * nqW.mSize));  // 0.007ms 0.04
     if(nqW.q_bias == nullptr)  nqmv((__half*)output, nqW, (__half*)input, algo);
     else                       nqmv_bias((__half*)output, nqW, (__half*)input, algo);
 }
 void matmul(void* output, void* input, nQWeight_fp16 &nqW, int m, int algo){
-    hipMemset(output, 0, sizeof(__half) * nqW.mSize);
+    GPU_CHECK(hipMemset(output, 0, sizeof(__half) * nqW.mSize));
     if(nqW.q_bias == nullptr)  nqmv((__half*)output, nqW, (__half*)input, algo);
     else                       nqmv_bias((__half*)output, nqW, (__half*)input, algo);
 }
