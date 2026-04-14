@@ -3,7 +3,11 @@ name: HIP vs SYCL (meatloaf)
 on:
   pull_request:
     branches: [master]
-    paths: ['**-hip/**', '**-sycl/**']
+    paths:
+      - '**-hip/**'
+      - '**-sycl/**'
+      - '.github/workflows/meatloaf-chipstar-vs-sycl.yml'
+      - 'ci/meatloaf/**'
   workflow_dispatch:
     inputs:
       seed:
