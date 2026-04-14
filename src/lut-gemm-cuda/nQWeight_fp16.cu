@@ -21,13 +21,9 @@
 
 void nQWeight_fp16::parsing(unsigned int *bW, float *A, int row, int col, int num_bits, 
         bool is_row_wise_quantize, int num_alpha_groups, float* q_bias){
-    this->num_groups = num_alpha_groups;
-    this->group_size =  kSize/num_alpha_groups;
 
-    __half* p_alpha;
-    __half* p_q_bias;
     nb=num_bits;
-    this->is_row_wise_quantize = is_row_wise_quantize;
+
     if(is_row_wise_quantize){
         mSize = row; 
         kSize = col; 
@@ -36,6 +32,13 @@ void nQWeight_fp16::parsing(unsigned int *bW, float *A, int row, int col, int nu
         mSize = col; 
         kSize = row;             
     }
+
+    this->num_groups = num_alpha_groups;
+    this->group_size =  kSize/num_alpha_groups;
+    this->is_row_wise_quantize = is_row_wise_quantize;
+
+    __half* p_alpha;
+    __half* p_q_bias;
 
     if(q_bias == nullptr) p_q_bias = nullptr;
     else{
