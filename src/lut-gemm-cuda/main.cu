@@ -17,6 +17,7 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include "tests.h"
+#include "utils.h"
 
                                     
 template<int M, int N, int K, int NUM_BITS, int A_GROUP_SIZE=K>
@@ -51,10 +52,10 @@ public:
         dequantizeFrom_qW();
         fhCpy(d_input, input  ,M * K);
         fhCpy(d_weight_fp16, weight ,K * N);
-        cudaDeviceSynchronize();
+        GPU_CHECK(cudaDeviceSynchronize());
 
         nqW.parsing(bW, alpha, K, N, NUM_BITS, false, num_groups, q_bias);
-        cudaDeviceSynchronize();
+        GPU_CHECK(cudaDeviceSynchronize());
 
         // validate against BLAS GEMM
         double meanError = checkErr();
@@ -69,12 +70,12 @@ public:
         timer tm;
         // warmup 
         matmul((void*)C, (void*)A, nqW, m);
-        cudaDeviceSynchronize();
+        GPU_CHECK(cudaDeviceSynchronize());
 
         for(int i=0;i<iter;i++){
             tm.start();
             matmul((void*)C, (void*)A, nqW, m);
-            cudaDeviceSynchronize();
+            GPU_CHECK(cudaDeviceSynchronize());
             tm.end();
         }
         printf("latency min : %.5fms, max : %.5fms, avg:%.5f\n", tm.min(), tm.max(), tm.mean());
@@ -82,9 +83,9 @@ public:
 
     double checkErr(){
         cublas_gemm_ex(d_input, d_weight_fp16, d_cu_output, M, N, K);
-        cudaMemset(d_nq_output, 0, sizeof(__half) * M * N);
+        GPU_CHECK(cudaMemset(d_nq_output, 0, sizeof(__half) * M * N));
         matmul(d_nq_output, d_input, nqW, M);
-        cudaDeviceSynchronize();
+        GPU_CHECK(cudaDeviceSynchronize());
         return checkOutputMeanError(d_cu_output, d_nq_output);
     }
 
@@ -152,10 +153,10 @@ public:
         q_bias = (float*) malloc (sizeof(float) * num_groups * N);
         weight = (float*) malloc (sizeof(float) * K * N);
         input = (float*) malloc (sizeof(float) * M * K);
-        cudaMallocManaged(&d_input    , sizeof(__half) * M * K);   
-        cudaMallocManaged(&d_weight_fp16, sizeof(__half) * K * N);   
-        cudaMallocManaged(&d_cu_output, sizeof(__half) * M * N);       
-        cudaMallocManaged(&d_nq_output, sizeof(__half) * M * N);
+        GPU_CHECK(cudaMallocManaged(&d_input    , sizeof(__half) * M * K));
+        GPU_CHECK(cudaMallocManaged(&d_weight_fp16, sizeof(__half) * K * N));
+        GPU_CHECK(cudaMallocManaged(&d_cu_output, sizeof(__half) * M * N));
+        GPU_CHECK(cudaMallocManaged(&d_nq_output, sizeof(__half) * M * N));
     }
     
     void free_memory(){
@@ -165,10 +166,10 @@ public:
         free(q_bias);
         free(weight);
         free(input);
-        cudaFree(d_input);
-        cudaFree(d_weight_fp16);
-        cudaFree(d_cu_output);
-        cudaFree(d_nq_output);
+        GPU_CHECK(cudaFree(d_input));
+        GPU_CHECK(cudaFree(d_weight_fp16));
+        GPU_CHECK(cudaFree(d_cu_output));
+        GPU_CHECK(cudaFree(d_nq_output));
     }
 
     void fhCpy(__half* a, float* b, int size){

@@ -46,13 +46,13 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-nQWeight_fp16.o : nQWeight_fp16.cu nQWeight_fp16.h
+nQWeight_fp16.o : nQWeight_fp16.cu nQWeight_fp16.h utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o : main.cu tests.h kernels.h mv_fp16.h
+main.o : main.cu tests.h kernels.h mv_fp16.h utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernels.o : kernels.cu kernels.h mv_fp16.h
+kernels.o : kernels.cu kernels.h mv_fp16.h utils.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

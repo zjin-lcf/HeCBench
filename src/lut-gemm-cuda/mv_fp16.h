@@ -20,10 +20,7 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <stdint.h>
-
-inline int div_roundup(int x , int y) {
-  return (x + y - 1)/ y;
-}
+#include "utils.h"
 
 template<int K_TILE_SIZE>
 __global__ void _nqmv(uint32_t *W, __half *alpha, __half *input, __half *output, int M, int K, int NUM_BITS, int M_TILE_SIZE, int group_size){
