@@ -1,53 +1,80 @@
-name: chipStar vs SYCL (meatloaf)
-
-# Self-hosted Intel-GPU CI on the `meatloaf` runner. Builds the curated
-# benchmark subset twice -- once with chipStar's `hipcc` (HIP-on-SPIR-V) and
-# once with oneAPI `icpx` (SYCL) -- and publishes a side-by-side performance
-# table to the job step summary.
-#
-# One-time setup on the runner is documented in ci/meatloaf/README.md.
+name: HIP vs SYCL (meatloaf)
 
 on:
   pull_request:
     branches: [master]
+    paths: ['**-hip/**', '**-sycl/**']
   workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Regenerate known_failures.yaml baseline'
+        required: false
+        default: 'false'
+        type: boolean
 
 concurrency:
   group: meatloaf-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  chipstar-vs-sycl:
+  hip-vs-sycl:
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 720
+    timeout-minutes: 480
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Show environment
         run: |
-          set +e
           uname -a
-          lscpu | head -20
-          source /etc/profile.d/modules.sh || true
-          module use "$HOME/modulefiles" || true
-          module avail HIP 2>&1 | sed -n '1,40p'
-          which clinfo && clinfo -l || true
+          which hipcc icpx || true
 
-      - name: Run chipStar-vs-SYCL comparison
-        run: bash ci/meatloaf/run-comparison.sh
+      - name: Detect changed benchmarks
+        if: github.event_name == 'pull_request'
+        run: |
+          git diff --name-only origin/master...HEAD \
+            | grep -oE '[^/]+-hip|[^/]+-sycl' \
+            | sed 's/-hip$//;s/-sycl$//' | sort -u \
+            > /tmp/bench-list.txt
+          echo "Changed benchmarks:"
+          cat /tmp/bench-list.txt || echo "(none)"
 
-      - name: Publish comparison table to step summary
+      - name: Run CI (seed mode)
+        if: inputs.seed == true
+        run: python3 ci/meatloaf/ci-manager.py --seed
+        env:
+          CI_ROOT: ${{ github.workspace }}
+
+      - name: Run CI (check mode)
+        if: inputs.seed != true
+        run: python3 ci/meatloaf/ci-manager.py --check
+        env:
+          CI_ROOT: ${{ github.workspace }}
+          BENCH_LIST: /tmp/bench-list.txt
+
+      - name: Commit updated known_failures.yaml (seed mode only)
+        if: inputs.seed == true && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name "meatloaf-ci[bot]"
+          git config user.email "meatloaf-ci@users.noreply.github.com"
+          git add ci/meatloaf/known_failures.yaml
+          git diff --cached --quiet || git commit -m "ci: update known_failures.yaml baseline"
+          git push origin HEAD:${{ github.head_ref }}
+
+      - name: Publish report to step summary
         if: always()
         run: |
-          if [ -f ci/meatloaf/results/comparison.md ]; then
-            cat ci/meatloaf/results/comparison.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f ci/meatloaf/results/report.md ]; then
+            cat ci/meatloaf/results/report.md >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "comparison.md not produced" >> "$GITHUB_STEP_SUMMARY"
+            echo "Report not generated" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload raw results
+      - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: meatloaf-results
           path: ci/meatloaf/results/
+          retention-days: 5
