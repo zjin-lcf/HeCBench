@@ -40,11 +40,12 @@ void validate_result(D* device_result, const T* cpu_reference,
       printf("Mismatch of %s at %zu: CPU_ref: %f vs GPU: %f\n", name, i, cpu_reference[i], (T)out_gpu[i]);
       nfaults++;
       if (nfaults >= max_int(10, n_print)) {
-        free(out_gpu);
+        break;
       }
     }
   }
-
+  
+  printf("%s\n", (nfaults == 0) ? "PASS" : "FAIL");
   free(out_gpu);
 }
 
@@ -209,7 +210,6 @@ int main(int argc, char **argv) {
     silu_forward2(d_x, d_out, N, block_size);
     validate_result(d_out, out, "out", N);
   }
-  printf("Forward pass: all results match\n\n");
 
   printf("Checking backward pass\n");
   for (int block_size: block_sizes) {
@@ -229,9 +229,6 @@ int main(int argc, char **argv) {
     silu_backward3(d_dout, d_x, d_dx, N, block_size);
     validate_result(d_dx, dx, "dx", N);
   }
-  printf("Backward pass: all results match\n\n");
-
-  printf("All results match. Starting benchmarks.\n\n");
 
   printf("\nForward pass benchmarks:\n");
   for (int block_size: block_sizes) {

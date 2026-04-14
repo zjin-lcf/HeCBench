@@ -24,20 +24,21 @@ void validate_result(sycl::queue &q,
                      const char* name, std::uint64_t num_elements,
                      T tolerance=1e-4, int n_print=5, int check_all=0)
 {
-    D* out_gpu = (D*)malloc(num_elements * sizeof(D));
-    q.memcpy(out_gpu, device_result, num_elements * sizeof(D)).wait();
-    int nfaults = 0;
-    for (uint64_t i = 0; i < num_elements; i++) {
-      if (std::fabs(cpu_reference[i] - (T)out_gpu[i]) > tolerance && std::isfinite(cpu_reference[i])) {
-        printf("Mismatch of %s at %zu: CPU_ref: %f vs GPU: %f\n", name, i, cpu_reference[i], (T)out_gpu[i]);
-        nfaults++;
-        if (nfaults >= max_int(10, n_print)) {
-          free(out_gpu);
-        }
+  D* out_gpu = (D*)malloc(num_elements * sizeof(D));
+  q.memcpy(out_gpu, device_result, num_elements * sizeof(D)).wait();
+  int nfaults = 0;
+  for (uint64_t i = 0; i < num_elements; i++) {
+    if (std::fabs(cpu_reference[i] - (T)out_gpu[i]) > tolerance && std::isfinite(cpu_reference[i])) {
+      printf("Mismatch of %s at %zu: CPU_ref: %f vs GPU: %f\n", name, i, cpu_reference[i], (T)out_gpu[i]);
+      nfaults++;
+      if (nfaults >= max_int(10, n_print)) {
+        break;
       }
     }
+  }
 
-    free(out_gpu);
+  printf("%s\n", (nfaults == 0) ? "PASS" : "FAIL");
+  free(out_gpu);
 }
 
 void silu_forward_kernel(const float* x, float* out, uint64_t N,
@@ -257,7 +258,6 @@ int main(int argc, char **argv) {
     silu_forward2(q, d_x, d_out, N, block_size);
     validate_result(q, d_out, out, "out", N);
   }
-  printf("Forward pass: all results match\n\n");
 
   printf("Checking backward pass\n");
   for (int block_size: block_sizes) {
@@ -277,9 +277,6 @@ int main(int argc, char **argv) {
     silu_backward3(q, d_dout, d_x, d_dx, N, block_size);
     validate_result(q, d_dx, dx, "dx", N);
   }
-  printf("Backward pass: all results match\n\n");
-
-  printf("All results match. Starting benchmarks.\n\n");
 
   printf("\nForward pass benchmarks:\n");
   for (int block_size: block_sizes) {
