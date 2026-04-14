@@ -28,20 +28,21 @@ void validate_result(sycl::queue &q,
                      const char* name, std::uint64_t num_elements,
                      T tolerance=1e-4, int n_print=5, int check_all=0)
 {
-    D* out_gpu = (D*)malloc(num_elements * sizeof(D));
-    q.memcpy(out_gpu, device_result, num_elements * sizeof(D)).wait();
-    int nfaults = 0;
-    for (uint64_t i = 0; i < num_elements; i++) {
-      if (std::fabs(cpu_reference[i] - (T)out_gpu[i]) > tolerance && std::isfinite(cpu_reference[i])) {
-        printf("Mismatch of %s at %zu: CPU_ref: %f vs GPU: %f\n", name, i, cpu_reference[i], (T)out_gpu[i]);
-        nfaults++;
-        if (nfaults >= max_int(10, n_print)) {
-          free(out_gpu);
-        }
+  D* out_gpu = (D*)malloc(num_elements * sizeof(D));
+  q.memcpy(out_gpu, device_result, num_elements * sizeof(D)).wait();
+  int nfaults = 0;
+  for (uint64_t i = 0; i < num_elements; i++) {
+    if (std::fabs(cpu_reference[i] - (T)out_gpu[i]) > tolerance && std::isfinite(cpu_reference[i])) {
+      printf("Mismatch of %s at %zu: CPU_ref: %f vs GPU: %f\n", name, i, cpu_reference[i], (T)out_gpu[i]);
+      nfaults++;
+      if (nfaults >= max_int(10, n_print)) {
+        break;
       }
     }
+  }
 
-    free(out_gpu);
+  printf("%s\n", (nfaults == 0) ? "PASS" : "FAIL");
+  free(out_gpu);
 }
 
 // -----------------------------------------------------------------------------------------------
@@ -545,7 +546,6 @@ int main(int argc, char **argv) {
     else
         groupnorm_forward<32>(q, d_x, d_weight, d_bias, d_out, d_mean, d_rstd, B, C, H, W, n_groups);
     validate_result(q, d_out, out, "out", B * C * img_size, fwd_acc);
-    printf("Forward pass successful\n");
 
     printf("Checking forward2 pass\n");
 
@@ -554,7 +554,6 @@ int main(int argc, char **argv) {
     else
         groupnorm_forward2<32>(q, d_x, d_weight, d_bias, d_out, d_mean, d_rstd, B, C, H, W, n_groups);
     validate_result(q, d_out, out, "out", B * C * img_size, fwd_acc);
-    printf("Forward2 pass successful\n");
 
     printf("Checking backward pass\n");
 
@@ -571,10 +570,8 @@ int main(int argc, char **argv) {
     validate_result(q, d_dweight, dweight, "dweight", C, acc);
     printf("Checking dx\n");
     validate_result(q, d_dx, dx, "dx", B * C * img_size, 1.0f);
-    printf("Backward pass successful\n");
     printf("\n─────────────────────────────────────────────────────\n");
 
-    printf("All results match. Starting benchmarks.\n\n");
     printf("Forward pass benchmarks\n");
     float elapsed_time;
     if (warpSize == 64)

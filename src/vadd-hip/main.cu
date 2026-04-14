@@ -107,7 +107,8 @@ void run_vectorized(const __half* dA, const __half* dB, __half* dC, size_t total
 // ===========================================================================
 // TV-layout element-wise add
 //
-//   Block tile: TILE_M=16 rows × TILE_N=256 cols  per thread-block.
+//   Block tile: TILE_M=16 rows × TILE_N cols  per thread-block.
+//   TILE_N depends on the Warp size supported by the AMD GPU
 //   Thread organisation inside the tile:
 //     - 4 warps  (TILE_M / VALS_M  = 16/4  = 4 warps of 32 threads each)
 //     - Threads in a warp are consecutive in the N direction (stride 1 in N)
@@ -126,11 +127,11 @@ void run_vectorized(const __half* dA, const __half* dB, __half* dC, size_t total
 // ===========================================================================
 
 static constexpr int TILE_M     = 16;   // block tile rows
-static constexpr int TILE_N     = 256;  // block tile cols  (= 32 lanes × 8 values)
 static constexpr int VALS_M     =  4;   // values per thread in M dimension
 static constexpr int VALS_N     =  8;   // values per thread in N dimension (128-bit load)
 static constexpr int WARPS      =  TILE_M / VALS_M;
 
+template <int TILE_N>
 __global__ void tv_elementwise_add_kernel(
     const __half* __restrict__ gA,
     const __half* __restrict__ gB,
@@ -182,16 +183,14 @@ __global__ void tv_elementwise_add_kernel(
   }
 }
 
+template <int WARP_SIZE, int TILE_N>
 void run_tv_layout(const __half* dA, const __half* dB, __half* dC, int M, int N)
 {
   assert(M % TILE_M == 0 && "M must be divisible by TILE_M=16");  // 4 warps
-  assert(N % TILE_N == 0 && "N must be divisible by TILE_N=256"); // 1 warp
-  int warp_size;
-  GPU_CHECK(hipDeviceGetAttribute(&warp_size, hipDeviceAttributeWarpSize, 0));
-  int THREADS = WARPS * warp_size;
+  assert(N % TILE_N == 0 && "N must be divisible by TILE_N (warpSize * VALS_N)"); // 1 warp
   dim3 grid(N / TILE_N, M / TILE_M);
-  dim3 block(THREADS); // 128 threads
-  tv_elementwise_add_kernel<<<grid, block>>>(dA, dB, dC, M, N);
+  dim3 block(WARPS * WARP_SIZE);
+  tv_elementwise_add_kernel<TILE_N><<<grid, block>>>(dA, dB, dC, M, N);
 }
 
 // helpers
@@ -274,15 +273,26 @@ int main(int argc, char* argv[])
   BenchResult r2 = {ms, gbps};
   print_result("vectorized", pass2, r2, repeat);
 
-  printf("=== TV-layout (block tile 16×256, 8×fp16 per thread per row) ===\n");
+  int warp_size;
+  GPU_CHECK(hipDeviceGetAttribute(&warp_size, hipDeviceAttributeWarpSize, 0));
+
+  printf("=== TV-layout (block tile %d×%d, 8×fp16 per thread per row) ===\n",
+         TILE_M, warp_size * VALS_N);
   GPU_CHECK(hipMemset(dC, 0, bytes));
-  run_tv_layout(dA, dB, dC, M, N);
+
+  if (warp_size == 64)
+    run_tv_layout<64, 64 * VALS_N>(dA, dB, dC, M, N);
+  else
+    run_tv_layout<32, 32 * VALS_N>(dA, dB, dC, M, N);
   GPU_CHECK(hipMemcpy(hOut, dC, bytes, hipMemcpyDeviceToHost));
   bool pass3 = allclose(hRef, hOut, total);
 
   start = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
-    run_tv_layout(dA, dB, dC, M, N);
+    if (warp_size == 64)
+      run_tv_layout<64, 64 * VALS_N>(dA, dB, dC, M, N);
+    else
+      run_tv_layout<32, 32 * VALS_N>(dA, dB, dC, M, N);
   }
   GPU_CHECK(hipDeviceSynchronize());
   end = std::chrono::steady_clock::now();
