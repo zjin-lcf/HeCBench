@@ -33,10 +33,11 @@ void validate_result(D* out_gpu, const T* cpu_reference,
       printf("Mismatch of %s at %zu: CPU_ref: %f vs GPU: %f\n", name, i, cpu_reference[i], (T)out_gpu[i]);
       nfaults++;
       if (nfaults >= max_int(10, n_print)) {
-        return;
+        break;
       }
     }
   }
+  printf("%s\n", (nfaults == 0) ? "PASS" : "FAIL");
 }
 
 // -----------------------------------------------------------------------------------------------
@@ -265,7 +266,6 @@ int main(int argc, char **argv) {
 
       float fwd_acc = 1e-2;
       validate_result(d_out, out, "out", B * C * img_size, fwd_acc);
-      printf("Forward pass successful\n");
 
       printf("Checking backward pass\n");
 
@@ -281,10 +281,8 @@ int main(int argc, char **argv) {
       validate_result(d_dweight, dweight, "dweight", C, acc);
       printf("Checking dx\n");
       validate_result(d_dx, dx, "dx", B * C * img_size, 1.0f);
-      printf("Backward pass successful\n");
       printf("\n─────────────────────────────────────────────────────\n");
 
-      printf("All results match. Starting benchmarks.\n\n");
       printf("Forward pass benchmarks\n");
       float elapsed_time = benchmark_kernel(repeat, groupnorm_forward,
                                             d_x, d_weight, d_bias, d_out, d_mean, d_rstd,
