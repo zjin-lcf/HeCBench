@@ -319,6 +319,7 @@ static void computeRSMT(const int* const __restrict__ idxin,
   GPU_CHECK(cudaMemcpy(d_yin, yin, size * sizeof(ctype), cudaMemcpyHostToDevice));
 
   // start time
+  GPU_CHECK(cudaDeviceSynchronize());
   timeval start, end;
   gettimeofday(&start, NULL);
 

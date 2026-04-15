@@ -337,6 +337,7 @@ static void computeRSMT(const int* const __restrict__ idxin,
   GPU_CHECK(hipMemcpy(d_yin, yin, size * sizeof(ctype), hipMemcpyHostToDevice));
 
   // start time
+  GPU_CHECK(hipDeviceSynchronize());
   timeval start, end;
   gettimeofday(&start, NULL);
 
