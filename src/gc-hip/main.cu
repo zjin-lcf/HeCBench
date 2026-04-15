@@ -49,7 +49,7 @@ February 2020.
 #include "graph.h"
 
 static const int ThreadsPerBlock = 512;
-static const int WS = 32;  // warp size and bits per int
+static const int WS = 32;  // word size and bits per int
 static const int MSB = 1 << (WS - 1);
 static const int Mask = (1 << (WS / 2)) - 1;
 
@@ -74,7 +74,12 @@ void init(const int nodes,
     int* const __restrict__ wl,
     int* __restrict__ wlsize)
 {
-  const int lane = threadIdx.x % WS;
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WarpSize 64
+#else
+  #define WarpSize 32
+#endif
+  const int lane = threadIdx.x % WarpSize;
   const int thread = threadIdx.x + blockIdx.x * ThreadsPerBlock;
   const int threads = gridDim.x * ThreadsPerBlock;
 
@@ -103,16 +108,16 @@ void init(const int nodes,
       }
     }
 
-    int bal = __ballot(cond);
+    unsigned long long bal = __ballot(cond);
     while (bal != 0) {
-      const int who = __ffs(bal) - 1;
+      const int who = __ffsll(bal) - 1;
       bal &= bal - 1;
       const int wv = __shfl(v, who);
       const int wbeg = __shfl(beg, who);
       const int wend = __shfl(end, who);
       const int wdegv = wend - wbeg;
       int wpos = wbeg;
-      for (int i = wbeg + lane; __any(i < wend); i += WS) {
+      for (int i = wbeg + lane; __any(i < wend); i += WarpSize) {
         int wnei;
         bool prio = false;
         if (i < wend) {
@@ -120,10 +125,10 @@ void init(const int nodes,
           const int wdegn = nidx[wnei + 1] - nidx[wnei];
           prio = ((wdegv < wdegn) || ((wdegv == wdegn) && (hash(wv) < hash(wnei))) || ((wdegv == wdegn) && (hash(wv) == hash(wnei)) && (wv < wnei)));
         }
-        const int b = __ballot(prio);
-        const int offs = __popc(b & ((1 << lane) - 1));
+        const unsigned long long b = __ballot(prio);
+        const int offs = __popcll(b & ((1ULL << lane) - 1));
         if (prio) nlist2[wpos + offs] = wnei;
-        wpos += __popc(b);
+        wpos += __popcll(b);
       }
       if (who == lane) pos = wpos;
     }
@@ -151,9 +156,14 @@ void runLarge(const int nodes,
     const int* const __restrict__ wl,
     const int* __restrict__ wlsize)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WarpSize 64
+#else
+  #define WarpSize 32
+#endif
   const int stop = *wlsize;
   if (stop != 0) {
-    const int lane = threadIdx.x % WS;
+    const int lane = threadIdx.x % WarpSize;
     const int thread = threadIdx.x + blockIdx.x * ThreadsPerBlock;
     const int threads = gridDim.x * ThreadsPerBlock;
     bool again;
@@ -173,9 +183,9 @@ void runLarge(const int nodes,
           }
         }
 
-        int bal = __ballot(cond);
+        unsigned long long bal = __ballot(cond);
         while (bal != 0) {
-          const int who = __ffs(bal) - 1;
+          const int who = __ffsll(bal) - 1;
           bal &= bal - 1;
           const int wdata = __shfl(data, who);
           const int wrange = wdata >> (WS / 2);
@@ -188,7 +198,7 @@ void runLarge(const int nodes,
 
           bool wshortcut = true;
           bool wdone = true;
-          for (int i = wbeg + lane; __any(i < wend); i += WS) {
+          for (int i = wbeg + lane; __any(i < wend); i += WarpSize) {
             int nei, neidata, neirange;
             if (i < wend) {
               nei = nlist[i];
@@ -219,6 +229,9 @@ void runLarge(const int nodes,
           wpcol &= __shfl_xor(wpcol, 4);
           wpcol &= __shfl_xor(wpcol, 8);
           wpcol &= __shfl_xor(wpcol, 16);
+          #if defined(__GFX8__) || defined(__GFX9__)
+          wpcol &= __shfl_xor(wpcol, 32);
+          #endif
           if (who == lane) pcol = wpcol;
           if (who == lane) done = wdone;
           if (who == lane) shortcut = wshortcut;
@@ -314,11 +327,10 @@ int main(int argc, char* argv[])
 
   if (argc != 3) {printf("USAGE: %s <input_file_name> <repeat>\n\n", argv[0]);  exit(-1);}
 
-  int WarpSize;
-  hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
-  if (WS != WarpSize) {printf("ERROR: warp size must be %d\n\n", WS);  exit(-1);}
+  int Warp_Size;
+  hipDeviceGetAttribute(&Warp_Size, hipDeviceAttributeWarpSize, 0);
   if (WS != sizeof(int) * 8) {printf("ERROR: bits per word must match warp size\n\n");  exit(-1);}
-  if ((ThreadsPerBlock < WS) || ((ThreadsPerBlock % WS) != 0)) {
+  if ((ThreadsPerBlock < Warp_Size) || ((ThreadsPerBlock % Warp_Size) != 0)) {
     printf("ERROR: threads per block must be a multiple of the warp size\n\n");
     exit(-1);
   }
