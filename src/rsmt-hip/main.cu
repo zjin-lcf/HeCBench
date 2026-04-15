@@ -15,6 +15,11 @@ void buildMST(const ID num,
               edge* const __restrict__ edges,
               ctype dist[PinLimit])
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WS 64
+#else
+  #define WS 32
+#endif
   __shared__ ID source[WarpsPerBlock][PinLimit];
   __shared__ ID destin[WarpsPerBlock][PinLimit];
   __shared__ ctype mindj[WarpsPerBlock];
@@ -68,6 +73,11 @@ bool insertSteinerPoints(ID& num,
                          const edge* const __restrict__ edges,
                          ctype dist[PinLimit])
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WS 64
+#else
+  #define WS 32
+#endif
   __shared__ ID adj[WarpsPerBlock][PinLimit][8];
   __shared__ int cnt[WarpsPerBlock][PinLimit];
 
@@ -146,13 +156,13 @@ bool insertSteinerPoints(ID& num,
         }
       }
     }
-    const int bal = __ballot(insert);
-    const int pos = __popc(bal & ~(-1 << lane)) + num;
+    const unsigned long long bal = __ballot(insert);
+    const int pos = __popcll(bal & ~(-1ULL << lane)) + num;
     if (insert) {
       x[pos] = stx;
       y[pos] = sty;
     }
-    num += __popc(bal);
+    num += __popcll(bal);
   }
 
   return __any(updated);
@@ -170,6 +180,11 @@ inline void processSmallNet(const int i,
                              edge* const __restrict__ edges,
                               int* const __restrict__ wl)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WS 64
+#else
+  #define WS 32
+#endif
   __shared__ ctype dist[WarpsPerBlock][PinLimit];
   const int lane = threadIdx.x % WS;
   const int warp = threadIdx.x / WS;
@@ -219,6 +234,11 @@ inline void processLargeNet(const int i,
                             ctype* const __restrict__ yout,
                              edge* const __restrict__ edges)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WS 64
+#else
+  #define WS 32
+#endif
   __shared__ ctype dist[WarpsPerBlock][PinLimit];
   const int warp = threadIdx.x / WS;
 
@@ -290,6 +310,9 @@ static void computeRSMT(const int* const __restrict__ idxin,
                         const int numnets)
 {
   // obtain GPU info
+  int WarpSize;
+  hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
+
   hipDeviceProp_t deviceProp;
   hipGetDeviceProperties(&deviceProp, 0);
   const int SMs = deviceProp.multiProcessorCount;
@@ -322,8 +345,17 @@ static void computeRSMT(const int* const __restrict__ idxin,
   hipMemset(d_yout, -1, 2 * size * sizeof(ctype));
   hipMemset(d_edges, 0, 2 * size * sizeof(edge));
 
-  largeNetKernel<24, 64><<<blocks, 24 * WS>>>(d_idxin, d_xin, d_yin, d_idxout, d_xout, d_yout, d_edges, numnets, d_wl);
-  smallNetKernel<3, 512><<<blocks, 3 * WS>>>(d_idxin, d_xout, d_yout, d_edges, d_wl);
+  const int threadsPerBlock = 24 * 32;
+
+  if (WarpSize == 64)
+    largeNetKernel<12, 64><<<blocks, threadsPerBlock>>>(
+      d_idxin, d_xin, d_yin, d_idxout, d_xout, d_yout, d_edges, numnets, d_wl);
+  else
+    largeNetKernel<24, 64><<<blocks, threadsPerBlock>>>(
+      d_idxin, d_xin, d_yin, d_idxout, d_xout, d_yout, d_edges, numnets, d_wl);
+
+  smallNetKernel<3, 512><<<blocks, 3 * WarpSize>>>(
+    d_idxin, d_xout, d_yout, d_edges, d_wl);
 
   // end time
   hipDeviceSynchronize();
@@ -356,13 +388,6 @@ int main(int argc, char* argv[])
 
   if (argc != 2) {
     printf("Usage: %s file_name \n", argv[0]);
-    exit(-1);
-  }
-
-  int WarpSize;
-  hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
-  if (WarpSize != WS) {
-    printf("Wave size must be %d. Exit\n", WS);
     exit(-1);
   }
 

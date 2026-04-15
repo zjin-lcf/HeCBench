@@ -7,7 +7,6 @@
 #include <climits>
 
 static const int MaxPins = 256;  // must be a power of 2
-static const int WS = 32;  // warp size
 
 using ID = short;  // must be signed (point and edge IDs)
 using ctype = int;  // must be signed (coordinates and distances)  // change requires further change below
