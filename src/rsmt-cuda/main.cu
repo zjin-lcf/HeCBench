@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <sys/time.h>
-#include <cuda.h>
 #include "utils.h"
 
 static __device__ int currpos1 = 0;
@@ -307,52 +306,52 @@ static void computeRSMT(const int* const __restrict__ idxin,
   int* d_idxout;  ctype* d_xout;  ctype* d_yout;  edge* d_edges;
   int* d_wl;
   const int size = idxin[numnets];
-  cudaMalloc((void **)&d_idxin, (numnets + 1) * sizeof(int));
-  cudaMalloc((void **)&d_xin, size * sizeof(ctype));
-  cudaMalloc((void **)&d_yin, size * sizeof(ctype));
-  cudaMalloc((void **)&d_idxout, (numnets + 1) * sizeof(int));
-  cudaMalloc((void **)&d_xout, 2 * size * sizeof(ctype));
-  cudaMalloc((void **)&d_yout, 2 * size * sizeof(ctype));
-  cudaMalloc((void **)&d_edges, 2 * size * sizeof(edge));
-  cudaMalloc((void **)&d_wl, numnets * sizeof(int));
-  cudaMemcpy(d_idxin, idxin, (numnets + 1) * sizeof(int), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_xin, xin, size * sizeof(ctype), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_yin, yin, size * sizeof(ctype), cudaMemcpyHostToDevice);
+  GPU_CHECK(cudaMalloc((void **)&d_idxin, (numnets + 1) * sizeof(int)));
+  GPU_CHECK(cudaMalloc((void **)&d_xin, size * sizeof(ctype)));
+  GPU_CHECK(cudaMalloc((void **)&d_yin, size * sizeof(ctype)));
+  GPU_CHECK(cudaMalloc((void **)&d_idxout, (numnets + 1) * sizeof(int)));
+  GPU_CHECK(cudaMalloc((void **)&d_xout, 2 * size * sizeof(ctype)));
+  GPU_CHECK(cudaMalloc((void **)&d_yout, 2 * size * sizeof(ctype)));
+  GPU_CHECK(cudaMalloc((void **)&d_edges, 2 * size * sizeof(edge)));
+  GPU_CHECK(cudaMalloc((void **)&d_wl, numnets * sizeof(int)));
+  GPU_CHECK(cudaMemcpy(d_idxin, idxin, (numnets + 1) * sizeof(int), cudaMemcpyHostToDevice));
+  GPU_CHECK(cudaMemcpy(d_xin, xin, size * sizeof(ctype), cudaMemcpyHostToDevice));
+  GPU_CHECK(cudaMemcpy(d_yin, yin, size * sizeof(ctype), cudaMemcpyHostToDevice));
 
   // start time
   timeval start, end;
   gettimeofday(&start, NULL);
 
   // process nets
-  cudaMemset(d_xout, -1, 2 * size * sizeof(ctype));
-  cudaMemset(d_yout, -1, 2 * size * sizeof(ctype));
-  cudaMemset(d_edges, 0, 2 * size * sizeof(edge));
+  GPU_CHECK(cudaMemset(d_xout, -1, 2 * size * sizeof(ctype)));
+  GPU_CHECK(cudaMemset(d_yout, -1, 2 * size * sizeof(ctype)));
+  GPU_CHECK(cudaMemset(d_edges, 0, 2 * size * sizeof(edge)));
 
   largeNetKernel<24, 64><<<blocks, 24 * WS>>>(d_idxin, d_xin, d_yin, d_idxout, d_xout, d_yout, d_edges, numnets, d_wl);
   smallNetKernel<3, 512><<<blocks, 3 * WS>>>(d_idxin, d_xout, d_yout, d_edges, d_wl);
 
   // end time
-  cudaDeviceSynchronize();
+  GPU_CHECK(cudaDeviceSynchronize());
   gettimeofday(&end, NULL);
   const double runtime = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0;
   printf("compute time: %.6f s\n", runtime);
   printf("throughput: %.f nets/sec\n", numnets / runtime);
 
   // transfer results from GPU
-  cudaMemcpy(idxout, d_idxout, (numnets + 1) * sizeof(int), cudaMemcpyDeviceToHost);
-  cudaMemcpy(xout, d_xout, 2 * size * sizeof(ctype), cudaMemcpyDeviceToHost);
-  cudaMemcpy(yout, d_yout, 2 * size * sizeof(ctype), cudaMemcpyDeviceToHost);
-  cudaMemcpy(edges, d_edges, 2 * size * sizeof(edge), cudaMemcpyDeviceToHost);
+  GPU_CHECK(cudaMemcpy(idxout, d_idxout, (numnets + 1) * sizeof(int), cudaMemcpyDeviceToHost));
+  GPU_CHECK(cudaMemcpy(xout, d_xout, 2 * size * sizeof(ctype), cudaMemcpyDeviceToHost));
+  GPU_CHECK(cudaMemcpy(yout, d_yout, 2 * size * sizeof(ctype), cudaMemcpyDeviceToHost));
+  GPU_CHECK(cudaMemcpy(edges, d_edges, 2 * size * sizeof(edge), cudaMemcpyDeviceToHost));
 
   // clean up
-  cudaFree(d_wl);
-  cudaFree(d_edges);
-  cudaFree(d_yout);
-  cudaFree(d_xout);
-  cudaFree(d_idxout);
-  cudaFree(d_yin);
-  cudaFree(d_xin);
-  cudaFree(d_idxin);
+  GPU_CHECK(cudaFree(d_wl));
+  GPU_CHECK(cudaFree(d_edges));
+  GPU_CHECK(cudaFree(d_yout));
+  GPU_CHECK(cudaFree(d_xout));
+  GPU_CHECK(cudaFree(d_idxout));
+  GPU_CHECK(cudaFree(d_yin));
+  GPU_CHECK(cudaFree(d_xin));
+  GPU_CHECK(cudaFree(d_idxin));
 }
 
 int main(int argc, char* argv[])
@@ -372,7 +371,7 @@ int main(int argc, char* argv[])
   const int numnets = n.num_net;
 
   int* idxin = NULL;
-  cudaHostAlloc(&idxin, (numnets + 1) * sizeof(int), cudaHostAllocDefault);
+  GPU_CHECK(cudaHostAlloc(&idxin, (numnets + 1) * sizeof(int), cudaHostAllocDefault));
 
   // initialize idxin
   idxin[0] = 0;
@@ -407,10 +406,10 @@ int main(int argc, char* argv[])
 
   // pin coordinates
   ctype* xin = NULL;
-  cudaHostAlloc(&xin, idxin[numnets] * sizeof(ctype), cudaHostAllocDefault);
+  GPU_CHECK(cudaHostAlloc(&xin, idxin[numnets] * sizeof(ctype), cudaHostAllocDefault));
 
   ctype* yin = NULL;
-  cudaHostAlloc(&yin, idxin[numnets] * sizeof(ctype), cudaHostAllocDefault);
+  GPU_CHECK(cudaHostAlloc(&yin, idxin[numnets] * sizeof(ctype), cudaHostAllocDefault));
 
   // initialize pin coordinates
   pos = 0;
@@ -424,16 +423,16 @@ int main(int argc, char* argv[])
   // result storage
   const int size = 2 * idxin[numnets];
   int* idxout = NULL;
-  cudaHostAlloc(&idxout, (numnets + 1) * sizeof(int), cudaHostAllocDefault);
+  GPU_CHECK(cudaHostAlloc(&idxout, (numnets + 1) * sizeof(int), cudaHostAllocDefault));
 
   ctype* xout = NULL;
-  cudaHostAlloc(&xout, size * sizeof(ctype), cudaHostAllocDefault);
+  GPU_CHECK(cudaHostAlloc(&xout, size * sizeof(ctype), cudaHostAllocDefault));
 
   ctype* yout = NULL;
-  cudaHostAlloc(&yout, size * sizeof(ctype), cudaHostAllocDefault);
+  GPU_CHECK(cudaHostAlloc(&yout, size * sizeof(ctype), cudaHostAllocDefault));
 
   edge* edges = NULL;
-  cudaHostAlloc(&edges, size * sizeof(edge), cudaHostAllocDefault);
+  GPU_CHECK(cudaHostAlloc(&edges, size * sizeof(edge), cudaHostAllocDefault));
 
   // compute Steiner points and edges
   computeRSMT(idxin, xin, yin, idxout, xout, yout, edges, numnets);
@@ -454,13 +453,13 @@ int main(int argc, char* argv[])
 
   // clean up
   free_memory(g, n);
-  cudaFreeHost(edges);
-  cudaFreeHost(yout);
-  cudaFreeHost(xout);
-  cudaFreeHost(idxout);
-  cudaFreeHost(yin);
-  cudaFreeHost(xin);
-  cudaFreeHost(idxin);
+  GPU_CHECK(cudaFreeHost(edges));
+  GPU_CHECK(cudaFreeHost(yout));
+  GPU_CHECK(cudaFreeHost(xout));
+  GPU_CHECK(cudaFreeHost(idxout));
+  GPU_CHECK(cudaFreeHost(yin));
+  GPU_CHECK(cudaFreeHost(xin));
+  GPU_CHECK(cudaFreeHost(idxin));
 
   return 0;
 }
