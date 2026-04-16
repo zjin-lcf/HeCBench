@@ -15,6 +15,11 @@ void buildMST(const ID num,
               edge* const __restrict__ edges,
               ctype dist[PinLimit])
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WS 64
+#else
+  #define WS 32
+#endif
   __shared__ ID source[WarpsPerBlock][PinLimit];
   __shared__ ID destin[WarpsPerBlock][PinLimit];
   __shared__ ctype mindj[WarpsPerBlock];
@@ -68,6 +73,11 @@ bool insertSteinerPoints(ID& num,
                          const edge* const __restrict__ edges,
                          ctype dist[PinLimit])
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WS 64
+#else
+  #define WS 32
+#endif
   __shared__ ID adj[WarpsPerBlock][PinLimit][8];
   __shared__ int cnt[WarpsPerBlock][PinLimit];
 
@@ -146,13 +156,13 @@ bool insertSteinerPoints(ID& num,
         }
       }
     }
-    const int bal = __ballot(insert);
-    const int pos = __popc(bal & ~(-1 << lane)) + num;
+    const unsigned long long bal = __ballot(insert);
+    const int pos = __popcll(bal & ~(-1ULL << lane)) + num;
     if (insert) {
       x[pos] = stx;
       y[pos] = sty;
     }
-    num += __popc(bal);
+    num += __popcll(bal);
   }
 
   return __any(updated);
@@ -170,6 +180,11 @@ inline void processSmallNet(const int i,
                              edge* const __restrict__ edges,
                               int* const __restrict__ wl)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WS 64
+#else
+  #define WS 32
+#endif
   __shared__ ctype dist[WarpsPerBlock][PinLimit];
   const int lane = threadIdx.x % WS;
   const int warp = threadIdx.x / WS;
@@ -219,6 +234,11 @@ inline void processLargeNet(const int i,
                             ctype* const __restrict__ yout,
                              edge* const __restrict__ edges)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define WS 64
+#else
+  #define WS 32
+#endif
   __shared__ ctype dist[WarpsPerBlock][PinLimit];
   const int warp = threadIdx.x / WS;
 
@@ -290,8 +310,11 @@ static void computeRSMT(const int* const __restrict__ idxin,
                         const int numnets)
 {
   // obtain GPU info
+  int WarpSize;
+  GPU_CHECK(hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0));
+
   hipDeviceProp_t deviceProp;
-  hipGetDeviceProperties(&deviceProp, 0);
+  GPU_CHECK(hipGetDeviceProperties(&deviceProp, 0));
   const int SMs = deviceProp.multiProcessorCount;
   const int blocks = SMs * 2;
   printf("launching %d thread blocks with %d threads per block\n", blocks, 24 * WS);
@@ -301,52 +324,62 @@ static void computeRSMT(const int* const __restrict__ idxin,
   int* d_idxout;  ctype* d_xout;  ctype* d_yout;  edge* d_edges;
   int* d_wl;
   const int size = idxin[numnets];
-  hipMalloc((void **)&d_idxin, (numnets + 1) * sizeof(int));
-  hipMalloc((void **)&d_xin, size * sizeof(ctype));
-  hipMalloc((void **)&d_yin, size * sizeof(ctype));
-  hipMalloc((void **)&d_idxout, (numnets + 1) * sizeof(int));
-  hipMalloc((void **)&d_xout, 2 * size * sizeof(ctype));
-  hipMalloc((void **)&d_yout, 2 * size * sizeof(ctype));
-  hipMalloc((void **)&d_edges, 2 * size * sizeof(edge));
-  hipMalloc((void **)&d_wl, numnets * sizeof(int));
-  hipMemcpy(d_idxin, idxin, (numnets + 1) * sizeof(int), hipMemcpyHostToDevice);
-  hipMemcpy(d_xin, xin, size * sizeof(ctype), hipMemcpyHostToDevice);
-  hipMemcpy(d_yin, yin, size * sizeof(ctype), hipMemcpyHostToDevice);
+  GPU_CHECK(hipMalloc((void **)&d_idxin, (numnets + 1) * sizeof(int)));
+  GPU_CHECK(hipMalloc((void **)&d_xin, size * sizeof(ctype)));
+  GPU_CHECK(hipMalloc((void **)&d_yin, size * sizeof(ctype)));
+  GPU_CHECK(hipMalloc((void **)&d_idxout, (numnets + 1) * sizeof(int)));
+  GPU_CHECK(hipMalloc((void **)&d_xout, 2 * size * sizeof(ctype)));
+  GPU_CHECK(hipMalloc((void **)&d_yout, 2 * size * sizeof(ctype)));
+  GPU_CHECK(hipMalloc((void **)&d_edges, 2 * size * sizeof(edge)));
+  GPU_CHECK(hipMalloc((void **)&d_wl, numnets * sizeof(int)));
+  GPU_CHECK(hipMemcpy(d_idxin, idxin, (numnets + 1) * sizeof(int), hipMemcpyHostToDevice));
+  GPU_CHECK(hipMemcpy(d_xin, xin, size * sizeof(ctype), hipMemcpyHostToDevice));
+  GPU_CHECK(hipMemcpy(d_yin, yin, size * sizeof(ctype), hipMemcpyHostToDevice));
 
   // start time
+  GPU_CHECK(hipDeviceSynchronize());
   timeval start, end;
   gettimeofday(&start, NULL);
 
   // process nets
-  hipMemset(d_xout, -1, 2 * size * sizeof(ctype));
-  hipMemset(d_yout, -1, 2 * size * sizeof(ctype));
-  hipMemset(d_edges, 0, 2 * size * sizeof(edge));
+  GPU_CHECK(hipMemset(d_xout, -1, 2 * size * sizeof(ctype)));
+  GPU_CHECK(hipMemset(d_yout, -1, 2 * size * sizeof(ctype)));
+  GPU_CHECK(hipMemset(d_edges, 0, 2 * size * sizeof(edge)));
 
-  largeNetKernel<24, 64><<<blocks, 24 * WS>>>(d_idxin, d_xin, d_yin, d_idxout, d_xout, d_yout, d_edges, numnets, d_wl);
-  smallNetKernel<3, 512><<<blocks, 3 * WS>>>(d_idxin, d_xout, d_yout, d_edges, d_wl);
+  const int threadsPerBlock = 24 * 32;
+
+  if (WarpSize == 64)
+    largeNetKernel<12, 64><<<blocks, threadsPerBlock>>>(
+      d_idxin, d_xin, d_yin, d_idxout, d_xout, d_yout, d_edges, numnets, d_wl);
+  else
+    largeNetKernel<24, 64><<<blocks, threadsPerBlock>>>(
+      d_idxin, d_xin, d_yin, d_idxout, d_xout, d_yout, d_edges, numnets, d_wl);
+
+  smallNetKernel<3, 512><<<blocks, 3 * WarpSize>>>(
+    d_idxin, d_xout, d_yout, d_edges, d_wl);
 
   // end time
-  hipDeviceSynchronize();
+  GPU_CHECK(hipDeviceSynchronize());
   gettimeofday(&end, NULL);
   const double runtime = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0;
   printf("compute time: %.6f s\n", runtime);
   printf("throughput: %.f nets/sec\n", numnets / runtime);
 
   // transfer results from GPU
-  hipMemcpy(idxout, d_idxout, (numnets + 1) * sizeof(int), hipMemcpyDeviceToHost);
-  hipMemcpy(xout, d_xout, 2 * size * sizeof(ctype), hipMemcpyDeviceToHost);
-  hipMemcpy(yout, d_yout, 2 * size * sizeof(ctype), hipMemcpyDeviceToHost);
-  hipMemcpy(edges, d_edges, 2 * size * sizeof(edge), hipMemcpyDeviceToHost);
+  GPU_CHECK(hipMemcpy(idxout, d_idxout, (numnets + 1) * sizeof(int), hipMemcpyDeviceToHost));
+  GPU_CHECK(hipMemcpy(xout, d_xout, 2 * size * sizeof(ctype), hipMemcpyDeviceToHost));
+  GPU_CHECK(hipMemcpy(yout, d_yout, 2 * size * sizeof(ctype), hipMemcpyDeviceToHost));
+  GPU_CHECK(hipMemcpy(edges, d_edges, 2 * size * sizeof(edge), hipMemcpyDeviceToHost));
 
   // clean up
-  hipFree(d_wl);
-  hipFree(d_edges);
-  hipFree(d_yout);
-  hipFree(d_xout);
-  hipFree(d_idxout);
-  hipFree(d_yin);
-  hipFree(d_xin);
-  hipFree(d_idxin);
+  GPU_CHECK(hipFree(d_wl));
+  GPU_CHECK(hipFree(d_edges));
+  GPU_CHECK(hipFree(d_yout));
+  GPU_CHECK(hipFree(d_xout));
+  GPU_CHECK(hipFree(d_idxout));
+  GPU_CHECK(hipFree(d_yin));
+  GPU_CHECK(hipFree(d_xin));
+  GPU_CHECK(hipFree(d_idxin));
 }
 
 int main(int argc, char* argv[])
@@ -359,13 +392,6 @@ int main(int argc, char* argv[])
     exit(-1);
   }
 
-  int WarpSize;
-  hipDeviceGetAttribute(&WarpSize, hipDeviceAttributeWarpSize, 0);
-  if (WarpSize != WS) {
-    printf("Wave size must be %d. Exit\n", WS);
-    exit(-1);
-  }
-
   printf("reading input file: %s\n", argv[1]);
   grid g;
   net_list n;
@@ -373,7 +399,7 @@ int main(int argc, char* argv[])
   const int numnets = n.num_net;
 
   int* idxin = NULL;
-  hipHostAlloc(&idxin, (numnets + 1) * sizeof(int), hipHostMallocDefault);
+  GPU_CHECK(hipHostAlloc(&idxin, (numnets + 1) * sizeof(int), hipHostMallocDefault));
 
   // initialize idxin
   idxin[0] = 0;
@@ -408,10 +434,10 @@ int main(int argc, char* argv[])
 
   // pin coordinates
   ctype* xin = NULL;
-  hipHostAlloc(&xin, idxin[numnets] * sizeof(ctype), hipHostMallocDefault);
+  GPU_CHECK(hipHostAlloc(&xin, idxin[numnets] * sizeof(ctype), hipHostMallocDefault));
 
   ctype* yin = NULL;
-  hipHostAlloc(&yin, idxin[numnets] * sizeof(ctype), hipHostMallocDefault);
+  GPU_CHECK(hipHostAlloc(&yin, idxin[numnets] * sizeof(ctype), hipHostMallocDefault));
 
   // initialize pin coordinates
   pos = 0;
@@ -425,16 +451,16 @@ int main(int argc, char* argv[])
   // result storage
   const int size = 2 * idxin[numnets];
   int* idxout = NULL;
-  hipHostAlloc(&idxout, (numnets + 1) * sizeof(int), hipHostMallocDefault);
+  GPU_CHECK(hipHostAlloc(&idxout, (numnets + 1) * sizeof(int), hipHostMallocDefault));
 
   ctype* xout = NULL;
-  hipHostAlloc(&xout, size * sizeof(ctype), hipHostMallocDefault);
+  GPU_CHECK(hipHostAlloc(&xout, size * sizeof(ctype), hipHostMallocDefault));
 
   ctype* yout = NULL;
-  hipHostAlloc(&yout, size * sizeof(ctype), hipHostMallocDefault);
+  GPU_CHECK(hipHostAlloc(&yout, size * sizeof(ctype), hipHostMallocDefault));
 
   edge* edges = NULL;
-  hipHostAlloc(&edges, size * sizeof(edge), hipHostMallocDefault);
+  GPU_CHECK(hipHostAlloc(&edges, size * sizeof(edge), hipHostMallocDefault));
 
   // compute Steiner points and edges
   computeRSMT(idxin, xin, yin, idxout, xout, yout, edges, numnets);
@@ -455,13 +481,13 @@ int main(int argc, char* argv[])
 
   // clean up
   free_memory(g, n);
-  hipHostFree(edges);
-  hipHostFree(yout);
-  hipHostFree(xout);
-  hipHostFree(idxout);
-  hipHostFree(yin);
-  hipHostFree(xin);
-  hipHostFree(idxin);
+  GPU_CHECK(hipHostFree(edges));
+  GPU_CHECK(hipHostFree(yout));
+  GPU_CHECK(hipHostFree(xout));
+  GPU_CHECK(hipHostFree(idxout));
+  GPU_CHECK(hipHostFree(yin));
+  GPU_CHECK(hipHostFree(xin));
+  GPU_CHECK(hipHostFree(idxin));
 
   return 0;
 }

@@ -18,6 +18,7 @@
 #include <cuda.h>
 
 #include "nQWeight_fp16.h"
+#include "utils.h"
 
 void nQWeight_fp16::parsing(unsigned int *bW, float *A, int row, int col, int num_bits, 
         bool is_row_wise_quantize, int num_alpha_groups, float* q_bias){
@@ -42,21 +43,21 @@ void nQWeight_fp16::parsing(unsigned int *bW, float *A, int row, int col, int nu
 
     if(q_bias == nullptr) p_q_bias = nullptr;
     else{
-        cudaMallocManaged(&p_q_bias    ,sizeof(__half  ) * num_groups * mSize);
+        GPU_CHECK(cudaMallocManaged(&p_q_bias, sizeof(__half  ) * num_groups * mSize));
         for(int i=0;i<num_groups*mSize;i++) p_q_bias[i] = __float2half(q_bias[i]);
     }
     
-    cudaMallocManaged(&p_alpha    ,sizeof(__half  ) * num_groups * mSize * nb);
+    GPU_CHECK(cudaMallocManaged(&p_alpha, sizeof(__half  ) * num_groups * mSize * nb));
     for(int i=0;i<num_groups*mSize*nb;i++) p_alpha[i] = __float2half(A[i]);
 
-    cudaMallocManaged(&bWeight  ,sizeof(uint32_t) * kSize * mSize * nb / 32);
-    cudaMemcpy(bWeight, bW      ,sizeof(uint32_t) * kSize * mSize * nb / 32,    cudaMemcpyHostToDevice);
+    GPU_CHECK(cudaMallocManaged(&bWeight  ,sizeof(uint32_t) * kSize * mSize * nb / 32));
+    GPU_CHECK(cudaMemcpy(bWeight, bW      ,sizeof(uint32_t) * kSize * mSize * nb / 32,    cudaMemcpyHostToDevice));
     this->alpha = (void*)p_alpha;
     this->q_bias = (void*)p_q_bias;
 }
 
 nQWeight_fp16::~nQWeight_fp16(){
-    cudaFree(alpha);
-    cudaFree(bWeight);
-    if(q_bias!= nullptr) cudaFree(q_bias);
+    GPU_CHECK(cudaFree(alpha));
+    GPU_CHECK(cudaFree(bWeight));
+    if(q_bias!= nullptr) GPU_CHECK(cudaFree(q_bias));
 }
