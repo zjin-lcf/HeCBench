@@ -1,6 +1,5 @@
 static const int Device = 0;
 static const int ThreadsPerBlock = 256;
-static const int warpsize = 32;
 static __device__ unsigned long long hi = 0;
 static __device__ int wSize = 0;
 
@@ -282,6 +281,11 @@ static __global__ void generateSpanningTree(
   int start,
   int end)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define warpsize 64
+#else
+  #define warpsize 32
+#endif
   const int from = (threadIdx.x + blockIdx.x * ThreadsPerBlock) / warpsize;
   const int incr = (gridDim.x * ThreadsPerBlock) / warpsize;
   const int lane = threadIdx.x % warpsize;
@@ -365,6 +369,11 @@ static __global__ void treelabel(
         int start,
         int end)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define warpsize 64
+#else
+  #define warpsize 32
+#endif
   const int from = (threadIdx.x + blockIdx.x * ThreadsPerBlock) / warpsize;
   const int incr = (gridDim.x * ThreadsPerBlock) / warpsize;
   const int lane = threadIdx.x % warpsize;
@@ -391,7 +400,7 @@ static __global__ void treelabel(
         }
       }
       const int currcount = lblinc;
-      for (int d = 1; d < 32; d *= 2) {
+      for (int d = 1; d < warpsize; d *= 2) {
         const int tmp = __shfl_up(lblinc, d);
         if (lane >= d) lblinc += tmp;
       }
@@ -404,7 +413,7 @@ static __global__ void treelabel(
         einfo[j].end = (einfo[j].end & 1) | ((lbl - 1) << 1);
         nlist[j] |= 1;  // child edge is in tree
       }
-      lbl = __shfl(lbl, 31);
+      lbl = __shfl(lbl, warpsize - 1);
     }
 
     // move tree nodes to front
@@ -423,10 +432,10 @@ static __global__ void treelabel(
           const int neighbor = n >> 1;
           state = ((neighbor != par) && ((parent[neighbor] >> 2) == node)) ? left : right;  // partitioning condition
         }
-        const int ball = __ballot(state == left);
-        const int balr = __ballot(state == right);
-        const int pfsl = __popc(ball & ~(-1 << lane));
-        const int pfsr = __popc(balr & ~(-1 << lane));
+        const unsigned long long ball = __ballot(state == left);
+        const unsigned long long balr = __ballot(state == right);
+        const int pfsl = __popcll(ball & ~(-1ULL << lane));
+        const int pfsr = __popcll(balr & ~(-1ULL << lane));
         const int pos = beg + ((state == right) ? (len - 1 - pfsr) : pfsl);
         if (state != none) {
           einfo[pos].beg = b;
@@ -452,8 +461,8 @@ static __global__ void treelabel(
             const int neighbor = n >> 1;
             state = ((neighbor != par) && ((parent[neighbor] >> 2) == node)) ? left : right;  // partitioning condition
           }
-          const int ball = __ballot(state == left);
-          const int pfsl = __popc(ball & ~(-1 << lane));
+          const unsigned long long ball = __ballot(state == left);
+          const unsigned long long pfsl = __popcll(ball & ~(-1ULL << lane));
           if (state == left) {
             int oldb, olde, oldin, oldneg, oldn;
             const int pos = lp + pfsl;
@@ -476,10 +485,10 @@ static __global__ void treelabel(
             n = oldn;
             state = (pos < read) ? none : some;
           }
-          lp += __popc(ball);
+          lp += __popcll(ball);
           read = max(read, lp);
-          const int balr = __ballot(state == right);
-          const int pfsr = __popc(balr & ~(-1 << lane));
+          const unsigned long long balr = __ballot(state == right);
+          const int pfsr = __popcll(balr & ~(-1ULL << lane));
           if (state == right) {
             int oldb, olde, oldin, oldneg, oldn;
             const int pos = rp - pfsr;
@@ -502,10 +511,10 @@ static __global__ void treelabel(
             n = oldn;
             state = (pos < read) ? none : some;
           }
-          rp -= __popc(balr);
+          rp -= __popcll(balr);
           if (read <= rp) {
-            const int bal = __ballot(state == none);
-            const int pfs = __popc(bal & ~(-1 << lane));
+            const unsigned long long bal = __ballot(state == none);
+            const int pfs = __popcll(bal & ~(-1ULL << lane));
             if (state == none) {
               const int pos = read + pfs;
               if (pos <= rp) {
@@ -517,7 +526,7 @@ static __global__ void treelabel(
                 state = some;
               }
             }
-            read += __popc(bal);  // may be too high but okay
+            read += __popcll(bal);  // may be too high but okay
           }
         } while (__any(state == some));
       }
@@ -544,8 +553,8 @@ static __global__ void treelabel(
       }
       if (__any(pos >= 0)) break;
     }
-    unsigned int bal = __ballot(pos >= 0);
-    const int lid = __ffs(bal) - 1;
+    unsigned long long bal = __ballot(pos >= 0);
+    const int lid = __ffsll(bal) - 1;
     pos = __shfl(pos, lid);
     if (paredge >= 0) {  // only one thread per warp
       einfo[paredge].beg = nodelabel | 1;
@@ -604,6 +613,11 @@ static __global__ void processCycles(
   const EdgeInfo* const __restrict__ einfo,
   bool* const  __restrict__ minus)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define warpsize 64
+#else
+  #define warpsize 32
+#endif
   const int from = (threadIdx.x + blockIdx.x * ThreadsPerBlock) / warpsize;
   const int incr = (gridDim.x * ThreadsPerBlock) / warpsize;
   const int lane = threadIdx.x % warpsize;
@@ -683,6 +697,11 @@ static __global__ void compute1(
   const bool* const __restrict__ minus,
   int* const __restrict__ negCnt)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define warpsize 64
+#else
+  #define warpsize 32
+#endif
   const int from = (threadIdx.x + blockIdx.x * ThreadsPerBlock) / warpsize;
   const int incr = (gridDim.x * ThreadsPerBlock) / warpsize;
   const int lane = threadIdx.x % warpsize;
@@ -772,6 +791,11 @@ static __global__ void ccHopCount(
   int* const __restrict__ ws1,
   int* const __restrict__ ws2)
 {
+#if defined(__GFX8__) || defined(__GFX9__)
+  #define warpsize 64
+#else
+  #define warpsize 32
+#endif
   const int from = (threadIdx.x + blockIdx.x * ThreadsPerBlock) / warpsize;
   const int incr = (gridDim.x * ThreadsPerBlock) / warpsize;
   const int lane = threadIdx.x % warpsize;
