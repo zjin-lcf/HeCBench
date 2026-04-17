@@ -646,7 +646,7 @@ static inline void pp(ID_T count, const POSVEL_T*  xx, const POSVEL_T*  yy,
       POSVEL_T rj2 = xj*xj + yj*yj + zj*zj;
 
       POSVEL_T odr1 = 0, odr2 = 0;
-      if (rj2 != 0) {
+      if (rj2 != 0 && ri != 0) {
         POSVEL_T rj  = sqrtf(rj2);
         POSVEL_T aij = (xi*xj + yi*yj + zi*zj)/(ri*rj);
 
