@@ -76,7 +76,6 @@ int reference (
         const float dir_rot = val - floorf(val / (period + 1e-8f)) * period;
         const float yaw = dir_rot + dir_offset + period * dir_label;
 
-        bndbox_output[0] = resCount+1;
         float *data = bndbox_output + resCount * 9;
         data[0] = box_input[box_offset];
         data[1] = box_input[box_offset + 1];
