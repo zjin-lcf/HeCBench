@@ -81,6 +81,8 @@ void call_TaskQueue_gpu(int blocks,
 
           data_queue[(t->id - offset) * tile_size + tid] += t->id;
         }
+        #pragma omp barrier
+
         if(tid == 0) {
           #pragma omp atomic capture
           next = (*consumed)++;
