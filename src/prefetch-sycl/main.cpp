@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-  bool concurrentManagedAccess = q.get_device().get_info<sycl::info::device::usm_shared_allocations>();
+  bool concurrentManagedAccess = q.get_device().has(sycl::aspect::usm_shared_allocations);
 
   if(!concurrentManagedAccess) {
     printf("info: concurrent managed access not supported on device. Skipped\n");
