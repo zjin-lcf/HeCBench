@@ -559,6 +559,8 @@ void prepare_svd_kernel(sycl::nd_item<1> &item,
     sums.w() += x_sq*x_sq;
   }
 
+  syncthreads();
+
   // Compute the final reductions.
   if (lid == 0) lsum = 0;
   syncthreads();

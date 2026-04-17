@@ -556,6 +556,8 @@ void prepare_svd_kernel(int num_paths,
     sums.w += x_sq*x_sq;
   }
 
+  __syncthreads();
+
   // Compute the final reductions.
   if (threadIdx.x == 0) lsum = 0;
   __syncthreads();
