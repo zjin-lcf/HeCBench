@@ -103,13 +103,15 @@ void FSMKernel(
       // mutate best FSM by flipping random bits with 1/4th probability
       for (i = 0; i < FSMSIZE * 2; i++) {
         rnd = LCG_random(rndstate+id) & LCG_random(rndstate+id);
-        fsm[i] = (next[i + sbest[blockIdx.x] * FSMSIZE * 2] ^ rnd) & (FSMSIZE - 1);
+        if (threadIdx.x != sbest[blockIdx.x])
+          fsm[i] = (next[i + sbest[blockIdx.x] * FSMSIZE * 2] ^ rnd) & (FSMSIZE - 1);
       }
     } else {
       // crossover best FSM with random FSMs using 3/4 of bits from best FSM
       for (i = 0; i < FSMSIZE * 2; i++) {
         rnd = LCG_random(rndstate+id) & LCG_random(rndstate+id);
-        fsm[i] = (fsm[i] & rnd) | (next[i + sbest[blockIdx.x] * FSMSIZE * 2] & ~rnd);
+        if (threadIdx.x != sbest[blockIdx.x])
+          fsm[i] = (fsm[i] & rnd) | (next[i + sbest[blockIdx.x] * FSMSIZE * 2] & ~rnd);
       }
     }
   } while (same[blockIdx.x] < CUTOFF);  // end of loop over generations
