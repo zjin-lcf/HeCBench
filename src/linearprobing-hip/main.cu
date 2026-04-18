@@ -174,7 +174,5 @@ int main(int argc, char* argv[])
 
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  printf("Success\n");
-
   return 0;
 }
