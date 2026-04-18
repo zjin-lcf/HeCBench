@@ -49,6 +49,7 @@ double insert_hashtable(KeyValue*__restrict pHashTable,
       }
       if (prev == kEmpty || prev == key)
       {
+        #pragma omp atomic write
         pHashTable[slot].value = value;
         break; //return;
       }

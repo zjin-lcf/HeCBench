@@ -33,7 +33,8 @@ k_hashtable_insert(KeyValue*__restrict__ hashtable,
       uint32_t prev = atomicCAS(&hashtable[slot].key, kEmpty, key);
       if (prev == kEmpty || prev == key)
       {
-        hashtable[slot].value = value;
+        //hashtable[slot].value = value;
+        atomicExch(&hashtable[slot].value, value);
         return;
       }
 
