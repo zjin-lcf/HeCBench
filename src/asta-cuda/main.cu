@@ -64,6 +64,7 @@ __global__ void PTTWAC_soa_asta(const int A,
   while(lmem[1] < m) {
     int next_in_cycle = (lmem[1] * A) - m * (lmem[1] / B);
     if(next_in_cycle == lmem[1]) {
+      __syncthreads();
       if(tid == 0) // Dynamic fetch
         lmem[1] = atomicAdd(&head[0], 1);
       __syncthreads();
@@ -104,6 +105,7 @@ __global__ void PTTWAC_soa_asta(const int A,
       if(i < b)
         backup4 = input[next_in_cycle * b + i];
 
+      __syncthreads();
       if(tid == 0) {
         lmem[0] = atomicExch(&finished[next_in_cycle], (int)1);
       }
