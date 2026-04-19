@@ -45,7 +45,7 @@ bucketsort.o: bucketsort.cu \
 mergesort.o: mergesort.cu mergesort.h kernel_mergeSortPass.h
 	$(CC) $(CFLAGS) -o mergesort.o -c mergesort.cu
 
-run: hybridsort
+run: main
 	$(LAUNCHER) ./main r
 
 clean:
