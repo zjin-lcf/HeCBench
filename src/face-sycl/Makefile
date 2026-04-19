@@ -19,7 +19,7 @@ HIP_ARCH  = gfx908
 # Program name & source code list
 #===============================================================================
 
-program = vj-cpu vj-gpu
+program = main-cpu main
 
 source = main.cpp
 
@@ -92,15 +92,15 @@ haar-cpu.o: haar.cpp $(HEADERS)
 rectangles.o: rectangles.cpp $(HEADERS)
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-vj-cpu: main.o haar-cpu.o image.o stdio-wrapper.o rectangles.o
+main-cpu: main.o haar-cpu.o image.o stdio-wrapper.o rectangles.o
 	$(CC) $(CFLAGS) -o $@ $+ $(LDFLAGS)
 
-vj-gpu: main.o haar-gpu.o image.o stdio-wrapper.o rectangles.o
+main: main.o haar-gpu.o image.o stdio-wrapper.o rectangles.o
 	$(CC) $(CFLAGS) -o $@ $+ $(LDFLAGS)
 
 clean:
 	rm -f $(program) *.o Output-cpu.pgm Output-gpu.pgm
 
 run: build
-	$(LAUNCHER) ./vj-cpu ../face-cuda/Face.pgm ../face-cuda/info.txt ../face-cuda/class.txt Output-cpu.pgm
-	$(LAUNCHER) ./vj-gpu ../face-cuda/Face.pgm ../face-cuda/info.txt ../face-cuda/class.txt Output-gpu.pgm
+	$(LAUNCHER) ./main-cpu ../face-cuda/Face.pgm ../face-cuda/info.txt ../face-cuda/class.txt Output-cpu.pgm
+	$(LAUNCHER) ./main ../face-cuda/Face.pgm ../face-cuda/info.txt ../face-cuda/class.txt Output-gpu.pgm
