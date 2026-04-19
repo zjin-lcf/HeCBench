@@ -26,7 +26,7 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 SRC = streamcluster.cu
-EXE = streamcluster
+EXE = main
 
 $(EXE):$(SRC) kernel.h streamcluster.h  streamcluster_cl.h
 	$(CC) $(CFLAGS) $(SRC) -o $(EXE) $(LDFLAGS)	
