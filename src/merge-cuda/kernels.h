@@ -61,20 +61,24 @@ __global__ void workloadDiagonals(
   const vec_t *__restrict__ B, uint32_t B_length, 
   uint32_t *__restrict__ diagonal_path_intersections) {
 
-  // Calculate combined index around the MergePath "matrix"
-  int32_t combinedIndex = (uint64_t)blockIdx.x * ((uint64_t)A_length + (uint64_t)B_length) / (uint64_t)gridDim.x;
   volatile __shared__ int32_t x_top, y_top, x_bottom, y_bottom,  found;
   __shared__ int32_t oneorzero[32];
 
   int threadOffset = threadIdx.x - 16;
 
-  // Figure out the coordinates of our diagonal
-  x_top = MIN(combinedIndex, A_length);
-  y_top = combinedIndex > (A_length) ? combinedIndex - (A_length) : 0;
-  x_bottom = y_top;
-  y_bottom = x_top;
+  if (threadIdx.x == 0) {
+    // Calculate combined index around the MergePath "matrix"
+    int32_t combinedIndex = (uint64_t)blockIdx.x * ((uint64_t)A_length + (uint64_t)B_length) / (uint64_t)gridDim.x;
 
-  found = 0;
+    // Figure out the coordinates of our diagonal
+    x_top = MIN(combinedIndex, A_length);
+    y_top = combinedIndex > (A_length) ? combinedIndex - (A_length) : 0;
+    x_bottom = y_top;
+    y_bottom = x_top;
+
+    found = 0;
+  }
+  __syncthreads();
 
   // Search the diagonal
   while(!found) {
