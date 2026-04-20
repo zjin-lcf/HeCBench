@@ -1,5 +1,5 @@
 /*
-MPC code [double] (LnVs BIT LVs ZE): A GPU-based compressor for arrays of 
+MPC code [double] (LnVs BIT LVs ZE): A GPU-based compressor for arrays of
 double-precision floating-point values.  See the following publication for
 more information: http://cs.txstate.edu/~mb92/papers/cluster15.pdf.
 
@@ -49,25 +49,28 @@ September 2015.
 
 #define TPB 1024  /* do not change */
 
+
+template <int WarpSize>
 static inline __device__
 void prefixsum(int &val, int sbuf[TPB])
 {
-  // warpSize is a HIP/CUDA built-in that reflects the actual hardware wavefront
-  // width at runtime (32 on wave32, 64 on wave64).
-  const int ws     = warpSize;
-  const int warp   = threadIdx.x / ws;
-  const int lane   = threadIdx.x & (ws - 1);
-  const int nwarps = TPB / ws;
+  const int warp   = threadIdx.x / WarpSize;
+  const int lane   = threadIdx.x & (WarpSize - 1);
 
-  for (int d = 1; d < ws; d *= 2) {
+  for (int d = 1; d < WarpSize; d *= 2) {
     int tmp = __shfl_up(val, d);
     if (lane >= d) val += tmp;
   }
-  if (lane == ws - 1) sbuf[warp] = val;
+  if (lane == WarpSize - 1) sbuf[warp] = val;
 
   __syncthreads();
-  if (threadIdx.x == 0) {
-    for (int i = 1; i < nwarps; i++) sbuf[i] += sbuf[i - 1];
+  if (warp == 0) {
+    int v = sbuf[lane];
+    for (int d = 1; d < WarpSize; d *= 2) {
+      int tmp = __shfl_up(v, d);
+      if (lane >= d) v += tmp;
+    }
+    sbuf[lane] = v;
   }
 
   __syncthreads();
@@ -76,24 +79,29 @@ void prefixsum(int &val, int sbuf[TPB])
   }
 }
 
+template <int WarpSize>
 static inline __device__
 void prefixsumlong(long &val, long sbuf[TPB])
 {
-  const int ws     = warpSize;
-  const int warp   = threadIdx.x / ws;
-  const int lane   = threadIdx.x & (ws - 1);
-  const int nwarps = TPB / ws;
+  const int warp   = threadIdx.x / WarpSize;
+  const int lane   = threadIdx.x & (WarpSize - 1);
 
-  for (int d = 1; d < ws; d *= 2) {
+  for (int d = 1; d < WarpSize; d *= 2) {
     unsigned int tmpl = __shfl_up((int)val, d);
     long tmph = __shfl_up((int)(val >> 32), d);
     if (lane >= d) val += (tmph << 32) + tmpl;
   }
-  if (lane == ws - 1) sbuf[warp] = val;
+  if (lane == WarpSize - 1) sbuf[warp] = val;
 
   __syncthreads();
-  if (threadIdx.x == 0) {
-    for (int i = 1; i < nwarps; i++) sbuf[i] += sbuf[i - 1];
+  if (warp == 0) {
+    long v = sbuf[lane];
+    for (int d = 1; d < WarpSize; d *= 2) {
+      unsigned int tmpl = __shfl_up((int)v, d);
+      long tmph = __shfl_up((int)(v >> 32), d);
+      if (lane >= d) v += (tmph << 32) + tmpl;
+    }
+    sbuf[lane] = v;
   }
 
   __syncthreads();
@@ -102,28 +110,32 @@ void prefixsumlong(long &val, long sbuf[TPB])
   }
 }
 
+template <int WarpSize>
 static inline __device__
 void prefixsumdimlong(long &val, long sbuf[TPB], const unsigned char dim)
 {
-  const int ws     = warpSize;
-  const int tid    = threadIdx.x;
-  const int warp   = tid / ws;
-  const int lane   = tid & (ws - 1);
-  const int tix    = (warp * dim) + (tid % dim);
-  const int nwarps = TPB / ws;
+  const int tid = threadIdx.x;
+  const int warp   = threadIdx.x / WarpSize;
+  const int lane   = threadIdx.x & (WarpSize - 1);
+  const int tix = (warp * dim) + (tid % dim);
 
-  for (int d = dim; d < ws; d *= 2) {
+  for (int d = dim; d < WarpSize; d *= 2) {
     unsigned int tmpl = __shfl_up((int)val, d);
     long tmph = __shfl_up((int)(val >> 32), d);
     if (lane >= d) val += (tmph << 32) + tmpl;
   }
-  if ((lane + dim) > (ws - 1)) sbuf[tix] = val;
+  if ((lane + dim) > (WarpSize - 1)) sbuf[tix] = val;
 
   __syncthreads();
-  if (warp == 0 && lane < (int)dim) {
-    for (int w = 1; w < nwarps; w++) {
-      sbuf[w * dim + lane] += sbuf[(w - 1) * dim + lane];
+  if (warp < dim) {
+    const int idx = (lane * dim) + warp;
+    long v = sbuf[idx];
+    for (int d = 1; d < WarpSize; d *= 2) {
+      unsigned int tmpl = __shfl_up((int)v, d);
+      long tmph = __shfl_up((int)(v >> 32), d);
+      if (lane >= d) v += (tmph << 32) + tmpl;
     }
+    sbuf[idx] = v;
   }
 
   __syncthreads();
@@ -152,9 +164,10 @@ The upper half of the first element specifies how many elements are actually
 used.  It should be replaced by the value n before the data is further processed.
 *****************************************************************************/
 
+template <int WarpSize>
 static __global__ __launch_bounds__(1024, 2)
 void MPCcompress(
-  const int n, 
+  const int n,
   long* __restrict__ const original,
   long* __restrict__ const compressed,
   volatile int* __restrict__ const goffset,
@@ -163,13 +176,12 @@ void MPCcompress(
   const int tid = threadIdx.x;
   const int tidm1 = tid - 1;
   const int tidmdim = tid - dim;
-  const int ws    = warpSize;
-  const int lanex = tid & (ws - 1);
-  const int warpx = tid & ~(ws - 1);
-  const int bid   = blockIdx.x;
-  const int gdim  = gridDim.x;
-  const int bid1  = ((bid + 1) == gdim) ? 0 : (bid + 1);
-  const int init  = 1 + (n + ws - 1) / ws;
+  const int lanex = tid & 63;
+  const int warpx = tid & 0x3c0;
+  const int bid = blockIdx.x;
+  const int gdim = gridDim.x;
+  const int bid1 = ((bid + 1) == gdim) ? 0 : (bid + 1);
+  const int init = 1 + (n + 63) / 64;
   const int chunksm1 = ((n + (TPB - 1)) / TPB) - 1;
 
   __shared__ int start, top;
@@ -195,7 +207,7 @@ void MPCcompress(
     __syncthreads();
     long v2 = 0;
 
-    for (int i = ws - 1; i >= 0; i--) {
+    for (int i = 63; i >= 0; i--) {
       v2 = (v2 << 1) + ((sbuf2[warpx + i] >> lanex) & 1);
     }
     sbuf1[tid] = v2;
@@ -208,16 +220,21 @@ void MPCcompress(
     int loc = 0;
     if (v2 != 0) loc = 1;
 
-    // __ballot returns a 64-bit mask on wave64 and a 32-bit mask (zero-extended)
-    // on wave32.  The first thread of each warp-sized group writes the bitmap.
     unsigned long long bitmap = __ballot(loc);
 
-    if (lanex == 0) {
-      if (idx < n) compressed[1 + idx / ws] = (long)bitmap;
+    if constexpr (WarpSize == 64) {
+      if (idx < n) compressed[1 + idx / 64] = bitmap;
+    } else {
+      if (lanex == 32) {
+        sbuf2[tid] = bitmap;
+      }
+      __syncthreads();
+      if (lanex == 0) {
+        if (idx < n) compressed[1 + idx / 64] = (sbuf2[tid + 32] << 32) + bitmap;
+      }
     }
 
-    __syncthreads();
-    prefixsum(loc, (int*)sbuf1);
+    prefixsum<WarpSize>(loc, (int*)sbuf1);
 
     if (v2 != 0) {
       sbuf2[loc - 1] = v2;
@@ -266,23 +283,23 @@ The output array needs to provide space for n elements has to be cast to an
 array of doubles before it can be used.
 *****************************************************************************/
 
+template <int WarpSize>
 static __global__ __launch_bounds__(1024, 2)
 void MPCdecompress(
-  long* __restrict__ const compressed, 
+  long* __restrict__ const compressed,
   long* __restrict__ const decompressed,
   volatile int* __restrict__ const goffset)
 {
   const int dim = (compressed[0] & 31) + 1;
   const int n = compressed[0] >> 32;
   const int tid = threadIdx.x;
-  const int ws    = warpSize;
-  const int lanex = tid & (ws - 1);
-  const int warpx = tid & ~(ws - 1);
-  const int bid   = blockIdx.x;
-  const int gdim  = gridDim.x;
-  const int bid1  = ((bid + 1) == gdim) ? 0 : (bid + 1);
-  const int init  = 1 + (n + ws - 1) / ws;
-  const int nru   = (n - 1) | (ws - 1);
+  const int lanex = tid & 63;
+  const int warpx = tid & 0x3c0;
+  const int bid = blockIdx.x;
+  const int gdim = gridDim.x;
+  const int bid1 = ((bid + 1) == gdim) ? 0 : (bid + 1);
+  const int init = 1 + (n + 63) / 64;
+  const int nru = (n - 1) | 63;
   const int chunksm1 = ((n + (TPB - 1)) / TPB) - 1;
 
   __shared__ int start, top;
@@ -293,12 +310,12 @@ void MPCdecompress(
 
     int flag = 0;
     if (idx <= nru) {
-      flag = (compressed[1 + idx / ws] >> lanex) & 1;
+      flag = (compressed[1 + idx / 64] >> lanex) & 1;
     }
     int loc = flag;
 
     __syncthreads();
-    prefixsum(loc, (int*)sbuf1);
+    prefixsum<WarpSize>(loc, (int*)sbuf1);
 
     if (tid == (TPB - 1)) {
       int st = init;
@@ -324,17 +341,17 @@ void MPCdecompress(
       v2 = sbuf2[loc - 1];
     }
 
-    prefixsumlong(v2, sbuf1);
+    prefixsumlong<WarpSize>(v2, sbuf1);
 
     sbuf2[tid] = v2;
 
     __syncthreads();
     long v1 = 0;
-    for (int i = ws - 1; i >= 0; i--) {
+    for (int i = 63; i >= 0; i--) {
       v1 = (v1 << 1) + ((sbuf2[warpx + i] >> lanex) & 1);
     }
 
-    prefixsumdimlong(v1, sbuf1, dim);
+    prefixsumdimlong<WarpSize>(v1, sbuf1, dim);
 
     if (idx < n) {
       decompressed[idx] = v1;
@@ -357,7 +374,8 @@ int main(int argc, char *argv[])
 
   hipDeviceProp_t deviceProp;
   hipGetDeviceProperties(&deviceProp, 0);
-  if (deviceProp.warpSize != 32 && deviceProp.warpSize != 64) {
+
+  if ((deviceProp.warpSize != 32) && (deviceProp.warpSize != 64)) {
     printf("Only a warp size of 32 or 64 is supported. Exit..\n");
     exit(-1);
   }
@@ -371,7 +389,7 @@ int main(int argc, char *argv[])
 
   if (argc == 3) {
     dim = atoi(argv[2]);
-    outsize = insize + 1 + (insize + deviceProp.warpSize - 1) / deviceProp.warpSize;
+    outsize = insize + 1 + (insize + 63) / 64;
   } else {
     assert(((input[0] >> 8) & 0xffffff) == 0x43504d);
     dim = (input[0] & 31) + 1;
@@ -391,7 +409,10 @@ int main(int argc, char *argv[])
   if (argc == 3) {
     gettimeofday(&start, NULL);
     hipMemset(d_offs, -1, blocks * sizeof(int));
-    MPCcompress<<<blocks, TPB>>>(insize, d_in, d_out, d_offs, dim);
+    if (deviceProp.warpSize == 64)
+      MPCcompress<64><<<blocks, TPB>>>(insize, d_in, d_out, d_offs, dim);
+    else
+      MPCcompress<32><<<blocks, TPB>>>(insize, d_in, d_out, d_offs, dim);
     hipDeviceSynchronize();
     gettimeofday(&end, NULL);
 
@@ -412,7 +433,10 @@ int main(int argc, char *argv[])
 
     gettimeofday(&start, NULL);
     hipMemset(d_offs, -1, blocks * sizeof(int));
-    MPCdecompress<<<blocks, TPB>>>(d_in, d_out, d_offs);
+    if (deviceProp.warpSize == 64)
+      MPCdecompress<64><<<blocks, TPB>>>(d_in, d_out, d_offs);
+    else
+      MPCdecompress<32><<<blocks, TPB>>>(d_in, d_out, d_offs);
     hipDeviceSynchronize();
     gettimeofday(&end, NULL);
 
