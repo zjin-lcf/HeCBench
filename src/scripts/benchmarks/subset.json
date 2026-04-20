@@ -453,9 +453,9 @@
         ]
     ],
     "f16sp": [
-        "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
+        "(?:Average kernel1 execution time )([0-9.+-e]+)(?: \\(us\\))",
         [
-            "100000"
+            "1000"
         ]
     ],
     "fdtd3d": [
