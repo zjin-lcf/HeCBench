@@ -134,7 +134,7 @@ void chemv_gpu(float alpha_re, float alpha_im, float beta_re, float beta_im,
   cudaDeviceSynchronize();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Average execution time of chemv chemv_kernels: %f (us)\n", (time * 1e-3f) / REPEAT);
+  printf("Average execution time of chemv kernels: %f (us)\n", (time * 1e-3f) / REPEAT);
 
   cudaMemcpy(Y, dev_Y, Y_SIZE * sizeof(struct ComplexFloat), cudaMemcpyDeviceToHost);
   cudaFree(dev_AT);
