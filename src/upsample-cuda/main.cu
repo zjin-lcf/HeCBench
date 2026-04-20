@@ -33,21 +33,21 @@ void validate_result(D* device_result, const T* cpu_reference,
                      const char* name, std::uint64_t num_elements,
                      T tolerance=1e-4, int n_print=5, int check_all=0)
 {
-    D* out_gpu = (D*)malloc(num_elements * sizeof(D));
-    GPU_CHECK(cudaMemcpy(out_gpu, device_result, num_elements * sizeof(D), cudaMemcpyDeviceToHost));
-    int nfaults = 0;
-    for (uint64_t i = 0; i < num_elements; i++) {
-      if (std::fabs(cpu_reference[i] - (T)out_gpu[i]) > tolerance && std::isfinite(cpu_reference[i])) {
-        printf("Mismatch of %s at %zu: CPU_ref: %f vs GPU: %f\n", name, i, cpu_reference[i], (T)out_gpu[i]);
-        nfaults++;
-        if (nfaults >= max_int(10, n_print)) {
-          free(out_gpu);
-          return;
-        }
+  D* out_gpu = (D*)malloc(num_elements * sizeof(D));
+  GPU_CHECK(cudaMemcpy(out_gpu, device_result, num_elements * sizeof(D), cudaMemcpyDeviceToHost));
+  int nfaults = 0;
+  for (uint64_t i = 0; i < num_elements; i++) {
+    if (std::fabs(cpu_reference[i] - (T)out_gpu[i]) > tolerance && std::isfinite(cpu_reference[i])) {
+      printf("Mismatch of %s at %zu: CPU_ref: %f vs GPU: %f\n", name, i, cpu_reference[i], (T)out_gpu[i]);
+      nfaults++;
+      if (nfaults >= max_int(10, n_print)) {
+        break;
       }
     }
+  }
 
-    free(out_gpu);
+  printf("%s\n", (nfaults == 0) ? "PASS" : "FAIL");
+  free(out_gpu);
 }
 
 __global__ void upsample_forward_kernel(
@@ -251,7 +251,6 @@ int main(int argc, char **argv) {
     upsample_forward1(d_out, d_x, B, C, H, W, block_size);
     validate_result(d_out, out, "out", B * C * (H/2) * (W/2));
   }
-  printf("Forward1 pass: all results match\n\n");
 
   printf("Forward1 pass benchmarks:\n");
   for (int block_size : block_sizes) {
@@ -269,7 +268,6 @@ int main(int argc, char **argv) {
     upsample_forward2(d_out, d_x, B, C, H, W, block_size, block_size);
     validate_result(d_out, out, "out", B * C * (H/2) * (W/2));
   }
-  printf("Forward2 pass: all results match\n\n");
   printf("Forward2 pass benchmarks:\n");
   for (int block_size : block2D_sizes) {
 
@@ -287,8 +285,6 @@ int main(int argc, char **argv) {
     upsample_backward1(d_dx, d_dout, B, C, H, W, block_size);
     validate_result(d_dx, dx, "dx", S);
   }
-  printf("Backward pass: all results match\n\n");
-  printf("All results match. Starting benchmarks.\n\n");
 
   printf("\nBackward pass benchmarks:\n");
   for (int block_size : block_sizes) {
@@ -306,8 +302,6 @@ int main(int argc, char **argv) {
     upsample_backward2(d_dx, d_dout, B, C, H, W, block_size, block_size);
     validate_result(d_dx, dx, "dx", S);
   }
-  printf("Backward2 pass: all results match\n\n");
-  printf("All results match. Starting benchmarks.\n\n");
 
   printf("\nBackward2 pass benchmarks:\n");
   for (int block_size : block2D_sizes) {
