@@ -645,8 +645,7 @@
         "(?:GPU execution time: )([0-9.+-e]+)(?: ms)",
         [
             "r"
-        ],
-        "hybridsort"
+        ]
     ],
     "inversek2j": [
         "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
