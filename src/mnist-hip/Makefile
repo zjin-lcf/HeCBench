@@ -52,4 +52,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 2
+	$(LAUNCHER) ./$(program) ../mnist-cuda/data 2

@@ -1,7 +1,3 @@
-Copy data.zip from mnist-cuda
-
-  cp ../mnist-cuda/data.zip .
-
-Unzip data.zip before building the program
+Unzip data.zip in `mnist-cuda` before building the program
 
   unzip data.zip

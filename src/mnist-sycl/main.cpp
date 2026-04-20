@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <chrono>
 #include <cmath>
+#include <string>
 #include <sycl/sycl.hpp>
 
 #define USE_MNIST_LOADER
@@ -11,11 +12,16 @@
 static mnist_data *train_set, *test_set;
 static unsigned int train_cnt, test_cnt;
 
-static inline int loaddata()
+static inline int loaddata(std::string data_dir)
 {
-  int s1 = mnist_load("data/train-images.idx3-ubyte", "data/train-labels.idx1-ubyte",
+  std::string train_image_path = data_dir + "/train-images.idx3-ubyte";
+  std::string train_label_path = data_dir + "/train-labels.idx1-ubyte";
+  std::string test_image_path  = data_dir + "/t10k-images.idx3-ubyte";
+  std::string test_label_path  = data_dir + "/t10k-labels.idx1-ubyte";
+
+  int s1 = mnist_load(train_image_path.c_str(), train_label_path.c_str(),
                       &train_set, &train_cnt);
-  int s2 = mnist_load("data/t10k-images.idx3-ubyte", "data/t10k-labels.idx1-ubyte",
+  int s2 = mnist_load(test_image_path.c_str(), test_label_path.c_str(),
                       &test_set, &test_cnt);
   return s1 | s2;
 }
@@ -394,14 +400,15 @@ static void test(
 
 int main(int argc, const  char **argv)
 {
-  if (argc != 2) {
-    printf("Usage: %s <iterations>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage: %s <data path> <iterations>\n", argv[0]);
     return 1;
   }
 
-  const int iter = atoi(argv[1]);
+  const char* path = argv[1];
+  const int iter = atoi(argv[2]);
   srand(123);
-  if (loaddata() != 0) return 1;
+  if (loaddata(path) != 0) return 1;
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
