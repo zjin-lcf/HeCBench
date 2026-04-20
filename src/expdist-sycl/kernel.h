@@ -78,11 +78,15 @@ void distance_tiled(
     fill_shared_mem_tiled_1D<tile_size_x, block_size_x>(
        sh_A+sh_A_base, A+d*m, tx, i);
 
-    fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(
-       sh_B+sh_B_base, B+d*n, ty, j);
+    if (tx == 0)
+      fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(
+         sh_B+sh_B_base, B+d*n, ty, j);
   }
   fill_shared_mem_tiled_1D<tile_size_x, block_size_x>(sh_scale_A, scale_A, tx, i);
-  fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(sh_scale_B, scale_B, ty, j);
+  if (tx == 0)
+    fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(sh_scale_B, scale_B, ty, j);
+
+  syncthreads();
 
   T s_cross_term = 0.0;
   #pragma unroll

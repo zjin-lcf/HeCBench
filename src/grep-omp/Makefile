@@ -13,7 +13,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = nfa
+program = main
 
 source = main.cpp nfautil.cpp regex.cpp
 

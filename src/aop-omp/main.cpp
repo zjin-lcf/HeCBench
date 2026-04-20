@@ -578,6 +578,7 @@ void prepare_svd_kernel(const int numTeams,
         sums.z += x_sq*x;
         sums.w += x_sq*x_sq;
       }
+      #pragma omp barrier
 
       // Compute the final reductions.
       if (lid == 0) lsum = 0;

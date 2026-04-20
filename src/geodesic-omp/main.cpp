@@ -163,11 +163,19 @@ void verify(int size, const float *output, const float *expected_output) {
 }
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    printf("Usage %s <repeat>\n", argv[0]);
+  if (argc != 3) {
+    printf("Usage %s <path to city locations> <repeat>\n", argv[0]);
     return 1;
   }
-  int iteration = atoi(argv[1]);
+  const char* filename = argv[1];
+  int iteration = atoi(argv[2]);
+
+  printf("Reading city locations from file %s...\n", filename);
+  FILE* fp = fopen(filename, "r");
+  if (fp == NULL) {
+    perror ("Error opening the file");
+    exit(-1);
+  }
 
   int num_cities = 2097152; // 2 ** 21
   int num_ref_cities = 6; // bombay, melbourne, waltham, moscow, glasgow, morocco
@@ -175,14 +183,6 @@ int main(int argc, char** argv) {
   int N = num_cities * num_ref_cities;
   int city = 0;
   float lat, lon;
-
-  const char* filename = "locations.txt";
-  printf("Reading city locations from file %s...\n", filename);
-  FILE* fp = fopen(filename, "r");
-  if (fp == NULL) {
-    perror ("Error opening the file");
-    exit(-1);
-  }
 
   float4* input  = (float4*) aligned_alloc(4096, N*sizeof(float4));
   float*  output = (float*) aligned_alloc(4096, N*sizeof(float));

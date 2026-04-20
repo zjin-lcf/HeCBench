@@ -576,7 +576,7 @@ void ForceCalculationKernel(
 
   diff = threadIdx.x - sbase;
   // make multiple copies to avoid index calculations later
-  if (diff < MAXDEPTH) {
+  if ((base > 0) && (diff < MAXDEPTH)) {
     dq[diff+j] = dq[diff];
   }
   __syncthreads();
@@ -597,11 +597,13 @@ void ForceCalculationKernel(
       pos[j] = 0;
       node[j] = nnodesd * 8;
     }
+    __syncwarp();
 
     do {
       // stack is not empty
       pd = pos[depth];
       nd = node[depth];
+      __syncwarp();
       while (pd < 8) {
         // node on top of stack has more children to process
         n = childd[nd + pd];  // load child pointer
@@ -635,6 +637,7 @@ void ForceCalculationKernel(
         }
       }
       depth--;  // done with this level
+      __syncwarp();
     } while (depth >= j);
 
     float4 acc = accVeld[i];

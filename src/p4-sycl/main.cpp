@@ -106,7 +106,6 @@ void postprocess (
                   sycl::access::address_space::global_space> (object_counter[0]);
     int resCount = ao_ref.fetch_add(1);
 
-    bndbox_output[0] = resCount+1;
     float *data = bndbox_output + resCount * 9;
     data[0] = box_input[box_offset];
     data[1] = box_input[box_offset + 1];

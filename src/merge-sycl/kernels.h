@@ -72,18 +72,21 @@ void workloadDiagonals(
   int threadIdx_x = item.get_local_id(0);
   int blockIdx_x = item.get_group(0);
   int gridDim_x = item.get_group_range(0);
-  // Calculate combined index around the MergePath "matrix"
-  int32_t combinedIndex = (uint64_t)blockIdx_x * ((uint64_t)A_length + (uint64_t)B_length) / (uint64_t)gridDim_x;
-
   int threadOffset = threadIdx_x - 16;
 
-  // Figure out the coordinates of our diagonal
-  x_top = MIN(combinedIndex, A_length);
-  y_top = combinedIndex > (A_length) ? combinedIndex - (A_length) : 0;
-  x_bottom = y_top;
-  y_bottom = x_top;
+  if (threadIdx_x == 0) {
+    // Calculate combined index around the MergePath "matrix"
+    int32_t combinedIndex = (uint64_t)blockIdx_x * ((uint64_t)A_length + (uint64_t)B_length) / (uint64_t)gridDim_x;
 
-  found = 0;
+    // Figure out the coordinates of our diagonal
+    x_top = MIN(combinedIndex, A_length);
+    y_top = combinedIndex > (A_length) ? combinedIndex - (A_length) : 0;
+    x_bottom = y_top;
+    y_bottom = x_top;
+
+    found = 0;
+  }
+  syncthreads();
 
   // Search the diagonal
   while(!(found)) {

@@ -705,7 +705,10 @@ int main(int argc, char* argv[])
         sycl::nd_range<1>(k8_gws, k8_lws), [=] (sycl::nd_item<1> item) {
         int i, j, k, n, depth, base, sbase, diff, pd, nd;
         float ax, ay, az, dx, dy, dz, tmp;
-        int lid = item.get_local_id(0);
+        auto sg = item.get_sub_group();
+        auto  g = item.get_group();
+
+        int lid = g.get_local_id(0);
         if (0 == lid) {
           tmp = radiusd[0] * 2;
           // precompute values that depend only on tree level
@@ -716,7 +719,7 @@ int main(int argc, char* argv[])
           }
           dq[i - 1] += epssq;
         }
-        item.barrier(sycl::access::fence_space::local_space);
+        sycl::group_barrier(g);
       
         // figure out first thread in each warp (lane 0)
         base = lid / WARPSIZE;
@@ -725,13 +728,14 @@ int main(int argc, char* argv[])
       
         diff = lid - sbase;
         // make multiple copies to avoid index calculations later
-        if (diff < MAXDEPTH) {
+        if ((base > 0) && (diff < MAXDEPTH)) {
           dq[diff+j] = dq[diff];
         }
-        item.barrier(sycl::access::fence_space::local_space);
+        sycl::group_barrier(g);
       
         // iterate over all bodies assigned to thread
-        for (k = item.get_global_id(0); k < nbodies; k += item.get_local_range(0) * item.get_group_range(0)) {
+        int inc = g.get_local_range(0) * g.get_group_range(0);
+        for (k = inc + lid; k < nbodies; k += inc) {
           i = sortd[k];  // get permuted/sorted index
           // cache position info
           const sycl::float4 pi = posMassd[i];
@@ -746,11 +750,13 @@ int main(int argc, char* argv[])
             pos[j] = 0;
             node[j] = nnodes * 8;
           }
+          sycl::group_barrier(sg);
       
           do {
             // stack is not empty
             pd = pos[depth];
             nd = node[depth];
+            sycl::group_barrier(sg);
             while (pd < 8) {
               // node on top of stack has more children to process
               n = childd[nd + pd];  // load child pointer
@@ -762,7 +768,7 @@ int main(int argc, char* argv[])
                 dy = pn.y() - pi.y();
                 dz = pn.z() - pi.z();
                 tmp = dx*dx + (dy*dy + (dz*dz + epssq));  // compute distance squared (plus softening)
-                if ((n < nbodies) || sycl::all_of_group(item.get_group(), tmp >= dq[depth])) {  
+                if ((n < nbodies) || sycl::all_of_group(g, tmp >= dq[depth])) {  
                 // check if all threads agree that cell is far enough away (or is a body)
                   tmp = sycl::rsqrt(tmp);  // compute distance
                   tmp = pn.w() * tmp * tmp * tmp;
@@ -784,6 +790,7 @@ int main(int argc, char* argv[])
               }
             }
             depth--;  // done with this level
+            sycl::group_barrier(sg);
           } while (depth >= j);
       
           sycl::float4 acc = accVeld[i];

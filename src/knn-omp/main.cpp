@@ -183,11 +183,6 @@ int main(int argc, char* argv[]) {
       {
         float shared_A[BLOCK_DIM*BLOCK_DIM];
         float shared_B[BLOCK_DIM*BLOCK_DIM];
-        int begin_A;
-        int begin_B;
-        int step_A;
-        int step_B;
-        int end_A;
         
         #pragma omp parallel 
         {
@@ -200,11 +195,11 @@ int main(int argc, char* argv[]) {
           float ssd = 0;
       
           // Loop parameters
-          begin_A = BLOCK_DIM * (omp_get_team_num() / ((query_nb+15)/16));
-          begin_B = BLOCK_DIM * (omp_get_team_num() % ((query_nb+15)/16));
-          step_A  = BLOCK_DIM * ref_nb;
-          step_B  = BLOCK_DIM * query_nb;
-          end_A   = begin_A + (dim - 1) * ref_nb;
+          int begin_A = BLOCK_DIM * (omp_get_team_num() / ((query_nb+15)/16));
+          int begin_B = BLOCK_DIM * (omp_get_team_num() % ((query_nb+15)/16));
+          int step_A  = BLOCK_DIM * ref_nb;
+          int step_B  = BLOCK_DIM * query_nb;
+          int end_A   = begin_A + (dim - 1) * ref_nb;
       
           // Conditions
           int cond0 = (begin_A + tx < ref_nb); // used to write in shared memory

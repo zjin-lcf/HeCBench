@@ -7,8 +7,8 @@
 #include <hip/hip_runtime.h>
 #endif
 
-#define RESULT_FILENAME "assets/_results.txt"
-#define TEMP_FILENAME "assets/temperature.txt"
+#define RESULT_FILENAME "../lr-sycl/assets/_results.txt"
+#define TEMP_FILENAME "../lr-sycl/assets/temperature.txt"
 
 #define TEMP_SIZE 96453
 #define TEMP_WORKGROUP_SIZE 63

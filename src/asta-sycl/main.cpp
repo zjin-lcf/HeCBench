@@ -204,6 +204,7 @@ int main(int argc, char **argv) {
         while(lmem[1] < m) {
           int next_in_cycle = (lmem[1] * A) - m * (lmem[1] / B);
           if(next_in_cycle == lmem[1]) {
+            item.barrier(sycl::access::fence_space::local_space);
             if(tid == 0) // Dynamic fetch
               lmem[1] = atomicAdd(d_head[0], 1);
             item.barrier(sycl::access::fence_space::local_space);
@@ -244,6 +245,7 @@ int main(int argc, char **argv) {
             if(i < b)
               backup4 = d_in_out[next_in_cycle * b + i];
 
+            item.barrier(sycl::access::fence_space::local_space);
             if(tid == 0) {
               lmem[0] = atomicExch(d_finished[next_in_cycle], (int)1);
             }

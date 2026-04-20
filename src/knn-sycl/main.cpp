@@ -70,11 +70,6 @@ void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_h
     auto AB = dist_dev;
     sycl::local_accessor<float, 2> shared_A (sycl::range<2>{BLOCK_DIM, BLOCK_DIM}, h);
     sycl::local_accessor<float, 2> shared_B (sycl::range<2>{BLOCK_DIM, BLOCK_DIM}, h);
-    sycl::local_accessor<int, 0> begin_A (h);
-    sycl::local_accessor<int, 0> begin_B (h);
-    sycl::local_accessor<int, 0> step_A (h);
-    sycl::local_accessor<int, 0> step_B (h);
-    sycl::local_accessor<int, 0> end_A (h);
     h.parallel_for<class ComputeDistanceGlobal>(
       sycl::nd_range<2>(g_16x16, t_16x16), [=] (sycl::nd_item<2> item) {
       // Thread index
@@ -86,11 +81,11 @@ void knn_parallel(sycl::queue &q, float *ref_host, int ref_width, float *query_h
       float ssd = 0;
 
       // Loop parameters
-      begin_A = BLOCK_DIM * item.get_group(0);
-      begin_B = BLOCK_DIM * item.get_group(1);
-      step_A  = BLOCK_DIM * ref_width;
-      step_B  = BLOCK_DIM * query_width;
-      end_A   = begin_A + (height - 1) * ref_width;
+      int begin_A = BLOCK_DIM * item.get_group(0);
+      int begin_B = BLOCK_DIM * item.get_group(1);
+      int step_A  = BLOCK_DIM * ref_width;
+      int step_B  = BLOCK_DIM * query_width;
+      int end_A   = begin_A + (height - 1) * ref_width;
 
       // Conditions
       int cond0 = (begin_A + tx < ref_width); // used to write in shared memory

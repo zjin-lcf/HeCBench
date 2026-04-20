@@ -73,6 +73,8 @@ void TaskQueue_gpu(const task_t *__restrict__ queue,
 
       data[(t->id - offset) * tile_size + tid] += t->id;
     }
+    __syncthreads();
+
     if(tid == 0) {
       next = atomicAdd(consumed, 1);
       // Fetch task

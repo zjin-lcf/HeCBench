@@ -453,9 +453,9 @@
         ]
     ],
     "f16sp": [
-        "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
+        "(?:Average kernel1 execution time )([0-9.+-e]+)(?: \\(us\\))",
         [
-            "100000"
+            "1000"
         ]
     ],
     "fdtd3d": [
@@ -645,8 +645,7 @@
         "(?:GPU execution time: )([0-9.+-e]+)(?: ms)",
         [
             "r"
-        ],
-        "hybridsort"
+        ]
     ],
     "inversek2j": [
         "(?:Average kernel execution time )([0-9.+-e]+)(?: \\(us\\))",
@@ -875,8 +874,8 @@
     "nbody": [
         "(?:Total Time \\(s\\)[ ]*: )([0-9.+-e]+)",
         [
-            "20000",
-            "100"
+            "16000",
+            "10"
         ]
     ],
     "nlll": [

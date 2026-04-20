@@ -70,7 +70,7 @@ static void write_results(results_t * results, const char * restricts) {
 int main(int argc, char* argv[]) {
   results_t results = {{0}};
   if (argc != 3) {
-    printf("Usage: linear <repeat> <cpu offset>\n");
+    printf("Usage: %s <repeat> <cpu offset>\n", argv[0]);
     printf("Device execution only when cpu offset is 0\n");
     printf("Host execution only when cpu offset is 100\n");
     exit(0);

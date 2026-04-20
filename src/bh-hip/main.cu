@@ -580,7 +580,7 @@ void ForceCalculationKernel(
 
   diff = threadIdx.x - sbase;
   // make multiple copies to avoid index calculations later
-  if (diff < MAXDEPTH) {
+  if ((base > 0) && (diff < MAXDEPTH)) {
     dq[diff+j] = dq[diff];
   }
   __syncthreads();

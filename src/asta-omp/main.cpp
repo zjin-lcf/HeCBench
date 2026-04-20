@@ -184,6 +184,7 @@ int main(int argc, char **argv) {
           while(lmem[1] < m) {
             int next_in_cycle = (lmem[1] * A) - m * (lmem[1] / B);
             if(next_in_cycle == lmem[1]) {
+#pragma omp barrier
               if(tid == 0) {// Dynamic fetch
 #pragma omp atomic capture
                 lmem[1] = h_head[0]++;
@@ -263,6 +264,7 @@ int main(int argc, char **argv) {
                 data4 = backup4;
             }
 
+#pragma omp barrier
             if(tid == 0) { // Dynamic fetch
 #pragma omp atomic capture
               lmem[1] = h_head[0]++;

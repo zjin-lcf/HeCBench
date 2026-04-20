@@ -134,13 +134,15 @@ void FSMKernel(
       // mutate best FSM by flipping random bits with 1/4th probability
       for (i = 0; i < FSMSIZE * 2; i++) {
         rnd = LCG_random(rndstate+id) & LCG_random(rndstate+id);
-        fsm[i] = (next[i + sbest[bid] * FSMSIZE * 2] ^ rnd) & (FSMSIZE - 1);
+        if (lid != sbest[bid])
+          fsm[i] = (next[i + sbest[bid] * FSMSIZE * 2] ^ rnd) & (FSMSIZE - 1);
       }
     } else {
       // crossover best FSM with random FSMs using 3/4 of bits from best FSM
       for (i = 0; i < FSMSIZE * 2; i++) {
         rnd = LCG_random(rndstate+id) & LCG_random(rndstate+id);
-        fsm[i] = (fsm[i] & rnd) | (next[i + sbest[bid] * FSMSIZE * 2] & ~rnd);
+        if (lid != sbest[bid])
+          fsm[i] = (fsm[i] & rnd) | (next[i + sbest[bid] * FSMSIZE * 2] & ~rnd);
       }
     }
   } while (same[bid] < CUTOFF);  // end of loop over generations

@@ -42,11 +42,11 @@ void cuComputeDistanceGlobal(const float *__restrict__ A,
   __shared__ float shared_B[BLOCK_DIM][BLOCK_DIM];
 
   // Sub-matrix of A (begin, step, end) and Sub-matrix of B (begin, step)
-  __shared__ int begin_A;
-  __shared__ int begin_B;
-  __shared__ int step_A;
-  __shared__ int step_B;
-  __shared__ int end_A;
+  int begin_A;
+  int begin_B;
+  int step_A;
+  int step_B;
+  int end_A;
 
   // Thread index
   int tx = threadIdx.x;
@@ -67,8 +67,7 @@ void cuComputeDistanceGlobal(const float *__restrict__ A,
   int cond0 = (begin_A + tx < wA); // used to write in shared memory
   int cond1 = (begin_B + tx < wB); // used to write in shared memory & to
                                    // computations and to write in output matrix
-  int cond2 =
-      (begin_A + ty < wA); // used to computations and to write in output matrix
+  int cond2 = (begin_A + ty < wA); // used to computations and to write in output matrix
 
   // Loop over all the sub-matrices of A and B required to compute the block
   // sub-matrix

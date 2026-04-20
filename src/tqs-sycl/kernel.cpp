@@ -77,6 +77,8 @@ void TaskQueue_gpu(const task_t *__restrict queue,
 
       data[(t->id - offset) * tile_size + tid] += t->id;
     }
+    item.barrier(sycl::access::fence_space::local_space);
+
     if(tid == 0) {
       auto ao = sycl::atomic_ref<int,
                 sycl::memory_order::relaxed,

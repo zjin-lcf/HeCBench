@@ -15,6 +15,15 @@ inline uint32_t atomicCAS(uint32_t &val, uint32_t expected, uint32_t desired)
   return expected_value;
 }
 
+inline void atomicExch(uint32_t &val, uint32_t desired)
+{
+  auto atm = sycl::atomic_ref<uint32_t,
+                              sycl::memory_order::relaxed,
+                              sycl::memory_scope::device,
+                              sycl::access::address_space::global_space>(val);
+  atm.exchange(desired);
+}
+
 inline uint32_t atomicAdd(uint32_t *val, uint32_t operand)
 {
   auto atm = sycl::atomic_ref<uint32_t,
@@ -55,7 +64,8 @@ k_hashtable_insert(sycl::nd_item<1> &item,
 
       if (prev == kEmpty || prev == key)
       {
-        hashtable[slot].value = value;
+        //hashtable[slot].value = value;
+        atomicExch(hashtable[slot].value, value);
         return;
       }
 

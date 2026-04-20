@@ -12,7 +12,7 @@ LAUNCHER  =
 # Program name & source code list
 #===============================================================================
 
-program = keccektree
+program = main
 
 source = KeccakF.cu KeccakTreeCPU.cu KeccakTreeGPU.cu Test.cu main.cu
 
