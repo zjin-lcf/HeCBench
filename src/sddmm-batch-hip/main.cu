@@ -50,6 +50,7 @@
 #include <stdlib.h>
 #include <math.h> 
 #include <chrono>
+#include <vector>
 #include <hip/hip_runtime_api.h>
 #include <hipsparse/hipsparse.h>
 #include "utils.h"
@@ -132,7 +133,12 @@ int main(int argc, char *argv[])
 
   const size_t value_size_bytes  = b * C_nnz * sizeof(float);
   const size_t colidx_size_bytes = b * C_nnz * sizeof(int);
+#ifdef __HIP_PLATFORM_AMD__
+  // Bug fix: dC_offsets is HIPSPARSE_INDEX_32I (32-bit), so use int not size_t
+  const size_t rowidx_size_bytes = b * (A_num_rows + 1) * sizeof(int);
+#else
   const size_t rowidx_size_bytes = b * (A_num_rows + 1) * sizeof(size_t);
+#endif
 
   float *hA = (float*) malloc (b * A_size * sizeof(float));
   float *hB = (float*) malloc (b * B_size * sizeof(float));
@@ -177,7 +183,12 @@ int main(int argc, char *argv[])
   //--------------------------------------------------------------------------
   // Device memory management
   int *dC_columns;
+#ifdef __HIP_PLATFORM_AMD__
+  // Bug fix: use int* to match HIPSPARSE_INDEX_32I; original used size_t* (64-bit mismatch)
+  int *dC_offsets;
+#else
   size_t *dC_offsets;
+#endif
   float *dC_values, *dB, *dA;
   CHECK_HIP( hipMalloc((void**) &dA, b * A_size * sizeof(float)) )
   CHECK_HIP( hipMalloc((void**) &dB, b * B_size * sizeof(float)) )
@@ -197,12 +208,78 @@ int main(int argc, char *argv[])
                        hipMemcpyHostToDevice) )
   //--------------------------------------------------------------------------
   // HIPSPARSE APIs
-  hipsparseHandle_t     handle = NULL;
+  hipsparseHandle_t handle = NULL;
+  void*  dBuffer    = NULL;
+  size_t bufferSize = 0;
+  CHECK_HIPSPARSE( hipsparseCreate(&handle) )
+
+#ifdef __HIP_PLATFORM_AMD__
+  // rocSPARSE/hipSPARSE SDDMM does not support batched computation via
+  // strided-batch descriptors. Work around by looping over each batch element
+  // individually, using separate per-batch matrix descriptors.
+  std::vector<hipsparseDnMatDescr_t> matA(b), matB(b);
+  std::vector<hipsparseSpMatDescr_t> matC(b);
+
+  for (int i = 0; i < b; i++) {
+    CHECK_HIPSPARSE( hipsparseCreateDnMat(&matA[i], A_num_rows, A_num_cols, lda,
+                                          dA + i * A_size,
+                                          HIP_R_32F, HIPSPARSE_ORDER_ROW) )
+    CHECK_HIPSPARSE( hipsparseCreateDnMat(&matB[i], A_num_cols, B_num_cols, ldb,
+                                          dB + i * B_size,
+                                          HIP_R_32F, HIPSPARSE_ORDER_ROW) )
+    CHECK_HIPSPARSE( hipsparseCreateCsr(&matC[i], A_num_rows, B_num_cols, C_nnz,
+                                        dC_offsets + i * (A_num_rows + 1),
+                                        dC_columns + i * C_nnz,
+                                        dC_values  + i * C_nnz,
+                                        HIPSPARSE_INDEX_32I, HIPSPARSE_INDEX_32I,
+                                        HIPSPARSE_INDEX_BASE_ZERO, HIP_R_32F) )
+  }
+
+  // Compute buffer size using batch 0 (all batches share the same shape)
+  CHECK_HIPSPARSE( hipsparseSDDMM_bufferSize(
+                               handle,
+                               HIPSPARSE_OPERATION_NON_TRANSPOSE,
+                               HIPSPARSE_OPERATION_NON_TRANSPOSE,
+                               &alpha, matA[0], matB[0], &beta, matC[0], HIP_R_32F,
+                               HIPSPARSE_SDDMM_ALG_DEFAULT, &bufferSize) )
+  CHECK_HIP( hipMalloc(&dBuffer, bufferSize) )
+
+  // execute preprocess using batch 0 (sparsity pattern is the same for all batches)
+  CHECK_HIPSPARSE( hipsparseSDDMM_preprocess(
+                                handle,
+                                HIPSPARSE_OPERATION_NON_TRANSPOSE,
+                                HIPSPARSE_OPERATION_NON_TRANSPOSE,
+                                &alpha, matA[0], matB[0], &beta, matC[0], HIP_R_32F,
+                                HIPSPARSE_SDDMM_ALG_DEFAULT, dBuffer) )
+
+  hipDeviceSynchronize();
+  auto start = std::chrono::steady_clock::now();
+
+  for (int r = 0; r < repeat; r++) {
+    for (int i = 0; i < b; i++) {
+      CHECK_HIPSPARSE( hipsparseSDDMM(handle,
+                                      HIPSPARSE_OPERATION_NON_TRANSPOSE,
+                                      HIPSPARSE_OPERATION_NON_TRANSPOSE,
+                                      &alpha, matA[i], matB[i], &beta, matC[i], HIP_R_32F,
+                                      HIPSPARSE_SDDMM_ALG_DEFAULT, dBuffer) )
+    }
+  }
+  hipDeviceSynchronize();
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Average execution time of batched SDDMM (%d batches): %f (us)\n",
+         b, (time * 1e-3f) / repeat);
+
+  // destroy matrix/vector descriptors
+  for (int i = 0; i < b; i++) {
+    CHECK_HIPSPARSE( hipsparseDestroyDnMat(matA[i]) )
+    CHECK_HIPSPARSE( hipsparseDestroyDnMat(matB[i]) )
+    CHECK_HIPSPARSE( hipsparseDestroySpMat(matC[i]) )
+  }
+#else
+  // CUDA path: use native cuSPARSE batched SDDMM via strided-batch descriptors
   hipsparseDnMatDescr_t matA, matB;
   hipsparseSpMatDescr_t matC;
-  void*                 dBuffer    = NULL;
-  size_t                bufferSize = 0;
-  CHECK_HIPSPARSE( hipsparseCreate(&handle) )
   // Create dense matrix A
   CHECK_HIPSPARSE( hipsparseCreateDnMat(&matA, A_num_rows, A_num_cols, lda, dA,
                                         HIP_R_32F, HIPSPARSE_ORDER_ROW) )
@@ -241,7 +318,6 @@ int main(int argc, char *argv[])
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    // execute SpMM
     CHECK_HIPSPARSE( hipsparseSDDMM(handle,
                                     HIPSPARSE_OPERATION_NON_TRANSPOSE,
                                     HIPSPARSE_OPERATION_NON_TRANSPOSE,
@@ -257,6 +333,7 @@ int main(int argc, char *argv[])
   CHECK_HIPSPARSE( hipsparseDestroyDnMat(matA) )
   CHECK_HIPSPARSE( hipsparseDestroyDnMat(matB) )
   CHECK_HIPSPARSE( hipsparseDestroySpMat(matC) )
+#endif
   CHECK_HIPSPARSE( hipsparseDestroy(handle) )
 
   //--------------------------------------------------------------------------
