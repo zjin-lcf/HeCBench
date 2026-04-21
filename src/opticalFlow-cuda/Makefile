@@ -46,11 +46,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu *.h Makefile
+%.o: %.cu *.cuh *.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj) *.flo
 
 run: $(program)
-	$(LAUNCHER) ./$(program)
+	$(LAUNCHER) ./$(program) data/frame10.ppm data/frame11.ppm

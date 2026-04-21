@@ -97,4 +97,7 @@ static void WarpImage(const float *src, int w, int h, int s, const float *u,
       hipCreateTextureObject(&texToWarp, &texRes, &texDescr, NULL));
 
   WarpingKernel<<<blocks, threads>>>(w, h, s, u, v, out, texToWarp);
+
+  checkCudaErrors(hipDeviceSynchronize());
+  checkCudaErrors(hipDestroyTextureObject(texToWarp));
 }
