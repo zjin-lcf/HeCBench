@@ -93,4 +93,7 @@ static void Upscale(const float *src, int width, int height, int stride,
 
   UpscaleKernel<<<blocks, threads>>>(newWidth, newHeight, newStride, scale, out,
                                      texCoarse);
+
+  checkCudaErrors(hipDeviceSynchronize());
+  checkCudaErrors(hipDestroyTextureObject(texCoarse));
 }

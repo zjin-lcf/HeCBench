@@ -95,4 +95,7 @@ static void Downscale(const float *src, int width, int height, int stride,
 
   DownscaleKernel<<<blocks, threads>>>(newWidth, newHeight, newStride, out,
                                        texFine);
+
+  checkCudaErrors(cudaDeviceSynchronize());
+  checkCudaErrors(cudaDestroyTextureObject(texFine));
 }

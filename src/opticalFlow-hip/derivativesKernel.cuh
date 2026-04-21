@@ -141,4 +141,8 @@ static void ComputeDerivatives(const float *I0, const float *I1, int w, int h,
 
   ComputeDerivativesKernel<<<blocks, threads>>>(w, h, s, Ix, Iy, Iz, texSource,
                                                 texTarget);
+
+  checkCudaErrors(hipDeviceSynchronize());
+  checkCudaErrors(hipDestroyTextureObject(texSource));
+  checkCudaErrors(hipDestroyTextureObject(texTarget));
 }
