@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
 
   const size_t value_size_bytes  = b * C_nnz * sizeof(float);
   const size_t colidx_size_bytes = b * C_nnz * sizeof(int);
-  const size_t rowidx_size_bytes = b * (A_num_rows + 1) * sizeof(size_t);
+  const size_t rowidx_size_bytes = b * (A_num_rows + 1) * sizeof(int);
 
   float *hA = (float*) malloc (b * A_size * sizeof(float));
   float *hB = (float*) malloc (b * B_size * sizeof(float));
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
   //--------------------------------------------------------------------------
   // Device memory management
   int *dC_columns;
-  size_t *dC_offsets;
+  int *dC_offsets;
   float *dC_values, *dB, *dA;
   CHECK_CUDA( cudaMalloc((void**) &dA, b * A_size * sizeof(float)) )
   CHECK_CUDA( cudaMalloc((void**) &dB, b * B_size * sizeof(float)) )
