@@ -133,12 +133,7 @@ int main(int argc, char *argv[])
 
   const size_t value_size_bytes  = b * C_nnz * sizeof(float);
   const size_t colidx_size_bytes = b * C_nnz * sizeof(int);
-#ifdef __HIP_PLATFORM_AMD__
-  // Bug fix: dC_offsets is HIPSPARSE_INDEX_32I (32-bit), so use int not size_t
   const size_t rowidx_size_bytes = b * (A_num_rows + 1) * sizeof(int);
-#else
-  const size_t rowidx_size_bytes = b * (A_num_rows + 1) * sizeof(size_t);
-#endif
 
   float *hA = (float*) malloc (b * A_size * sizeof(float));
   float *hB = (float*) malloc (b * B_size * sizeof(float));
@@ -183,12 +178,7 @@ int main(int argc, char *argv[])
   //--------------------------------------------------------------------------
   // Device memory management
   int *dC_columns;
-#ifdef __HIP_PLATFORM_AMD__
-  // Bug fix: use int* to match HIPSPARSE_INDEX_32I; original used size_t* (64-bit mismatch)
   int *dC_offsets;
-#else
-  size_t *dC_offsets;
-#endif
   float *dC_values, *dB, *dA;
   CHECK_HIP( hipMalloc((void**) &dA, b * A_size * sizeof(float)) )
   CHECK_HIP( hipMalloc((void**) &dB, b * B_size * sizeof(float)) )
@@ -214,7 +204,7 @@ int main(int argc, char *argv[])
   CHECK_HIPSPARSE( hipsparseCreate(&handle) )
 
 #ifdef __HIP_PLATFORM_AMD__
-  // rocSPARSE/hipSPARSE SDDMM does not support batched computation via
+  // rocSPARSE/hipSPARSE SDDMM currently does not support batched computation via
   // strided-batch descriptors. Work around by looping over each batch element
   // individually, using separate per-batch matrix descriptors.
   std::vector<hipsparseDnMatDescr_t> matA(b), matB(b);
@@ -252,7 +242,7 @@ int main(int argc, char *argv[])
                                 &alpha, matA[0], matB[0], &beta, matC[0], HIP_R_32F,
                                 HIPSPARSE_SDDMM_ALG_DEFAULT, dBuffer) )
 
-  hipDeviceSynchronize();
+  CHECK_HIP(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
 
   for (int r = 0; r < repeat; r++) {
@@ -264,7 +254,7 @@ int main(int argc, char *argv[])
                                       HIPSPARSE_SDDMM_ALG_DEFAULT, dBuffer) )
     }
   }
-  hipDeviceSynchronize();
+  CHECK_HIP(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of batched SDDMM (%d batches): %f (us)\n",
@@ -314,7 +304,7 @@ int main(int argc, char *argv[])
                                 &alpha, matA, matB, &beta, matC, HIP_R_32F,
                                 HIPSPARSE_SDDMM_ALG_DEFAULT, dBuffer) )
 
-  hipDeviceSynchronize();
+  CHECK_HIP(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
@@ -324,7 +314,7 @@ int main(int argc, char *argv[])
                                     &alpha, matA, matB, &beta, matC, HIP_R_32F,
                                     HIPSPARSE_SDDMM_ALG_DEFAULT, dBuffer) )
   }
-  hipDeviceSynchronize();
+  CHECK_HIP(hipDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average execution time of SDDMM: %f (us)\n", (time * 1e-3f) / repeat);
