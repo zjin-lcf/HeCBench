@@ -139,11 +139,8 @@ __global__ void tv_elementwise_add_kernel(
     const int M,
     const int N)
 {
-#if defined(__GFX8__) || defined(__GFX9__)
-  #define WarpSize 64
-#else
-  #define WarpSize 32
-#endif
+  const int WarpSize = warpSize;  // CUDA/HIP built-in, resolved at runtime
+
   // Block-tile origin in global memory
   int blk_row = blockIdx.y * TILE_M;   // first row of this block's tile
   int blk_col = blockIdx.x * TILE_N;   // first col of this block's tile
