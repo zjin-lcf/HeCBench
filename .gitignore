@@ -14,12 +14,13 @@ dpct_output
 main
 *.tmp
 
-# Exclude text files except CMake and documentation
+# Exclude text files except CMake, documentation, and CI configs
 *.txt
 !CMakeLists.txt
 !plan.md
 !README*.md
 !*.markdown
+!ci/**/*.txt
 
 # Exclude JSON files except CMake presets
 *.json
