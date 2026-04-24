@@ -1,5 +1,135 @@
 #pragma once
 
+#if CUDA_VERSION >= 12080
+
+#define ATOMIC(NAME)                                                           \
+  template <typename scalar, size_t size> struct Atomic##NAME##IntegerImpl;    \
+                                                                               \
+  template <typename scalar> struct Atomic##NAME##IntegerImpl<scalar, 4> {     \
+    inline __device__ void operator()(scalar *address, scalar val) {           \
+      uint32_t *address_as_ui = (uint32_t *)address;                           \
+      auto old = __nv_atomic_load_n(address_as_ui, __NV_ATOMIC_RELAXED);       \
+      uint32_t assumed;                                                        \
+                                                                               \
+      do {                                                                     \
+        assumed = old;                                                         \
+        old = atomicCAS(address_as_ui, assumed, OP(val, (scalar)old));         \
+      } while (assumed != old);                                                \
+    }                                                                          \
+  };                                                                           \
+                                                                               \
+  template <typename scalar> struct Atomic##NAME##IntegerImpl<scalar, 8> {     \
+    inline __device__ void operator()(scalar *address, scalar val) {           \
+      unsigned long long *address_as_ull = (unsigned long long *)address;      \
+      auto old = __nv_atomic_load_n(address_as_ull, __NV_ATOMIC_RELAXED);      \
+      unsigned long long assumed;                                              \
+                                                                               \
+      do {                                                                     \
+        assumed = old;                                                         \
+        old = atomicCAS(address_as_ull, assumed, OP(val, (scalar)old));        \
+      } while (assumed != old);                                                \
+    }                                                                          \
+  };                                                                           \
+                                                                               \
+  template <typename scalar, size_t size> struct Atomic##NAME##DecimalImpl;    \
+                                                                               \
+                                                                               \
+  template <typename scalar> struct Atomic##NAME##DecimalImpl<scalar, 4> {     \
+    inline __device__ void operator()(scalar *address, scalar val) {           \
+      int *address_as_i = (int *)address;                                      \
+      auto old = __nv_atomic_load_n(address_as_i, __NV_ATOMIC_RELAXED);        \
+      int assumed;                                                             \
+                                                                               \
+      do {                                                                     \
+        assumed = old;                                                         \
+        old = atomicCAS(address_as_i, assumed,                                 \
+                        __float_as_int(OP(val, __int_as_float(assumed))));     \
+      } while (assumed != old);                                                \
+    }                                                                          \
+  };                                                                           \
+                                                                               \
+  template <typename scalar> struct Atomic##NAME##DecimalImpl<scalar, 8> {     \
+    inline __device__ void operator()(scalar *address, scalar val) {           \
+      unsigned long long int *address_as_ull =                                 \
+          (unsigned long long int *)address;                                   \
+      auto old = __nv_atomic_load_n(address_as_ull, __NV_ATOMIC_RELAXED);      \
+      unsigned long long int assumed;                                          \
+                                                                               \
+      do {                                                                     \
+        assumed = old;                                                         \
+        old = atomicCAS(                                                       \
+            address_as_ull, assumed,                                           \
+            __double_as_longlong(OP(val, __longlong_as_double(assumed))));     \
+      } while (assumed != old);                                                \
+    }                                                                          \
+  };
+
+#elif __HIPCC__
+
+#define ATOMIC(NAME)                                                           \
+  template <typename scalar, size_t size> struct Atomic##NAME##IntegerImpl;    \
+                                                                               \
+  template <typename scalar> struct Atomic##NAME##IntegerImpl<scalar, 4> {     \
+    inline __device__ void operator()(scalar *address, scalar val) {           \
+      uint32_t *address_as_ui = (uint32_t *)address;                           \
+      auto old = __atomic_load_n(address_as_ui, __ATOMIC_RELAXED);             \
+      uint32_t assumed;                                                        \
+                                                                               \
+      do {                                                                     \
+        assumed = old;                                                         \
+        old = atomicCAS(address_as_ui, assumed, OP(val, (scalar)old));         \
+      } while (assumed != old);                                                \
+    }                                                                          \
+  };                                                                           \
+                                                                               \
+  template <typename scalar> struct Atomic##NAME##IntegerImpl<scalar, 8> {     \
+    inline __device__ void operator()(scalar *address, scalar val) {           \
+      unsigned long long *address_as_ull = (unsigned long long *)address;      \
+      auto old = __atomic_load_n(address_as_ull, __ATOMIC_RELAXED);            \
+      unsigned long long assumed;                                              \
+                                                                               \
+      do {                                                                     \
+        assumed = old;                                                         \
+        old = atomicCAS(address_as_ull, assumed, OP(val, (scalar)old));        \
+      } while (assumed != old);                                                \
+    }                                                                          \
+  };                                                                           \
+                                                                               \
+  template <typename scalar, size_t size> struct Atomic##NAME##DecimalImpl;    \
+                                                                               \
+                                                                               \
+  template <typename scalar> struct Atomic##NAME##DecimalImpl<scalar, 4> {     \
+    inline __device__ void operator()(scalar *address, scalar val) {           \
+      int *address_as_i = (int *)address;                                      \
+      auto old = __atomic_load_n(address_as_i, __ATOMIC_RELAXED);              \
+      int assumed;                                                             \
+                                                                               \
+      do {                                                                     \
+        assumed = old;                                                         \
+        old = atomicCAS(address_as_i, assumed,                                 \
+                        __float_as_int(OP(val, __int_as_float(assumed))));     \
+      } while (assumed != old);                                                \
+    }                                                                          \
+  };                                                                           \
+                                                                               \
+  template <typename scalar> struct Atomic##NAME##DecimalImpl<scalar, 8> {     \
+    inline __device__ void operator()(scalar *address, scalar val) {           \
+      unsigned long long int *address_as_ull =                                 \
+          (unsigned long long int *)address;                                   \
+      auto old = __atomic_load_n(address_as_ull, __ATOMIC_RELAXED);            \
+      unsigned long long int assumed;                                          \
+                                                                               \
+      do {                                                                     \
+        assumed = old;                                                         \
+        old = atomicCAS(                                                       \
+            address_as_ull, assumed,                                           \
+            __double_as_longlong(OP(val, __longlong_as_double(assumed))));     \
+      } while (assumed != old);                                                \
+    }                                                                          \
+  };
+
+#else
+
 #define ATOMIC(NAME)                                                           \
   template <typename scalar, size_t size> struct Atomic##NAME##IntegerImpl;    \
                                                                                \
@@ -61,6 +191,7 @@
       } while (assumed != old);                                                \
     }                                                                          \
   };
+#endif
 
 #define OP(X, Y) Y + X
 ATOMIC(Add)
