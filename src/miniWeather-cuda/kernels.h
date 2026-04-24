@@ -1,24 +1,3 @@
-/*
- * Copyright 2010 by NVIDIA Corporation.  All rights reserved.  All
- * information contained herein is proprietary and confidential to NVIDIA
- * Corporation.  Any use, reproduction, or disclosure without the written
- * permission of NVIDIA Corporation is prohibited.
-
-  Double-precision floating point atomic add
- */
-__device__ __forceinline__
-double atomic_add(double *address, double val)
-{
-  // Doing it all as longlongs cuts one __longlong_as_double from the inner loop
-  unsigned long long *ptr = (unsigned long long *)address;
-  unsigned long long old, newdbl, ret = *ptr;
-  do {
-    old = ret;
-    newdbl = __double_as_longlong(__longlong_as_double(old)+val);
-  } while((ret = atomicCAS(ptr, old, newdbl)) != old);
-  return __longlong_as_double(ret);
-}
-
 __global__
 void compute_flux_x (const double *__restrict__ state,
                            double *__restrict__ flux,
@@ -276,8 +255,8 @@ void acc_mass_te (double *__restrict__ mass,
 
     // mass += r        *dx*dz; // Accumulate domain mass
     // te   += (ke + ie)*dx*dz; // Accumulate domain total energy
-    atomic_add(mass, r*dx*dz);
-    atomic_add(te, (ke+ie)*dx*dz);
+    atomicAdd(mass, r*dx*dz);
+    atomicAdd(te, (ke+ie)*dx*dz);
   }
 }
 
