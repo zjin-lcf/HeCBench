@@ -76,9 +76,11 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj) *.mpc *.org
+	rm -rf $(program) $(obj) *.txt fpc
 
 run: $(program)
+        # compression
 	$(LAUNCHER) ./$(program) ../mpc-cuda/msg_sp.trace.out 1
-	$(LAUNCHER) ./$(program) ../mpc-cuda/msg_sp.trace.out.mpc 
-	diff ../mpc-cuda/msg_sp.trace.out msg_sp.trace.out.mpc.org
+        # decompression
+	$(LAUNCHER) ./$(program) compression.txt
+	diff ../mpc-cuda/msg_sp.trace.out decompression.txt

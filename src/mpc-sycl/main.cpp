@@ -51,25 +51,26 @@ using std::string;
 
 #define TPB 1024  /* do not change */
 
+template <int WarpSize>
 static inline 
 void prefixsum(int &val, int sbuf[TPB], sycl::nd_item<1> &item)
 {
-  const int warp = item.get_local_id(0) >> 5;
-  const int lane = item.get_local_id(0) & 31;
+  const int warp = item.get_local_id(0) / WarpSize;
+  const int lane = item.get_local_id(0) & (WarpSize - 1);
 
   auto sg = item.get_sub_group();
 
-  for (int d = 1; d < 32; d *= 2) {
+  for (int d = 1; d < WarpSize; d *= 2) {
     int tmp = sycl::shift_group_right(sg, val, d);
     if (lane >= d) val += tmp;
   }
-  if (lane == 31) sbuf[warp] = val;
+  if (lane == WarpSize - 1) sbuf[warp] = val;
 
   item.barrier(sycl::access::fence_space::local_space);
 
   if (warp == 0) {
     int v = sbuf[lane];
-    for (int d = 1; d < 32; d *= 2) {
+    for (int d = 1; d < WarpSize; d *= 2) {
       int tmp = sycl::shift_group_right(sg, v, d);
       if (lane >= d) v += tmp;
     }
@@ -83,20 +84,21 @@ void prefixsum(int &val, int sbuf[TPB], sycl::nd_item<1> &item)
   }
 }
 
+template <int WarpSize>
 static inline 
 void prefixsumlong(long &val, long sbuf[TPB], sycl::nd_item<1> &item)
 {
-  const int warp = item.get_local_id(0) >> 5;
-  const int lane = item.get_local_id(0) & 31;
+  const int warp = item.get_local_id(0) / WarpSize;
+  const int lane = item.get_local_id(0) & (WarpSize - 1);
 
   auto sg = item.get_sub_group();
 
-  for (int d = 1; d < 32; d *= 2) {
+  for (int d = 1; d < WarpSize; d *= 2) {
     unsigned int tmpl = sycl::shift_group_right(sg, (int)val, d);
     long tmph = sycl::shift_group_right(sg, (int)(val >> 32), d);
     if (lane >= d) val += (tmph << 32) + tmpl;
   }
-  if (lane == 31) sbuf[warp] = val;
+  if (lane == WarpSize - 1) sbuf[warp] = val;
 
   item.barrier(sycl::access::fence_space::local_space);
 
@@ -117,30 +119,31 @@ void prefixsumlong(long &val, long sbuf[TPB], sycl::nd_item<1> &item)
   }
 }
 
+template <int WarpSize>
 static inline 
 void prefixsumdimlong(long &val, long sbuf[TPB], const unsigned char dim,
                       sycl::nd_item<1> &item)
 {
   const int tid = item.get_local_id(0);
-  const int warp = tid >> 5;
-  const int lane = tid & 31;
+  const int warp = tid / WarpSize;
+  const int lane = tid & (WarpSize - 1);
   const int tix = (warp * dim) + (tid % dim);
 
   auto sg = item.get_sub_group();
 
-  for (int d = dim; d < 32; d *= 2) {
+  for (int d = dim; d < WarpSize; d *= 2) {
     unsigned int tmpl = sycl::shift_group_right(sg, (int)val, d);
     long tmph = sycl::shift_group_right(sg, (int)(val >> 32), d);
     if (lane >= d) val += (tmph << 32) + tmpl;
   }
-  if ((lane + dim) > 31) sbuf[tix] = val;
+  if ((lane + dim) > (WarpSize - 1)) sbuf[tix] = val;
 
   item.barrier(sycl::access::fence_space::local_space);
 
   if (warp < dim) {
     const int idx = (lane * dim) + warp;
     long v = sbuf[idx];
-    for (int d = 1; d < 32; d *= 2) {
+    for (int d = 1; d < WarpSize; d *= 2) {
       unsigned int tmpl = sycl::shift_group_right(sg, (int)v, d);
       long tmph = sycl::shift_group_right(sg, (int)(v >> 32), d);
       if (lane >= d) v += (tmph << 32) + tmpl;
@@ -175,6 +178,7 @@ The upper half of the first element specifies how many elements are actually
 used.  It should be replaced by the value n before the data is further processed.
 *****************************************************************************/
 
+template <int WarpSize>
 static 
 void MPCcompress(
   const int n, 
@@ -236,21 +240,25 @@ void MPCcompress(
     int loc = 0;
     if (v2 != 0) loc = 1;
 
-    unsigned int bitmap = sycl::reduce_over_group(
-        sg, loc ? (0x1 << sg.get_local_linear_id()) : 0,
+    unsigned long long bitmap = sycl::reduce_over_group(
+        sg, loc ? (1UL << sg.get_local_linear_id()) : 0,
         sycl::ext::oneapi::plus<>());
 
-    if (lanex == 32) {
-      sbuf2[tid] = bitmap;
+    if constexpr (WarpSize == 64) {
+      if (idx < n) compressed[1 + idx / 64] = bitmap;
+    } else {
+      if (lanex == 32) {
+        sbuf2[tid] = bitmap;
+      }
+
+      item.barrier(sycl::access::fence_space::local_space);
+
+      if (lanex == 0) {
+        if (idx < n) compressed[1 + idx / 64] = (sbuf2[tid + 32] << 32) + bitmap;
+      }
     }
 
-    item.barrier(sycl::access::fence_space::local_space);
-
-    if (lanex == 0) {
-      if (idx < n) compressed[1 + idx / 64] = (sbuf2[tid + 32] << 32) + bitmap;
-    }
-
-    prefixsum(loc, (int *)sbuf1, item);
+    prefixsum<WarpSize>(loc, (int *)sbuf1, item);
 
     if (v2 != 0) {
       sbuf2[loc - 1] = v2;
@@ -300,6 +308,7 @@ The output array needs to provide space for n elements has to be cast to an
 array of doubles before it can be used.
 *****************************************************************************/
 
+template <int WarpSize>
 static 
 void MPCdecompress(
   long* __restrict const compressed, 
@@ -334,7 +343,7 @@ void MPCdecompress(
 
     item.barrier(sycl::access::fence_space::local_space);
 
-    prefixsum(loc, (int *)sbuf1, item);
+    prefixsum<WarpSize>(loc, (int *)sbuf1, item);
 
     if (tid == (TPB - 1)) {
       int st = init;
@@ -362,7 +371,7 @@ void MPCdecompress(
       v2 = sbuf2[loc - 1];
     }
 
-    prefixsumlong(v2, sbuf1, item);
+    prefixsumlong<WarpSize>(v2, sbuf1, item);
 
     sbuf2[tid] = v2;
 
@@ -373,7 +382,7 @@ void MPCdecompress(
       v1 = (v1 << 1) + ((sbuf2[warpx + i] >> lanex) & 1);
     }
 
-    prefixsumdimlong(v1, sbuf1, dim, item);
+    prefixsumdimlong<WarpSize>(v1, sbuf1, dim, item);
 
     if (idx < n) {
       decompressed[idx] = v1;
@@ -435,23 +444,43 @@ int main(int argc, char *argv[])
   sycl::range<1> gws (blocks * TPB);
   sycl::range<1> lws (TPB);
 
+  auto sg_sizes = q.get_device().get_info<sycl::info::device::sub_group_sizes>();
+  auto r = std::max_element(sg_sizes.begin(), sg_sizes.end());
+  int WarpSize = *r;
+
   if (argc == 3) {
     gettimeofday(&start, NULL);
     q.memset(d_offs, -1, blocks * sizeof(int)).wait();
- 
-    q.submit([&](sycl::handler &cgh) {
-      sycl::local_accessor<int, 0> sm_start(cgh);
-      sycl::local_accessor<int, 0> sm_top(cgh);
-      sycl::local_accessor<long, 1> sbuf1(TPB, cgh);
-      sycl::local_accessor<long, 1> sbuf2(TPB, cgh);
 
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        MPCcompress(insize, d_in, d_out, d_offs, dim, item,
-                    sm_start, sm_top,
-                    sbuf1.get_multi_ptr<sycl::access::decorated::no>().get(),
-                    sbuf2.get_multi_ptr<sycl::access::decorated::no>().get());
-      });
-    }).wait();
+    if (WarpSize == 64) { 
+      q.submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<int, 0> sm_start(cgh);
+        sycl::local_accessor<int, 0> sm_top(cgh);
+        sycl::local_accessor<long, 1> sbuf1(TPB, cgh);
+        sycl::local_accessor<long, 1> sbuf2(TPB, cgh);
+
+        cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+          MPCcompress<64>(insize, d_in, d_out, d_offs, dim, item,
+                          sm_start, sm_top,
+                          sbuf1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          sbuf2.get_multi_ptr<sycl::access::decorated::no>().get());
+        });
+      }).wait();
+    } else {
+      q.submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<int, 0> sm_start(cgh);
+        sycl::local_accessor<int, 0> sm_top(cgh);
+        sycl::local_accessor<long, 1> sbuf1(TPB, cgh);
+        sycl::local_accessor<long, 1> sbuf2(TPB, cgh);
+
+        cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+          MPCcompress<32>(insize, d_in, d_out, d_offs, dim, item,
+                          sm_start, sm_top,
+                          sbuf1.get_multi_ptr<sycl::access::decorated::no>().get(),
+                          sbuf2.get_multi_ptr<sycl::access::decorated::no>().get());
+        });
+      }).wait();
+    }
 
     gettimeofday(&end, NULL);
 
@@ -466,26 +495,44 @@ int main(int argc, char *argv[])
     q.memcpy(output, d_out, outsize * sizeof(long)).wait();
     output[0] = (((long)insize) << 32) + (0x43504d00 - 1) + dim;
 
-    name += ".mpc";
+    name = "compression.txt";
     
   } else {
 
     gettimeofday(&start, NULL);
     q.memset(d_offs, -1, blocks * sizeof(int)).wait();
-    q.submit([&](sycl::handler &cgh) {
-      sycl::local_accessor<int, 0> sm_start(cgh);
-      sycl::local_accessor<int, 0> sm_top(cgh);
-      sycl::local_accessor<long, 1> sbuf1(TPB, cgh);
-      sycl::local_accessor<long, 1> sbuf2(TPB, cgh);
 
-      cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
-        MPCdecompress(
-            d_in, d_out, d_offs, item,
-            sm_start, sm_top,
-            sbuf1.get_multi_ptr<sycl::access::decorated::no>().get(),
-            sbuf2.get_multi_ptr<sycl::access::decorated::no>().get());
-      });
-    }).wait();
+    if (WarpSize == 64) { 
+      q.submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<int, 0> sm_start(cgh);
+        sycl::local_accessor<int, 0> sm_top(cgh);
+        sycl::local_accessor<long, 1> sbuf1(TPB, cgh);
+        sycl::local_accessor<long, 1> sbuf2(TPB, cgh);
+
+        cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+          MPCdecompress<64>(
+              d_in, d_out, d_offs, item,
+              sm_start, sm_top,
+              sbuf1.get_multi_ptr<sycl::access::decorated::no>().get(),
+              sbuf2.get_multi_ptr<sycl::access::decorated::no>().get());
+        });
+      }).wait();
+    } else {
+      q.submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<int, 0> sm_start(cgh);
+        sycl::local_accessor<int, 0> sm_top(cgh);
+        sycl::local_accessor<long, 1> sbuf1(TPB, cgh);
+        sycl::local_accessor<long, 1> sbuf2(TPB, cgh);
+
+        cgh.parallel_for(sycl::nd_range<1>(gws, lws), [=](sycl::nd_item<1> item) {
+          MPCdecompress<32>(
+              d_in, d_out, d_offs, item,
+              sm_start, sm_top,
+              sbuf1.get_multi_ptr<sycl::access::decorated::no>().get(),
+              sbuf2.get_multi_ptr<sycl::access::decorated::no>().get());
+        });
+      }).wait();
+    }
 
     gettimeofday(&end, NULL);
 
@@ -495,7 +542,7 @@ int main(int argc, char *argv[])
     printf("decompression time: %.2f ms\n", 1000.0 * dtime);
     printf("decompression throughput: %.3f GB/s\n\n", 0.000000001 * sizeof(long) * outsize / dtime);
 
-    name += ".org";
+    name = "decompression.txt";
   }
 
   writeFile(name.c_str(), output, outsize);
