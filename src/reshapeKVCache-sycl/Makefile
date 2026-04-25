@@ -30,7 +30,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../accuracy-cuda  -fsycl \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fsycl \
           --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
@@ -72,7 +72,7 @@ endif
 $(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp utils.h kernels.h ../f8cast-sycl/kernels.h
+%.o: %.cpp utils.h kernels.h ../f8cast-sycl/kernels.h reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

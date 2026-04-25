@@ -1,7 +1,5 @@
 #include <cassert>
 #include <iostream>
-#include <sycl/sycl.hpp>
-#include "../f8cast-sycl/kernels.h"
 
 enum class Fp8KVCacheDataType {
   kAuto = 0,
@@ -26,7 +24,7 @@ inline uint8_t scaled_vec_conversion<uint8_t, sycl::ext::oneapi::bfloat16>(
 template <>
 inline uint8_t scaled_vec_conversion<uint8_t, float>(
     const float& a, const float scale) {
-  return fp8e4m3fn_from_fp32_value(static_cast<float>(a) / scale);
+  return fp8e4m3fn_from_fp32_value(a / scale);
 }
 
 

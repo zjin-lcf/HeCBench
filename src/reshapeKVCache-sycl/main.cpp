@@ -3,8 +3,11 @@
 #include <cstdio>
 #include <random>
 #include <vector>
+#include <sycl/sycl.hpp>
+#include "../f8cast-sycl/kernels.h"
 #include "utils.h"
 #include "kernels.h"
+#include "reference.h"
 
 template <typename scalar_t, typename cache_t, Fp8KVCacheDataType kv_dt>
 void reshape_and_cache(sycl::queue &q,
@@ -16,12 +19,12 @@ void reshape_and_cache(sycl::queue &q,
     int value_stride = key_stride;
     int headsize_div_x = head_size / x;
 
-    uint64_t key_size = (uint64_t)num_tokens * num_heads * head_size;
+    uint64_t key_size = (uint64_t)num_tokens * key_stride;
     uint64_t value_size = key_size;
 
     uint64_t num_blocks = (num_tokens + block_size - 1) / block_size;
 
-    uint64_t key_cache_size = num_blocks * num_heads * head_size * block_size;
+    uint64_t key_cache_size = num_blocks * block_size * key_stride;
 
     uint64_t value_cache_size = key_cache_size;
 
@@ -76,6 +79,40 @@ void reshape_and_cache(sycl::queue &q,
       q.parallel_for(sycl::nd_range<1>(gws, lws), kFn);
     }
 
+    std::vector<cache_t> r_key_cache(key_cache_size, 0);
+    std::vector<cache_t> r_value_cache(value_cache_size, 0);
+    std::vector<cache_t> h_key_cache(key_cache_size, 0);
+    std::vector<cache_t> h_value_cache(value_cache_size, 0);
+
+    reference<scalar_t, cache_t, kv_dt>(
+      h_key.data(), h_value.data(),
+      r_key_cache.data(), r_value_cache.data(),
+      h_slot_mapping.data(),
+      key_stride, value_stride, num_tokens, num_heads, head_size, block_size,
+      x, k_scale, v_scale);
+
+    q.memcpy(h_key_cache.data(), d_key_cache, key_cache_size * sizeof(cache_t));
+    q.memcpy(h_value_cache.data(), d_value_cache, value_cache_size * sizeof(cache_t));
+    q.wait();
+
+    bool ok = true;
+    for (uint64_t i = 0; i < key_cache_size; i++) {
+      if (r_key_cache[i] != h_key_cache[i]) {
+        printf("key %zu: %d %d\n", i, r_key_cache[i], h_key_cache[i]);
+        ok = false;
+        break;
+      }
+    }
+
+    for (uint64_t i = 0; i < value_cache_size; i++) {
+      if (r_value_cache[i] != h_value_cache[i]) {
+        printf("value %zu: %d %d\n", i, r_value_cache[i], h_value_cache[i]);
+        ok = false;
+        break;
+      }
+    }
+    printf("%s\n", ok ? "PASS" : "FAIL");
+
     q.wait();
     auto start = std::chrono::steady_clock::now();
 
@@ -93,12 +130,6 @@ void reshape_and_cache(sycl::queue &q,
                      sizeof(scalar_t) * (key_size + value_size);
     printf("Average bandwidth of reshape and cache kernel: %f (GB/s)\n", bytes * repeat * 1.f / time);
 
-    std::vector<cache_t> h_key_cache(key_cache_size);
-    std::vector<cache_t> h_value_cache(value_cache_size);
-
-    q.memcpy(h_key_cache.data(), d_key_cache, key_cache_size * sizeof(cache_t));
-
-    q.memcpy(h_value_cache.data(), d_value_cache, value_cache_size * sizeof(cache_t));
     q.wait();
 
     sycl::free(d_key, q);
