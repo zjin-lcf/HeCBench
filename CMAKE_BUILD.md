@@ -1,6 +1,6 @@
 # CMake Build System for HeCBench
 
-This document describes the new CMake-based build system for HeCBench, which replaces the previous Makefile-based approach.
+This document describes the CMake-based build system for HeCBench. The initial system was created by Jeffrey Vetter and Claude. 
 
 ## Overview
 
