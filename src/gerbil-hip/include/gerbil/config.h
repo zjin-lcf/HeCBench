@@ -37,7 +37,7 @@ namespace gerbil {
 
 #define HYBRID_COUNTER false
 
-#ifdef GPU
+#ifdef GERBIL_USE_GPU
 #define IF_GPU(x) x
 #else
 #define IF_GPU(x)
