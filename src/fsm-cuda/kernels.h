@@ -28,7 +28,7 @@ void FSMKernel(
   int *__restrict__ oldmax)
 {
   int i, d, pc, s, bit, id, misses, rnd;
-  unsigned long long myresult, current;
+  unsigned long long myresult;
   unsigned char *fsm, state[TABSIZE];
   __shared__ unsigned char next[FSMSIZE * 2 * POPSIZE];
 
@@ -121,11 +121,9 @@ void FSMKernel(
     id = blockIdx.x;
     myresult = length - misses;
     myresult = (myresult << 32) + id;
-    current = *((unsigned long long *)best);
-    while (myresult > current) {
-      atomicCAS((unsigned long long *)best, current, myresult);
-      current = *((unsigned long long *)best);
-    }
+
+    atomicMax((unsigned long long *)best, myresult);
+
     for (i = 0; i < FSMSIZE * 2; i++) {
       bfsm[id * (FSMSIZE*2) + i] = fsm[i];
     }

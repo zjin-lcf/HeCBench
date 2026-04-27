@@ -19,6 +19,10 @@ int main(int argc, char** argv) {
     sim.SetNumberOfParticles(n);
     if (argc == 3) {
       nstep = std::atoi(argv[2]);
+      if (nstep < 4) {
+        std::cerr << "The number of integration steps should be at least 4\n";
+        return 1;
+      }
       sim.SetNumberOfSteps(nstep);
     }
   }

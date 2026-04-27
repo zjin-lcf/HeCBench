@@ -1,46 +1,50 @@
 static const int ThreadsPerBlock = 256;
-static const int warpsize = 32;
 
-inline int atomicCAS(int *val, int expected, int desired)
+inline int atomicCAS(int &val, int expected, int desired)
 {
   int expected_value = expected;
   auto atm = sycl::atomic_ref<int,
     sycl::memory_order::relaxed,
     sycl::memory_scope::device,
-    sycl::access::address_space::global_space>(*val);
+    sycl::access::address_space::global_space>(val);
   atm.compare_exchange_strong(expected_value, desired);
   return expected_value;
 }
 
-inline int atomicAdd(int *val, int operand)
+inline int atomicAdd(int &val, int operand)
 {
   auto atm = sycl::atomic_ref<int,
     sycl::memory_order::relaxed,
     sycl::memory_scope::device,
-    sycl::access::address_space::global_space>(*val);
+    sycl::access::address_space::global_space>(val);
   return atm.fetch_add(operand);
 }
 
-inline int atomicAnd(int *val, int operand)
+inline int atomicLoad(int &val)
 {
   auto atm = sycl::atomic_ref<int,
     sycl::memory_order::relaxed,
     sycl::memory_scope::device,
-    sycl::access::address_space::global_space>(*val);
+    sycl::access::address_space::global_space>(val);
+  return atm.load();
+}
+
+inline int atomicAnd(int &val, int operand)
+{
+  auto atm = sycl::atomic_ref<int,
+    sycl::memory_order::relaxed,
+    sycl::memory_scope::device,
+    sycl::access::address_space::global_space>(val);
   return atm.fetch_and(operand);
 }
 
-inline void atomicMax(unsigned long long *val, unsigned long long operand)
+inline void atomicMax(unsigned long long &val, unsigned long long operand)
 {
   auto atm = sycl::atomic_ref<unsigned long long,
     sycl::memory_order::relaxed,
     sycl::memory_scope::device,
-    sycl::access::address_space::global_space>(*val);
+    sycl::access::address_space::global_space>(val);
   atm.fetch_max(operand);
-}
-
-inline int __ffs(int x) {
-  return (x == 0) ? 0 : sycl::ctz(x) + 1;
 }
 
 template <typename T>
@@ -315,7 +319,7 @@ static void generateSpanningTree(
   const int* const __restrict nlist,
   const int seed,
   EdgeInfo* const einfo,
-  volatile int* const parent,
+  int* const parent,
   int* const queue,
   const int level,
   int* const tail,
@@ -324,9 +328,10 @@ static void generateSpanningTree(
   sycl::nd_item<1> &item)
 {
   auto sg = item.get_sub_group();
-  const int from = item.get_global_id(0) / warpsize;
-  const int incr = item.get_group_range(0) * ThreadsPerBlock / warpsize;
-  const int lane = item.get_local_id(0) % warpsize;
+  int warpSize = sg.get_max_local_range()[0];
+  const int from = item.get_global_id(0) / warpSize;
+  const int incr = item.get_group_range(0) * ThreadsPerBlock / warpSize;
+  const int lane = sg.get_local_linear_id(); //item.get_local_id(0) % warpSize;
   const int seed2 = seed * seed + seed;
   const int bit = (level & 1) | 2;
 
@@ -334,20 +339,20 @@ static void generateSpanningTree(
     const int node = queue[i];
     const int me = (node << 2) | bit;
     if (lane == 0)
-        atomicAnd((int *)(parent+node), ~3);
-    for (int j = nindex[node + 1] - 1 - lane; j >= nindex[node]; j -= warpsize) {  // reverse order on purpose
+        atomicAnd(parent[node], ~3);
+    for (int j = nindex[node + 1] - 1 - lane; j >= nindex[node];j -= warpSize) {  // reverse order on purpose
       const int neighbor = nlist[j] >> 1;
       const int seed3 = neighbor ^ seed2;
       const int hash_me = hash(me ^ seed3);
       int val, hash_val;
       do {  // pick parent deterministically
-          val = parent[neighbor];
+          val = atomicLoad(parent[neighbor]);
           hash_val = hash(val ^ seed3);
         } while (((val < 0) || (((val & 3) == bit) && ((hash_val < hash_me) ||
                  ((hash_val == hash_me) && (val < me))))) &&
-                 (atomicCAS((int*)(parent+neighbor), val, me) != val));
+                 (atomicCAS(parent[neighbor], val, me) != val));
         if (val < 0) {
-          val = atomicAdd(tail, 1);
+          val = atomicAdd(*tail, 1);
           queue[val] = neighbor;
       }
     }
@@ -397,7 +402,7 @@ static void rootcount(
   // bottom up: push counts
   for (int i = start + from; i < end; i += incr) {
     const int node = queue[i];
-    atomicAdd(&label[parent[node] >> 2], label[node]);
+    atomicAdd(label[parent[node] >> 2], label[node]);
   }
 }
 
@@ -421,9 +426,10 @@ static void treelabel(
         )
 {
   auto sg = item.get_sub_group();
-  const int from = item.get_global_id(0) / warpsize;
-  const int incr = item.get_group_range(0) * ThreadsPerBlock / warpsize;
-  const int lane = item.get_local_id(0) % warpsize;
+  int warpSize = sg.get_max_local_range()[0];
+  const int from = item.get_global_id(0) / warpSize;
+  const int incr = item.get_group_range(0) * ThreadsPerBlock / warpSize;
+  const int lane = sg.get_local_linear_id(); //item.get_local_id(0) % warpSize;
 
   //cuv
   // top down: label tree + set nlist flag + set edge info + move tree nodes to front + make parent edge first in list
@@ -436,7 +442,7 @@ static void treelabel(
 
     // set nlist flag + set edge info
     int lbl = (nodelabel >> 1) + 1;
-    for (int j = beg + lane; sycl::any_of_group(sg, j < end); j += warpsize) {
+    for (int j = beg + lane; sycl::any_of_group(sg, j < end); j += warpSize) {
       int lblinc = 0;
       int neighbor = -1;
       bool cond = false;
@@ -448,9 +454,8 @@ static void treelabel(
         }
       }
       const int currcount = lblinc;
-      for (int d = 1; d < 32; d *= 2) {
-        const int tmp =
-            sycl::shift_group_right(sg, lblinc, d);
+      for (int d = 1; d < warpSize; d *= 2) {
+        const int tmp = sycl::shift_group_right(sg, lblinc, d);
         if (lane >= d) lblinc += tmp;
       }
       lbl += lblinc;
@@ -462,14 +467,14 @@ static void treelabel(
         einfo[j].end = (einfo[j].end & 1) | ((lbl - 1) << 1);
         nlist[j] |= 1;  // child edge is in tree
       }
-      lbl = sycl::select_from_group(sg, lbl, 31);
+      lbl = sycl::select_from_group(sg, lbl, warpSize-1);
     }
 
     // move tree nodes to front
     const int len = end - beg;
     if (len > 0) {
       enum {none, some, left, right};
-      if (len <= warpsize) {
+      if (len <= warpSize) {
         const int src = beg + lane;
         int b, e, in, neg,  n, state = none;
         if (lane < len) {
@@ -481,14 +486,14 @@ static void treelabel(
           const int neighbor = n >> 1;
           state = ((neighbor != par) && ((parent[neighbor] >> 2) == node)) ? left : right;  // partitioning condition
         }
-        const int ball = sycl::reduce_over_group(
-            sg, state == left ? (0x1 << sg.get_local_linear_id()) : 0,
+        const unsigned long ball = sycl::reduce_over_group(
+            sg, state == left ? (1UL << sg.get_local_linear_id()) : 0,
             sycl::ext::oneapi::plus<>());
-        const int balr = sycl::reduce_over_group(
-            sg, state == right ? (0x1 << sg.get_local_linear_id()) : 0,
+        const unsigned long balr = sycl::reduce_over_group(
+            sg, state == right ? (1UL << sg.get_local_linear_id()) : 0,
             sycl::ext::oneapi::plus<>());
-        const int pfsl = sycl::popcount(ball & ~(-1 << lane));
-        const int pfsr = sycl::popcount(balr & ~(-1 << lane));
+        const int pfsl = sycl::popcount(ball & ~(-1UL << lane));
+        const int pfsr = sycl::popcount(balr & ~(-1UL << lane));
         const int pos = beg + ((state == right) ? (len - 1 - pfsr) : pfsl);
         if (state != none) {
           einfo[pos].beg = b;
@@ -501,7 +506,7 @@ static void treelabel(
         int lp = beg;
         int rp = end - 1;
         int state = some;
-        int read = beg + sycl::min(warpsize, len);
+        int read = beg + sycl::min(warpSize, len);
         int src = beg + lane;
         int b = einfo[src].beg;
         int e = einfo[src].end;
@@ -514,10 +519,10 @@ static void treelabel(
             const int neighbor = n >> 1;
             state = ((neighbor != par) && ((parent[neighbor] >> 2) == node)) ? left : right;  // partitioning condition
           }
-          const int ball = sycl::reduce_over_group(
-              sg, state == left ? (0x1 << sg.get_local_linear_id()) : 0,
+          const unsigned long ball = sycl::reduce_over_group(
+              sg, state == left ? (1UL << sg.get_local_linear_id()) : 0,
               sycl::ext::oneapi::plus<>());
-          const int pfsl = sycl::popcount(ball & ~(-1 << lane));
+          const int pfsl = sycl::popcount(ball & ~(-1UL << lane));
           if (state == left) {
             int oldb, olde, oldin, oldneg, oldn;
             const int pos = lp + pfsl;
@@ -542,10 +547,10 @@ static void treelabel(
           }
           lp += sycl::popcount(ball);
           read = sycl::max(read, lp);
-          const int balr = sycl::reduce_over_group(
-              sg, state == right ? (0x1 << sg.get_local_linear_id()) : 0,
+          const unsigned long balr = sycl::reduce_over_group(
+              sg, state == right ? (1UL << sg.get_local_linear_id()) : 0,
               sycl::ext::oneapi::plus<>());
-          const int pfsr = sycl::popcount(balr & ~(-1 << lane));
+          const int pfsr = sycl::popcount(balr & ~(-1UL << lane));
           if (state == right) {
             int oldb, olde, oldin, oldneg, oldn;
             const int pos = rp - pfsr;
@@ -570,10 +575,10 @@ static void treelabel(
           }
           rp -= sycl::popcount(balr);
           if (read <= rp) {
-            const int bal = sycl::reduce_over_group(
-                sg, state == none ? (0x1 << sg.get_local_linear_id()) : 0,
+            const unsigned long bal = sycl::reduce_over_group(
+                sg, state == none ? (1UL << sg.get_local_linear_id()) : 0,
                 sycl::ext::oneapi::plus<>());
-            const int pfs = sycl::popcount(bal & ~(-1 << lane));
+            const int pfs = sycl::popcount(bal & ~(-1UL << lane));
             if (state == none) {
               const int pos = read + pfs;
               if (pos <= rp) {
@@ -593,7 +598,7 @@ static void treelabel(
 
     //find paredge here
     int paredge = -1;
-    for (int j = beg + lane; sycl::any_of_group(sg, j < end); j += warpsize) {
+    for (int j = beg + lane; sycl::any_of_group(sg, j < end); j += warpSize) {
       if (j < end) {
         const int neighbor = nlist[j] >> 1;
         if (neighbor == par) {
@@ -603,7 +608,7 @@ static void treelabel(
       if (sycl::any_of_group(sg, paredge >= 0)) break;
     }
     int pos = -1;
-    for (int j = beg + lane; sycl::any_of_group(sg, j < end); j += warpsize) {
+    for (int j = beg + lane; sycl::any_of_group(sg, j < end); j += warpSize) {
       if (j < end) {
         const int neighbor = nlist[j] >> 1;
         if (((parent[neighbor] >> 2) != node)) {
@@ -612,11 +617,11 @@ static void treelabel(
       }
       if (sycl::any_of_group(sg, pos >= 0)) break;
     }
-    unsigned int bal = sycl::reduce_over_group(
-        sg, pos >= 0 ? (0x1 << sg.get_local_linear_id()) : 0,
+    unsigned unsigned long bal = sycl::reduce_over_group(
+        sg, pos >= 0 ? (1UL << sg.get_local_linear_id()) : 0,
         sycl::ext::oneapi::plus<>());
 
-    const int lid = __ffs(bal) - 1;
+    const int lid = sycl::ctz(bal);
     pos = sycl::select_from_group(sg, pos, lid);
     if (paredge >= 0) {  // only one thread per warp
       einfo[paredge].beg = nodelabel | 1;
@@ -686,9 +691,10 @@ static void processCycles(
   )
 {
   auto sg = item.get_sub_group();
-  const int from = item.get_global_id(0) / warpsize;
-  const int incr = item.get_group_range(0) * ThreadsPerBlock / warpsize;
-  const int lane = item.get_local_id(0) % warpsize;
+  int warpSize = sg.get_max_local_range()[0];
+  const int from = item.get_global_id(0) / warpSize;
+  const int incr = item.get_group_range(0) * ThreadsPerBlock / warpSize;
+  const int lane = sg.get_local_linear_id(); //item.get_local_id(0) % warpSize;
 
   for (int i = from; i < nodes; i += incr) {
     const int target0 = label[i];
@@ -711,7 +717,7 @@ static void processCycles(
         }
         minus[j] = sum & 1;
       }
-      j -= warpsize;
+      j -= warpSize;
     }
     sycl::group_barrier(sg);
   }
@@ -771,14 +777,17 @@ static void compute1(
   int* const __restrict negCnt,
   sycl::nd_item<1> &item)
 {
-  const int from = item.get_global_id(0) / warpsize;
-  const int incr = item.get_group_range(0) * ThreadsPerBlock / warpsize;
-  const int lane = item.get_local_id(0) % warpsize;
+  auto sg = item.get_sub_group();
+  int warpSize = sg.get_max_local_range()[0];
+  const int from = item.get_global_id(0) / warpSize;
+  const int incr = item.get_group_range(0) * ThreadsPerBlock / warpSize;
+  const int lane = sg.get_local_linear_id(); //item.get_local_id(0) % warpSize;
+
   for (int v = from; v < nodes; v += incr) {
     const int beg = nidx[v];
     const int end = nidx[v + 1];
     int vstat = representative(v, label);
-    for (int j = beg + lane; j < end; j += warpsize) {
+    for (int j = beg + lane; j < end; j += warpSize) {
       const int nli = nlist[j] >> 1;
       if (minus[j]) {
         negCnt[j]++;
@@ -790,12 +799,12 @@ static void compute1(
           if (vstat != ostat) {
             int ret;
             if (vstat < ostat) {
-              if ((ret = atomicCAS(label+ostat, ostat, vstat)) != ostat) {
+              if ((ret = atomicCAS(label[ostat], ostat, vstat)) != ostat) {
                 ostat = ret;
                 repeat = true;
               }
             } else {
-              if ((ret = atomicCAS(label+vstat, vstat, ostat)) != vstat) {
+              if ((ret = atomicCAS(label[vstat], vstat, ostat)) != vstat) {
                 vstat = ret;
                 repeat = true;
               }
@@ -839,7 +848,7 @@ static void ccSize(
     *wSize = 0;
   }
   for (int v = from; v < nodes; v += incr) {
-    atomicAdd(&count[label[v]], 1);
+    atomicAdd(count[label[v]], 1);
   }
 }
 
@@ -851,7 +860,7 @@ static void largestCC(const int nodes, const int* const __restrict count,
   for (int v = from; v < nodes; v += incr) {
     const unsigned long long d_hi = (((unsigned long long)count[v]) << 32)| v;
     if (*hi < d_hi) {
-      atomicMax(hi, d_hi);
+      atomicMax(*hi, d_hi);
     }
   }
 }
@@ -868,9 +877,12 @@ static void ccHopCount(
   unsigned long long *hi,
   int *wSize)
 {
-  const int from = item.get_global_id(0) / warpsize;
-  const int incr = (item.get_group_range(0) * ThreadsPerBlock) / warpsize;
-  const int lane = item.get_local_id(0) % warpsize;
+  auto sg = item.get_sub_group();
+  int warpSize = sg.get_max_local_range()[0];
+  const int from = item.get_global_id(0) / warpSize;
+  const int incr = item.get_group_range(0) * ThreadsPerBlock / warpSize;
+  const int lane = sg.get_local_linear_id(); //item.get_local_id(0) % warpSize;
+
 
   const int hi2 = *hi & 0xffffffff;
   for (int v = from; v < nodes; v += incr) {
@@ -878,11 +890,11 @@ static void ccHopCount(
     if (lblv == v) {
       count[lblv] = (lblv == hi2) ? 0 : INT_MAX - 1;  // init count
     }
-    for (int j = nidx[v] + lane; j < nidx[v + 1]; j += warpsize) {
+    for (int j = nidx[v] + lane; j < nidx[v + 1]; j += warpSize) {
       const int nli = nlist[j] >> 1;
       const int lbln = label[nli];
       if (lblv < lbln) {  // only one direction
-        const int idx = atomicAdd(wSize, 1);  // get the return value and use it
+        const int idx = atomicAdd(*wSize, 1);  // get the return value and use it
         ws1[idx] = lblv;
         ws2[idx] = lbln;
       }

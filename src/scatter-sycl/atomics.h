@@ -1,29 +1,19 @@
 #pragma once
 
-template<typename T, typename V>
-inline T atomicCAS(T *val, T expected, V desired)
-{
-  T expected_value = expected;
-  auto atm = sycl::atomic_ref<T,
-    sycl::memory_order::relaxed,
-    sycl::memory_scope::device,
-    sycl::access::address_space::global_space>(*val);
-  atm.compare_exchange_strong(expected_value, (T)desired);
-  return expected_value;
-}
-
 #define ATOMIC(NAME)                                                                                                                  \
   template <typename scalar, size_t size> struct Atomic##NAME##IntegerImpl;                                                           \
                                                                                                                                       \
   template <typename scalar> struct Atomic##NAME##IntegerImpl<scalar, 4> {                                                            \
     inline void operator()(scalar *address, scalar val) {                                                                             \
       uint32_t *address_as_ui = (uint32_t *)address;                                                                                  \
-      uint32_t old = *address_as_ui;                                                                                                  \
+      auto atm = sycl::atomic_ref<uint32_t, sycl::memory_order::relaxed,                                                              \
+            sycl::memory_scope::device, sycl::access::address_space::global_space>(*address_as_ui);                                   \
+      uint32_t old = atm.load();                                                                                                      \
       uint32_t assumed;                                                                                                               \
-                                                                                                                                      \
       do {                                                                                                                            \
         assumed = old;                                                                                                                \
-        old = atomicCAS(address_as_ui, assumed, OP(val, (scalar)old));                                                                \
+        uint32_t updated = OP(val, (scalar)old);                                                                                      \
+        atm.compare_exchange_strong(old, updated);                                                                                    \
       } while (assumed != old);                                                                                                       \
     }                                                                                                                                 \
   };                                                                                                                                  \
@@ -31,12 +21,14 @@ inline T atomicCAS(T *val, T expected, V desired)
   template <typename scalar> struct Atomic##NAME##IntegerImpl<scalar, 8> {                                                            \
     inline void operator()(scalar *address, scalar val) {                                                                             \
       unsigned long long *address_as_ull = (unsigned long long *)address;                                                             \
-      unsigned long long old = *address_as_ull;                                                                                       \
+      auto atm = sycl::atomic_ref<unsigned long long, sycl::memory_order::relaxed,                                                    \
+            sycl::memory_scope::device, sycl::access::address_space::global_space>(*address_as_ull);                                  \
+      unsigned long long old = atm.load();                                                                                            \
       unsigned long long assumed;                                                                                                     \
-                                                                                                                                      \
       do {                                                                                                                            \
         assumed = old;                                                                                                                \
-        old = atomicCAS(address_as_ull, assumed, OP(val, (scalar)old));                                                               \
+        unsigned long long updated = OP(val, (scalar)old);                                                                            \
+        atm.compare_exchange_strong(old, updated);                                                                                    \
       } while (assumed != old);                                                                                                       \
     }                                                                                                                                 \
   };                                                                                                                                  \
@@ -46,29 +38,29 @@ inline T atomicCAS(T *val, T expected, V desired)
   template <typename scalar> struct Atomic##NAME##DecimalImpl<scalar, 4> {                                                            \
     inline void operator()(scalar *address, scalar val) {                                                                             \
       int *address_as_i = (int *)address;                                                                                             \
-      int old = *address_as_i;                                                                                                        \
+      auto atm = sycl::atomic_ref<int, sycl::memory_order::relaxed,                                                                   \
+            sycl::memory_scope::device, sycl::access::address_space::global_space>(*address_as_i);                                    \
+      int old = atm.load();                                                                                                           \
       int assumed;                                                                                                                    \
-                                                                                                                                      \
       do {                                                                                                                            \
         assumed = old;                                                                                                                \
-        old = atomicCAS(address_as_i, assumed,                                                                                        \
-                        sycl::bit_cast<int, float>(OP(val, sycl::bit_cast<float>(assumed))));                                         \
+        int updated = sycl::bit_cast<int, float>(OP(val, sycl::bit_cast<float>(assumed)));                                            \
+        atm.compare_exchange_strong(old, updated);                                                                                    \
       } while (assumed != old);                                                                                                       \
     }                                                                                                                                 \
   };                                                                                                                                  \
                                                                                                                                       \
   template <typename scalar> struct Atomic##NAME##DecimalImpl<scalar, 8> {                                                            \
     inline void operator()(scalar *address, scalar val) {                                                                             \
-      unsigned long long int *address_as_ull =                                                                                        \
-          (unsigned long long int *)address;                                                                                          \
-      unsigned long long int old = *address_as_ull;                                                                                   \
-      unsigned long long int assumed;                                                                                                 \
-                                                                                                                                      \
+      unsigned long long *address_as_ull = (unsigned long long *)address;                                                             \
+      auto atm = sycl::atomic_ref<unsigned long long, sycl::memory_order::relaxed,                                                    \
+            sycl::memory_scope::device, sycl::access::address_space::global_space>(*address_as_ull);                                  \
+      unsigned long long old = atm.load();                                                                                            \
+      unsigned long long assumed;                                                                                                     \
       do {                                                                                                                            \
         assumed = old;                                                                                                                \
-        old = atomicCAS(                                                                                                              \
-            address_as_ull, assumed,                                                                                                  \
-            sycl::bit_cast<long long, double>(OP(val, sycl::bit_cast<double>(assumed))));                                             \
+        unsigned long long updated = sycl::bit_cast<unsigned long long, double>(OP(val, sycl::bit_cast<double>(assumed)));            \
+        atm.compare_exchange_strong(old, updated);                                                                                    \
       } while (assumed != old);                                                                                                       \
     }                                                                                                                                 \
   };

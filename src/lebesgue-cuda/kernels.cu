@@ -5,11 +5,16 @@
 __device__ __forceinline__
 double atomicMax(double *address, double val)
 {
-  unsigned long long ret = __double_as_longlong(*address);
+  unsigned long long *ptr = (unsigned long long *)address;
+  #if CUDA_VERSION >= 12080
+  unsigned long long ret = __nv_atomic_load_n(ptr, __NV_ATOMIC_RELAXED);
+  #else
+  unsigned long long ret = *ptr;
+  #endif
   while(val > __longlong_as_double(ret))
   {
     unsigned long long old = ret;
-    if((ret = atomicCAS((unsigned long long *)address, old, __double_as_longlong(val))) == old)
+    if((ret = atomicCAS(ptr, old, __double_as_longlong(val))) == old)
       break;
   }
   return __longlong_as_double(ret);

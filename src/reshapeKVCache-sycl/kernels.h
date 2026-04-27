@@ -1,24 +1,29 @@
 template <typename scalar_t, typename cache_t, Fp8KVCacheDataType kv_dt>
-__global__ void reshape_and_cache_kernel(
-    const scalar_t* __restrict__ key,    // [num_tokens, num_heads, head_size]
-    const scalar_t* __restrict__ value,  // [num_tokens, num_heads, head_size]
-    cache_t* __restrict__ key_cache,     // [num_blocks, num_heads, head_size/x, block_size, x]
-    cache_t* __restrict__ value_cache,   // [num_blocks, num_heads, head_size,  block_size]
-    const int64_t* __restrict__ slot_mapping,  // [num_tokens]
+void reshape_and_cache_kernel(
+    const scalar_t *__restrict__ key,   // [num_tokens, num_heads, head_size]
+    const scalar_t *__restrict__ value, // [num_tokens, num_heads, head_size]
+    cache_t *__restrict__ key_cache,    // [num_blocks, num_heads, head_size/x,
+                                        // block_size, x]
+    cache_t *__restrict__ value_cache,  // [num_blocks, num_heads, head_size,
+                                        // block_size]
+    const int64_t *__restrict__ slot_mapping, // [num_tokens]
     const int key_stride, const int value_stride, const int num_heads,
-    const int head_size, const int block_size, const int x,
-    const float k_scale, const float v_scale)
+    const int head_size, const int block_size, const int x, const float k_scale,
+    const float v_scale,
+    sycl::nd_item<1> &item)
 {
-  const int64_t token_idx = blockIdx.x;
+  const int64_t token_idx = item.get_group(0);
   const int64_t slot_idx = slot_mapping[token_idx];
-  if (slot_idx < 0) return;
+  if (slot_idx < 0) {
+    return;
+  }
 
   const int64_t block_idx = slot_idx / block_size;
   const int64_t block_offset = slot_idx % block_size;
   const int h_block_count = head_size / x;  // head block count
 
-  for (int h_block_idx = threadIdx.x; h_block_idx < num_heads * h_block_count;
-           h_block_idx += blockDim.x) {
+  for (int h_block_idx = item.get_local_id(0); h_block_idx < num_heads * h_block_count;
+           h_block_idx += item.get_local_range(0)) {
 
     const int head_idx = h_block_idx / h_block_count;
     const int h_block = h_block_idx % h_block_count;
@@ -54,3 +59,4 @@ __global__ void reshape_and_cache_kernel(
     }
   }
 }
+

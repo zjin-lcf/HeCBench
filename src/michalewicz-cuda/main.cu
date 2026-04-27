@@ -8,11 +8,16 @@
 __device__ __forceinline__
 float atomicMin(float *addr, float value)
 {
-  unsigned ret = __float_as_uint(*addr);
+  unsigned *ptr = (unsigned *)addr;
+  #if CUDA_VERSION >= 12080
+  unsigned ret = __nv_atomic_load_n(ptr, __NV_ATOMIC_RELAXED);
+  #else
+  unsigned ret = *ptr;
+  #endif
   while(value < __uint_as_float(ret))
   {
     unsigned old = ret;
-    if((ret = atomicCAS((unsigned *)addr, old, __float_as_uint(value))) == old)
+    if((ret = atomicCAS(ptr, old, __float_as_uint(value))) == old)
       break;
   }
   return __uint_as_float(ret);

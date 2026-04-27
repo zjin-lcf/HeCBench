@@ -3,14 +3,16 @@
 #include <cstdio>
 #include <random>
 #include <vector>
+#include <sycl/sycl.hpp>
+#include "../f8cast-sycl/kernels.h"
 #include "utils.h"
 #include "kernels.h"
 #include "reference.h"
 
 template <typename scalar_t, typename cache_t, Fp8KVCacheDataType kv_dt>
-void reshape_and_cache(int num_tokens, int num_heads, int head_size,
-                       int block_size, int x, int repeat)
-{
+void reshape_and_cache(sycl::queue &q,
+                       int num_tokens, int num_heads, int head_size,
+                       int block_size, int x, int repeat) try {
     assert(head_size % x == 0);
 
     int key_stride = num_heads * head_size;
@@ -49,36 +51,32 @@ void reshape_and_cache(int num_tokens, int num_heads, int head_size,
 
     std::shuffle(h_slot_mapping.begin(), h_slot_mapping.end(), gen);
 
-    scalar_t *d_key, *d_value;
-    cache_t *d_key_cache, *d_value_cache;
-    int64_t* d_slot_mapping;
+    scalar_t *d_key = sycl::malloc_device<scalar_t>(key_size, q);
+    scalar_t *d_value = sycl::malloc_device<scalar_t>(value_size, q);
+    cache_t *d_key_cache = sycl::malloc_device<cache_t>(key_cache_size, q);
+    cache_t *d_value_cache = sycl::malloc_device<cache_t>(value_cache_size, q);
+    int64_t* d_slot_mapping = sycl::malloc_device<int64_t>(num_tokens, q);
 
-    GPU_CHECK(hipMalloc(&d_key, key_size * sizeof(scalar_t)));
-    GPU_CHECK(hipMalloc(&d_value, value_size * sizeof(scalar_t)));
-    GPU_CHECK(hipMalloc(&d_key_cache, key_cache_size * sizeof(cache_t)));
-    GPU_CHECK(hipMalloc(&d_value_cache, value_cache_size * sizeof(cache_t)));
-    GPU_CHECK(hipMalloc(&d_slot_mapping, num_tokens * sizeof(int64_t)));
+    q.memset(d_key_cache, 0, key_cache_size * sizeof(cache_t));
+    q.memset(d_key_cache, 0, value_cache_size * sizeof(cache_t));
+    q.memcpy(d_key, h_key.data(), key_size * sizeof(scalar_t));
+    q.memcpy(d_value, h_value.data(), value_size * sizeof(scalar_t));
+    q.memcpy(d_slot_mapping, h_slot_mapping.data(), num_tokens * sizeof(int64_t));
 
-    GPU_CHECK(hipMemset(d_key_cache, 0, key_cache_size * sizeof(cache_t)));
-    GPU_CHECK(hipMemset(d_value_cache, 0, value_cache_size * sizeof(cache_t)));
+    int threadsPerBlock = std::min(num_heads * headsize_div_x, 512);
+    sycl::range<1> gws (threadsPerBlock * num_tokens);
+    sycl::range<1> lws (threadsPerBlock);
 
-    GPU_CHECK(hipMemcpy(d_key, h_key.data(),
-                         key_size * sizeof(scalar_t), hipMemcpyHostToDevice));
-    GPU_CHECK(hipMemcpy(d_value, h_value.data(),
-                         value_size * sizeof(scalar_t), hipMemcpyHostToDevice));
-    GPU_CHECK(hipMemcpy(d_slot_mapping, h_slot_mapping.data(),
-                         num_tokens * sizeof(int64_t), hipMemcpyHostToDevice));
-
-    dim3 grid(num_tokens);
-    dim3 block(std::min(num_heads * headsize_div_x, 512));
+    auto kFn = [=](sycl::nd_item<1> item) {
+      reshape_and_cache_kernel<scalar_t, cache_t, kv_dt>(
+        d_key, d_value, d_key_cache, d_value_cache, d_slot_mapping,
+        key_stride, value_stride, num_heads, head_size, block_size,
+        x, k_scale, v_scale, item);
+    };
 
     // warmup
     for (int i = 0; i < 30; i++) {
-        reshape_and_cache_kernel<scalar_t, cache_t, kv_dt><<<grid, block>>>(
-          d_key, d_value, d_key_cache, d_value_cache, d_slot_mapping,
-          key_stride, value_stride, num_heads, head_size, block_size,
-          x, k_scale, v_scale
-        );
+      q.parallel_for(sycl::nd_range<1>(gws, lws), kFn);
     }
 
     std::vector<cache_t> r_key_cache(key_cache_size, 0);
@@ -92,15 +90,10 @@ void reshape_and_cache(int num_tokens, int num_heads, int head_size,
       h_slot_mapping.data(),
       key_stride, value_stride, num_tokens, num_heads, head_size, block_size,
       x, k_scale, v_scale);
-    
 
-    GPU_CHECK(hipMemcpy(h_key_cache.data(), d_key_cache,
-                         key_cache_size * sizeof(cache_t),
-                         hipMemcpyDeviceToHost));
-
-    GPU_CHECK(hipMemcpy(h_value_cache.data(), d_value_cache,
-                         value_cache_size * sizeof(cache_t),
-                         hipMemcpyDeviceToHost));
+    q.memcpy(h_key_cache.data(), d_key_cache, key_cache_size * sizeof(cache_t));
+    q.memcpy(h_value_cache.data(), d_value_cache, value_cache_size * sizeof(cache_t));
+    q.wait();
 
     bool ok = true;
     for (uint64_t i = 0; i < key_cache_size; i++) {
@@ -120,32 +113,35 @@ void reshape_and_cache(int num_tokens, int num_heads, int head_size,
     }
     printf("%s\n", ok ? "PASS" : "FAIL");
 
-    GPU_CHECK(hipDeviceSynchronize());
+    q.wait();
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < repeat; i++) {
-        reshape_and_cache_kernel<scalar_t, cache_t, kv_dt><<<grid, block>>>(
-          d_key, d_value, d_key_cache, d_value_cache, d_slot_mapping,
-          key_stride, value_stride, num_heads, head_size, block_size,
-          x, k_scale, v_scale
-        );
+      q.parallel_for(sycl::nd_range<1>(gws, lws), kFn);
     }
 
-    GPU_CHECK(hipDeviceSynchronize());
+    q.wait();
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     printf("Average execution time of reshape and cache kernel: %f (us)\n", (time * 1e-3f) / repeat);
 
-    uint64_t bytes = sizeof(cache_t) * (key_cache_size + value_cache_size) + 
+    uint64_t bytes = sizeof(cache_t) * (key_cache_size + value_cache_size) +
                      sizeof(int64_t) * num_tokens +
                      sizeof(scalar_t) * (key_size + value_size);
-    printf("Average bandwidth of reshape and cache kernel: %f (GB/s)\n", bytes * repeat * 1.0 / time);
+    printf("Average bandwidth of reshape and cache kernel: %f (GB/s)\n", bytes * repeat * 1.f / time);
 
-    GPU_CHECK(hipFree(d_key));
-    GPU_CHECK(hipFree(d_value));
-    GPU_CHECK(hipFree(d_key_cache));
-    GPU_CHECK(hipFree(d_value_cache));
-    GPU_CHECK(hipFree(d_slot_mapping));
+    q.wait();
+
+    sycl::free(d_key, q);
+    sycl::free(d_value, q);
+    sycl::free(d_key_cache, q);
+    sycl::free(d_value_cache, q);
+    sycl::free(d_slot_mapping, q);
+}
+catch (sycl::exception const &exc) {
+  std::cerr << exc.what() << "Exception caught at file:" << __FILE__
+            << ", line:" << __LINE__ << std::endl;
+  std::exit(1);
 }
 
 int main(int argc, char* argv[]) {
@@ -158,17 +154,24 @@ int main(int argc, char* argv[]) {
     const int head_size = atoi(argv[3]);
     const int repeat = atoi(argv[4]);
 
+#ifdef USE_GPU
+    sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
+#else
+    sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
+#endif
+
     for (int block_size = 16; block_size <= 32; block_size *= 2) {
         for (int x = 1; x <= 8; x *= 2) {
             printf("Block size: %d, Head size divisor: %d\n", block_size, x);
             printf("─────────────────────────────────────────────────────\n");
             printf("Reshape FP32 -> FP8 KV cache\n");
             reshape_and_cache<float, uint8_t, Fp8KVCacheDataType::kFp8E4M3>(
-              num_tokens, num_heads, head_size, block_size, x, repeat);
+              q, num_tokens, num_heads, head_size, block_size, x, repeat);
 
             printf("Reshape BF16 -> FP8 KV cache\n");
-            reshape_and_cache<__hip_bfloat16, uint8_t, Fp8KVCacheDataType::kFp8E4M3>(
-              num_tokens, num_heads, head_size, block_size, x, repeat);
+            reshape_and_cache<sycl::ext::oneapi::bfloat16, uint8_t,
+                              Fp8KVCacheDataType::kFp8E4M3>(
+              q, num_tokens, num_heads, head_size, block_size, x, repeat);
             printf("─────────────────────────────────────────────────────\n");
         }
     }

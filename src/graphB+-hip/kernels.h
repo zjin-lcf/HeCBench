@@ -274,7 +274,7 @@ static __global__ void generateSpanningTree(
   const int* const __restrict__ nlist,
   const int seed,
   EdgeInfo* const einfo,
-  volatile int* const parent,
+  int* const parent,
   int* const queue,
   const int level,
   int* const tail,
@@ -295,18 +295,18 @@ static __global__ void generateSpanningTree(
   for (int i = start + from; i < end; i += incr) {
     const int node = queue[i];
     const int me = (node << 2) | bit;
-    if (lane == 0) atomicAnd((int*)&parent[node], ~3);
+    if (lane == 0) atomicAnd(&parent[node], ~3);
     for (int j = nindex[node + 1] - 1 - lane; j >= nindex[node]; j -= warpsize) {  // reverse order on purpose
       const int neighbor = nlist[j] >> 1;
       const int seed3 = neighbor ^ seed2;
       const int hash_me = hash(me ^ seed3);
       int val, hash_val;
       do {  // pick parent deterministically
-          val = parent[neighbor];
+          val = __atomic_load_n(&parent[neighbor], __ATOMIC_RELAXED);
           hash_val = hash(val ^ seed3);
         } while (((val < 0) || (((val & 3) == bit) && ((hash_val < hash_me) || 
                  ((hash_val == hash_me) && (val < me))))) && 
-                 (atomicCAS((int*)&parent[neighbor], val, me) != val));
+                 (atomicCAS(&parent[neighbor], val, me) != val));
         if (val < 0) {
           val = atomicAdd(tail, 1);
           queue[val] = neighbor;
