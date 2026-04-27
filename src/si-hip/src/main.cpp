@@ -3,6 +3,7 @@
 #include <hip/hip_runtime.h>
 #include <hipblas/hipblas.h>
 #include <thrust/scan.h>
+#include <thrust/execution_policy.h>
 #include "io.hpp"
 #include "util.hpp"
 #include "host_timer.hpp"
