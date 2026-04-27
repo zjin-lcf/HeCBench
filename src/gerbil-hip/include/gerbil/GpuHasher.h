@@ -27,7 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "SyncQueue.h"
 #include <chrono>
 
-#ifdef GPU
+#ifdef GERBIL_USE_GPU
 #include "KmerCountingHashTable.h"
 #endif
 
@@ -46,7 +46,7 @@ private:
 	// output queue
 	SyncSwapQueueMPSC<KmcBundle>* _kmcSyncSwapQueue;
 
-#ifdef GPU
+#ifdef GERBIL_USE_GPU
 	// thread own hash tables
 	KmerCountingHashTable<K>** tables;
 #endif
@@ -89,7 +89,7 @@ public:
 		for(uint i(0); i < HISTOGRAM_SIZE; ++i)
 			_histogram[i].store(0);
 
-#ifdef GPU
+#ifdef GERBIL_USE_GPU
 		tables = new KmerCountingHashTable<K>*[_numThreads];
 		// crate thread-own gpu hash tables
 		for (uint32_t i = 0; i < numThreads; i++) {
@@ -104,7 +104,7 @@ public:
 
 	~HasherTask() {
 
-#ifdef GPU
+#ifdef GERBIL_USE_GPU
 		for (uint32_t i = 0; i < _numThreads; i++) {
 			delete tables[i];
 		}
@@ -127,7 +127,7 @@ public:
 
 		// spawn threads
 		for (uint32_t devID = 0; devID < _numThreads; devID++) {
-#ifdef GPU
+#ifdef GERBIL_USE_GPU
 			_threads[devID] =
 			new std::thread(
 

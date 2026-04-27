@@ -17,7 +17,7 @@
 // is there another OS?
 #endif
 
-#ifdef GPU
+#ifdef GERBIL_USE_GPU
 #include <hip/hip_runtime.h>
 #endif
 
@@ -83,7 +83,7 @@ gerbil::Application::Application() :
 }
 
 gerbil::Application::~Application() {
-#ifdef GPU
+#ifdef GERBIL_USE_GPU
 	hipDeviceReset();
 #endif
 }
@@ -145,7 +145,7 @@ void gerbil::Application::parseParams(const int &argc, char** argv) {
 			case 'h': _histogram = true; break;
 			}
 			break;
-#ifdef GPU
+#ifdef GERBIL_USE_GPU
 		case 'g': {
 			// determine number of gpus to use
 			int num;
@@ -192,7 +192,7 @@ void gerbil::Application::parseParams(const int &argc, char** argv) {
 			printf("         gerbil         gerbil format\n");
 			printf("         fasta          fasta format\n");
 			printf("         none           no output\n");
-#ifdef GPU
+#ifdef GERBIL_USE_GPU
 			printf("  -g                    enable gpu\n");
 #endif
 			printf("  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  \n");
