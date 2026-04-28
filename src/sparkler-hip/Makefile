@@ -1,16 +1,16 @@
 #===============================================================================
 # User Options
 #===============================================================================
-MPI_ROOT=$(HOME)/openmpi-4.1.0-install/
+MPI_ROOT ?= /usr/lib/x86_64-linux-gnu/openmpi
 HIPBLAS_ROOT=/opt/rocm/hipblas
 HIPRT_ROOT=/opt/rocm/hip
 
 # Compiler can be set below, or via environment variable
 CC        = hipcc
-LD        = $(MPI_ROOT)/bin/mpiCC
+LD       ?= mpiCC
 OPTIMIZE  = yes
 DEBUG     = no
-LAUNCHER  =
+LAUNCHER ?=
 
 #===============================================================================
 # Program name & source code list
@@ -59,4 +59,4 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) $(MPI_ROOT)/bin/mpirun -n 4 ./$(program) --num_vector 4000 --num_field 90000 --num_iterations 10
+	$(LAUNCHER) mpirun -n 4 ./$(program) --num_vector 4000 --num_field 90000 --num_iterations 10

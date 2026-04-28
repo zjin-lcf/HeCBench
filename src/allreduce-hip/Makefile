@@ -6,11 +6,9 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-MPI_ROOT  = $(HOME)/ompi_for_gpu/ompi
-LAUNCHER  = $(HOME)/ompi_for_gpu/ompi/bin/mpirun -n 2
+MPI_ROOT ?= /usr/lib/x86_64-linux-gnu/openmpi
+LAUNCHER ?= /usr/bin/mpirun -n 2
 
-#MPI_ROOT  = /usr/lib/x86_64-linux-gnu/openmpi
-#LAUNCHER  = /usr/bin/mpirun -n 1
 
 #===============================================================================
 # Program name & source code list
