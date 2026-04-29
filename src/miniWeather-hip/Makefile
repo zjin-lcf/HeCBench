@@ -6,8 +6,8 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-MPI_INCLUDE = "/usr/lib/x86_64-linux-gnu/openmpi/include"
-MPI_LIB_DIR = "/usr/lib/x86_64-linux-gnu/openmpi/lib"
+MPI_INCLUDE ?= "/usr/lib/x86_64-linux-gnu/openmpi/include"
+MPI_LIB_DIR ?= "/usr/lib/x86_64-linux-gnu/openmpi/lib"
 LAUNCHER    =
 
 #===============================================================================
