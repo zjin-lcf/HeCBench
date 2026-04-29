@@ -2,6 +2,8 @@
 # User Options
 #===============================================================================
 
+ROCM_PATH    ?= /opt/rocm
+
 # Compiler can be set below, or via environment variable
 CC        = hipcc
 OPTIMIZE  = yes
@@ -23,11 +25,11 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I/opt/rocm/include/hipblas \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I$(ROCM_PATH)/include/hipblas \
           -DHIPBLAS_V2
 
 # Linker Flags
-LDFLAGS = -lhipblas
+LDFLAGS = -L$(ROCM_PATH)/lib -lhipblas
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
