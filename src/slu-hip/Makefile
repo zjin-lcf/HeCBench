@@ -70,15 +70,27 @@ main.o: $(SLU_PATH)/main.cpp
 preprocess.o: $(SLU_PATH)/preprocess.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(SLU_PATH)/nicslu/lib/nicslu.a:
-	make -C $(SLU_PATH)/nicslu/
+# Auto-extract NICSLU on first build (or if a previous extraction was
+# incomplete). nicslu/Makefile is the sentinel — make treats the extracted
+# tree as an output of the tarball.
+$(SLU_PATH)/nicslu/Makefile: $(SLU_PATH)/nicslu.tar.bz2
+	@if [ ! -f $(SLU_PATH)/nicslu/include/nicslu.h ] || \
+	    [ ! -d $(SLU_PATH)/nicslu/source ]; then \
+		echo "Extracting NICSLU..."; \
+		rm -rf $(SLU_PATH)/nicslu; \
+		tar -xjf $(SLU_PATH)/nicslu.tar.bz2 -C $(SLU_PATH); \
+	fi
 
-$(SLU_PATH)/nicslu/util/nicslu_util.a:
-	make -C $(SLU_PATH)/nicslu/
+$(SLU_PATH)/nicslu/lib/nicslu.a: $(SLU_PATH)/nicslu/Makefile
+	$(MAKE) -C $(SLU_PATH)/nicslu/
+
+$(SLU_PATH)/nicslu/util/nicslu_util.a: $(SLU_PATH)/nicslu/Makefile
+	$(MAKE) -C $(SLU_PATH)/nicslu/
 
 clean:
 	rm -rf $(program) $(obj) *.dat
-	make -C $(SLU_PATH)/nicslu/ clean
+	@[ -f $(SLU_PATH)/nicslu/Makefile ] && \
+		$(MAKE) -C $(SLU_PATH)/nicslu/ clean || true
 
 test: $(program)
 	$(LAUNCHER) ./$(program) -i $(SLU_PATH)/nicslu/test/add32.mtx
