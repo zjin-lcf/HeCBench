@@ -1,9 +1,10 @@
 #===============================================================================
 # User Options
 #===============================================================================
+
 MPI_ROOT ?= /usr/lib/x86_64-linux-gnu/openmpi
-HIPBLAS_ROOT=/opt/rocm/hipblas
-HIPRT_ROOT=/opt/rocm/hip
+HIPBLAS_ROOT ?= $(ROCM_PATH)
+HIPRT_ROOT   ?= $(ROCM_PATH)
 
 # Compiler can be set below, or via environment variable
 CC        = hipcc
@@ -28,11 +29,10 @@ obj = $(source:.cu=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -I$(MPI_ROOT)/include -std=c++17 -Wall -fPIE \
-          -I/opt/rocm/include/hipblas
+          -I$(ROCM_PATH)/include/hipblas
 
 # Linker Flags
-LDFLAGS = -L$(HIPBLAS_ROOT)/lib -lhipblas \
-	  -L$(HIPRT_ROOT)/lib -lamdhip64 
+LDFLAGS = -L$(HIPBLAS_ROOT)/lib -lhipblas -L$(HIPRT_ROOT)/lib -lamdhip64 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

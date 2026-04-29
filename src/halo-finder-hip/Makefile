@@ -1,4 +1,5 @@
-HIPCC_BIN=/opt/rocm/bin
+ROCM_PATH ?= /opt/rocm
+HIPCC_BIN ?= $(ROCM_PATH)/bin
 
 # the path may be adjusted for each platform
 MPI_INCLUDE ?= /usr/lib/x86_64-linux-gnu/openmpi/include
@@ -6,7 +7,7 @@ MPI_INCLUDE ?= /usr/lib/x86_64-linux-gnu/openmpi/include
 OPT=-O3 -DRCB_UNTHREADED_BUILD -DUSE_SERIAL_COSMO
 
 #HIPCC_FLAGS=-ffast_math -DINLINE_FORCE -I${MPI_INCLUDE}
-HIPCC_FLAGS=-I${MPI_INCLUDE} -I/opt/rocm/hip/include
+HIPCC_FLAGS=-I${MPI_INCLUDE} -I$(ROCM_PATH)/include
 
 HACC_PLATFORM=hip
 HACC_OBJDIR=${HACC_PLATFORM}
