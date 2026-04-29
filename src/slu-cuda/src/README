@@ -1,2 +1,1 @@
-Please uncompress the file, nicslu.tar.bz2, before building the application.
-
+The NICSLU library (nicslu.tar.bz2) is auto-extracted by the Makefile on first build.
