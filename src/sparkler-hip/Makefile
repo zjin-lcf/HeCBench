@@ -2,8 +2,9 @@
 # User Options
 #===============================================================================
 MPI_ROOT=$(HOME)/openmpi-4.1.0-install/
-HIPBLAS_ROOT=/opt/rocm/hipblas
-HIPRT_ROOT=/opt/rocm/hip
+ROCM_PATH    ?= /opt/rocm
+HIPBLAS_ROOT ?= $(ROCM_PATH)
+HIPRT_ROOT   ?= $(ROCM_PATH)
 
 # Compiler can be set below, or via environment variable
 CC        = hipcc
