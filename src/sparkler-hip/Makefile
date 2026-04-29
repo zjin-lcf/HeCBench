@@ -2,13 +2,14 @@
 # User Options
 #===============================================================================
 
-MPI_ROOT ?= /usr/lib/x86_64-linux-gnu/openmpi
+MPI_ROOT     ?= /usr/lib/x86_64-linux-gnu/openmpi
+ROCM_PATH    ?= /opt/rocm
 HIPBLAS_ROOT ?= $(ROCM_PATH)
 HIPRT_ROOT   ?= $(ROCM_PATH)
 
 # Compiler can be set below, or via environment variable
 CC        = hipcc
-LD       ?= mpiCC
+LD        = mpiCC
 OPTIMIZE  = yes
 DEBUG     = no
 LAUNCHER ?=
