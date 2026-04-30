@@ -149,14 +149,14 @@ void GSimulation::Start() {
   total_time_ = t0.Elapsed();
   total_flops_ = gflops * get_nsteps();
   av /= (double)(nf - 2);
-  dev = sqrt(dev / (double)(nf - 2) - av * av);
+  // when nf = 3, deviation is 0 (N/A)
+  dev = (nf == 3) ? 0.0 : sqrt(dev / (double)(nf - 2) - av * av);
 
   std::cout << "\n";
   std::cout << "# Total Energy        : " << kenergy_ << "\n";
   std::cout << "# Total Time (s)      : " << total_time_ << "\n";
   std::cout << "# Average Performance : " << av << " +- " << dev << "\n";
-  std::cout << "==============================="
-            << "\n";
+  std::cout << "===============================\n";
 
   cudaFree(p);
   cudaFree(e);
