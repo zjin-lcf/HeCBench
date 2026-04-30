@@ -146,12 +146,20 @@ $(OBJDIR)/%.o: %.cxx | $(OBJDIR)
 dims-local.c: dfft/dims.c
 	cp -f dfft/dims.c dims-local.c
 
+# Explicit prerequisite: dims-local.o needs dims-local.c to be generated first.
+# Without this, 'make -j' can attempt to compile the object before 'cp' runs.
+$(OBJDIR)/dims-local.o: dims-local.c
 
 $(OBJDIR)/ForceTreeTest: $(OBJDIR)/ForceTreeTest.o $(OBJDIR)/libparticle.a $(OBJDIR)/libBHForceTree.a $(OBJDIR)/libpartition.a $(OBJDIR)/libhalotime.a $(OBJDIR)/libbigchunk.a $(OBJDIR)/dims-local.o
 	${HACC_MPI_CXX} ${CXXFLAGS} -o $@ $^ ${LDFLAGS} -DUSE_SERIAL_COSMO=1
 
-$(OBJDIR)/libpartition.a: $(OBJDIR)/libpartition.a($(OBJDIR)/Partition.o)
-	#ranlib $@
+# Use explicit object lists + ar/ranlib instead of the deprecated
+# archive(member.o) syntax. The latter triggers Make's built-in .c.o and .o.a
+# implicit rules (which call cc), bypassing this project's hipcc recipe and
+# mis-compiling the objects.
+$(OBJDIR)/libpartition.a: $(OBJDIR)/Partition.o
+	ar rv $@ $(OBJDIR)/Partition.o
+	ranlib $@
 
 
 PARTICLE_SOURCES += ParticleDistribute.cxx
@@ -160,16 +168,18 @@ PARTICLE_SOURCES += InitialExchange.cxx
 PARTICLE_SOURCES += Message.cxx
 PARTICLE_OBJLIST = $(PARTICLE_SOURCES:.cxx=.o)
 PARTICLE_OBJECTS := $(addprefix $(OBJDIR)/,$(PARTICLE_OBJLIST))
-$(OBJDIR)/libparticle.a: $(OBJDIR)/libparticle.a($(PARTICLE_OBJECTS))
-	#ranlib $@
+$(OBJDIR)/libparticle.a: $(PARTICLE_OBJECTS)
+	ar rv $@ $(PARTICLE_OBJECTS)
+	ranlib $@
 
 
 HT_SOURCES += Timings.cxx
 HT_SOURCES += Timer.cxx
 HT_OBJLIST = $(HT_SOURCES:.cxx=.o)
 HT_OBJECTS := $(addprefix $(OBJDIR)/,$(HT_OBJLIST))
-$(OBJDIR)/libhalotime.a: $(OBJDIR)/libhalotime.a($(HT_OBJECTS))
-	#ranlib $@
+$(OBJDIR)/libhalotime.a: $(HT_OBJECTS)
+	ar rv $@ $(HT_OBJECTS)
+	ranlib $@
 
 
 FORCE_SOURCES += ForceLaw.cxx
@@ -180,14 +190,21 @@ FORCE_SOURCES_C += BGQStep16.c
 FORCE_OBJLIST = $(FORCE_SOURCES:.cxx=.o)
 FORCE_OBJLIST_C = $(FORCE_SOURCES_C:.c=.o)
 FORCE_OBJECTS := $(addprefix $(OBJDIR)/,$(FORCE_OBJLIST) $(FORCE_OBJLIST_C))
-$(OBJDIR)/libBHForceTree.a: $(OBJDIR)/libBHForceTree.a($(FORCE_OBJECTS) $(FORCE_OBJLIST_C))
-	#ranlib $@
+# Note: $(FORCE_OBJLIST_C) is already a subset of $(FORCE_OBJECTS) (added via
+# addprefix above) — listing it again as a separate prerequisite causes Make
+# to try its implicit cc rule for those objects.
+$(OBJDIR)/libBHForceTree.a: $(FORCE_OBJECTS)
+	ar rv $@ $(FORCE_OBJECTS)
+	ranlib $@
 
-$(OBJDIR)/libbigchunk.a: $(OBJDIR)/libbigchunk.a($(OBJDIR)/bigchunk.o)
-	#ranlib $@
+$(OBJDIR)/libbigchunk.a: $(OBJDIR)/bigchunk.o
+	ar rv $@ $(OBJDIR)/bigchunk.o
+	ranlib $@
 
 clean:
 	rm -rf sycl
+	rm -f dims-local.c
+	rm -f *.o *.a ForceTreeTest 2>/dev/null || true
 
 run: progs
 	$(LAUNCHER) ./sycl/ForceTreeTest 0.5 0.1 10000 0.1 10 N 12 rcb
