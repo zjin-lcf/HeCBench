@@ -14,7 +14,7 @@ LAUNCHER  =
 
 program = main
 
-source = main.cu tgv.cu ra.cu
+source = main.cu ra.cu
 
 obj = $(source:.cu=.o)
 
@@ -45,11 +45,11 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu ra.h float2math.h tgv.h Makefile
+%.o: %.cu ra.h float2math.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) pincat_recon.ra
 
 run: $(program)
 	$(LAUNCHER) ./$(program)
