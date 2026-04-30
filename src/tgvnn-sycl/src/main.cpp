@@ -37,7 +37,7 @@ main (int argc, char *argv[])
     const char *in_img, *in_mask, *out_img;
     in_img = "../../tgvnn-cuda/data/pincat.ra";
     in_mask = "../../tgvnn-cuda/data/pincat_mask.ra";
-    out_img = "../result/pincat_recon.ra";
+    out_img = "pincat_recon.ra";
 
     float alpha = 0.004;
     float beta = 0.5;
