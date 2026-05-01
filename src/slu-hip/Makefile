@@ -19,7 +19,7 @@ SLU_LIBS = $(SLU_PATH)/nicslu/lib/nicslu.a \
 
 program = main
 
-obj = preprocess.o Timer.o numeric.o symbolic.o main.o $(SLU_LIBS)
+obj = $(SLU_LIBS) preprocess.o Timer.o numeric.o symbolic.o main.o
 
 #===============================================================================
 # Sets Flags

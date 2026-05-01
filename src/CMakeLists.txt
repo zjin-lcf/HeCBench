@@ -455,6 +455,7 @@ set(HECBENCH_POC_BENCHMARKS
     # Final batch: remaining benchmarks
     addBiasQKV
     addBiasResidualLayerNorm
+    attentionMergeState
     attention-paged
     allreduce
     atomicAggregate

@@ -223,16 +223,11 @@ void SNICIT::_weight_bias_alloc_read() {
   }
   else {file_offset = 1;}
   for(int hidden_layer = 0; hidden_layer < num_layers; hidden_layer++) {
-    int *hidden_roffw;
-    int *hidden_colsw;
-    float *hidden_valsw;
-    float *hidden_bias;
+    int *hidden_roffw = new int[num_hidden_neurons+1](); // value initialization
+    int *hidden_colsw = new int[nnz];
+    float *hidden_valsw = new float[nnz];
+    float *hidden_bias = new float[num_hidden_neurons];
 
-    hidden_roffw = new int[num_hidden_neurons+1];
-    hidden_colsw = new int[nnz];
-    hidden_valsw = new float[nnz];
-    hidden_bias = new float[num_hidden_neurons];
-    memset(hidden_roffw, 0, (num_hidden_neurons+1)*sizeof(int));
     int* dev_cur_roffw;
     int* dev_cur_colsw;
     float* dev_cur_valsw;

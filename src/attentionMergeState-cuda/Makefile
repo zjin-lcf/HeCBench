@@ -2,12 +2,11 @@
 # User Options
 #===============================================================================
 
-ROCM_PATH    ?= /opt/rocm
-
 # Compiler can be set below, or via environment variable
-CC        = hipcc
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
+ARCH      = sm_60
 LAUNCHER  =
 
 #===============================================================================
@@ -25,11 +24,11 @@ obj = $(source:.cu=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I$(ROCM_PATH)/include/hipblas \
-          -DHIPBLAS_V2
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall -arch=$(ARCH) \
+          --expt-relaxed-constexpr
 
 # Linker Flags
-LDFLAGS = -L$(ROCM_PATH)/lib -lhipblas
+LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -41,7 +40,6 @@ endif
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
@@ -49,11 +47,14 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernels.h Makefile
+%.o: %.cu reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 1000
+	$(LAUNCHER) ./$(program) 1024 32 128 1000
+	$(LAUNCHER) ./$(program) 1024 64 128 1000
+	$(LAUNCHER) ./$(program) 1024 128 128 1000
+	$(LAUNCHER) ./$(program) 1024 256 128 1000

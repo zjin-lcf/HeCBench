@@ -2,12 +2,11 @@
 # User Options
 #===============================================================================
 
-ROCM_PATH    ?= /opt/rocm
-
 # Compiler can be set below, or via environment variable
-CC        = hipcc
+CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
+DEVICE    = gpu
 LAUNCHER  =
 
 #===============================================================================
@@ -16,24 +15,23 @@ LAUNCHER  =
 
 program = main
 
-source = main.cu
+source = main.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I$(ROCM_PATH)/include/hipblas \
-          -DHIPBLAS_V2
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../attentionMergeState-sycl
 
 # Linker Flags
-LDFLAGS = -L$(ROCM_PATH)/lib -lhipblas
+LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
+  CFLAGS += -g
   LDFLAGS  += -g
 endif
 
@@ -42,18 +40,26 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+ifeq ($(DEVICE),gpu)
+  CFLAGS +=-fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
+else
+  CFLAGS +=-qopenmp
+endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile
+$(program): $(obj)
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu kernels.h Makefile
+%.o: %.cpp ../attentionMergeState-sycl/reference.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 1000
+	$(LAUNCHER) ./$(program) 1024 32 128 1000
+	$(LAUNCHER) ./$(program) 1024 64 128 1000
+	$(LAUNCHER) ./$(program) 1024 128 128 1000
+	$(LAUNCHER) ./$(program) 1024 256 128 1000

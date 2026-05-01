@@ -99,7 +99,7 @@ void save_rafile(sycl::float2 *h_out, const char *out_path, const size_t dim0,
 void scaledata(sycl::float2 *d_array, const size_t array_size,
                const float factor, const sycl::nd_item<3> &item)
 {
-    for (int id = item.get_group(2) * item.get_local_range(2) +
+    for (size_t id = item.get_group(2) * item.get_local_range(2) +
                   item.get_local_id(2);
          id < array_size;
          id += item.get_local_range(2) * item.get_group_range(2))
@@ -116,8 +116,8 @@ compute_alpha (float alpha0, float alpha1, int iter, int index)
 }
 
 float compute_maxmag(sycl::queue &q, sycl::float2 *d_array, const size_t array_size) {
-  int max_idx;
-  int *d_max_idx = sycl::malloc_device<int>(1, q);
+  int64_t max_idx;
+  int64_t *d_max_idx = sycl::malloc_device<int64_t>(1, q);
   oneapi::mkl::blas::column_major::iamax(
       q, array_size, (std::complex<float> *)d_array, 1,
       d_max_idx, oneapi::mkl::index_base::one);
@@ -134,7 +134,7 @@ void arrayadd(sycl::float2 *array_c, sycl::float2 *array_a,
               sycl::float2 *array_b, const size_t array_size, float alpha,
               float beta, const sycl::nd_item<3> &item)
 {
-    for (int id = item.get_group(2) * item.get_local_range(2) +
+    for (size_t id = item.get_group(2) * item.get_local_range(2) +
                   item.get_local_id(2);
          id < array_size;
          id += item.get_local_range(2) * item.get_group_range(2))
@@ -148,7 +148,7 @@ arrayadd (float *array_c, float *array_a, float *array_b,
   const size_t array_size, float alpha, float beta,
   const sycl::nd_item<3> &item)
 {
-    for (int id = item.get_group(2) * item.get_local_range(2) +
+    for (size_t id = item.get_group(2) * item.get_local_range(2) +
                   item.get_local_id(2);
          id < array_size;
          id += item.get_local_range(2) * item.get_group_range(2))
@@ -161,7 +161,7 @@ void arraydot(sycl::float2 *array_c, sycl::float2 *array_a,
               sycl::float2 *array_b, const size_t array_size,
               const sycl::nd_item<3> &item, float alpha = 1.f)
 {
-    for (int id = item.get_group(2) * item.get_local_range(2) +
+    for (size_t id = item.get_group(2) * item.get_local_range(2) +
                   item.get_local_id(2);
          id < array_size;
          id += item.get_local_range(2) * item.get_group_range(2))
@@ -173,7 +173,7 @@ void arraydot(sycl::float2 *array_c, sycl::float2 *array_a,
 void arrayreal(sycl::float2 *d_out, sycl::float2 *d_in, size_t array_size,
                const sycl::nd_item<3> &item)
 {
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < array_size;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -187,7 +187,7 @@ fft2_init(sycl::queue &q, const int rows, const int cols, const int ndyn)
 {
   // setup FFT plan, ndyn = # timepoints
   const int rank = 2;
-  int idist = 1, odist = 1, istride = ndyn, ostride = ndyn;
+  size_t idist = 1, odist = 1, istride = ndyn, ostride = ndyn;
   int n[rank] = {cols, rows};
 
   fft2_plan = fft::fft_engine::create(
@@ -253,7 +253,7 @@ void backward(sycl::queue &q, sycl::float2 *d_out, sycl::float2 *d_in, sycl::flo
 void update_r(sycl::float2 *d_r, sycl::float2 *d_tmp, sycl::float2 *d_imgb,
               size_t N, float sigma, const sycl::nd_item<3> &item)
 {
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N; id += item.get_local_range(2) * item.get_group_range(2))
     {
@@ -266,8 +266,8 @@ void grad_xx(sycl::float2 *d_out, sycl::float2 *d_in, const size_t N,
              const size_t rows, const size_t cols, const size_t ndyn,
              const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N - rows * ndyn;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -283,8 +283,8 @@ void grad_xx_bound(sycl::float2 *d_array, const size_t N, const size_t rows,
                    const size_t cols, const size_t ndyn,
                    const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < rows * ndyn;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -299,8 +299,8 @@ void grad_yy(sycl::float2 *d_out, sycl::float2 *d_in, const size_t N,
              const size_t rows, const size_t cols, const size_t ndyn,
              const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N - cols * ndyn;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -315,8 +315,8 @@ void grad_yy_bound(sycl::float2 *d_array, const size_t N, const size_t rows,
                    const size_t cols, const size_t ndyn,
                    const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < cols * ndyn;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -331,7 +331,7 @@ void grad_tt(sycl::float2 *d_out, sycl::float2 *d_in, const size_t N,
              const size_t rows, const size_t cols, const size_t ndyn, float mu,
              const sycl::nd_item<3> &item)
 {
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N - rows * cols;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -344,7 +344,7 @@ void grad_tt_bound(sycl::float2 *d_array, const size_t N, const size_t rows,
                    const size_t cols, const size_t ndyn,
                    const sycl::nd_item<3> &item)
 {
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < rows * cols;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -440,7 +440,7 @@ void proj_p(sycl::float2 *d_p, sycl::float2 *d_tmp, sycl::float2 *d_wbar,
             const sycl::nd_item<3> &item)
 {
   float absp, denom;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N; id += item.get_local_range(2) * item.get_group_range(2))
   {
@@ -462,8 +462,8 @@ void grad_xx_adj(sycl::float2 *d_out, sycl::float2 *d_in, const size_t N,
                  const size_t rows, const size_t cols, const size_t ndyn,
                  const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N - 2 * rows * ndyn;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -478,8 +478,8 @@ void grad_xx_adj_zero(sycl::float2 *d_out, sycl::float2 *d_in,
                       const size_t rows, const size_t cols, const size_t ndyn,
                       const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < rows * ndyn;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -494,8 +494,8 @@ void grad_xx_adj_bound(sycl::float2 *d_out, sycl::float2 *d_in,
                        const size_t rows, const size_t cols, const size_t ndyn,
                        const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < rows * ndyn;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -510,8 +510,8 @@ void grad_yy_adj(sycl::float2 *d_out, sycl::float2 *d_in, const size_t N,
                  const size_t rows, const size_t cols, const size_t ndyn,
                  const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N - 2 * cols * ndyn;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -526,8 +526,8 @@ void grad_yy_adj_zero(sycl::float2 *d_out, sycl::float2 *d_in,
                       const size_t rows, const size_t cols, const size_t ndyn,
                       const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < cols * ndyn;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -542,8 +542,8 @@ void grad_yy_adj_bound(sycl::float2 *d_out, sycl::float2 *d_in,
                        const size_t rows, const size_t cols, const size_t ndyn,
                        const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < cols * ndyn;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -559,7 +559,7 @@ void grad_tt_adj(sycl::float2 *d_out, sycl::float2 *d_in, const size_t N,
                  float mu, const sycl::nd_item<3> &item)
 {
   int stride = rows*cols;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N - 2 * rows * cols;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -572,8 +572,8 @@ void grad_tt_adj_zero(sycl::float2 *d_out, sycl::float2 *d_in,
                       const size_t rows, const size_t cols, const size_t ndyn,
                       const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < rows * cols;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -587,8 +587,8 @@ void grad_tt_adj_bound(sycl::float2 *d_out, sycl::float2 *d_in,
                        const size_t rows, const size_t cols, const size_t ndyn,
                        const sycl::nd_item<3> &item)
 {
-  int idx;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  size_t idx;
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < rows * cols;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -683,7 +683,7 @@ void proj_q(sycl::float2 *d_q, sycl::float2 *d_tmp, const size_t N, float sigma,
             float alpha, const sycl::nd_item<3> &item)
 {
   float absq, denom;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N; id += item.get_local_range(2) * item.get_group_range(2))
     {
@@ -722,7 +722,7 @@ void update_s(sycl::float2 *d_imgs, sycl::float2 *d_tmp, sycl::float2 *d_imgz,
               const size_t N, float tau, const sycl::nd_item<3> &item)
 {
   sycl::float2 divp;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N; id += item.get_local_range(2) * item.get_group_range(2))
     {
@@ -735,7 +735,7 @@ void update_w(sycl::float2 *d_w, sycl::float2 *d_tmp, sycl::float2 *d_p,
               const size_t N, float tau, const sycl::nd_item<3> &item)
 {
   sycl::float2 divq;
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < N; id += item.get_local_range(2) * item.get_group_range(2))
     {
@@ -753,7 +753,7 @@ void update_w(sycl::float2 *d_w, sycl::float2 *d_tmp, sycl::float2 *d_p,
 void shrink(sycl::float2 *d_array2, float *d_array, const float beta,
             const int array_size, const sycl::nd_item<3> &item)
 {
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < array_size;
        id += item.get_local_range(2) * item.get_group_range(2))
@@ -766,7 +766,7 @@ void shrink(sycl::float2 *d_array2, float *d_array, const float beta,
 void arrayabs(float *d_array, sycl::float2 *d_array2, const size_t array_size,
               const sycl::nd_item<3> &item)
 {
-  for (int id = item.get_group(2) * item.get_local_range(2) +
+  for (size_t id = item.get_group(2) * item.get_local_range(2) +
                 item.get_local_id(2);
        id < array_size;
        id += item.get_local_range(2) * item.get_group_range(2))

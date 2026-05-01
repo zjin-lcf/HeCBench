@@ -86,7 +86,7 @@ $(program): $(obj)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) pincat_recon.ra
 
 run: $(program)
 	$(LAUNCHER) ./$(program)
