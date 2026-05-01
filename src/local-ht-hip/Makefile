@@ -1,9 +1,7 @@
-HIP_ARCH ?= gfx906
-
 .PHONY: all clean run
 
 all:
-	$(MAKE) -C src HIP_ARCH=$(HIP_ARCH)
+	$(MAKE) -C src
 
 clean:
 	$(MAKE) -C src clean

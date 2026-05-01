@@ -1,9 +1,7 @@
-HIP_ARCH ?= gfx906
-
 .PHONY: all clean run
 
 all:
-	$(MAKE) -C Simulation HIP_ARCH=$(HIP_ARCH)
+	$(MAKE) -C Simulation
 
 clean:
 	$(MAKE) -C Simulation clean
