@@ -100,11 +100,18 @@ SNICIT::SNICIT(
     const int _batch_size,
     const int _num_input,
     const bool _is_cifar
-) : q(_queue), weight_path(_weight_path), bias_path(_bias_path), 
-    num_hidden_neurons(_num_hidden_neurons), num_layers(_num_layers), 
-    num_classes(10), density(_density), 
-    nnz(std::round(_num_hidden_neurons*_num_hidden_neurons*_density)), num_input(_num_input), batch_size(_batch_size),
-    seed_size(_seed_size), threshold(_threshold), is_cifar(_is_cifar)
+) : weight_path(_weight_path),
+    bias_path(_bias_path),
+    num_hidden_neurons(_num_hidden_neurons),
+    num_layers(_num_layers),
+    num_classes(10),
+    num_input(_num_input),
+    batch_size(_batch_size),
+    nnz(std::round(_num_hidden_neurons*_num_hidden_neurons*_density)),
+    density(_density),
+    is_cifar(_is_cifar),
+    threshold(_threshold),
+    seed_size(_seed_size)
  {
   std::cout<<"Constructing SNICIT method......\n";
   input_size = is_cifar ? _num_hidden_neurons : 784;
@@ -475,11 +482,8 @@ void SNICIT::_infer() {
 
         cgh.parallel_for(
             sycl::nd_range<3>(
-                sycl::range<3>(1, 1, batch_size) *
-                    sycl::range<3>(1, (int)(1024 / num_hidden_neurons),
-                                   num_hidden_neurons),
-                sycl::range<3>(1, (int)(1024 / num_hidden_neurons),
-                               num_hidden_neurons)),
+                sycl::range<3>(1, (int)(1024 / num_hidden_neurons), batch_size * num_hidden_neurons),
+                sycl::range<3>(1, (int)(1024 / num_hidden_neurons), num_hidden_neurons)),
             [=](sycl::nd_item<3> item) {
               dense_input(_dev_Y_input_ct0, _dev_input_weight_ct1,
                           _dev_input_bias_ct2, batch_size_ct3, input_size_ct4,
@@ -521,11 +525,8 @@ void SNICIT::_infer() {
 
         cgh.parallel_for(
             sycl::nd_range<3>(
-                sycl::range<3>(1, 1, batch_size) *
-                    sycl::range<3>(1, num_hidden_neurons,
-                                   (int)(1024 / num_hidden_neurons)),
-                sycl::range<3>(1, num_hidden_neurons,
-                               (int)(1024 / num_hidden_neurons))),
+                sycl::range<3>(1, num_hidden_neurons, (int)(1024 / num_hidden_neurons) * batch_size),
+                sycl::range<3>(1, num_hidden_neurons, (int)(1024 / num_hidden_neurons))),
             [=](sycl::nd_item<3> item) {
               sparse_hidden(_dev_Y_hidden_cur_layer_ct0,
                             _dev_hidden_roffw_cur_layer_ct1,
@@ -594,8 +595,7 @@ void SNICIT::_infer() {
 
       cgh.parallel_for(
           sycl::nd_range<3>(
-              sycl::range<3>(1, 1, batch_size) *
-                  sycl::range<3>(1, y_star_cnt, 1024 / y_star_cnt),
+              sycl::range<3>(1, y_star_cnt, 1024 / y_star_cnt * batch_size),
               sycl::range<3>(1, y_star_cnt, 1024 / y_star_cnt)),
           [=](sycl::nd_item<3> item) {
             coarse_cluster(
@@ -640,11 +640,8 @@ void SNICIT::_infer() {
 
         cgh.parallel_for(
             sycl::nd_range<3>(
-                sycl::range<3>(1, 1, ne_rows) *
-                    sycl::range<3>(1, num_hidden_neurons,
-                                   (int)(1024 / num_hidden_neurons)),
-                sycl::range<3>(1, num_hidden_neurons,
-                               (int)(1024 / num_hidden_neurons))),
+                sycl::range<3>(1, num_hidden_neurons, (int)(1024 / num_hidden_neurons) * ne_rows),
+                sycl::range<3>(1, num_hidden_neurons, (int)(1024 / num_hidden_neurons))),
             [=](sycl::nd_item<3> item) {
               sparse_hidden_post(
                   rowsY_ct0, _dev_Y_hidden_threshold_ct1,
@@ -671,8 +668,7 @@ void SNICIT::_infer() {
         auto _dev_Y_hidden_threshold_ct6 = _dev_Y_hidden[threshold % 2];
 
         cgh.parallel_for(
-            sycl::nd_range<3>(sycl::range<3>(1, 1, ne_rows) *
-                                  sycl::range<3>(1, 1, num_hidden_neurons),
+            sycl::nd_range<3>(sycl::range<3>(1, 1, ne_rows * num_hidden_neurons),
                               sycl::range<3>(1, 1, num_hidden_neurons)),
             [=](sycl::nd_item<3> item) {
               update_post(
@@ -695,7 +691,7 @@ void SNICIT::_infer() {
 
       auto post_p_toc = std::chrono::steady_clock::now();
       auto post_p_duration = std::chrono::duration_cast<std::chrono::microseconds>(post_p_toc - post_p_tic).count();
-      // std::cout<<"[**post convergence**]finished layer "<< cur_layer <<" in "<< post_p_duration/1000.0<< "ms"<<std::endl;
+      std::cout<<"[**post convergence**]finished layer "<< cur_layer <<" in "<< post_p_duration/1000.0<< "ms"<<std::endl;
     }
     auto post_toc = std::chrono::steady_clock::now();
     post_duration = std::chrono::duration_cast<std::chrono::microseconds>(post_toc - post_tic).count();
@@ -711,8 +707,7 @@ void SNICIT::_infer() {
       auto num_hidden_neurons_ct2 = num_hidden_neurons;
 
       cgh.parallel_for(
-          sycl::nd_range<3>(sycl::range<3>(1, 1, batch_size) *
-                                sycl::range<3>(1, 1, num_hidden_neurons),
+          sycl::nd_range<3>(sycl::range<3>(1, 1, batch_size * num_hidden_neurons),
                             sycl::range<3>(1, 1, num_hidden_neurons)),
           [=](sycl::nd_item<3> item) {
             recover(
@@ -744,8 +739,7 @@ void SNICIT::_infer() {
 
       cgh.parallel_for(
           sycl::nd_range<3>(
-              sycl::range<3>(1, 1, batch_size) *
-                  sycl::range<3>(1, (int)(1024 / num_classes), num_classes),
+              sycl::range<3>(1, (int)(1024 / num_classes), batch_size * num_classes),
               sycl::range<3>(1, (int)(1024 / num_classes), num_classes)),
           [=](sycl::nd_item<3> item) {
             dense_output(
