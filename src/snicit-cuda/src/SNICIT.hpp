@@ -28,8 +28,6 @@ class SNICIT{
     float* _dev_output_bias;
     int* _dev_result_label;
     
-
-
     std::string weight_path, bias_path;
     int num_hidden_neurons, num_layers;
     int input_size, num_classes, num_input, batch_size;
@@ -86,11 +84,18 @@ SNICIT::SNICIT(
     const int _batch_size,
     const int _num_input,
     const bool _is_cifar
-) : weight_path(_weight_path), bias_path(_bias_path), 
-    num_hidden_neurons(_num_hidden_neurons), num_layers(_num_layers), 
-    num_classes(10), density(_density), 
-    nnz(std::round(_num_hidden_neurons*_num_hidden_neurons*_density)), num_input(_num_input), batch_size(_batch_size),
-    seed_size(_seed_size), threshold(_threshold), is_cifar(_is_cifar)
+) : weight_path(_weight_path),
+    bias_path(_bias_path),
+    num_hidden_neurons(_num_hidden_neurons),
+    num_layers(_num_layers),
+    num_classes(10),
+    num_input(_num_input),
+    batch_size(_batch_size),
+    nnz(std::round(_num_hidden_neurons*_num_hidden_neurons*_density)),
+    density(_density),
+    is_cifar(_is_cifar),
+    threshold(_threshold),
+    seed_size(_seed_size)
  {
   std::cout<<"Constructing SNICIT method......\n";
   input_size = is_cifar ? _num_hidden_neurons : 784;
@@ -592,7 +597,7 @@ void SNICIT::_infer() {
 
       auto post_p_toc = std::chrono::steady_clock::now();
       auto post_p_duration = std::chrono::duration_cast<std::chrono::microseconds>(post_p_toc - post_p_tic).count();
-      // std::cout<<"[**post convergence**]finished layer "<< cur_layer <<" in "<< post_p_duration/1000.0<< "ms"<<std::endl;
+      std::cout<<"[**post convergence**]finished layer "<< cur_layer <<" in "<< post_p_duration/1000.0<< "ms"<<std::endl;
     }
     auto post_toc = std::chrono::steady_clock::now();
     post_duration = std::chrono::duration_cast<std::chrono::microseconds>(post_toc - post_tic).count();
