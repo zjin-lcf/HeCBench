@@ -140,12 +140,13 @@ MPlib        = -lmpi #$(MPdir)/lib/release/libmpi.so
 # used. The variable LAdir is only used for defining LAinc and LAlib.
 #
 LAdir        ?= $(HOME)/lapack/build_lapack_32
+ROCM_PATH    ?= /opt/rocm
 LAinc        = -I$(LAdir)/include -I$(TOPdir)/src/cuda/
 LAlib 	     = -L$(TOPdir)/src/cuda/ -ldgemm \
 		-L$(LAdir)/lib/ -lcblas \
 		-L$(LAdir)/lib -lblas \
 		-lm -lstdc++ \
-		-L/opt/rocm/lib/ -lhipblas 
+		-L$(ROCM_PATH)/lib/ -lhipblas
 #
 # ----------------------------------------------------------------------
 # - F77 / C interface --------------------------------------------------
