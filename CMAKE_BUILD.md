@@ -18,7 +18,7 @@ The CMake build system provides:
 Depending on which programming models you want to build:
 
 - **CUDA**: NVIDIA CUDA Toolkit (12.2+)
-- **HIP**: AMD ROCm (6.0+)
+- **HIP**: AMD ROCm (7.0+)
 - **SYCL**: Intel oneAPI DPC++ or hipSYCL
 - **OpenMP**: Intel oneAPI, NVIDIA HPC SDK, or AOMP
 - **CMake**: 3.21 or later
