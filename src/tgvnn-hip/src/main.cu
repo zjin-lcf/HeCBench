@@ -50,11 +50,11 @@
 int blocksize = 128;
 int gridsize = 128;
 
-//CUDA global variables
+//HIP global variables
 hipStream_t stream[2];
 
-hipblasStatus_t cublas_status;
-hipblasHandle_t cublas_handle;
+hipblasStatus_t hipblas_status;
+hipblasHandle_t hipblas_handle;
 
 hipsolverStatus_t cusolver_status;
 hipsolverHandle_t cusolver_handle;
@@ -159,16 +159,16 @@ float
 compute_maxmag (float2 *d_array, const size_t array_size)
 {
   long max_idx;
-  cublas_status = hipblasIcamax_64(cublas_handle, array_size, d_array, 1, &max_idx);
-  if (cublas_status != HIPBLAS_STATUS_SUCCESS) {
-     printf ("CUBLAS Scnrm2 failed:%d\n", cublas_status);
+  hipblas_status = hipblasIcamax_64(hipblas_handle, array_size, d_array, 1, &max_idx);
+  if (hipblas_status != HIPBLAS_STATUS_SUCCESS) {
+     printf ("hipblasIcamax_64 failed:%d\n", hipblas_status);
      exit(EXIT_FAILURE);
   }
 
   float2 *h_tmp;
   h_tmp = (float2*)safe_malloc(sizeof(float2));
   cuTry(hipMemcpyAsync(h_tmp, d_array+max_idx-1, sizeof(float2),
-          hipMemcpyDeviceToHost));
+        hipMemcpyDeviceToHost));
 
   return abs(h_tmp[0].x);
 }
@@ -247,7 +247,7 @@ backward (float2 *d_out, float2 *d_in, float2 *d_mask,
   cuTry(hipMalloc((void **)&d_tmp, N * sizeof(float2)));
 
   cuTry(hipMemcpyAsync(d_tmp, d_in, N * sizeof(float2),
-          hipMemcpyDeviceToDevice, stream[0]));
+        hipMemcpyDeviceToDevice, stream[0]));
 
   arraydot<<<gridsize, blocksize>>>(d_tmp, d_tmp, d_mask, N);
   hipfftExecC2C(fft2_plan, d_tmp, d_out, HIPFFT_BACKWARD);
@@ -649,11 +649,11 @@ compute_ser(float2 *d_array, float2 *d_img, const size_t array_size)
   arrayabs<<<gridsize, blocksize>>>(d_tmp, d_img, array_size);
   arrayadd<<<gridsize, blocksize>>>(d_diff, d_diff, d_tmp, array_size, 1.f, -1.f);
 
-  cublas_status = hipblasSnrm2_64(cublas_handle, array_size, d_tmp, 1, &img_norm);
-  assert(cublas_status == HIPBLAS_STATUS_SUCCESS);
+  hipblas_status = hipblasSnrm2_64(hipblas_handle, array_size, d_tmp, 1, &img_norm);
+  assert(hipblas_status == HIPBLAS_STATUS_SUCCESS);
 
-  cublas_status = hipblasSnrm2_64(cublas_handle, array_size, d_diff, 1, &diff_norm);
-  assert(cublas_status == HIPBLAS_STATUS_SUCCESS);
+  hipblas_status = hipblasSnrm2_64(hipblas_handle, array_size, d_diff, 1, &diff_norm);
+  assert(hipblas_status == HIPBLAS_STATUS_SUCCESS);
 
   ser = -20.f*log10f(diff_norm/img_norm);
 
@@ -670,7 +670,7 @@ tgv_cs(float2 *d_imgl, float2 *d_imgs, float2 *h_img, float2 *h_mask,
       float tau, float sigma, float reduction, int iter)
 {
   // Setup cuda handles
-  cublas_status = hipblasCreate(&cublas_handle);
+  hipblas_status = hipblasCreate(&hipblas_handle);
   cusolver_status = hipsolverDnCreate(&cusolver_handle);
 
   // Read image and mask
@@ -780,11 +780,11 @@ tgv_cs(float2 *d_imgl, float2 *d_imgs, float2 *h_img, float2 *h_mask,
     alpha1 = compute_alpha(alpha10, alpha11, iter, i);
 
     cuTry(hipMemcpyAsync(d_lold, d_imgl, N * sizeof(float2),
-            hipMemcpyDeviceToDevice, stream[0]));
+          hipMemcpyDeviceToDevice, stream[0]));
     cuTry(hipMemcpyAsync(d_sold, d_imgs, N * sizeof(float2),
-            hipMemcpyDeviceToDevice, stream[0]));
+          hipMemcpyDeviceToDevice, stream[0]));
     cuTry(hipMemcpyAsync(d_wold, d_w, 3 * N * sizeof(float2),
-            hipMemcpyDeviceToDevice, stream[0]));
+          hipMemcpyDeviceToDevice, stream[0]));
 
     // update r
     update_r(d_r, d_lbar, d_sbar, d_imgb, d_tmp, d_mask,
@@ -842,13 +842,13 @@ tgv_cs(float2 *d_imgl, float2 *d_imgs, float2 *h_img, float2 *h_mask,
 
     shrink<<<gridsize, blocksize>>>(d_ls2, d_ls, beta, lds);
 
-    cublas_status = hipblasCdgmm_64(cublas_handle, HIPBLAS_SIDE_LEFT,
+    hipblas_status = hipblasCdgmm_64(hipblas_handle, HIPBLAS_SIDE_LEFT,
       lds, ldvt, d_lvt, ldvt, d_ls2, 1, d_lsvt, ldvt);
-    assert(cublas_status == HIPBLAS_STATUS_SUCCESS);
+    assert(hipblas_status == HIPBLAS_STATUS_SUCCESS);
 
-    cublas_status = hipblasCgemm_64(cublas_handle, HIPBLAS_OP_N, HIPBLAS_OP_N,
+    hipblas_status = hipblasCgemm_64(hipblas_handle, HIPBLAS_OP_N, HIPBLAS_OP_N,
       ldu, ldvt, lds, &a, d_lu, ldu, d_lsvt, ldvt, &b, d_imgl, ldu);
-    assert(cublas_status == HIPBLAS_STATUS_SUCCESS);
+    assert(hipblas_status == HIPBLAS_STATUS_SUCCESS);
 
     // update intermediate variables
     arrayadd<<<gridsize, blocksize>>>(d_sbar, d_imgs, d_sold, N, 2.f, -1.f);
@@ -898,7 +898,7 @@ tgv_cs(float2 *d_imgl, float2 *d_imgs, float2 *h_img, float2 *h_mask,
   cuTry(hipFree(d_rwork));
   cuTry(hipFree(devInfo));
 
-  hipblasDestroy(cublas_handle);
+  hipblasDestroy(hipblas_handle);
   hipsolverDnDestroy(cusolver_handle);
 }
 
@@ -1039,8 +1039,8 @@ main (int argc, char *argv[])
 
     // Run TGV+NN
 
-    // Setup CUDA
-    hipSetDevice(0);
+    // Setup HIP
+    cuTry(hipSetDevice(0));
     cuTry(hipStreamCreate(&stream[0]));
     cuTry(hipStreamCreate(&stream[1]));
 
@@ -1052,7 +1052,7 @@ main (int argc, char *argv[])
 
     tgv_cs(d_imgl, d_imgs, h_img, h_mask, N, rows, cols, ndyn,
            alpha, beta, mu, tau, sigma, reduction, iter);
-    hipDeviceSynchronize();
+    cuTry(hipDeviceSynchronize());
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -1065,9 +1065,9 @@ main (int argc, char *argv[])
     float2 *h_out;
     h_out = (float2 *)safe_malloc(2 * N * sizeof(float2));
     cuTry(hipMemcpyAsync(h_out, d_imgl, N * sizeof(float2),
-            hipMemcpyDeviceToHost, stream[0]));
+          hipMemcpyDeviceToHost, stream[0]));
     cuTry(hipMemcpyAsync(h_out+N, d_imgs, N * sizeof(float2),
-            hipMemcpyDeviceToHost, stream[0]));
+          hipMemcpyDeviceToHost, stream[0]));
     save_rafile(h_out, out_img, rows, cols, ndyn, 2);
 
     // Free memory and destory cuda stream
