@@ -524,6 +524,7 @@ set(HECBENCH_POC_BENCHMARKS
     halo-finder
     leukocyte
     miniFE
+    mergeVS
     pointerchase
     rmsnorm
     saxpy-ompt
