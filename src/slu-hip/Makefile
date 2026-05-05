@@ -84,8 +84,9 @@ $(SLU_PATH)/nicslu/Makefile: $(SLU_PATH)/nicslu.tar.bz2
 $(SLU_PATH)/nicslu/lib/nicslu.a: $(SLU_PATH)/nicslu/Makefile
 	$(MAKE) -C $(SLU_PATH)/nicslu/
 
-$(SLU_PATH)/nicslu/util/nicslu_util.a: $(SLU_PATH)/nicslu/Makefile
-	$(MAKE) -C $(SLU_PATH)/nicslu/
+# nicslu's top-level make builds both archives in one pass; depend on the
+# lib target to serialize and avoid a parallel-make race in `ar`.
+$(SLU_PATH)/nicslu/util/nicslu_util.a: $(SLU_PATH)/nicslu/lib/nicslu.a
 
 clean:
 	rm -rf $(program) $(obj) *.dat
