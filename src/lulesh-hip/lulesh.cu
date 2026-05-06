@@ -2864,20 +2864,19 @@ int main(int argc, char *argv[])
         d_vol_error,
         numElem );
 
-    hipMemcpy(vdov, d_vdov, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
     hipMemcpy(&vol_error, d_vol_error, sizeof(int), hipMemcpyDeviceToHost); 
+    if (vol_error >= 0){
+      printf("VolumeError: negative volumn\n");
+      exit(VolumeError);
+    }
 
 #ifdef VERIFY
+    hipMemcpy(vdov, d_vdov, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
     for ( Index_t k=0 ; k<numElem ; ++k )
     {
       printf("kintec: %d %f\n", k, vdov[k]);
     }
 #endif
-
-    if (vol_error >= 0){
-      printf("VolumeError: negative volumn\n");
-      exit(VolumeError);
-    }
 
     //======================================================= 
     //CalcQForElems(domain, vnew) ;
@@ -3007,19 +3006,22 @@ int main(int argc, char *argv[])
         rho0,
         numElem );
 
-    hipMemcpy(ss, d_ss, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
-    hipMemcpy(arealg, d_arealg, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
+    //hipMemcpy(arealg, d_arealg, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
 
 #ifdef VERIFY
     hipMemcpy(p, d_p, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
     hipMemcpy(q, d_q, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
     hipMemcpy(e, d_e, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
+    hipMemcpy(ss, d_ss, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
     hipMemcpy(v, d_v, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
     for (int i = 0; i < numElem; i++) {
       printf("eos: %f %f %f %f %f\n", q[i], p[i], e[i], ss[i], v[i]);
     }
 #endif
 
+    hipMemcpy(e, d_e, sizeof(Real_t)*numElem, hipMemcpyDeviceToHost);
+
+    // TODO: offload to device
     CalcTimeConstraintsForElems(domain);
 
     if ((opts.showProg != 0) && (opts.quiet == 0) && (myRank == 0)) {

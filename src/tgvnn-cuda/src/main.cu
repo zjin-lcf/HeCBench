@@ -161,7 +161,7 @@ compute_maxmag (float2 *d_array, const size_t array_size)
   long max_idx;
   cublas_status = cublasIcamax_64(cublas_handle, array_size, d_array, 1, &max_idx);
   if (cublas_status != CUBLAS_STATUS_SUCCESS) {
-     printf ("CUBLAS Scnrm2 failed:%d\n", cublas_status);
+     printf ("cublasIcamax_64 failed:%d\n", cublas_status);
      exit(EXIT_FAILURE);
   }
 
@@ -1040,7 +1040,7 @@ main (int argc, char *argv[])
     // Run TGV+NN
 
     // Setup CUDA
-    cudaSetDevice(0);
+    cuTry(cudaSetDevice(0));
     cuTry(cudaStreamCreate(&stream[0]));
     cuTry(cudaStreamCreate(&stream[1]));
 
@@ -1052,7 +1052,7 @@ main (int argc, char *argv[])
 
     tgv_cs(d_imgl, d_imgs, h_img, h_mask, N, rows, cols, ndyn,
            alpha, beta, mu, tau, sigma, reduction, iter);
-    cudaDeviceSynchronize();
+    cuTry(cudaDeviceSynchronize());
 
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

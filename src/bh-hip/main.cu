@@ -263,7 +263,7 @@ void TreeBuildingKernel(
     if (ch != -2) {  // skip if child pointer is locked and try again later
       locked = n*8+j;
       if (ch == -1) {
-        if (-1 == atomicCAS((int*)&childd[locked], -1, i)) {  // if null, just insert the new body
+        if (ch == atomicCAS((int*)&childd[locked], ch, i)) {  // if null, just insert the new body
           i += inc;  // move on to next body
           skip = 1;
         }
@@ -350,7 +350,7 @@ void SummarizationKernel(
     const int nbodiesd,
     volatile int* const __restrict__ countd,
     const int* const __restrict__ childd,
-    volatile float4* const __restrict__ posMassd,
+    volatile float4* const __restrict__ posMassd, // will cause hanging for 2048 bodies without volatile
     int* const __restrict bottomd)
 {
   __shared__ int child[THREADS3 * 8];
@@ -385,7 +385,6 @@ void SummarizationKernel(
           for (i = 0; i < 8; i++) {
             ch = child[i*THREADS3+threadIdx.x];
             if (ch >= 0) {
-              // four reads due to missing copy constructor for "volatile float4"
               const float chx = posMassd[ch].x;
               const float chy = posMassd[ch].y;
               const float chz = posMassd[ch].z;
@@ -406,11 +405,9 @@ void SummarizationKernel(
           }
           countd[k] = cnt;
           m = 1.0f / cm;
-          // four writes due to missing copy constructor for "volatile float4"
           posMassd[k].x = px * m;
           posMassd[k].y = py * m;
           posMassd[k].z = pz * m;
-          __threadfence();
           posMassd[k].w = cm;
         }
       }
@@ -479,7 +476,6 @@ void SummarizationKernel(
         posMassd[k].x = px * m;
         posMassd[k].y = py * m;
         posMassd[k].z = pz * m;
-        __threadfence();
         posMassd[k].w = cm;
         k += inc;
       }
@@ -601,11 +597,13 @@ void ForceCalculationKernel(
       pos[j] = 0;
       node[j] = nnodesd * 8;
     }
+    __syncwarp();
 
     do {
       // stack is not empty
       pd = pos[depth];
       nd = node[depth];
+      __syncwarp();
       while (pd < 8) {
         // node on top of stack has more children to process
         n = childd[nd + pd];  // load child pointer
@@ -639,6 +637,7 @@ void ForceCalculationKernel(
         }
       }
       depth--;  // done with this level
+      __syncwarp();
     } while (depth >= j);
 
     float4 acc = accVeld[i];
@@ -718,7 +717,7 @@ static int randx = 7;
 static double drnd()
 {
   const int lastrand = randx;
-  randx = (1103515245 * randx + 12345) & 0x7FFFFFFF;
+  randx = (1103515245L * randx + 12345) & 0x7FFFFFFF;
   return (double)lastrand / 2147483648.0;
 }
 
@@ -893,31 +892,31 @@ int main(int argc, char* argv[])
   gettimeofday(&starttime, NULL);
 
   // run timesteps (launch kernels on a device)
-  hipLaunchKernelGGL(InitializationKernel, dim3(1), dim3(1), 0, 0, d_step, d_blkcnt);
+  InitializationKernel<<<1, 1>>>(d_step, d_blkcnt);
 
   for (step = 0; step < timesteps; step++) {
-    hipLaunchKernelGGL(BoundingBoxKernel, dim3(blocks * FACTOR1), dim3(THREADS1), 0, 0, 
+    BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(
         nnodes, nbodies, d_start, d_child, d_posMass, d_max, d_min, 
         d_radius, d_bottom, d_step, d_blkcnt );
 
-    hipLaunchKernelGGL(ClearKernel1, dim3(blocks * 1), dim3(256), 0, 0, nnodes, nbodies, d_child);
+    ClearKernel1<<<blocks, 256>>>(nnodes, nbodies, d_child);
 
-    hipLaunchKernelGGL(TreeBuildingKernel, dim3(blocks * FACTOR2), dim3(THREADS2), 0, 0, 
+    TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(
         nnodes, nbodies, d_child, d_posMass, d_radius, d_bottom);
 
-    hipLaunchKernelGGL(ClearKernel2, dim3(blocks * 1), dim3(256), 0, 0, nnodes, d_start, d_posMass, d_bottom);
+    ClearKernel2<<<blocks, 256>>>(nnodes, d_start, d_posMass, d_bottom);
 
-    hipLaunchKernelGGL(SummarizationKernel, dim3(blocks * FACTOR3), dim3(THREADS3), 0, 0, 
+    SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(
         nnodes, nbodies, d_count, d_child, d_posMass, d_bottom);
 
-    hipLaunchKernelGGL(SortKernel, dim3(blocks * FACTOR4), dim3(THREADS4), 0, 0, 
+    SortKernel<<<blocks * FACTOR4, THREADS4>>>(
         nnodes, nbodies, d_sort, d_count, d_start, d_child, d_bottom);
 
-    hipLaunchKernelGGL(ForceCalculationKernel, dim3(blocks * FACTOR5), dim3(THREADS5), 0, 0, 
+    ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(
         nnodes, nbodies, dthf, itolsq, epssq, d_sort, d_child, d_posMass, 
         d_vel, d_accVel, d_radius, d_step);
 
-    hipLaunchKernelGGL(IntegrationKernel, dim3(blocks * FACTOR6), dim3(THREADS6), 0, 0, 
+    IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(
         nbodies, dtime, dthf, d_posMass, d_vel, d_accVel);
   }
   hipDeviceSynchronize();
