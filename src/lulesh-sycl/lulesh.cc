@@ -2092,28 +2092,29 @@ int main(int argc, char *argv[])
     });
 
     device_queue.submit([&] (handler &cgh) {
-      auto acc = d_vdov.get_access<sycl_read>(cgh);
-      cgh.copy(acc, vdov);
-    });
-
-    device_queue.submit([&] (handler &cgh) {
       auto acc = d_vol_error.get_access<sycl_read>(cgh);
       cgh.copy(acc, &vol_error);
     });
 
     device_queue.wait();
 
+    if (vol_error >= 0){
+      printf("VolumeError: negative volumn\n");
+      exit(VolumeError);
+    }
+
 #ifdef VERIFY
+    device_queue.submit([&] (handler &cgh) {
+      auto acc = d_vdov.get_access<sycl_read>(cgh);
+      cgh.copy(acc, vdov);
+    }).wait();
+
     for ( Index_t k=0 ; k<numElem ; ++k )
     {
       printf("kintec: %d %f\n", k, vdov[k]);
     }
 #endif
 
-    if (vol_error >= 0){
-      printf("VolumeError: negative volumn\n");
-      exit(VolumeError);
-    }
 
     //======================================================= 
     //CalcQForElems(domain, vnew) ;
@@ -2711,17 +2712,10 @@ int main(int argc, char *argv[])
       });
     });
 
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_ss.get_access<sycl_read>(cgh);
-      cgh.copy(acc, ss);
-    });
-
-    device_queue.submit([&] (handler &cgh) {
-      auto acc = d_arealg.get_access<sycl_read>(cgh);
-      cgh.copy(acc, arealg);
-    });
-
-    device_queue.wait();
+    //device_queue.submit([&] (handler &cgh) {
+    //  auto acc = d_arealg.get_access<sycl_read>(cgh);
+    //  cgh.copy(acc, arealg);
+    //});
 
 #ifdef VERIFY
     device_queue.submit([&] (handler &cgh) {
@@ -2737,6 +2731,10 @@ int main(int argc, char *argv[])
       cgh.copy(acc, e);
     });
     device_queue.submit([&] (handler &cgh) {
+      auto acc = d_ss.get_access<sycl_read>(cgh);
+      cgh.copy(acc, ss);
+    });
+    device_queue.submit([&] (handler &cgh) {
       auto acc = d_v.get_access<sycl_read>(cgh);
       cgh.copy(acc, v);
     });
@@ -2748,6 +2746,7 @@ int main(int argc, char *argv[])
     }
 #endif
 
+    // TODO: offload to device
     CalcTimeConstraintsForElems(domain);
 
     if ((opts.showProg != 0) && (opts.quiet == 0) && (myRank == 0)) {
@@ -2759,6 +2758,11 @@ int main(int argc, char *argv[])
     }
     opts.iteration_cap -= 1;
   }
+
+  device_queue.submit([&] (handler &cgh) {
+    auto acc = d_e.get_access<sycl_read>(cgh);
+    cgh.copy(acc, e);
+  }).wait();
 
   // Use reduced max elapsed time
   double elapsed_time;

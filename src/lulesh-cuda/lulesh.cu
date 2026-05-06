@@ -2864,20 +2864,19 @@ int main(int argc, char *argv[])
         d_vol_error,
         numElem );
 
-    cudaMemcpy(vdov, d_vdov, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
     cudaMemcpy(&vol_error, d_vol_error, sizeof(int), cudaMemcpyDeviceToHost); 
+    if (vol_error >= 0){
+      printf("VolumeError: negative volumn\n");
+      exit(VolumeError);
+    }
 
 #ifdef VERIFY
+    cudaMemcpy(vdov, d_vdov, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
     for ( Index_t k=0 ; k<numElem ; ++k )
     {
       printf("kintec: %d %f\n", k, vdov[k]);
     }
 #endif
-
-    if (vol_error >= 0){
-      printf("VolumeError: negative volumn\n");
-      exit(VolumeError);
-    }
 
     //======================================================= 
     //CalcQForElems(domain, vnew) ;
@@ -3007,19 +3006,20 @@ int main(int argc, char *argv[])
         rho0,
         numElem );
 
-    cudaMemcpy(ss, d_ss, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
-    cudaMemcpy(arealg, d_arealg, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
+    //cudaMemcpy(arealg, d_arealg, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
 
 #ifdef VERIFY
     cudaMemcpy(p, d_p, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
     cudaMemcpy(q, d_q, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
     cudaMemcpy(e, d_e, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
+    cudaMemcpy(ss, d_ss, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
     cudaMemcpy(v, d_v, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
     for (int i = 0; i < numElem; i++) {
       printf("eos: %f %f %f %f %f\n", q[i], p[i], e[i], ss[i], v[i]);
     }
 #endif
 
+    // TODO offload to a device
     CalcTimeConstraintsForElems(domain);
 
     if ((opts.showProg != 0) && (opts.quiet == 0) && (myRank == 0)) {
@@ -3031,6 +3031,8 @@ int main(int argc, char *argv[])
     }
     opts.iteration_cap -= 1;
   } // while
+
+  cudaMemcpy(e, d_e, sizeof(Real_t)*numElem, cudaMemcpyDeviceToHost);
 
   // Use reduced max elapsed time
   double elapsed_time;

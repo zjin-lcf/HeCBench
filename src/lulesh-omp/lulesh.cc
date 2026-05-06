@@ -1875,20 +1875,19 @@ int main(int argc, char *argv[])
       }
     }
 
-#pragma omp target update from (vdov[0:numElem])
-#pragma omp target update from (vol_error[0:1])
+    #pragma omp target update from (vol_error[0:1])
+    if (vol_error[0] >= 0){
+      printf("VolumeError: negative volumn\n");
+      exit(VolumeError);
+    }
 
 #ifdef VERIFY
+    #pragma omp target update from (vdov[0:numElem])
     for ( Index_t k=0 ; k<numElem ; ++k )
     {
       printf("kintec: %d %f\n", k, vdov[k]);
     }
 #endif
-
-    if (vol_error[0] >= 0){
-      printf("VolumeError: negative volumn\n");
-      exit(VolumeError);
-    }
 
     //======================================================= 
     //CalcQForElems(domain, vnew) ;
@@ -2438,19 +2437,20 @@ int main(int argc, char *argv[])
       v[elem] = vnew_t ;
     }
 
-#pragma omp target update from (ss[0:numElem])
-#pragma omp target update from (arealg[0:numElem])
+    //#pragma omp target update from (arealg[0:numElem])
 
 #ifdef VERIFY
     #pragma omp target update from (q[0:numElem])
     #pragma omp target update from (p[0:numElem])
     #pragma omp target update from (e[0:numElem])
+    #pragma omp target update from (ss[0:numElem])
     #pragma omp target update from (v[0:numElem])
     for (int i = 0; i < numElem; i++) {
       printf("eos: %f %f %f %f %f\n", q[i], p[i], e[i], ss[i], v[i]);
     }
 #endif
 
+    // TODO: offload to device
     CalcTimeConstraintsForElems(domain);
 
     if ((opts.showProg != 0) && (opts.quiet == 0) && (myRank == 0)) {
@@ -2462,6 +2462,7 @@ int main(int argc, char *argv[])
     }
     opts.iteration_cap -= 1;
   }
+  #pragma omp target update from (e[0:numElem])
 }
 
   // Use reduced max elapsed time
