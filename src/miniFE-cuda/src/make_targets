@@ -41,7 +41,7 @@ run: main
 	./main -nx 128 -ny 128 -nz 128
 
 clean:
-	rm -f *.o *.a *.x *.linkinfo miniFE_info.hpp
+	rm -f *.o *.a *.x *.linkinfo miniFE_info.hpp main
 
 realclean: clean
 	rm -f gmon.out gprof.* *~ *.yaml *.TVD.* *.mtx* *.vec* minife_debug*
