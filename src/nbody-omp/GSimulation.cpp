@@ -95,7 +95,7 @@ void GSimulation::Start() {
   constexpr float kSofteningSquared = 1e-3f;
   // prevents explosion in the case the particles are really close to each other
   constexpr float kG = 6.67259e-11f;
-  double gflops = 1e-9 * ((11. + 18.) * n * n + n * 19.);
+  double gflops = 1e-9 * ((11. + 10.) * n * n + n * 19.);
   int nf = 0;
   double av = 0.0, dev = 0.0;
 
@@ -133,9 +133,11 @@ void GSimulation::Start() {
             dx * dx + dy * dy + dz * dz + kSofteningSquared;  // 6flops
           distance_inv = 1.0f / sqrtf(distance_sqr);       // 1div+1sqrt
 
-          acc0 += dx * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
-          acc1 += dy * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
-          acc2 += dz * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
+          auto strength = kG * pj.mass * distance_inv * distance_inv * distance_inv; // 4flops
+
+          acc0 += dx * strength;  // 2flops
+          acc1 += dy * strength;  // 2flops
+          acc2 += dz * strength;  // 2flops
         }
         pi.acc[0] = acc0;
         pi.acc[1] = acc1;

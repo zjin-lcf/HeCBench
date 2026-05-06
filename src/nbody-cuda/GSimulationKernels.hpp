@@ -22,9 +22,11 @@ accelerate_particles( Particle* p, const int n, const float kSofteningSquared, c
       dx * dx + dy * dy + dz * dz + kSofteningSquared;  // 6flops
     distance_inv = rsqrtf(distance_sqr);       // 1div+1sqrt
 
-    acc0 += dx * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
-    acc1 += dy * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
-    acc2 += dz * kG * pj.mass * distance_inv * distance_inv * distance_inv;  // 6flops
+    auto strength = kG * pj.mass * distance_inv * distance_inv * distance_inv; // 4 flops
+
+    acc0 += dx * strength;  // 2flops
+    acc1 += dy * strength;  // 2flops
+    acc2 += dz * strength;  // 2flops
   }
   pi.acc[0] = acc0;
   pi.acc[1] = acc1;

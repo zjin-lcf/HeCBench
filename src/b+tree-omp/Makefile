@@ -109,4 +109,5 @@ clean:
 		./kernel/*.o \
 		./util/timer/*.o \
 		./util/num/*.o \
-		output.txt
+		output.txt \
+		main

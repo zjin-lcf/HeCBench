@@ -77,7 +77,7 @@ main:./main.o \
 			./util/timer/timer.o \
 			./util/num/num.o \
 			$(LDFLAGS) \
-	                -o main
+			-o main
 
 
 main.o:	./b+tree.h ./main.c
@@ -125,4 +125,5 @@ clean:
 		./kernel/*.o \
 		./util/timer/*.o \
 		./util/num/*.o \
-		output.txt
+		output.txt \
+		main
