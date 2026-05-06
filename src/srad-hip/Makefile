@@ -53,7 +53,7 @@ $(program): $(obj) Makefile
 
 # delete all object files
 clean:
-	rm -f *.o srad *pgm
+	rm -f *.o srad *pgm main
 
 run: $(program)
 	$(LAUNCHER) ./$(program) 1000 0.5 502 458
