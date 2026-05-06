@@ -97,7 +97,7 @@ void GSimulation::Start() {
   constexpr float kSofteningSquared = 1e-3f;
   // prevents explosion in the case the particles are really close to each other
   constexpr float kG = 6.67259e-11f;
-  double gflops = 1e-9 * ((11. + 18.) * n * n + n * 19.);
+  double gflops = 1e-9 * ((11. + 10.) * n * n + n * 19.);
   int nf = 0;
   double av = 0.0, dev = 0.0;
 

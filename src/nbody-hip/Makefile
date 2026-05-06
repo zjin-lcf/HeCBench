@@ -46,7 +46,8 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu GSimulationKernels.hpp ../nbody-cuda/GSimulationReference.hpp \
+%.o: %.cu ../nbody-cuda/GSimulationKernels.hpp \
+          ../nbody-cuda/GSimulationReference.hpp \
           GSimulation.hpp Particle.hpp type.hpp Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
