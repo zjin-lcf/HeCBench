@@ -98,5 +98,6 @@ clean:
 		./kernel/*.o \
 		./util/timer/*.o \
 		./util/num/*.o \
+		main \
     output.txt
 
