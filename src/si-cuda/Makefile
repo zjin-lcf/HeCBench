@@ -1,12 +1,14 @@
-# si-hip was a benchmark that builds via CMake instead of Make.
+# si-cuda was a benchmark that builds via CMake instead of Make.
 # This wrapper drives the CMake build out-of-tree under release/ and
 # matches the all/clean interface the rest of HeCBench expects.
+
+ARCH = sm_60
 
 .PHONY: all clean run gen_dataset
 
 all:
 	mkdir -p release
-	cd release && cmake $(CURDIR) -DCMAKE_BUILD_TYPE=Release
+	cd release && cmake $(CURDIR) -DSM_ARCH=$(subst sm_,,$(ARCH)) -DCMAKE_BUILD_TYPE=Release
 	$(MAKE) -C release
 
 clean:

@@ -6,10 +6,15 @@ We cover and adapt techniques initially proposed for graph analytics, while we i
 We experiment when both a single pair of two large sets are processed and all pairs in a dataset are examined.
 
 
-## Compile (Intel DevCloud)
+## Compile (Intel oneAPI base tool kit)
 
 ```
-mkdir release && cd release
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=dpcpp ..
 make -j
 ```
+
+## Run
+
+```
+make run
+```
+

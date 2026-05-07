@@ -1,4 +1,4 @@
-# si-hip was a benchmark that builds via CMake instead of Make.
+# si-sycl was a benchmark that builds via CMake instead of Make.
 # This wrapper drives the CMake build out-of-tree under release/ and
 # matches the all/clean interface the rest of HeCBench expects.
 
@@ -6,7 +6,7 @@
 
 all:
 	mkdir -p release
-	cd release && cmake $(CURDIR) -DCMAKE_BUILD_TYPE=Release
+	cd release && cmake $(CURDIR) -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DCMAKE_BUILD_TYPE=Release
 	$(MAKE) -C release
 
 clean:
