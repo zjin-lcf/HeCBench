@@ -1,4 +1,4 @@
-# si-hip is the only HIP benchmark that builds via CMake instead of Make.
+# si-hip was a benchmark that builds via CMake instead of Make.
 # This wrapper drives the CMake build out-of-tree under release/ and
 # matches the all/clean interface the rest of HeCBench expects.
 
