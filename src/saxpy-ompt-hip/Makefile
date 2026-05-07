@@ -7,7 +7,7 @@ CC        = amdclang++
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
-ARCH      = gfx906
+ARCH     ?= gfx906
 LAUNCHER  =
 
 #===============================================================================
