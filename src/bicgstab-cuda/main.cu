@@ -377,8 +377,8 @@ int main(int argc, char** argv) {
     double* h_A_values  = (double*) malloc(nnz * sizeof(double));
     double* h_X         = (double*) malloc(m * sizeof(double));
     printf("Matrix parsing...\n");
-    mtx_parsing(file_path, num_lines, num_rows, nnz, h_A_rows,
-                h_A_columns, h_A_values, base);
+    nnz = mtx_parsing(file_path, num_lines, num_rows, nnz, h_A_rows,
+                      h_A_columns, h_A_values, base);
     printf("Testing BiCGStab\n");
     for (int i = 0; i < num_rows; i++)
         h_X[i] = 1.0;
