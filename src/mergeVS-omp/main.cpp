@@ -183,13 +183,9 @@ void run_test(int repeat, bool causal, struct configs &cfg)
                                  h_vcnt[0:idxcnt_size], \
                                  h_scnt[0:idxcnt_size]) \
                           map(tofrom: h_blk_cnt[0:res.n_scalar], \
-                                      r_blk_cnt[0:res.n_scalar], \
                                       h_col_cnt[0:res.n_scalar], \
-                                      r_col_cnt[0:res.n_scalar], \
                                       h_blk_off[0:res.n_offset], \
-                                      r_blk_off[0:res.n_offset], \
-                                      h_col_idx[0:res.n_index], \
-                                      r_col_idx[0:res.n_index])
+                                      h_col_idx[0:res.n_index])
   {
     auto start = std::chrono::steady_clock::now();
 
