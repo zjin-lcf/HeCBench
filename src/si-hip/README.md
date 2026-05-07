@@ -7,17 +7,12 @@ We experiment when both a single pair of two large sets are processed and all pa
 
 
 ## Compile
-
 ```
-mkdir release && cd release
-CXX=hipcc cmake .. -DCMAKE_BUILD_TYPE=Release 
-make -j 4
+make -j
 ```
 
 ## Run
 
 ```
-./generate_dataset --iterations 100 --universe 1000 -k 1000
-./main --input out_asc_uniform_1000_1000_100.bin
-./main --input out_desc_uniform_1000_1000_100.bin
+make run
 ```
