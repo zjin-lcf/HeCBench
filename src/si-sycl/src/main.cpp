@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
-    sycl::queue host(sycl::cpu_selector{}); // exclusive scan on host
+    sycl::queue host(sycl::cpu_selector_v); // exclusive scan on host
     auto policy = oneapi::dpl::execution::make_device_policy(host);
 
     fmt::print(
@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
               devOutput, B.length,
               {copyA, copyB});
         }
-        catch(cl::sycl::exception const& e) {
+        catch(sycl::exception const& e) {
           std::cout << "\t\tCaught synchronous SYCL exception during GEMM:\n"
                     << e.what() << std::endl;
         }
