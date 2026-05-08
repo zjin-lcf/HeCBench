@@ -8,6 +8,7 @@ OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 ARCH     ?= gfx906
+ROCM_PATH ?= /opt/rocm
 LAUNCHER  =
 
 #===============================================================================
@@ -26,10 +27,10 @@ obj = $(source:.c=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -Wall -D__HIP_PLATFORM_AMD__ \
-          -I/opt/rocm/include -I/opt/rocm/hipblas/include
+          -I$(ROCM_PATH)/include -I$(ROCM_PATH)/include/hipblas
 
 # Linker Flags
-LDFLAGS = -L/opt/rocm/hipblas/lib -lhipblas -L/opt/rocm/lib -lamdhip64
+LDFLAGS = -L$(ROCM_PATH)/lib -lhipblas -lamdhip64
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
