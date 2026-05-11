@@ -3,11 +3,10 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = nvc++
+CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
-SM        = cc70
+ARCH      = sm_60
 LAUNCHER  =
 
 #===============================================================================
@@ -16,49 +15,50 @@ LAUNCHER  =
 
 program = main
 
-source = main.cpp
+source = main.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++14 -Wall -I../mergeVS-cuda
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
 LDFLAGS = 
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -DDEBUG
+  CFLAGS += -g
   LDFLAGS  += -g
 endif
-
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS +=-Minfo -mp=gpu -gpu=$(SM)
-else
-  CFLAGS +=-qopenmp
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj)
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp ../mergeVS-cuda/reference.h kernels.h
+%.o: %.cu  config.h kernels.h reference.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 1000
+	$(LAUNCHER) ./$(program) --op bgmv_shrink --tokens 1 --hidden 4096 --rank 16 --loras 4 --repeat 200
+	$(LAUNCHER) ./$(program) --op bgmv_shrink --vectorize --tokens 1 --hidden 4096 --rank 16 --loras 4 --repeat 200
+	$(LAUNCHER) ./$(program) --op bgmv_shrink --tokens 512 --hidden 4096 --rank 16 --loras 4 --repeat 200
+	$(LAUNCHER) ./$(program) --op bgmv_shrink --vectorize --tokens 512 --hidden 4096 --rank 16 --loras 4 --repeat 200
+	$(LAUNCHER) ./$(program) --op bgmv_expand --tokens 1 --hidden 4096 --rank 16 --loras 4 --repeat 200
+	$(LAUNCHER) ./$(program) --op bgmv_expand --vectorize --tokens 1 --hidden 4096 --rank 16 --loras 4 --repeat 200
+	$(LAUNCHER) ./$(program) --op bgmv_expand --tokens 512 --hidden 4096 --rank 16 --loras 4 --repeat 200
+	$(LAUNCHER) ./$(program) --op bgmv_expand --vectorize --tokens 512 --hidden 4096 --rank 16 --loras 4 --repeat 200

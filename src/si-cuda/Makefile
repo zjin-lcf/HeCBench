@@ -2,10 +2,12 @@
 # This wrapper drives the CMake build out-of-tree under release/ and
 # matches the all/clean interface the rest of HeCBench expects.
 
-ARCH = sm_60
+ARCH      = sm_60
+LAUNCHER  =
 
-.PHONY: all clean run gen_dataset
+.PHONY: all clean run
 
+# CUDA Path may need to be set properly first
 all:
 	mkdir -p release
 	cd release && cmake $(CURDIR) -DSM_ARCH=$(subst sm_,,$(ARCH)) -DCMAKE_BUILD_TYPE=Release
@@ -24,11 +26,9 @@ clean:
 DATASET = release/out_asc_uniform_1000_1000_100.bin \
           release/out_desc_uniform_1000_1000_100.bin
 
-$(DATASET): release/generate_dataset
+$(DATASET): | all
 	cd release && ./generate_dataset --iterations 100 --universe 1000 -k 1000
 
-gen_dataset: $(DATASET)
-
-run: all gen_dataset
-	cd release && ./main --input out_asc_uniform_1000_1000_100.bin
-	cd release && ./main --input out_desc_uniform_1000_1000_100.bin
+run: $(DATASET)
+	cd release && $(LAUNCHER) ./main --input out_asc_uniform_1000_1000_100.bin
+	cd release && $(LAUNCHER) ./main --input out_desc_uniform_1000_1000_100.bin

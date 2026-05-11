@@ -463,6 +463,7 @@ set(HECBENCH_POC_BENCHMARKS
     atomicSystemWide
     attentionMultiHead
     axhelm
+    bgmv
     bh
     bicgstab
     bincount
