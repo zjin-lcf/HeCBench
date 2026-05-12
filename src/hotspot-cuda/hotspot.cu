@@ -1,14 +1,11 @@
 #include <chrono>
+#include <cmath>
+#include <cstring>
 #include <cuda.h>
 #include "hotspot.h"
 #include "kernel.h"
+#include "reference.h"
 
-// Returns the current system time in microseconds
-long long get_time() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (tv.tv_sec * 1000000) + tv.tv_usec;
-}
 
 void writeoutput(float *vect, int grid_rows, int grid_cols, char *file) {
   int i,j, index=0;
@@ -20,7 +17,7 @@ void writeoutput(float *vect, int grid_rows, int grid_cols, char *file) {
     return;
   }
 
-  for (i=0; i < grid_rows; i++) 
+  for (i=0; i < grid_rows; i++)
     for (j=0; j < grid_cols; j++)
     {
       sprintf(str, "%d\t%g\n", index, vect[i*grid_cols+j]);
@@ -28,7 +25,7 @@ void writeoutput(float *vect, int grid_rows, int grid_cols, char *file) {
       index++;
     }
 
-  fclose(fp);	
+  fclose(fp);
 }
 
 void readinput(float *vect, int grid_rows, int grid_cols, char *file) {
@@ -43,7 +40,7 @@ void readinput(float *vect, int grid_rows, int grid_cols, char *file) {
     exit(-1);
   }
 
-  for (i=0; i <= grid_rows-1; i++) 
+  for (i=0; i <= grid_rows-1; i++)
     for (j=0; j <= grid_cols-1; j++)
     {
       if (fgets(str, STR_SIZE, fp) == NULL) {
@@ -61,17 +58,17 @@ void readinput(float *vect, int grid_rows, int grid_cols, char *file) {
       vect[i*grid_cols+j] = val;
     }
 
-  fclose(fp);	
+  fclose(fp);
 }
 
 /* compute N time steps */
 int compute_tran_temp(
-    float *MatrixPower, 
-    float *MatrixTemp[2], 
+    float *MatrixPower,
+    float *MatrixTemp[2],
     int col, int row,
-    int total_iterations, int num_iterations, 
+    int total_iterations, int num_iterations,
     int blockCols, int blockRows, int borderCols, int borderRows)
-{ 
+{
   float grid_height = chip_height / row;
   float grid_width = chip_width / col;
 
@@ -91,10 +88,7 @@ int compute_tran_temp(
 
   // Determine GPU work group grid
   dim3 blocks (BLOCK_SIZE, BLOCK_SIZE);
-  dim3 grids (blockCols, blockRows);  
-
-  cudaDeviceSynchronize();
-  auto start = std::chrono::steady_clock::now();
+  dim3 grids (blockCols, blockRows);
 
   for (t = 0; t < total_iterations; t += num_iterations) {
 
@@ -108,11 +102,6 @@ int compute_tran_temp(
     src = 1 - src;
     dst = 1 - dst;
   }
-
-  cudaDeviceSynchronize();
-  auto end = std::chrono::steady_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-  printf("Total kernel execution time %f (s)\n", time * 1e-9f);
 
   return src;
 }
@@ -153,8 +142,8 @@ int main(int argc, char** argv) {
   ofile=argv[6];
 
   size=sizeof(float)*grid_rows*grid_cols;
-  
-  // --------------- pyramid parameters --------------- 
+
+  // --------------- pyramid parameters ---------------
   int borderCols = (pyramid_height)*EXPAND_RATE/2;
   int borderRows = (pyramid_height)*EXPAND_RATE/2;
   int smallBlockCol = BLOCK_SIZE-(pyramid_height)*EXPAND_RATE;
@@ -164,8 +153,17 @@ int main(int argc, char** argv) {
 
   FilesavingTemp = (float *) malloc(size);
   FilesavingPower = (float *) malloc(size);
+  float *result = (float *) malloc(size);
 
-  if( !FilesavingPower || !FilesavingTemp) {
+  if( !FilesavingPower || !FilesavingTemp || !result) {
+    printf("unable to allocate memory");
+    exit(-1);
+  }
+
+  float *MatrixTemp_ref[2];
+  MatrixTemp_ref[0] = (float*) malloc (size);
+  MatrixTemp_ref[1] = (float*) malloc (size);
+  if( !MatrixTemp_ref[0] || !MatrixTemp_ref[1]) {
     printf("unable to allocate memory");
     exit(-1);
   }
@@ -174,7 +172,20 @@ int main(int argc, char** argv) {
   readinput(FilesavingTemp, grid_rows, grid_cols, tfile);
   readinput(FilesavingPower, grid_rows, grid_cols, pfile);
 
-  long long start_time = get_time();
+  // reference
+  auto start = std::chrono::steady_clock::now();
+
+  memcpy(MatrixTemp_ref[0], FilesavingTemp, size);
+  int ret = reference(FilesavingPower, MatrixTemp_ref, grid_cols, grid_rows,
+                      total_iterations, pyramid_height);
+  float *result_ref = MatrixTemp_ref[ret];
+
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Total reference execution time %f (s)\n", time * 1e-9f);
+
+  // device offloading
+  start = std::chrono::steady_clock::now();
 
   float *MatrixPower;
   cudaMalloc((void**)&MatrixPower, size);
@@ -185,23 +196,43 @@ int main(int argc, char** argv) {
   cudaMalloc((void**)&MatrixTemp[1], size);
   cudaMemcpy(MatrixTemp[0], FilesavingTemp, size, cudaMemcpyHostToDevice);
 
-  // Perform the computation
-  int ret = compute_tran_temp(MatrixPower, MatrixTemp, grid_cols, grid_rows, 
-        total_iterations, pyramid_height, blockCols, blockRows, borderCols, borderRows);
+  cudaDeviceSynchronize();
+  auto kstart = std::chrono::steady_clock::now();
+  ret = compute_tran_temp(MatrixPower, MatrixTemp, grid_cols, grid_rows,
+                          total_iterations, pyramid_height, blockCols, blockRows, borderCols, borderRows);
 
-  cudaMemcpy(FilesavingPower, MatrixTemp[ret], size, cudaMemcpyDeviceToHost);
+  cudaDeviceSynchronize();
+  auto kend = std::chrono::steady_clock::now();
+  auto ktime = std::chrono::duration_cast<std::chrono::nanoseconds>(kend - kstart).count();
+  printf("Total kernel execution time %f (s)\n", ktime * 1e-9f);
 
-  long long end_time = get_time();
-  printf("Device offloading time: %.3f seconds\n", ((float) (end_time - start_time)) / (1000*1000));
+  cudaMemcpy(result, MatrixTemp[ret], size, cudaMemcpyDeviceToHost);
+
+  end = std::chrono::steady_clock::now();
+  time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Device offloading time: %.3f (s)\n", time * 1e-9f);
+
+  bool ok = true;
+  for (int i = 0; i < grid_cols * grid_rows; i++) {
+    if (fabsf(result_ref[i] - result[i]) > 1e-3f) {
+       ok = false;
+       break;
+    }
+  }
+  printf("%s\n", ok ? "PASS" : "FAIL");
 
   // Write final output to output file
-  writeoutput(FilesavingPower, grid_rows, grid_cols, ofile);
+  writeoutput(result, grid_rows, grid_cols, ofile);
 
   cudaFree(MatrixPower);
   cudaFree(MatrixTemp[0]);
   cudaFree(MatrixTemp[1]);
+
+  free(MatrixTemp_ref[0]);
+  free(MatrixTemp_ref[1]);
   free(FilesavingTemp);
   free(FilesavingPower);
+  free(result);
 
   return 0;
 }
