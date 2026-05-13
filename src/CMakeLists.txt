@@ -463,6 +463,7 @@ set(HECBENCH_POC_BENCHMARKS
     atomicSystemWide
     attentionMultiHead
     axhelm
+    base64e
     bgmv
     bh
     bicgstab
