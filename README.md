@@ -54,7 +54,7 @@ Each benchmark falls into a single category. While such classification is not ac
     atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fma, fpc, histogram, lzss, minmax, mpc, mtf, quantAQLM, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, scatter, scatterAdd, scatterThrust, segment-reduce
 
 ### Data encoding, decoding, or verification
-    ans, crc64, crs, entropy, jenkins-hash, kiss, ldpc, md5hash, murmurhash3
+    ans, base64e, crc64, crs, entropy, jenkins-hash, kiss, ldpc, md5hash, murmurhash3
 
 ### Finance
     aop, black-scholes, binomial, bonds, libor
@@ -346,6 +346,9 @@ Early results are shown [here](results/README.md)
 
 ### backprop (opencl)
   Backpropagation in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### base64e (opencl)
+  Base64 encoding (Jin, Z. and Finkel, H., 2019, July. Base64 encoding on heterogeneous computing platforms. In 2019 IEEE 30th International Conference on Application-specific Systems, Architectures and Processors (ASAP) (Vol. 2160, pp. 247-254). IEEE.)
 
 ### bezier-surface (opencl)
   The Bezier surface (https://github.com/chai-benchmarks/chai)
