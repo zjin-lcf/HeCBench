@@ -527,6 +527,7 @@ set(HECBENCH_POC_BENCHMARKS
     leukocyte
     miniFE
     mergeVS
+    mlp
     pointerchase
     rmsnorm
     saxpy-ompt
