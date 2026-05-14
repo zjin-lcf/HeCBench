@@ -462,6 +462,7 @@ set(HECBENCH_POC_BENCHMARKS
     atomicCAS
     atomicSystemWide
     attentionMultiHead
+    attentionMultiHeadKVCache
     axhelm
     base64e
     bgmv
