@@ -1,5 +1,5 @@
-#include <sys/time.h>
 #include <stdio.h>
+#include <chrono>
 #include <type_traits> // is_same
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
@@ -83,11 +83,10 @@ void test_gemm(hipblasHandle_t handle,
   int compute32F_mode = 0)
 {
   double total_time = 0;
-  struct timeval start, end;
 
   for (int i = 0; i < iteration; ++i) {
     hipDeviceSynchronize();
-    gettimeofday(&start, NULL);
+    auto start = std::chrono::steady_clock::now();
     bool success = hipblas_gemm_ex(handle,
                                    HIPBLAS_OP_N,
                                    HIPBLAS_OP_N,
@@ -105,10 +104,11 @@ void test_gemm(hipblasHandle_t handle,
                                    static_cast<hipblasGemmAlgo_t>(algo),
                                    compute32F_mode);
     hipDeviceSynchronize();
-    gettimeofday(&end, NULL);
+    auto end = std::chrono::steady_clock::now();
+
     if (!success) break;
     else if (i > 0) {
-      total_time += (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) * 0.001;
+      total_time += std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     }
   }
   if (total_time > 0.0) {

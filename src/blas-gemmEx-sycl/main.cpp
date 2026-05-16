@@ -1,6 +1,5 @@
-#include <sys/time.h>
 #include <stdio.h>
-#include <vector>
+#include <chrono>
 #include <sycl/sycl.hpp>
 #include <oneapi/mkl.hpp>
 #include "utils.h"
@@ -60,10 +59,9 @@ void test_gemm(sycl::queue &q,
                  oneapi::mkl::blas::compute_mode::standard)
 {
   double total_time = 0;
-  struct timeval start, end;
 
   for (int i = 0; i < iteration; ++i) {
-    gettimeofday(&start, NULL);
+    auto start = std::chrono::steady_clock::now();
     bool success = mkl_gemm_ex(q,
                                oneapi::mkl::transpose::nontrans,
                                oneapi::mkl::transpose::nontrans,
@@ -79,10 +77,10 @@ void test_gemm(sycl::queue &q,
                                alpha,
                                beta,
                                mode);
-    gettimeofday(&end, NULL);
+    auto end = std::chrono::steady_clock::now();
     if (!success) break;
     else if (i > 0) {
-      total_time += (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) * 0.001;
+      total_time += std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     }
   }
   if (total_time > 0.0) {
