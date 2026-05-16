@@ -6,6 +6,7 @@
 CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
+ROCM_PATH ?= /opt/rocm
 LAUNCHER  =
 
 #===============================================================================
@@ -24,10 +25,10 @@ obj = $(source:.cu=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -DHIPBLAS_USE_HIP_HALF \
-          -I/opt/rocm/include/hipblas -I../blas-gemmBatched-cuda
+          -I$(ROCM_PATH)/include -I../blas-gemmBatched-cuda
 
 # Linker Flags
-LDFLAGS = -lhipblas
+LDFLAGS = -L$(ROCM_PATH)/lib -lhipblas
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
