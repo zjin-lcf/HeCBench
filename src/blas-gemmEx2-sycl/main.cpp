@@ -1,6 +1,5 @@
-#include <sys/time.h>
 #include <stdio.h>
-#include <vector>
+#include <chrono>
 #include <sycl/sycl.hpp>
 #include <oneapi/dnnl/dnnl.hpp>
 #include <oneapi/dnnl/dnnl_sycl.hpp>
@@ -89,10 +88,9 @@ void test_gemm(const int m, const int n, const int k,
                const S alpha, const S beta, int iteration)
 {
   double total_time = 0;
-  struct timeval start, end;
 
   for (int i = 0; i < iteration; ++i) {
-    gettimeofday(&start, NULL);
+    auto start = std::chrono::steady_clock::now();
     bool success = onednn_gemm(n, // number of rows of matrix A and C
                                m, // number of columns of matrix B and C
                                k, // number of columns of A and rows of B
@@ -101,10 +99,11 @@ void test_gemm(const int m, const int n, const int k,
                                C,
                                alpha,
                                beta);
-    gettimeofday(&end, NULL);
+    auto end = std::chrono::steady_clock::now();
+
     if (!success) break;
     else if (i > 0) {
-      total_time += (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) * 0.001;
+      total_time += std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     }
   }
   if (total_time > 0.0) {
