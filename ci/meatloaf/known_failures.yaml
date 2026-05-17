@@ -1,0 +1,57 @@
+# Known benchmark failures as of 2026-04-14
+#
+# This file tracks the baseline status of each benchmark (pass/compile/run/correctness).
+# CI compares current results against this baseline to detect regressions.
+#
+# To regenerate: python3 ci/meatloaf/ci-manager.py --seed
+#
+# Status values:
+#   pass          - compiles and runs successfully
+#   compile       - fails to compile
+#   run           - compiles but crashes / times out on execution
+#   correctness   - runs but exit code non-zero
+#   skip          - hangs GPU with unkillable orphan; never run
+
+meta:
+  generated_at: "2026-04-14"
+
+benchmarks:
+  # Known compile failures (mostly SYCL icpx toolchain issues)
+  accuracy:
+    sycl: compile
+  ace:
+    sycl: compile
+  adam:
+    sycl: compile
+  adv:
+    sycl: compile
+  ans:
+    sycl: compile
+  aop:
+    sycl: compile
+  attentionMultiHead:
+    sycl: compile
+  axhelm:
+    hip: compile
+    sycl: compile
+  bitcracker:
+    hip: compile
+  bm3d:
+    sycl: compile
+  bsw:
+    sycl: compile
+  btree:
+    sycl: compile
+  bwt:
+    sycl: compile
+
+  # Benchmarks that hang GPU with unkillable orphan
+  # https://github.com/CHIP-SPV/chipStar/issues/1234
+  flip:
+    hip: skip
+    sycl: skip
+
+  # Known passing benchmarks (sample)
+  bsearch:
+    hip: pass
+    sycl: pass
