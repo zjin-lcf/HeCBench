@@ -227,6 +227,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < 10; ++i)
     printf("%.5f%c", float(iC[i])/127/127, " \n"[i==9]);
 
+  hipblasDestroy(handle);
   free_memory(dA, dB, dC);
   free_memory(fA, fB, fC);
   free_memory(hA, hB, hC);
