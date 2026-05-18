@@ -5,10 +5,10 @@
    Systems Biology: Interdisciplinary applications," by IGI Global.
  */
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <sys/time.h>
 #include <sycl/sycl.hpp>
 
 #ifdef __NVPTX__
@@ -52,12 +52,6 @@ int main(int argc, char **argv) {
   int *cpu_distance; 
   int *gpu_distance; 
 
-  /* used to time CPU and GPU implementations */
-  double start_cpu, stop_cpu;
-  double start_gpu, stop_gpu;
-  float elapsedTime; 
-  struct timeval tp;
-  struct timezone tzp;
   /* verification result */ 
   int status;
 
@@ -98,22 +92,17 @@ int main(int argc, char **argv) {
   sycl::range<2> lws (1, THREADS);
 
   /* CPU */
+  auto start = std::chrono::steady_clock::now();
   bzero(cpu_distance,INSTANCES*INSTANCES*sizeof(int));
-  gettimeofday(&tp, &tzp);
-  start_cpu = tp.tv_sec*1000000+tp.tv_usec;
   CPU(data, cpu_distance);
-  gettimeofday(&tp, &tzp);
-  stop_cpu = tp.tv_sec*1000000+tp.tv_usec;
-  elapsedTime = stop_cpu - start_cpu;
-  printf("CPU time: %f (us)\n",elapsedTime);
+  auto end = std::chrono::steady_clock::now();
+  double elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+  printf("CPU time: %f (us)\n", elapsedTime);
 
-  elapsedTime = 0; 
+  start = std::chrono::steady_clock::now();
   for (int n = 0; n < iterations; n++) {
     /* register GPU kernel */
     q.memset(d_distance, 0, distance_bytes).wait();
-
-    gettimeofday(&tp, &tzp);
-    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     q.submit([&] (sycl::handler &h) {
       h.parallel_for<class k1>(
@@ -148,27 +137,22 @@ int main(int argc, char **argv) {
           ao.fetch_add(count);
         }
       });
-    }).wait();
-
-    gettimeofday(&tp, &tzp);
-    stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime += stop_gpu - start_gpu;
+    });
   }
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
   q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  if (status != 0) printf("FAIL\n");
-  else printf("PASS\n");
+  printf("%s\n", status ? "FAIL" : "PASS");
 
-  elapsedTime = 0; 
+  start = std::chrono::steady_clock::now();
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
     q.memset(d_distance, 0, distance_bytes).wait();
-
-    gettimeofday(&tp, &tzp);
-    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     /*  coalesced GPU implementation of the all-pairs kernel using
         character data types, registers, and shared memory */
@@ -231,27 +215,22 @@ int main(int argc, char **argv) {
           d_distance[INSTANCES*gy + gx] = dist[0];
         }
       });
-    }).wait();
-
-    gettimeofday(&tp, &tzp);
-    stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime += stop_gpu - start_gpu;
+    });
   }
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
   q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  if (status != 0) printf("FAIL\n");
-  else printf("PASS\n");
+  printf("%s\n", status ? "FAIL" : "PASS");
 
-  elapsedTime = 0; 
+  start = std::chrono::steady_clock::now();
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
     q.memset(d_distance, 0, distance_bytes).wait();
-
-    gettimeofday(&tp, &tzp);
-    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
 
     q.submit([&] (sycl::handler &h) {
       h.parallel_for<class k3>(
@@ -286,19 +265,17 @@ int main(int argc, char **argv) {
           d_distance[INSTANCES*gy + gx] = sum;
         }
       });
-    }).wait();
-
-    gettimeofday(&tp, &tzp);
-    stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime += stop_gpu - start_gpu;
+    });
   }
+  q.wait();
+  end = std::chrono::steady_clock::now();
+  elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
   q.memcpy(gpu_distance, d_distance, distance_bytes).wait();
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  if (status != 0) printf("FAIL\n");
-  else printf("PASS\n");
+  printf("%s\n", status ? "FAIL" : "PASS");
 
   free(cpu_distance);
   free(gpu_distance);

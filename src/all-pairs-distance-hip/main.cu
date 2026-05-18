@@ -5,12 +5,12 @@
    Systems Biology: Interdisciplinary applications," by IGI Global.
  */
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <hip/hip_runtime.h>
 #include <hipcub/hipcub.hpp>
-#include <sys/time.h>
 
 #define INSTANCES 224   /* # of instances */
 #define ATTRIBUTES 4096 /* # of attributes */
@@ -24,7 +24,7 @@ void CPU(int * data, int * distance) {
   for (int i = 0; i < INSTANCES; i++) {
     for (int j = 0; j < INSTANCES; j++) {
       for (int k = 0; k < ATTRIBUTES; k++) {
-        distance[i + INSTANCES * j] += 
+        distance[i + INSTANCES * j] +=
           (data[i * ATTRIBUTES + k] != data[j * ATTRIBUTES + k]);
       }
     }
@@ -47,8 +47,8 @@ __global__ void k1 (const char *data, int *distance) {
        values. This reduces writes to global memory */
     char count = 0;
 
-    if(j.x ^ k.x) 
-      count++; 
+    if(j.x ^ k.x)
+      count++;
     if(j.y ^ k.y)
       count++;
     if(j.z ^ k.z)
@@ -78,7 +78,7 @@ __global__ void k2 (const char *data, int *distance) {
    */
   __shared__ int dist[THREADS];
 
-  /* each thread initializes its own location of the shared array */ 
+  /* each thread initializes its own location of the shared array */
   dist[idx] = 0;
 
   /* At this point, the threads must be synchronized to ensure that
@@ -90,7 +90,7 @@ __global__ void k2 (const char *data, int *distance) {
     char4 k = *(char4 *)(data + i + ATTRIBUTES*gy);
     char count = 0;
 
-    if(j.x ^ k.x) 
+    if(j.x ^ k.x)
       count++;
     if(j.y ^ k.y)
       count++;
@@ -122,7 +122,7 @@ __global__ void k2 (const char *data, int *distance) {
     /* Thread 0 will then write the output to global memory. Note that
        this does not need to be performed atomically, because only one
        thread per block is writing to global memory, and each block
-       corresponds to a unique memory address. 
+       corresponds to a unique memory address.
      */
     distance[INSTANCES*gy + gx] = dist[0];
   }
@@ -145,7 +145,7 @@ __global__ void k3 (const char *data, int *distance) {
     char4 k = *(char4 *)(data + i + ATTRIBUTES*gy);
     char count = 0;
 
-    if(j.x ^ k.x) 
+    if(j.x ^ k.x)
       count++;
     if(j.y ^ k.y)
       count++;
@@ -170,30 +170,24 @@ int main(int argc, char **argv) {
     printf("Usage: %s <iterations>\n", argv[0]);
     return 1;
   }
-  
+
   const int iterations = atoi(argv[1]);
 
   /* host data */
-  int *data; 
+  int *data;
   char *data_char;
-  int *cpu_distance; 
-  int *gpu_distance; 
+  int *cpu_distance;
+  int *gpu_distance;
 
   /* device data */
   char *data_char_device;
-  int *distance_device; 
+  int *distance_device;
 
   /* block and grid dimensions */
-  dim3 dimBlock; 
-  dim3 dimGrid; 
+  dim3 dimBlock;
+  dim3 dimGrid;
 
-  /* used to time CPU and GPU implementations */
-  double start_cpu, stop_cpu;
-  double start_gpu, stop_gpu;
-  float elapsedTime; 
-  struct timeval tp;
-  struct timezone tzp;
-  /* verification result */ 
+  /* verification result */
   int status;
 
   /* seed RNG */
@@ -214,10 +208,10 @@ int main(int argc, char **argv) {
   }
 
   /* allocate GPU memory */
-  hipMalloc((void **)&data_char_device, 
+  hipMalloc((void **)&data_char_device,
       INSTANCES * ATTRIBUTES * sizeof(char));
 
-  hipMalloc((void **)&distance_device, 
+  hipMalloc((void **)&distance_device,
       INSTANCES * INSTANCES * sizeof(int));
 
   hipMemcpy(data_char_device, data_char,
@@ -225,96 +219,70 @@ int main(int argc, char **argv) {
       hipMemcpyHostToDevice);
 
   /* specify grid and block dimensions */
-  dimBlock.x = THREADS; 
-  dimBlock.y = 1; 
+  dimBlock.x = THREADS;
+  dimBlock.y = 1;
   dimGrid.x = INSTANCES;
   dimGrid.y = INSTANCES;
 
 
   /* CPU */
+  auto start = std::chrono::steady_clock::now();
   bzero(cpu_distance,INSTANCES*INSTANCES*sizeof(int));
-  gettimeofday(&tp, &tzp);
-  start_cpu = tp.tv_sec*1000000+tp.tv_usec;
   CPU(data, cpu_distance);
-  gettimeofday(&tp, &tzp);
-  stop_cpu = tp.tv_sec*1000000+tp.tv_usec;
-  elapsedTime = stop_cpu - start_cpu;
-  printf("CPU time: %f (us)\n",elapsedTime);
+  auto end = std::chrono::steady_clock::now();
+  double elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+  printf("CPU time: %f (us)\n", elapsedTime);
 
-  elapsedTime = 0; 
+  start = std::chrono::steady_clock::now();
   for (int n = 0; n < iterations; n++) {
     /* register GPU kernel */
     hipMemset(distance_device, 0, INSTANCES * INSTANCES * sizeof(int));
-    hipDeviceSynchronize();
-
-    gettimeofday(&tp, &tzp);
-    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
-
     k1<<<dimGrid,dimBlock>>>(data_char_device, distance_device);
-    hipDeviceSynchronize();
-
-    gettimeofday(&tp, &tzp);
-    stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime += stop_gpu - start_gpu;
   }
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
   hipMemcpy(gpu_distance, distance_device,
-             INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost); 
+             INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost);
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  if (status != 0) printf("FAIL\n");
-  else printf("PASS\n");
+  printf("%s\n", status ? "FAIL" : "PASS");
 
-  elapsedTime = 0; 
+  start = std::chrono::steady_clock::now();
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
     hipMemset(distance_device, 0, INSTANCES * INSTANCES * sizeof(int));
-    hipDeviceSynchronize();
-
-    gettimeofday(&tp, &tzp);
-    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
-
     k2<<<dimGrid,dimBlock>>>(data_char_device, distance_device);
-    hipDeviceSynchronize();
-
-    gettimeofday(&tp, &tzp);
-    stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime += stop_gpu - start_gpu;
   }
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
   hipMemcpy(gpu_distance, distance_device,
-             INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost); 
+             INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost);
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  if (status != 0) printf("FAIL\n");
-  else printf("PASS\n");
+  printf("%s\n", status ? "FAIL" : "PASS");
 
-  elapsedTime = 0; 
+  start = std::chrono::steady_clock::now();
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
     hipMemset(distance_device, 0, INSTANCES * INSTANCES * sizeof(int));
-    hipDeviceSynchronize();
-
-    gettimeofday(&tp, &tzp);
-    start_gpu = tp.tv_sec*1000000+tp.tv_usec;
-
     k3<<<dimGrid,dimBlock>>>(data_char_device, distance_device);
-    hipDeviceSynchronize();
-
-    gettimeofday(&tp, &tzp);
-    stop_gpu = tp.tv_sec*1000000+tp.tv_usec;
-    elapsedTime += stop_gpu - start_gpu;
   }
+  hipDeviceSynchronize();
+  end = std::chrono::steady_clock::now();
+  elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
   hipMemcpy(gpu_distance, distance_device,
-             INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost); 
+             INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost);
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  if (status != 0) printf("FAIL\n");
-  else printf("PASS\n");
+  printf("%s\n", status ? "FAIL" : "PASS");
 
   free(cpu_distance);
   free(gpu_distance);
