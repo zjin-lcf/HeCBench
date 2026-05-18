@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#include <sys/time.h>
+#include <chrono>
 #include <sycl/sycl.hpp>
 #include "backprop.h"
 #include "reference.h"
@@ -10,19 +10,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 
-double get_time() {
-  struct timeval t;
-  gettimeofday(&t,NULL);
-  return t.tv_sec+t.tv_usec*1e-6;
-}
-
 unsigned int num_threads = 0;
 unsigned int num_blocks = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Program main
 ////////////////////////////////////////////////////////////////////////////////
-int main( int argc, char** argv) 
+int main( int argc, char** argv)
 {
   setup(argc, argv);
   return 0;
@@ -35,7 +29,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
 
   in = net->input_n;
   hid = net->hidden_n;
-  out = net->output_n;   
+  out = net->output_n;
 
   float *input_weights_one_dim;
   float *input_weights_one_dim_r;
@@ -53,7 +47,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   // this preprocessing stage is temporarily added to correct the bug of wrong memcopy using two-dimensional net->inputweights
   // todo: fix mem allocation
   int m = 0;
-  for (int k = 0; k <= in; k++) {  
+  for (int k = 0; k <= in; k++) {
     for (int j = 0; j <= hid; j++) {
       input_weights_one_dim[m] = net->input_weights[k][j];
       input_weights_one_dim_r[m] = net->input_weights[k][j];
@@ -64,7 +58,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
 
   printf("Performing device offload\n");
 
-  double offload_start = get_time();
+  auto start = std::chrono::steady_clock::now();
 
 #ifdef USE_GPU
   sycl::queue q(sycl::gpu_selector_v, sycl::property::queue::in_order());
@@ -97,7 +91,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
 
   for (int j = 1; j <= hid; j++) {
     sum = 0.0;
-    for (int k = 0; k < num_blocks; k++) {  
+    for (int k = 0; k < num_blocks; k++) {
       sum += partial_sum[k * hid + j-1] ;
     }
 #ifdef DEBUG
@@ -109,7 +103,7 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
 
   bpnn_layerforward(net->hidden_units, net->output_units, net->hidden_weights, hid, out);
   bpnn_output_error(net->output_delta, net->target, net->output_units, out, &out_err);
-  bpnn_hidden_error(net->hidden_delta, hid, net->output_delta, out, net->hidden_weights, net->hidden_units, &hid_err);  
+  bpnn_hidden_error(net->hidden_delta, hid, net->output_delta, out, net->hidden_weights, net->hidden_units, &hid_err);
   bpnn_adjust_weights(net->output_delta, out, net->hidden_units, hid, net->hidden_weights, net->hidden_prev_weights);
 
   // input_weights_sycl has been written in the first kernel, so it needs to be restored.
@@ -136,13 +130,14 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   sycl::free(d_hidden_delta, q);
   sycl::free(d_input_prev_weights, q);
 
-  double offload_end = get_time();
-  printf("Device offloading time = %lf(s)\n", offload_end - offload_start);
+  auto end = std::chrono::steady_clock::now();
+  auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  printf("Device offloading time = %lf(s)\n", time * 1e-9);
 
-  reference (in, hid, out, net, 
+  reference (in, hid, out, net,
              input_weights_one_dim_r,
              input_weights_prev_one_dim,
-             partial_sum); 
+             partial_sum);
 
   bool ok = true;
   for (int i = 0; i < (in+1)*(hid+1); i++) {
@@ -154,9 +149,9 @@ int bpnn_train_kernel(BPNN *net, float *eo, float *eh)
   printf("%s\n", ok ? "PASS" : "FAIL");
 
 #ifdef OUTPUT
-  for (int i = 0; i < (in+1); i++) 
+  for (int i = 0; i < (in+1); i++)
     printf("i=%d input_units=%f\n", i,net->input_units[i]);
-  for (int i = 0; i < (in+1)*(hid+1); i++) 
+  for (int i = 0; i < (in+1)*(hid+1); i++)
     printf("i=%d input_weights=%f\n", i,input_weights_one_dim[i]);
 #endif
   free(input_weights_prev_one_dim);
