@@ -45,7 +45,7 @@ endif
 $(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-$(obj): hotspot.cu ../hotspot-cuda/hotspot.h ../hotspot-cuda/kernel.h
+$(obj): hotspot.cu ../hotspot-cuda/reference.h ../hotspot-cuda/hotspot.h ../hotspot-cuda/kernel.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

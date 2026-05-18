@@ -54,7 +54,7 @@ Each benchmark falls into a single category. While such classification is not ac
     atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fma, fpc, histogram, lzss, minmax, mpc, mtf, quantAQLM, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, scatter, scatterAdd, scatterThrust, segment-reduce
 
 ### Data encoding, decoding, or verification
-    ans, crc64, crs, entropy, jenkins-hash, kiss, ldpc, md5hash, murmurhash3
+    ans, base64e, crc64, crs, entropy, jenkins-hash, kiss, ldpc, md5hash, murmurhash3
 
 ### Finance
     aop, black-scholes, binomial, bonds, libor
@@ -69,10 +69,10 @@ Each benchmark falls into a single category. While such classification is not ac
     adjacent, aligned-types, asta, blockAccess, blockexchange, blockScan, collision, concurrentKernels, conversion, dispatch, dp4a, graphExecution, ert, interleave, intrinsics-cast, kernelLaunch, layout, mallocFree, maxFlops, mixbench, nosync, openmp, overlap, pad, pitch, popcount, pointerchase, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamCreateCopyDestroy, streamOrderedAllocation, streamPriority, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy 
 
 ### Machine learning  
-    accuracy, adam, adamw, addBiasQKV, addBiasResidualLayerNorm, attention, attention-paged, attentionMergeState, attentionMultiHead, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, dwconv1d, expdist, flip, gd, gelu, ge-spmm, geglu, glu, gmm, gru, kalman, kmc, kmeans, knn, layernorm, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mergeVS, mf-sgd, mmcsf, mnist, moe, moe-align, moe-sum, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, permute, perplexity, pointwise, pool, qkv, qtclustering, remap, relu, resnet-kernels, rmsnorm, rowwiseMoments, rotary, sampling, scel, silu, snicit, softmax, softmax-fused, softmax-online, ssm, stddev, streamcluster, tsne, unfold, vol2col, wedford, winograd, word2vec
+    accuracy, adam, adamw, addBiasQKV, addBiasResidualLayerNorm, attention, attention-paged, attentionMergeState, attentionMultiHead, attentionMultiHeadKVCache, backprop, bincount, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, dwconv1d, expdist, flip, gd, gelu, ge-spmm, geglu, glu, gmm, gru, kalman, kmc, kmeans, knn, layernorm, lda, lif, logprob, lr, lrn, mask, matern, maxpool3d, mcpr, meanshift, mergeVS, mf-sgd, mlp, mmcsf, mnist, moe, moe-align, moe-sum, mrc, multinomial, nlll, nonzero, overlay, p4, page-rank, permute, perplexity, pointwise, pool, qkv, qtclustering, remap, relu, resnet-kernels, rmsnorm, rowwiseMoments, rotary, sampling, scel, silu, snicit, softmax, softmax-fused, softmax-online, ssm, stddev, streamcluster, tsne, unfold, vol2col, wedford, winograd, word2vec
 
 ### Math
-    atan2, axpby, bgmv, blas-dot, blas-fp8gemm, blas-gemm, blas-gemmBatched, blas-gemmStridedBatched, blas-gemmEx, blas-gemmEx2, complex, cross, determinant, divergence, dp, eigenvalue, f16max, f16sp, f8cast, fresnel, fwt, gaussian, geam, gels, gemv, hadamard, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, ludb, lut-gemm, michalewicz, matrix-rotate, matrixT, minkowski, mr, mrg32k3a, norm2, nqueen, ntt, phmm, pnpoly, quant3MatMul, reverse2D, rfs, romberg, rsc, sddmm-batch, secp256k1, simpleSpmv, slu, spd2s, spgeam, spgemm, spmm, spmv, spnnz, sps2d, spsort, sptrsv, thomas, wyllie, zeropoint
+    atan2, axpby, bgmv, blas-dot, blas-fp8gemm, blas-gemm, blas-gemmBatched, blas-gemmStridedBatched, blas-gemmEx, blas-gemmEx2, braycurtis, complex, cross, determinant, divergence, dp, eigenvalue, f16max, f16sp, f8cast, fresnel, fwt, gaussian, geam, gels, gemv, hadamard, hellinger, hmm, idivide, interval, jaccard, jacobi, kurtosis, lanczos, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, ludb, lut-gemm, michalewicz, matrix-rotate, matrixT, minkowski, mr, mrg32k3a, norm2, nqueen, ntt, phmm, pnpoly, quant3MatMul, reverse2D, rfs, romberg, rsc, sddmm-batch, secp256k1, simpleSpmv, slu, spd2s, spgeam, spgemm, spmm, spmv, spnnz, sps2d, spsort, sptrsv, thomas, wyllie, zeropoint
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -332,6 +332,9 @@ Early results are shown [here](results/README.md)
 ### attentionMultiHead (cuda)
   Implementation of multi-head attention (https://github.com/IrishCoffee/cudnnMultiHeadAttention)
 
+### attentionMultiHeadKVCache (cuda)
+  Implementation of multi-head attention with KV cache (https://github.com/flashinfer-ai/flashinfer)
+
 ### axpby (cuda)
   Sum of multiple scalar-vector products (https://github.com/NVIDIA/apex)
 
@@ -346,6 +349,9 @@ Early results are shown [here](results/README.md)
 
 ### backprop (opencl)
   Backpropagation in the Rodinia benchmark suite (http://lava.cs.virginia.edu/Rodinia/download_links.htm)
+
+### base64e (opencl)
+  Base64 encoding (Jin, Z. and Finkel, H., 2019, July. Base64 encoding on heterogeneous computing platforms. In 2019 IEEE 30th International Conference on Application-specific Systems, Architectures and Processors (ASAP) (Vol. 2160, pp. 247-254). IEEE.)
 
 ### bezier-surface (opencl)
   The Bezier surface (https://github.com/chai-benchmarks/chai)
@@ -424,6 +430,9 @@ Early results are shown [here](results/README.md)
 
 ### boxfilter (cuda)
   Box filtering (http://developer.download.nvidia.com/compute/cuda/3_0/sdk/website/OpenCL/website/samples.html)
+
+### braycurtis (cuda)
+  The Bray-Curtis distance (https://github.com/inspiros/torchpairwise)
 
 ### bscan (cuda)
   Binary scan in a block (Harris, M. and Garland, M., 2012. Optimizing parallel prefix operations for the Fermi architecture. In GPU Computing Gems Jade Edition (pp. 29-38). Morgan Kaufmann.)
@@ -1129,6 +1138,9 @@ Early results are shown [here](results/README.md)
 
 ### mixbench (cuda)
   A read-only version of mixbench (https://github.com/ekondis/mixbench)
+
+### mlp (cuda)
+  Multi-layer perceptron that fuses matrix multiplication, bias and ReLU (https://github.com/Dao-AILab/flash-attention)
 
 ### mmcsf (cuda)
   MTTKRP kernel using mixed-mode CSF (https://github.com/isratnisa/MM-CSF)

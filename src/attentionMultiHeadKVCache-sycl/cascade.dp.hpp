@@ -1,0 +1,363 @@
+/*!
+ * Copyright (c) 2023 by FlashInfer team.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#ifndef FLASHINFER_CASCADE_CPP_
+#define FLASHINFER_CASCADE_CPP_
+
+#include <sycl/sycl.hpp>
+#include "cp_async.dp.hpp"
+#include "math.dp.hpp"
+#include "utils.dp.hpp"
+#include "state.dp.hpp"
+#include <cmath>
+
+namespace flashinfer {
+
+using cp_async::PrefetchMode;
+using cp_async::SharedMemFillMode;
+
+/*!
+ * \brief The CUDA kernel that merges the self-attention state of two index sets A and B.
+ * \tparam vec_size The vector size used in the kernel.
+ * \tparam DTypeIn The data type of v_a and v_b.
+ * \tparam DTypeO The data type of v_merged.
+ * \param v_a The partial v of index set A. (n, h, d)
+ * \param s_a The logsumexp value of index set A. (n, h)
+ * \param v_b The partial v of index set B. (n, h, d)
+ * \param s_b The logsumexp value of index set B. (n, h)
+ * \param v_merged The merged v of index set A union B. (n, h, d)
+ * \param s_merged The merged logsumexp value of index set A union B. (n, h)
+ * \param num_heads The number of heads of v_a and v_b.
+ * \param head_dim The dimension of each head.
+ * \note Both s_a and s_b are logsumexp values with base 2.
+ */
+template <uint32_t vec_size, typename DTypeIn, typename DTypeO>
+void MergeStateKernel(DTypeIn* __restrict__ v_a, float* __restrict__ s_a,
+                                 DTypeIn* __restrict__ v_b, float* __restrict__ s_b,
+                                 DTypeO* __restrict__ v_merged, float* __restrict__ s_merged,
+                                 uint32_t num_heads, uint32_t head_dim,
+                                 const sycl::nd_item<3> &item) {
+  uint32_t tx = item.get_local_id(2), ty = item.get_local_id(1);
+  uint32_t pos = item.get_group(2);
+  uint32_t head_idx = ty;
+
+  float s_a_val = s_a[pos * num_heads + head_idx];
+  float s_b_val = s_b[pos * num_heads + head_idx];
+  float s_max = sycl::max(s_a_val, s_b_val);
+  s_a_val = math::ptx_exp2(s_a_val - s_max);
+  s_b_val = math::ptx_exp2(s_b_val - s_max);
+  float a_scale = s_a_val / (s_a_val + s_b_val);
+  float b_scale = s_b_val / (s_a_val + s_b_val);
+  vec_t<float, vec_size> v_a_vec, v_b_vec, v_merged_vec;
+  v_a_vec.cast_load(v_a + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+  v_b_vec.cast_load(v_b + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+#pragma unroll
+  for (uint32_t i = 0; i < vec_size; ++i) {
+    v_merged_vec[i] = a_scale * v_a_vec[i] + b_scale * v_b_vec[i];
+  }
+  v_merged_vec.cast_store(v_merged + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+  if (s_merged != nullptr) {
+    s_merged[pos * num_heads + head_idx] = math::ptx_log2(s_a_val + s_b_val) + s_max;
+  }
+}
+
+template <uint32_t bdx, uint32_t bdy, uint32_t vec_size, typename DTypeIn>
+inline void
+threadblock_sync_state(state_t<vec_size> &st, DTypeIn *v_smem, float *s_smem,
+                       const sycl::nd_item<3> &item) {
+  constexpr uint32_t head_dim = vec_size * bdx;
+  const uint32_t tx = item.get_local_id(2);
+  const uint32_t ty = item.get_local_id(1);
+  st.o.cast_store(v_smem + ty * head_dim + tx * vec_size);
+  s_smem[ty] = st.get_lse();
+  st.init();
+  item.barrier(sycl::access::fence_space::local_space);
+
+#pragma unroll
+  for (uint32_t iter = 0; iter < bdy; ++iter) {
+    float s = s_smem[iter];
+    vec_t<float, vec_size> v;
+    v.cast_load(v_smem + iter * head_dim + tx * vec_size);
+    st.merge(v, s, 1);
+  }
+}
+
+template <uint32_t bdx, uint32_t bdy, uint32_t vec_size, typename DTypeIn>
+inline void threadblock_sum(vec_t<float, vec_size> &v, DTypeIn *v_smem,
+                                     const sycl::nd_item<3> &item) {
+  const uint32_t tx = item.get_local_id(2), ty = item.get_local_id(1);
+  constexpr uint32_t head_dim = vec_size * bdx;
+  v.cast_store(v_smem + ty * head_dim + tx * vec_size);
+  v.fill(DTypeIn(0.f));
+  item.barrier(sycl::access::fence_space::local_space);
+
+#pragma unroll
+  for (uint32_t iter = 0; iter < bdy; ++iter) {
+    vec_t<float, vec_size> v_iter;
+    v_iter.cast_load(v_smem + iter * head_dim + tx * vec_size);
+#pragma unroll
+    for (uint32_t i = 0; i < vec_size; ++i) {
+      v[i] += v_iter[i];
+    }
+  }
+}
+
+template <uint32_t vec_size, typename DTypeIn, typename DTypeO>
+void AttentionSumKernel(DTypeIn* __restrict__ V, DTypeO* __restrict__ v_sum,
+                                   uint32_t num_index_sets, uint32_t num_heads, uint32_t head_dim,
+                                   const sycl::nd_item<3> &item) {
+  uint32_t tx = item.get_local_id(2), ty = item.get_local_id(1);
+  uint32_t pos = item.get_group(2);
+  uint32_t head_idx = ty;
+
+  if (num_index_sets == 0) {
+    vec_t<DTypeO, vec_size> v;
+    v.fill(DTypeO(0.f));
+    v.store(v_sum + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+    return;
+  }
+
+  if (num_index_sets == 1) {
+    vec_t<DTypeO, vec_size> v;
+    v.cast_load(V + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+    v.store(v_sum + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+    return;
+  }
+
+  vec_t<float, vec_size> v_sum_vec;
+  v_sum_vec.fill(0.f);
+#pragma unroll 2
+  for (uint32_t iter = 0; iter < num_index_sets; ++iter) {
+    vec_t<float, vec_size> v;
+    v.cast_load(V + ((pos * num_index_sets + iter) * num_heads + head_idx) * head_dim +
+                tx * vec_size);
+#pragma unroll
+    for (uint32_t i = 0; i < vec_size; ++i) {
+      v_sum_vec[i] += v[i];
+    }
+  }
+
+  v_sum_vec.cast_store(v_sum + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+}
+
+template <uint32_t vec_size, typename DTypeIn, typename DTypeO>
+void MergeStatesKernel(DTypeIn *__restrict__ V, float *__restrict__ S,
+                       DTypeO *__restrict__ v_merged,
+                       float *__restrict__ s_merged, uint32_t num_index_sets,
+                       uint32_t num_heads, uint32_t head_dim,
+                       const sycl::nd_item<3> &item) {
+  uint32_t tx = item.get_local_id(2), ty = item.get_local_id(1);
+  uint32_t pos = item.get_group(2);
+  uint32_t head_idx = ty;
+
+  if (num_index_sets == 0) {
+    vec_t<DTypeO, vec_size> v;
+    v.fill(DTypeO(0.f));
+    v.store(v_merged + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+    if (s_merged != nullptr) {
+      s_merged[pos * num_heads + head_idx] = -math::inf;
+    }
+    return;
+  }
+
+  if (num_index_sets == 1) {
+    vec_t<DTypeO, vec_size> v;
+    v.cast_load(V + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+    v.store(v_merged + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+    if (s_merged != nullptr) {
+      s_merged[pos * num_heads + head_idx] = S[pos * num_heads + head_idx];
+    }
+    return;
+  }
+
+  state_t<vec_size> st;
+#pragma unroll 2
+  for (uint32_t iter = 0; iter < num_index_sets; ++iter) {
+    float s = S[(pos * num_index_sets + iter) * num_heads + head_idx];
+    vec_t<float, vec_size> v;
+    v.cast_load(V + ((pos * num_index_sets + iter) * num_heads + head_idx) * head_dim +
+                tx * vec_size);
+    st.merge(v, s, 1);
+  }
+
+  st.normalize();
+  st.o.cast_store(v_merged + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+  if (s_merged != nullptr) {
+    s_merged[pos * num_heads + head_idx] = st.get_lse();
+  }
+}
+
+/*!
+ * \brief The CUDA kernel that merges self-attention states of a list of index sets,
+ *   accelerated for larger number of index sets.
+ * \tparam vec_size The vector size used in the kernel.
+ * \tparam bdx The blockDim.x used in the kernel.
+ * \tparam bdy The blockDim.y used in the kernel.
+ * \tparam num_smem_stages The number of stages of shared memory used in the kernel.
+ * \tparam DTypeIn The data type of v.
+ * \tparam DTypeO The data type of v_merged.
+ * \param V The partial v of index sets. (n, num_index_sets, h, d)
+ * \param S The logsumexp value of index sets. (n, num_index_sets, h)
+ * \param v_merged The merged v of index sets union. (n, h, d)
+ * \param s_merged The merged logsumexp value of index sets union. (n, h)
+ * \param num_heads The number of heads of v.
+ * \param head_dim The dimension of each head.
+ * \note s are logsumexp values with base 2.
+ */
+template <uint32_t vec_size, uint32_t bdx, uint32_t bdy,
+          uint32_t num_smem_stages, typename DTypeIn, typename DTypeO>
+void MergeStatesLargeNumIndexSetsKernel(
+    DTypeIn *__restrict__ V, float *__restrict__ S,
+    DTypeO *__restrict__ v_merged, float *__restrict__ s_merged,
+    uint32_t num_index_sets, uint32_t num_heads,
+    const sycl::nd_item<3> &item, uint8_t *smem) {
+  uint32_t tx = item.get_local_id(2), ty = item.get_local_id(1);
+  uint32_t pos = item.get_group(2);
+  uint32_t head_idx = item.get_group(1);
+  state_t<vec_size> st;
+  constexpr uint32_t vec_bits = sizeof(DTypeIn) * vec_size * 8;
+  constexpr uint32_t head_dim = vec_size * bdx;
+
+  DTypeIn* v_smem = (DTypeIn*)smem;
+  float* s_smem = (float*)(smem + num_smem_stages * bdy * head_dim * sizeof(DTypeIn));
+
+#pragma unroll
+  for (uint32_t iter = 0; iter < num_smem_stages; ++iter) {
+    cp_async::pred_load<vec_bits, PrefetchMode::kPrefetch, SharedMemFillMode::kNoFill>(
+        v_smem + (iter * bdy + ty) * head_dim + tx * vec_size,
+        V + ((pos * num_index_sets + (iter * bdy + ty)) * num_heads + head_idx) * head_dim +
+            tx * vec_size,
+        (iter * bdy + ty) < num_index_sets);
+    cp_async::commit_group();
+  }
+#pragma unroll 4
+  for (uint32_t iter = 0; iter < ceil_div(num_index_sets, bdy); ++iter) {
+    if (iter % bdx == 0) {
+      s_smem[ty * bdx + tx] =
+          iter * bdy + (ty * bdx + tx) < num_index_sets
+              ? S[(pos * num_index_sets + (iter * bdy + ty * bdx + tx)) * num_heads + head_idx]
+              : 0.f;
+      item.barrier(sycl::access::fence_space::local_space);
+    }
+    cp_async::wait_group<num_smem_stages - 1>();
+    item.barrier(sycl::access::fence_space::local_space);
+    vec_t<float, vec_size> v;
+    v.cast_load(v_smem + ((iter % num_smem_stages) * bdy + ty) * head_dim + tx * vec_size);
+    if (iter * bdy + ty < num_index_sets) {
+      float s = s_smem[(iter % bdx) * bdy + ty];
+      st.merge(v, s, 1);
+    }
+    item.barrier(sycl::access::fence_space::local_space);
+    cp_async::pred_load<vec_bits, PrefetchMode::kPrefetch, SharedMemFillMode::kNoFill>(
+        v_smem + ((iter % num_smem_stages) * bdy + ty) * head_dim + tx * vec_size,
+        V +
+            ((pos * num_index_sets + ((iter + num_smem_stages) * bdy + ty)) * num_heads +
+             head_idx) *
+                head_dim +
+            tx * vec_size,
+        (iter + num_smem_stages) * bdy + ty < num_index_sets);
+    cp_async::commit_group();
+  }
+  cp_async::wait_group<0>();
+  item.barrier(sycl::access::fence_space::local_space);
+
+  st.normalize();
+  threadblock_sync_state<bdx, bdy, vec_size>(st, v_smem, s_smem, item);
+  st.normalize();
+
+  st.o.cast_store(v_merged + (pos * num_heads + head_idx) * head_dim + tx * vec_size);
+  if (s_merged != nullptr) {
+    s_merged[pos * num_heads + head_idx] = st.get_lse();
+  }
+}
+
+
+/*!
+ * \brief Merge self-attention states of a list of index sets.
+ * \tparam DTypeIn The data type of v.
+ * \tparam DTypeO The data type of v_merged.
+ * \param v The partial v of index sets. (n, num_index_sets, h, d)
+ * \param s The logsumexp value of index sets. (n, num_index_sets, h)
+ * \param v_merged The merged v of index sets union. (n, h, d)
+ * \param s_merged The merged logsumexp value of index sets union. (n, h)
+ * \param num_index_sets The number of index sets.
+ * \param seq_len The sequence length.
+ * \param num_heads The number of heads of v.
+ * \param head_dim The dimension of each head.
+ * \param stream The CUDA stream to execute the kernel.
+ * \return status Indicates whether CUDA calls are successful
+ * \note s are logsumexp values with base 2.
+ */
+template <typename DTypeIn, typename DTypeO>
+void
+MergeStates(DTypeIn *v, float *s, DTypeO *v_merged, float *s_merged,
+            uint32_t num_index_sets, uint32_t seq_len, uint32_t num_heads,
+            uint32_t head_dim,
+            sycl::queue &stream) {
+  DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
+    constexpr uint32_t vec_size = std::max(16U / sizeof(DTypeIn), HEAD_DIM / 32U);
+    constexpr uint32_t bdx = HEAD_DIM / vec_size;
+    if (num_index_sets >= seq_len) {
+      constexpr uint32_t num_threads = 128;
+      constexpr uint32_t bdy = num_threads / bdx;
+      sycl::range<3> gws (1, num_heads * bdy, seq_len * bdx);
+      sycl::range<3> lws (1, bdy, bdx);
+      constexpr uint32_t num_smem_stages = 4;
+      uint32_t smem_size =
+          num_smem_stages * bdy * head_dim * sizeof(DTypeIn) + num_threads * sizeof(float);
+      stream.submit([&](sycl::handler &cgh) {
+        sycl::local_accessor <uint8_t, 1> smem (smem_size, cgh);
+        cgh.parallel_for(sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
+          MergeStatesLargeNumIndexSetsKernel<vec_size, bdx, bdy, num_smem_stages, DTypeIn, DTypeO>(
+            v, s, v_merged, s_merged, num_index_sets, num_heads, item,
+            smem.get_multi_ptr<sycl::access::decorated::no>().get());
+        });
+      });
+    } else {
+      uint32_t bdy = num_heads;
+      sycl::range<3> gws (1, bdy, seq_len * bdx);
+      sycl::range<3> lws (1, bdy, bdx);
+      stream.submit([&](sycl::handler &cgh) {
+        cgh.parallel_for(sycl::nd_range<3>(gws, lws), [=](sycl::nd_item<3> item) {
+          MergeStatesKernel<vec_size, DTypeIn, DTypeO>(
+            v, s, v_merged, s_merged, num_index_sets, num_heads, head_dim, item);
+        });
+      });
+    }
+  });
+}
+
+template <typename DTypeIn, typename DTypeO>
+void AttentionSum(DTypeIn *v, DTypeO *v_sum, uint32_t num_index_sets,
+                  uint32_t seq_len, uint32_t num_heads, uint32_t head_dim,
+                  sycl::queue &stream) {
+  DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
+    constexpr uint32_t vec_size = std::max(16U / sizeof(DTypeIn), HEAD_DIM / 32U);
+    constexpr uint32_t bdx = HEAD_DIM / vec_size;
+    uint32_t bdy = num_heads;
+    sycl::range<3> gws(1, bdy, seq_len * bdx);
+    sycl::range<3> lws(1, bdy, bdx);
+    stream.parallel_for(sycl::nd_range<3>(gws, lws),
+                         [=](sycl::nd_item<3> item_ct1) {
+      AttentionSumKernel<vec_size, DTypeIn, DTypeO>(
+        v, v_sum, num_index_sets, num_heads, head_dim, item_ct1);
+    });
+  });
+}
+
+
+}  // namespace flashinfer
+
+#endif  // FLASHINFER_CASCADE_CPP_
