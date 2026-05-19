@@ -462,7 +462,9 @@ set(HECBENCH_POC_BENCHMARKS
     atomicCAS
     atomicSystemWide
     attentionMultiHead
+    attentionMultiHeadKVCache
     axhelm
+    base64e
     bgmv
     bh
     bicgstab
@@ -526,6 +528,7 @@ set(HECBENCH_POC_BENCHMARKS
     leukocyte
     miniFE
     mergeVS
+    mlp
     pointerchase
     rmsnorm
     saxpy-ompt

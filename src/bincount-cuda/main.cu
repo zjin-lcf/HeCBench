@@ -2,8 +2,10 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <random>
 #include <cuda.h>
+#include "reference.h"
 
 #define threadsPerBlock  256
 
@@ -136,7 +138,7 @@ void eval(IndexType input_size, int repeat)
 {
   size_t input_size_bytes = sizeof(input_t) * input_size;
 
-  input_t *input = (input_t*) malloc (input_size_bytes); 
+  input_t *input = (input_t*) malloc (input_size_bytes);
 
   // https://cplusplus.com/reference/random/normal_distribution/
   std::default_random_engine generator (123);
@@ -147,7 +149,7 @@ void eval(IndexType input_size, int repeat)
 
   auto min_iter = std::min_element(input, input+input_size);
   auto max_iter = std::max_element(input, input+input_size);
-  
+
   input_t input_minvalue = *min_iter;
   input_t input_maxvalue = *max_iter;
   printf("Input min, max values: (%f %f)\n", (float)input_minvalue, (float)input_maxvalue);
@@ -168,7 +170,13 @@ void eval(IndexType input_size, int repeat)
 
     IndexType output_size = nbins;
     size_t output_size_bytes = sizeof(output_t) * output_size;
-    output_t *output = (output_t*) malloc (output_size_bytes); 
+    output_t *output = (output_t*) malloc (output_size_bytes);
+
+    // reference
+    output_t *output_r = (output_t*) calloc (output_size, sizeof(output_t));
+    reference<output_t, input_t, IndexType>(
+      output_r, input, nbins, input_minvalue, input_maxvalue,
+      input_size, output_size, repeat);
 
     output_t *d_output;
     cudaMalloc((void**)&d_output, output_size_bytes);
@@ -184,14 +192,8 @@ void eval(IndexType input_size, int repeat)
     HANDLE_SWITCH_CASE(memType)
     cudaMemcpy(output, d_output, output_size_bytes, cudaMemcpyDeviceToHost);
 
-    auto min_iter = std::min_element(output, output+output_size);
-    auto max_iter = std::max_element(output, output+output_size);
-    output_t minvalue = *min_iter;
-    output_t maxvalue = *max_iter;
-    printf("Output min, median, max values: (%ld %ld %ld)\n",
-           (int64_t)minvalue / repeat,
-           (int64_t)output[output_size/2] / repeat,
-           (int64_t)maxvalue / repeat);
+    int status = memcmp(output, output_r, output_size_bytes);
+    printf("%s\n", status ? "FAIL" : "PASS");
 
     if (sharedMem <= maxSharedMemory) {
       printf("\n");
@@ -202,18 +204,13 @@ void eval(IndexType input_size, int repeat)
       HANDLE_SWITCH_CASE(memType)
       cudaMemcpy(output, d_output, output_size_bytes, cudaMemcpyDeviceToHost);
 
-      auto min_iter = std::min_element(output, output+output_size);
-      auto max_iter = std::max_element(output, output+output_size);
-      output_t minvalue = *min_iter;
-      output_t maxvalue = *max_iter;
-      printf("Output min, median, max values: (%ld %ld %ld)\n\n",
-             (int64_t)minvalue / repeat,
-             (int64_t)output[output_size/2] / repeat,
-             (int64_t)maxvalue / repeat);
+      int status = memcmp(output, output_r, output_size_bytes);
+      printf("%s\n", status ? "FAIL" : "PASS");
     }
 
     cudaFree(d_output);
     free(output);
+    free(output_r);
   }
 
   cudaFree(d_input);
@@ -231,5 +228,5 @@ int main(int argc, char* argv[])
 
   eval<int, float, int>(n, repeat);
 
-  return 0; 
+  return 0;
 }
