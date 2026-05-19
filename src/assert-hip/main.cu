@@ -81,14 +81,14 @@ bool runTest(int argc, char **argv)
   printf("\n-- End assert output\n\n");
 
   // Check for errors and failed asserts in asynchronous kernel launch.
-  if (error == hipErrorAssert)
+  if (error == hipErrorLaunchFailure)
   {
     printf("Device assert failed as expected, "
            "HIP error message is: %s\n\n",
            hipGetErrorString(error));
   }
 
-  return (error == hipErrorAssert);
+  return (error == hipErrorLaunchFailure);
 }
 
 bool runPerf(int argc, char **argv)
