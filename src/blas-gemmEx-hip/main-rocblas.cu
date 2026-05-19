@@ -38,7 +38,7 @@ bool gemm_ex(
     AType = BType = CType = ComputeType = rocblas_datatype_f64_r;
 
   } else if (std::is_same<T, float>::value) {
-    AType = BType = CType = rocblas_datatype_f32_r;
+    AType = BType = CType = ComputeType = rocblas_datatype_f32_r;
 
   } else if (std::is_same<T, __half>::value) {
     AType = BType = CType = rocblas_datatype_f16_r;
