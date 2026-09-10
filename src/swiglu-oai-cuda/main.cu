@@ -11,12 +11,24 @@
 
 #if !defined(__CUDACC_VER_MAJOR__) || !defined(__CUDACC_VER_MINOR__)
 #error "swiglu-oai-cuda must be compiled with the NVIDIA CUDA compiler"
-#elif (__CUDACC_VER_MAJOR__ < 12) || \
-      (__CUDACC_VER_MAJOR__ == 12 && __CUDACC_VER_MINOR__ < 8)
-#error "swiglu-oai-cuda requires CUDA Toolkit 12.8 or newer for FP4 support"
+#elif !defined(CUDART_VERSION) || (CUDART_VERSION < 11080)
+#error "swiglu-oai-cuda requires CUDA Toolkit 11.8 or newer for FP8 support"
 #endif
 
+// cuda_fp4.h and __nv_cvt_float_to_e8m0() first ship with CUDA Toolkit 12.8.
+// Older toolkits keep every other format and take the software E2M1/E8M0
+// codecs below, which make the same rounding decisions as reference.h.
+#ifndef SWIGLU_HAS_NATIVE_FP4
+#if CUDART_VERSION >= 12080
+#define SWIGLU_HAS_NATIVE_FP4 1
+#else
+#define SWIGLU_HAS_NATIVE_FP4 0
+#endif
+#endif
+
+#if SWIGLU_HAS_NATIVE_FP4
 #include <cuda_fp4.h>
+#endif
 #include "reference.h"
 
 #define CUDA_CHECK(call)                                                       \
@@ -39,22 +51,80 @@ static_assert(sizeof(size_t) >= 8,
 // Native low-precision helpers, shared by host and device
 // ---------------------------------------------------------------------------
 
+#if !SWIGLU_HAS_NATIVE_FP4
+// Software E2M1 codec for toolkits without cuda_fp4.h. Representable
+// magnitudes are 0, 0.5, 1, 1.5, 2, 3, 4, 6; the nearest-value search with its
+// tie-to-even-index rule mirrors round_to_e2m1() in reference.h, including the
+// strict `> 5.f` that lets the 4/6 tie land on 4.
 __host__ __device__ __forceinline__
-__nv_fp4x2_e2m1 fp4x2_pack(const float lo, const float hi)
+uint8_t soft_e2m1_encode(const float x)
 {
-  __nv_fp4x2_e2m1 packed;
-  packed.__x = __nv_cvt_float2_to_fp4x2(
-      make_float2(lo, hi), __NV_E2M1, cudaRoundNearest);
-  return packed;
+  const float lut[8] = {0.f, 0.5f, 1.f, 1.5f, 2.f, 3.f, 4.f, 6.f};
+  const uint8_t sign = (x < 0.f) ? 0x8u : 0x0u;
+  const float a = fabsf(x);
+  if (a > 5.f) return sign | 7u;
+  int best = 0;
+  float bestd = fabsf(a - lut[0]);
+  for (int i = 1; i < 8; i++) {
+    const float d = fabsf(a - lut[i]);
+    if (d < bestd || (d == bestd && (i % 2) == 0)) {
+      bestd = d;
+      best = i;
+    }
+  }
+  return sign | static_cast<uint8_t>(best);
 }
 
 __host__ __device__ __forceinline__
-float fp4x2_unpack(const __nv_fp4x2_storage_t byte, const int hi)
+float soft_e2m1_decode(const uint8_t nibble)
 {
+  const float lut[8] = {0.f, 0.5f, 1.f, 1.5f, 2.f, 3.f, 4.f, 6.f};
+  const float m = lut[nibble & 0x7u];
+  return (nibble & 0x8u) ? -m : m;
+}
+#endif
+
+// Two E2M1 values packed into one byte, low nibble first. Raw byte storage
+// keeps the host packing independent of the toolkit's FP4 type.
+__host__ __device__ __forceinline__
+uint8_t fp4x2_pack(const float lo, const float hi)
+{
+#if SWIGLU_HAS_NATIVE_FP4
+  return __nv_cvt_float2_to_fp4x2(
+      make_float2(lo, hi), __NV_E2M1, cudaRoundNearest);
+#else
+  return static_cast<uint8_t>(soft_e2m1_encode(lo) |
+                              (soft_e2m1_encode(hi) << 4));
+#endif
+}
+
+__host__ __device__ __forceinline__
+float fp4x2_unpack(const uint8_t byte, const int hi)
+{
+#if SWIGLU_HAS_NATIVE_FP4
   const __half2_raw h2 = __nv_cvt_fp4x2_to_halfraw2(byte, __NV_E2M1);
   __half_raw h;
   h.x = hi ? h2.y : h2.x;
   return __half2float(__half(h));
+#else
+  return soft_e2m1_decode(hi ? (byte >> 4) : (byte & 0xfu));
+#endif
+}
+
+// Round-toward-zero E8M0 encode of amax / 2^kE2M1MaxExp, which is the MXFP4
+// block scale. For a positive normal float the biased IEEE-754 exponent byte
+// minus kE2M1MaxExp is exactly the wanted byte; subnormals clamp to 0.
+__device__ __forceinline__
+uint8_t mxfp4_scale_byte(const float amax)
+{
+  if (!(amax > 0.f)) return 127;  // E8M0 has no zero; 2^0 for an empty block
+#if SWIGLU_HAS_NATIVE_FP4
+  return __nv_cvt_float_to_e8m0(amax * 0.25f, __NV_SATFINITE, cudaRoundZero);
+#else
+  const int s = static_cast<int>((__float_as_uint(amax) >> 23) & 0xffu) -
+                kE2M1MaxExp;
+  return s < 0 ? 0 : s > 254 ? 254 : static_cast<uint8_t>(s);
+#endif
 }
 
 // FP32 reserves exponent 0 for zero/subnormals while E8M0 treats exponent 0 as 2^{-127}
@@ -98,7 +168,7 @@ __device__ __forceinline__ float load_x_raw(const void* __restrict__ X,
   } else if constexpr (STORE == XS_FP8) {
     return static_cast<float>(static_cast<const __nv_fp8_e4m3*>(X)[i]);
   } else {
-    return fp4x2_unpack(static_cast<const __nv_fp4x2_e2m1*>(X)[i >> 1].__x,
+    return fp4x2_unpack(static_cast<const uint8_t*>(X)[i >> 1],
                         static_cast<int>(i & 1));
   }
 }
@@ -116,13 +186,16 @@ __device__ __forceinline__ float2 load_x_pair(
 {
   float2 pair;
   if constexpr (STORE == XS_FP4) {
-    const __nv_fp4x2_storage_t packed =
-        static_cast<const __nv_fp4x2_e2m1*>(X)[i >> 1].__x;
+    const uint8_t packed = static_cast<const uint8_t*>(X)[i >> 1];
+#if SWIGLU_HAS_NATIVE_FP4
     const __half2_raw h2 = __nv_cvt_fp4x2_to_halfraw2(packed, __NV_E2M1);
     __half_raw lo, hi;
     lo.x = h2.x;
     hi.x = h2.y;
     pair = make_float2(__half2float(__half(lo)), __half2float(__half(hi)));
+#else
+    pair = make_float2(fp4x2_unpack(packed, 0), fp4x2_unpack(packed, 1));
+#endif
   } else if constexpr (STORE == XS_FP8) {
     const __nv_fp8x2_storage_t packed =
         static_cast<const __nv_fp8x2_e4m3*>(X)[i >> 1].__x;
@@ -320,10 +393,7 @@ __global__ void swiglu_oai_kernel(const KernelArgs a)
       // chooses the block scale. E8M0 round-toward-zero is floor(log2) for
       // positive values, exactly matching reference.h's scale rule. E8M0 has
       // no zero, so retain byte 127 (scale 1) for an all-zero/NaN block.
-      const uint8_t sb = (amax > 0.f)
-          ? __nv_cvt_float_to_e8m0(
-                amax * 0.25f, __NV_SATFINITE, cudaRoundZero)
-          : 127;
+      const uint8_t sb = mxfp4_scale_byte(amax);
       const float s = e8m0_decode(sb);
 
       // Lane 0 of the block owns the scale byte. Its column is in range
@@ -338,7 +408,7 @@ __global__ void swiglu_oai_kernel(const KernelArgs a)
       if (active && (d & 1) == 0) {
         const float hi =
             (d + 1 < static_cast<int64_t>(a.dim)) ? paired : 0.f;
-        static_cast<__nv_fp4x2_e2m1*>(a.Y)[row * a.yRowStrideBytes + (d >> 1)] =
+        static_cast<uint8_t*>(a.Y)[row * a.yRowStrideBytes + (d >> 1)] =
             fp4x2_pack(y / s, hi / s);
       }
     }
@@ -435,7 +505,7 @@ static void pack_input(InDtype dtype, const float* xq, size_t n,
   if (store == XS_FP4) {
     // rowLen is 2*dim and therefore even, so a packed pair never straddles a
     // row, and 2j/2j+1 never straddle an MX block either: one scale for both.
-    __nv_fp4x2_e2m1* p = static_cast<__nv_fp4x2_e2m1*>(dst);
+    uint8_t* p = static_cast<uint8_t*>(dst);
     for (size_t j = 0; j < n / 2; j++) {
       const size_t i = 2 * j;
       const float s = scale_at(i);
@@ -515,16 +585,16 @@ static void unpack_output(OutQuant q, int rows, int dim, size_t blocksPerRow,
     return;
   }
 
-  const __nv_fp4x2_e2m1* p = static_cast<const __nv_fp4x2_e2m1*>(src);
+  const uint8_t* p = static_cast<const uint8_t*>(src);
   const size_t rowBytes = mxfp4_row_bytes(dim);
   for (size_t i = 0; i < static_cast<size_t>(rows); i++) {
     for (size_t b = 0; b < blocksPerRow; b++) {
       const float s = e8m0_decode(yscales[i * blocksPerRow + b]);
       const int d0 = static_cast<int>(b * MX_BLOCK);
       const int nk = (d0 + MX_BLOCK < dim) ? MX_BLOCK : (dim - d0);
-      const __nv_fp4x2_e2m1* blk = p + i * rowBytes + b * (MX_BLOCK / 2);
+      const uint8_t* blk = p + i * rowBytes + b * (MX_BLOCK / 2);
       for (int k = 0; k < nk; k++) {
-        Y[i * dim + d0 + k] = fp4x2_unpack(blk[k / 2].__x, k & 1) * s;
+        Y[i * dim + d0 + k] = fp4x2_unpack(blk[k / 2], k & 1) * s;
       }
     }
   }

@@ -8,8 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <algorithm>
 #include <chrono>
 #include <random>
+#include <vector>
 #include <sycl/sycl.hpp>
 #include "reference.h"
 
@@ -249,9 +251,29 @@ template <int STORE, int SCALE, OutQuant OUT, int BIAS, bool TIMED>
 class SwigluOAIKernel;
 
 template <int STORE, int SCALE, OutQuant OUT, int BIAS, bool TIMED>
+class SwigluOAIKernelSG32;
+
+// `force_sg32` asks for a sub-group of exactly MX_BLOCK lanes. The MXFP4
+// epilogue needs a sub-group of at least that width: the XOR masks stay below
+// MX_BLOCK, so on a wider sub-group each aligned MX_BLOCK-lane slice reduces
+// its own block and elects its own lane 0, but a narrower one would spread a
+// block over several sub-groups that each write a different scale for it.
+// Devices offering MX_BLOCK take the annotated kernel; devices whose sizes are
+// all wider (wave64, say) take the plain one, and main() rejects the rest.
+template <int STORE, int SCALE, OutQuant OUT, int BIAS, bool TIMED>
 static void submit_swiglu_kernel(sycl::queue &q, sycl::nd_range<1> launch,
-                                 const KernelArgs &a) {
+                                 const KernelArgs &a, bool force_sg32) {
   q.submit([&](sycl::handler &cgh) {
+    if constexpr (OUT == OUT_MXFP4) {
+      if (force_sg32) {
+        cgh.parallel_for<SwigluOAIKernelSG32<STORE, SCALE, OUT, BIAS, TIMED>>(
+            launch, [=](sycl::nd_item<1> item)
+                [[sycl::reqd_sub_group_size(MX_BLOCK)]] {
+              swiglu_oai_kernel<STORE, SCALE, OUT, BIAS>(item, a);
+            });
+        return;
+      }
+    }
     cgh.parallel_for<SwigluOAIKernel<STORE, SCALE, OUT, BIAS, TIMED>>(
         launch, [=](sycl::nd_item<1> item) {
           swiglu_oai_kernel<STORE, SCALE, OUT, BIAS>(item, a);
@@ -261,17 +283,18 @@ static void submit_swiglu_kernel(sycl::queue &q, sycl::nd_range<1> launch,
 
 template <int STORE, int SCALE, int BIAS, bool TIMED>
 static void submit_swiglu_out(sycl::queue &q, OutQuant out,
-                              sycl::nd_range<1> launch, const KernelArgs &a) {
+                              sycl::nd_range<1> launch, const KernelArgs &a,
+                              bool force_sg32) {
   switch (out) {
     case OUT_NONE:
       submit_swiglu_kernel<STORE, SCALE, OUT_NONE, BIAS, TIMED>(
-          q, launch, a); break;
+          q, launch, a, force_sg32); break;
     case OUT_FP8:
       submit_swiglu_kernel<STORE, SCALE, OUT_FP8, BIAS, TIMED>(
-          q, launch, a); break;
+          q, launch, a, force_sg32); break;
     case OUT_MXFP4:
       submit_swiglu_kernel<STORE, SCALE, OUT_MXFP4, BIAS, TIMED>(
-          q, launch, a); break;
+          q, launch, a, force_sg32); break;
     default: break;
   }
 }
@@ -279,29 +302,29 @@ static void submit_swiglu_out(sycl::queue &q, OutQuant out,
 template <int BIAS, bool TIMED>
 static void submit_swiglu_input(sycl::queue &q, InDtype in, OutQuant out,
                                 sycl::nd_range<1> launch,
-                                const KernelArgs &a) {
+                                const KernelArgs &a, bool force_sg32) {
   switch (in) {
     case IN_FP32:
       submit_swiglu_out<XS_F32, XSC_NONE, BIAS, TIMED>(
-          q, out, launch, a); break;
+          q, out, launch, a, force_sg32); break;
     case IN_FP16:
       submit_swiglu_out<XS_F16, XSC_NONE, BIAS, TIMED>(
-          q, out, launch, a); break;
+          q, out, launch, a, force_sg32); break;
     case IN_BF16:
       submit_swiglu_out<XS_BF16, XSC_NONE, BIAS, TIMED>(
-          q, out, launch, a); break;
+          q, out, launch, a, force_sg32); break;
     case IN_FP8:
       submit_swiglu_out<XS_FP8, XSC_TENSOR, BIAS, TIMED>(
-          q, out, launch, a); break;
+          q, out, launch, a, force_sg32); break;
     case IN_MXFP8:
       submit_swiglu_out<XS_FP8, XSC_MX, BIAS, TIMED>(
-          q, out, launch, a); break;
+          q, out, launch, a, force_sg32); break;
     case IN_FP4:
       submit_swiglu_out<XS_FP4, XSC_TENSOR, BIAS, TIMED>(
-          q, out, launch, a); break;
+          q, out, launch, a, force_sg32); break;
     case IN_MXFP4:
       submit_swiglu_out<XS_FP4, XSC_MX, BIAS, TIMED>(
-          q, out, launch, a); break;
+          q, out, launch, a, force_sg32); break;
     default: break;
   }
 }
@@ -309,9 +332,9 @@ static void submit_swiglu_input(sycl::queue &q, InDtype in, OutQuant out,
 template <bool TIMED>
 static void submit_swiglu(sycl::queue &q, InDtype in, OutQuant out,
                           BiasStore bias, sycl::nd_range<1> launch,
-                          const KernelArgs &a) {
+                          const KernelArgs &a, bool force_sg32) {
 #define SUBMIT_BIAS(B)                                                        \
-  submit_swiglu_input<B, TIMED>(q, in, out, launch, a)
+  submit_swiglu_input<B, TIMED>(q, in, out, launch, a, force_sg32)
   switch (bias) {
     case BS_NONE: SUBMIT_BIAS(BS_NONE); break;
     case BS_F16:  SUBMIT_BIAS(BS_F16);  break;
@@ -666,6 +689,28 @@ int main(int argc, char* argv[])
   sycl::queue q(sycl::cpu_selector_v, sycl::property::queue::in_order());
 #endif
 
+  // The MXFP4 epilogue reduces an MX block within one sub-group, so every
+  // sub-group the device may hand the kernel has to be at least MX_BLOCK
+  // lanes wide. When MX_BLOCK itself is available the kernel asks for exactly
+  // that; otherwise the device only offers wider sub-groups and the plain
+  // kernel is safe. A device that can pick a narrower size cannot run the
+  // path correctly, so it is skipped rather than silently mis-quantized.
+  bool force_sg32 = false;
+  if (out_quant == OUT_MXFP4) {
+    const std::vector<size_t> sg_sizes =
+        q.get_device().get_info<sycl::info::device::sub_group_sizes>();
+    force_sg32 = std::find(sg_sizes.begin(), sg_sizes.end(),
+                           static_cast<size_t>(MX_BLOCK)) != sg_sizes.end();
+    const size_t smallest = sg_sizes.empty()
+        ? 0 : *std::min_element(sg_sizes.begin(), sg_sizes.end());
+    if (!force_sg32 && smallest < static_cast<size_t>(MX_BLOCK)) {
+      printf("Skipped: mxfp4 output needs a sub-group of at least %d lanes, "
+             "which %s does not guarantee\n", MX_BLOCK,
+             q.get_device().get_info<sycl::info::device::name>().c_str());
+      return EXIT_SUCCESS;
+    }
+  }
+
   void *d_X = sycl::malloc_device(x_store_bytes, q);
   void *d_B = (bias == BS_NONE)
       ? nullptr : sycl::malloc_device(b_store_bytes, q);
@@ -711,7 +756,8 @@ int main(int argc, char* argv[])
   sycl::nd_range<1> launch(gws, lws);
 
   // check correctness before benchmarking
-  submit_swiglu<false>(q, in_dtype, out_quant, bias, launch, args);
+  submit_swiglu<false>(q, in_dtype, out_quant, bias, launch, args,
+                       force_sg32);
 
   q.memcpy(Y_store, d_Y, y_store_bytes);
   if (y_nscales) q.memcpy(y_scales, d_Yscales, y_nscales);
@@ -757,7 +803,8 @@ int main(int argc, char* argv[])
     q.wait_and_throw();
     auto start = std::chrono::steady_clock::now();
     for (int i = 0; i < repeat; i++)
-      submit_swiglu<true>(q, in_dtype, out_quant, bias, launch, args);
+      submit_swiglu<true>(q, in_dtype, out_quant, bias, launch, args,
+                          force_sg32);
     q.wait_and_throw();
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(

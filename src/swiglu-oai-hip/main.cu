@@ -25,9 +25,20 @@
 
 #if !defined(__HIPCC__)
 #error "swiglu-oai-hip must be compiled with hipcc"
-#elif HIP_VERSION_MAJOR < 7
-#error "swiglu-oai-hip requires ROCm 7.0 or newer for hip_fp4.h"
+#endif
+
+#ifndef SWIGLU_HAS_HIP_FP4
+// hip_fp4.h first ships with ROCm 7.0. Older installations keep every other
+// format and take the software E2M1 codec below, which makes the same
+// rounding decisions as reference.h.
+#if HIP_VERSION_MAJOR >= 7
+#define SWIGLU_HAS_HIP_FP4 1
 #else
+#define SWIGLU_HAS_HIP_FP4 0
+#endif
+#endif
+
+#if SWIGLU_HAS_HIP_FP4
 #include <hip/hip_fp4.h>
 #endif
 
@@ -145,7 +156,53 @@ __device__ __forceinline__ uint8_t device_e4m3_encode(float x) {
 #endif
 }
 
+#if SWIGLU_HAS_HIP_FP4
 static_assert(sizeof(__hip_fp4x2_e2m1) == 1, "two fp4 values must pack into one byte");
+#endif
+
+// ---------------------------------------------------------------------------
+// E2M1 codec. Representable magnitudes: 0, 0.5, 1, 1.5, 2, 3, 4, 6. The
+// software path is used when hip_fp4.h is unavailable; its nearest-value
+// search with a tie-to-even-index rule mirrors round_to_e2m1() in
+// reference.h, including the strict `> 5.f` that lets the 4/6 tie land on 4.
+// ---------------------------------------------------------------------------
+
+__host__ __device__ __forceinline__ float e2m1_decode(uint8_t nibble) {
+#if SWIGLU_HAS_HIP_FP4
+  __hip_fp4_e2m1 v;
+  v.__x = static_cast<__hip_fp4_storage_t>(nibble & 0xfu);
+  return static_cast<float>(v);
+#else
+  const float lut[8] = {0.f, 0.5f, 1.f, 1.5f, 2.f, 3.f, 4.f, 6.f};
+  const float m = lut[nibble & 0x7u];
+  return (nibble & 0x8u) ? -m : m;
+#endif
+}
+
+// Two E2M1 values packed into one byte, low nibble first.
+__host__ __device__ __forceinline__ uint8_t e2m1x2_encode(float lo, float hi) {
+#if SWIGLU_HAS_HIP_FP4
+  return __hip_fp4x2_e2m1(make_float2(lo, hi)).__x;
+#else
+  auto encode = [](float x) -> uint8_t {
+    const float lut[8] = {0.f, 0.5f, 1.f, 1.5f, 2.f, 3.f, 4.f, 6.f};
+    const uint8_t sign = (x < 0.f) ? 0x8u : 0x0u;
+    const float a = fabsf(x);
+    if (a > 5.f) return sign | 7u;
+    int best = 0;
+    float bestd = fabsf(a - lut[0]);
+    for (int i = 1; i < 8; i++) {
+      const float d = fabsf(a - lut[i]);
+      if (d < bestd || (d == bestd && (i % 2) == 0)) {
+        bestd = d;
+        best = i;
+      }
+    }
+    return sign | static_cast<uint8_t>(best);
+  };
+  return static_cast<uint8_t>(encode(lo) | (encode(hi) << 4));
+#endif
+}
 
 // ---------------------------------------------------------------------------
 // Device-side helpers
@@ -182,11 +239,8 @@ __device__ __forceinline__ float load_x_raw(
   } else if constexpr (STORE == XS_FP8) {
     return device_e4m3_decode(static_cast<const uint8_t*>(X)[idx]);
   } else {
-    __hip_fp4_e2m1 v;
-    v.__x = static_cast<__hip_fp4_storage_t>(
-        (static_cast<const uint8_t*>(X)[idx >> 1] >>
-         ((idx & 1) << 2)) & 0xf);
-    return static_cast<float>(v);
+    return e2m1_decode(static_cast<uint8_t>(
+        (static_cast<const uint8_t*>(X)[idx >> 1] >> ((idx & 1) << 2)) & 0xf));
   }
 }
 
@@ -199,9 +253,15 @@ __device__ __forceinline__ float2 load_x_pair(
     const float tensorScale, const int64_t idx, const int64_t scaleIdx) {
   float2 pair;
   if constexpr (STORE == XS_FP4) {
-    __hip_fp4x2_e2m1 packed;
-    packed.__x = static_cast<const uint8_t*>(X)[idx >> 1];
-    pair = static_cast<float2>(packed);
+    const uint8_t packed = static_cast<const uint8_t*>(X)[idx >> 1];
+#if SWIGLU_HAS_HIP_FP4
+    __hip_fp4x2_e2m1 native;
+    native.__x = packed;
+    pair = static_cast<float2>(native);
+#else
+    pair = make_float2(e2m1_decode(packed & 0xfu),
+                       e2m1_decode(packed >> 4));
+#endif
   } else if constexpr (STORE == XS_FP8) {
 #if defined(__gfx940__) || defined(__gfx941__) || defined(__gfx942__)
     __hip_fp8x2_e4m3_fnuz packed;
@@ -336,7 +396,7 @@ __global__ void swiglu_oai_kernel(const KernelArgs a) {
             (d + 1 < static_cast<int64_t>(a.dim)) ? paired : 0.f;
         static_cast<uint8_t*>(a.Y)[
             row * a.yRowStrideBytes + (d >> 1)] =
-            __hip_fp4x2_e2m1(make_float2(y / s, hi / s)).__x;
+            e2m1x2_encode(y / s, hi / s);
       }
     }
   }
@@ -432,8 +492,7 @@ static void pack_input(HipFp8Format fp8_format, InDtype dt, const float* xq,
     for (int64_t i = 0; i < n; i += 2) {
       const float scale = scale_at(i);
       const float hi = (i + 1 < n) ? xq[i + 1] / scale : 0.f;
-      p[i >> 1] =
-          __hip_fp4x2_e2m1(make_float2(xq[i] / scale, hi)).__x;
+      p[i >> 1] = e2m1x2_encode(xq[i] / scale, hi);
     }
     return;
   }
@@ -520,11 +579,10 @@ static void unpack_output(HipFp8Format fp8_format, OutQuant q,
   const uint8_t* p = static_cast<const uint8_t*>(src);
   for (int64_t r = 0; r < rows; r++) {
     for (int64_t d = 0; d < dim; d++) {
-      __hip_fp4_e2m1 v;
-      v.__x = static_cast<__hip_fp4_storage_t>(
+      const uint8_t nibble = static_cast<uint8_t>(
           (p[r * rowStride + (d >> 1)] >> ((d & 1) << 2)) & 0xf);
       dst[r * dim + d] =
-          static_cast<float>(v) *
+          e2m1_decode(nibble) *
           e8m0_to_float(scales[r * blocksPerRow + (d / MX_BLOCK)]);
     }
   }

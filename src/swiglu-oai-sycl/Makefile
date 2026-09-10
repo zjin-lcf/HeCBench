@@ -57,6 +57,10 @@ endif
 ifeq ($(HIP), yes)
   CFLAGS += -fsycl-targets=amdgcn-amd-amdhsa \
 	    -Xsycl-target-backend --offload-arch=$(HIP_ARCH)
+  # The mxfp4 kernel is also instantiated with a required sub-group size of
+  # 32, which amdgcn ignores. main() only selects that instantiation on
+  # devices that report the size as supported.
+  CFLAGS += -Wno-incorrect-sub-group-size
 endif
 
 # Debug Flags
@@ -90,7 +94,8 @@ run: $(program)
 	  output="$$($(LAUNCHER) ./$(program) "$$@" 2>&1)"; status=$$?; \
 	  printf '%s\n' "$$output"; \
 	  if [ $$status -ne 0 ] || \
-	     ! printf '%s\n' "$$output" | awk '$$0 == "PASS" { pass=1 } END { exit !pass }'; then \
+	     ! printf '%s\n' "$$output" | \
+	       awk '$$0 == "PASS" || /^Skipped: / { ok=1 } END { exit !ok }'; then \
 	    return 1; \
 	  fi; \
 	}; \

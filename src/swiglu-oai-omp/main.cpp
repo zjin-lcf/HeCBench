@@ -18,12 +18,14 @@ void swiglu_oai_kernel(
    const float* Bdata,
          float* Ydata)
 {
-  #pragma omp target teams distribute parallel for num_threads(block_size)
-  for (int index = 0; index < rows * dim; index++) {
-    const int i = index / dim;
-    const int d = index % dim;
+  const int64_t nelems = (int64_t)rows * dim;
 
-    const int64_t xOffset = (int64_t)i * 2 * dim;
+  #pragma omp target teams distribute parallel for num_threads(block_size)
+  for (int64_t index = 0; index < nelems; index++) {
+    const int64_t i = index / dim;
+    const int64_t d = index % dim;
+
+    const int64_t xOffset = i * 2 * dim;
 
     float gate = Xdata[xOffset + 2 * d] + Bdata[2 * d];
     float linear = Xdata[xOffset + 2 * d + 1] + Bdata[2 * d + 1];
@@ -32,7 +34,7 @@ void swiglu_oai_kernel(
     linear = fminf(fmaxf(linear, -limit), limit);
 
     const float s = 1.f / (1.f + expf(-alpha * gate));
-    Ydata[(int64_t)i * dim + d] = gate * s * (linear + 1.f);
+    Ydata[i * dim + d] = gate * s * (linear + 1.f);
   }
 }
 

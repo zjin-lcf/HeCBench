@@ -6,8 +6,9 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
-# __nv_fp8_e4m3 (cuda_fp8.h) needs CUDA >= 11.8; __nv_fp4x2_e2m1
-# (cuda_fp4.h) needs CUDA >= 12.8. FP4 conversion is native on
+# __nv_fp8_e4m3 (cuda_fp8.h) needs CUDA >= 11.8; the native FP4 conversions
+# (cuda_fp4.h) need CUDA >= 12.8, and older toolkits fall back to the software
+# E2M1/E8M0 codecs in main.cu. FP4 conversion is native on
 # architecture-specific Blackwell targets such as sm_100a; other targets use
 # CUDA's emulation path. sm_90 keeps this benchmark runnable on Hopper while
 # exercising native FP8 support.
@@ -66,6 +67,13 @@ clean:
 
 .PHONY: clean run
 
+#
+# Standard LLM inference: BF16 activation, no bias, no output quantization.
+# Bias-bearing FP16 model.
+# vLLM/SGLang-style fused SwiGLU followed by FP8 activation quantization.
+# Blackwell-style fused SwiGLU followed by MXFP4 activation quantization.
+# Low-precision MoE path with MXFP8 input, FP8 output, and BF16 bias.
+#
 run: $(program)
 	@run_case() { \
 	  output="$$($(LAUNCHER) ./$(program) "$$@" 2>&1)"; status=$$?; \
@@ -76,13 +84,8 @@ run: $(program)
 	  fi; \
 	}; \
 	set -e; \
-	# Standard LLM inference: BF16 activation, no bias, no output quantization. \
 	run_case $(ROWS) $(DIM) $(REPEAT) bf16 none none; \
-	# Bias-bearing FP16 model. \
 	run_case $(ROWS) $(DIM) $(REPEAT) fp16 none fp16; \
-	# vLLM/SGLang-style fused SwiGLU followed by FP8 activation quantization. \
 	run_case $(ROWS) $(DIM) $(REPEAT) bf16 fp8 none; \
-	# Blackwell-style fused SwiGLU followed by MXFP4 activation quantization. \
 	run_case $(ROWS) $(DIM) $(REPEAT) bf16 mxfp4 none; \
-	# Low-precision MoE path with MXFP8 input, FP8 output, and BF16 bias. \
 	run_case $(ROWS) $(DIM) $(REPEAT) mxfp8 fp8 bf16
