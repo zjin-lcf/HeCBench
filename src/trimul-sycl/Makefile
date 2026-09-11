@@ -11,9 +11,9 @@ LAUNCHER  ?=
 GPU       = yes
 CUDA      = no
 # BF16 joint_matrix requires Ampere or newer.
-CUDA_ARCH = sm_80
+CUDA_ARCH ?= sm_80
 HIP       = no
-HIP_ARCH  = gfx90a
+HIP_ARCH  ?= gfx90a
 ONEMKL    = no
 # path to the install of the oneMKL interface
 ONEMKL_PATH ?= /path/to/oneMKL
@@ -34,9 +34,7 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-# -Xarch_host keeps it on the host compilation
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -Xarch_host -fopenmp \
-          -I../trimul-cuda -fsycl
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I../trimul-cuda -fsycl
 
 ifneq ($(strip $(GCC_TOOLCHAIN)),)
   CFLAGS += --gcc-toolchain=$(GCC_TOOLCHAIN)
@@ -45,10 +43,13 @@ endif
 ifeq ($(VENDOR), AdaptiveCpp)
     CFLAGS_TMP := $(CFLAGS)
     CFLAGS = $(filter-out -fsycl, $(CFLAGS_TMP))
+    CFLAGS += -fopenmp
+    LDFLAGS = -fopenmp
+else
+    # -Xarch_host keeps OpenMP on the host compilation for DPC++
+    CFLAGS += -Xarch_host -fopenmp
+    LDFLAGS = -Xarch_host -fopenmp
 endif
-
-# Linker Flags
-LDFLAGS = -Xarch_host -fopenmp
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \
