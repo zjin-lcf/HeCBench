@@ -953,7 +953,7 @@ Early results are shown [here](results/README.md)
 ### kalman (cuda)
   Kalman filter (https://github.com/rapidsai/cuml/)  
 
-### kda (cuda, hip, sycl, omp)
+### kda (cuda)
   Fused recurrent Kimi Delta Attention forward pass (https://github.com/fla-org/flash-linear-attention)
 
 ### keccaktreehash (cuda)
