@@ -67,7 +67,7 @@ Each benchmark falls into a single category. While such classification is not ac
     aes, bitcracker, bitpermute, chacha20, columnarSolver, ecdh, keccaktreehash, merkle, present  
 
 ### Data compression and reduction
-    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fma, fpc, histogram, lzss, minmax, mpc, mtf, quantAQLM, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, scatter, scatterAdd, scatterThrust, segment-reduce
+    atomicAggregate, atomicCAS, atomicCost, atomicIntrinsics, atomicPerf, atomicSystemWide, bitpacking, bscan, bwt, compute-score, contract, dxtc2, filter, fma, fpc, histogram, lzss, minmax, mpc, mtf, quantAQLM, quantBnB, quantVLLM, rle, sc, scan, scan2, scan3, scatter, scatterAdd, scatterThrust, segment-reduce, segment-reduce2
 
 ### Data encoding, decoding, or verification
     ans, base64e, crc64, crs, entropy, jenkins-hash, kiss, ldpc, md5hash, murmurhash3
@@ -1547,6 +1547,9 @@ Early results are shown [here](results/README.md)
 
 ### segment-reduce (cuda)
   Segmented reduction using Thrust and oneDPL (https://github.com/c3sr/tcu_scope)
+
+### segment-reduce2 (cuda)
+  Sort-based group-by aggregations (https://github.com/AMD-Ecosystem/hipDF)
 
 ### segsort (cuda)
   Fast segmented sort on a GPU (https://github.com/Funatiq/bb_segsort)
