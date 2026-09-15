@@ -74,6 +74,11 @@ __global__ void benchmark_shmem(float4 *g_data){
 
 void shmembenchGPU(float *c, const size_t size, const int n) {
   // size floats, one float4 per thread => size/4 stored values
+  if (size % ((size_t)BLOCK_SIZE * 4) != 0) {
+    printf("size must be a multiple of %zu\n", (size_t)BLOCK_SIZE * 4);
+    printf("FAIL\n");
+    return;
+  }
   const size_t num_float4 = size / 4;
 
   dim3 dimBlock(BLOCK_SIZE, 1, 1);
@@ -98,6 +103,7 @@ void shmembenchGPU(float *c, const size_t size, const int n) {
 
   int errors = shmembench_verify(c, num_float4, BLOCK_SIZE, TOTAL_ITERATIONS);
   printf("%s\n", errors ? "FAIL" : "PASS");
+  if (errors) return;
 
   printf("Memory throughput\n");
   // 6LL keeps the product in 64-bit; 20492*size overflows 32-bit int

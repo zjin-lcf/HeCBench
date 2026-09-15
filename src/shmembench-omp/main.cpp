@@ -3,7 +3,7 @@
 #include <string.h>
 #include "shmem_kernels.h"
 
-#define VECTOR_SIZE (1024*1024)
+#define VECTOR_SIZE (1024ULL * 1024)
 
 int main(int argc, char* argv[]) {
   printf("Shared memory bandwidth microbenchmark\n");

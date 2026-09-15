@@ -53,15 +53,19 @@ void shmembenchGPU(float *c, const size_t size, const int n) {
   double time_shmem_128b;
 
   // size floats, one float4 per thread => size/4 stored values
+  if (size % ((size_t)BLOCK_SIZE * 4) != 0) {
+    printf("size must be a multiple of %zu\n", (size_t)BLOCK_SIZE * 4);
+    printf("FAIL\n");
+    return;
+  }
   const size_t num_float4 = size / 4;
-  int team_threads = 0;
+  int team_threads[1] = {0};
 
-  #pragma omp target data map(from: c[0:num_float4*4])
+  #pragma omp target data map(from: c[0:num_float4*4]) map(tofrom: team_threads[0:1])
   {
     auto start = high_resolution_clock::now();
     for (int i = 0; i < n; i++) {
-      #pragma omp target teams num_teams(num_float4/BLOCK_SIZE) thread_limit(BLOCK_SIZE) \
-              map(from: team_threads)
+      #pragma omp target teams num_teams(num_float4/BLOCK_SIZE) thread_limit(BLOCK_SIZE)
       {
         float4 shm_buffer[BLOCK_SIZE*6];
         #pragma omp parallel num_threads(BLOCK_SIZE)
@@ -70,7 +74,7 @@ void shmembenchGPU(float *c, const size_t size, const int n) {
           int blk = omp_get_num_threads();
           int gid = omp_get_team_num();
           int globaltid = gid * blk + tid;
-          if (tid == 0 && gid == 0) team_threads = blk;
+          if (tid == 0 && gid == 0) team_threads[0] = blk;
 
           set_vector(shm_buffer, tid+0*blk, init_val(tid));
           set_vector(shm_buffer, tid+1*blk, init_val(tid+1));
@@ -111,10 +115,13 @@ void shmembenchGPU(float *c, const size_t size, const int n) {
     // Copy results back to host memory
   }
 
-  int errors = 1;
-  if (team_threads == BLOCK_SIZE)
-    errors = shmembench_verify(c, num_float4, team_threads, TOTAL_ITERATIONS);
+  if (team_threads[0] != BLOCK_SIZE) {
+    printf("FAIL (team threads %d, expected %d)\n", team_threads[0], BLOCK_SIZE);
+    return;
+  }
+  int errors = shmembench_verify(c, num_float4, BLOCK_SIZE, TOTAL_ITERATIONS);
   printf("%s\n", errors ? "FAIL" : "PASS");
+  if (errors) return;
 
   printf("Memory throughput\n");
   // 6LL keeps the product in 64-bit; 20492*size overflows 32-bit int
