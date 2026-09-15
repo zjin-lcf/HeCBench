@@ -8,9 +8,7 @@
 #include <random>
 #include <vector>
 
-// Zipf/power-law group sizes with empty groups. Offsets, counts, and values
-// are signed 64-bit. CUDA CUB / hipCUB DeviceSegmentedReduce requires the
-// 64-bit interface (num_segments and offset iterators).
+// Zipf/power-law group sizes with empty groups. Offsets and values are signed 64-bit 
 using offset_t = std::int64_t;
 using value_t = std::int64_t;
 

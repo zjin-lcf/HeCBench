@@ -15,6 +15,8 @@
     }                                                                        \
   } while (0)
 
+static_assert(sizeof(offset_t) == 8, "64-bit CUB offset iterators required");
+
 template <typename Op>
 void bench_op(const char *name, Op op, value_t *d_in, value_t *d_out,
               offset_t *d_offsets, offset_t num_segments, offset_t num_items,
@@ -65,8 +67,7 @@ void segreduce(offset_t num_items, int repeat)
                    (p.num_segments + 1) * sizeof(offset_t),
                    cudaMemcpyHostToDevice));
 
-  // 64-bit CUB DeviceSegmentedReduce interface is required
-  // (num_segments and offset iterators).
+  // CUB 64-bit DeviceSegmentedReduce: int64_t num_segments and 64-bit offsets.
   auto sum_op = [](void *tmp, size_t &bytes, value_t *in, value_t *out,
                    offset_t n, offset_t *off) {
     return cub::DeviceSegmentedReduce::Sum(tmp, bytes, in, out, n, off, off + 1);

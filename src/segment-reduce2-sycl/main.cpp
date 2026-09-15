@@ -219,9 +219,9 @@ void launch(sycl::queue &q, const value_t *d_in, value_t *d_out,
           const int sg_size = sg.get_local_range()[0]; // typically 16, 32, or 64
           const int avg = static_cast<int>((t1 - t0) / nseg); // mean segment length
           int K = 1;
-          // K = largest power of two that is still <= avg and <= sg_size.
-          // Power of two so the later XOR-shuffle tree is a clean butterfly.
-          while (K < avg && K < sg_size)
+          // Double K while it is still below avg, stays <= sg_size, and
+          // divides sg_size (XOR teams stay complete).
+          while (K < avg && (K << 1) <= sg_size && sg_size % (K << 1) == 0)
             K <<= 1;
 
           const int segs_per_sg = sg_size / K;      // how many teams in one sub-group

@@ -1549,7 +1549,7 @@ Early results are shown [here](results/README.md)
   Segmented reduction using Thrust and oneDPL (https://github.com/c3sr/tcu_scope)
 
 ### segment-reduce2 (cuda)
-  Sort-based group-by aggregations (https://github.com/AMD-Ecosystem/hipDF)
+  Offset-based segmented sum/min/max with 64-bit CSR offsets
 
 ### segsort (cuda)
   Fast segmented sort on a GPU (https://github.com/Funatiq/bb_segsort)

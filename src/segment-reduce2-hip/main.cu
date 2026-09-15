@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <hip/hip_runtime.h>
 #include <hipcub/hipcub.hpp>
 #include "zipf.h"
@@ -14,6 +15,8 @@
       exit(EXIT_FAILURE);                                                    \
     }                                                                        \
   } while (0)
+
+static_assert(sizeof(offset_t) == 8, "64-bit hipCUB offset iterators required");
 
 template <typename Op>
 void bench_op(const char *name, Op op, value_t *d_in, value_t *d_out,
@@ -65,8 +68,7 @@ void segreduce(offset_t num_items, int repeat)
                   (p.num_segments + 1) * sizeof(offset_t),
                   hipMemcpyHostToDevice));
 
-  // 64-bit hipCUB DeviceSegmentedReduce interface is required
-  // (num_segments and offset iterators).
+  // hipCUB 64-bit offset iterators (int64_t*). num_segments remains int.
   auto sum_op = [](void *tmp, size_t &bytes, value_t *in, value_t *out,
                    offset_t n, offset_t *off) {
     return hipcub::DeviceSegmentedReduce::Sum(tmp, bytes, in, out, n, off, off + 1);
