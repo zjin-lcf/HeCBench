@@ -199,18 +199,18 @@ static void nlist_kernel(std::size_t nodes, const std::uint64_t *graph_ptr,
                          const double *positions, const double *cells,
                          const double *inverses, const std::uint64_t *pbc,
                          Candidate *slots, int *counts) {
-#pragma omp target teams num_teams(nodes) thread_limit(kNlistBlock)            \
+  // distribute assigns destinations to whatever league the runtime creates;
+  // static,1 keeps one dst per team when occupancy allows, matching CUDA.
+#pragma omp target teams distribute dist_schedule(static, 1)                   \
+    thread_limit(kNlistBlock)                                                   \
     is_device_ptr(graph_ptr, node_batch, positions, cells, inverses, pbc,       \
                   slots, counts)
-  {
+  for (std::size_t dst = 0; dst < nodes; ++dst) {
     Candidate pool[kNlistPool];
     Candidate best[kMaxNeighbors];
     Candidate ranked[kMaxNeighbors];
     int images[kNlistBlock];
     int max_images, pool_count, count;
-    const int nteams = omp_get_num_teams();
-    for (std::size_t dst = static_cast<std::size_t>(omp_get_team_num());
-         dst < nodes; dst += static_cast<std::size_t>(nteams)) {
     const int graph = static_cast<int>(node_batch[dst]);
     const double *h = cells + 9 * graph;
     const double *iv = inverses + 9 * graph;
@@ -296,7 +296,6 @@ static void nlist_kernel(std::size_t nodes, const std::uint64_t *graph_ptr,
       for (int index = lane; index < count; index += kNlistBlock)
         slots[dst * kMaxNeighbors + index] = best[index];
     }
-    }
   }
 }
 
@@ -308,12 +307,10 @@ static void scan_counts_kernel(const int *counts, std::size_t nodes,
                                std::uint64_t *offsets,
                                std::uint64_t *block_totals, std::size_t length,
                                int grid) {
-#pragma omp target teams num_teams(grid) thread_limit(kScanBlock)              \
-    is_device_ptr(counts, offsets, block_totals)
-  {
+#pragma omp target teams distribute dist_schedule(static, 1)                   \
+    thread_limit(kScanBlock) is_device_ptr(counts, offsets, block_totals)
+  for (int block = 0; block < grid; ++block) {
     std::uint64_t shared[kScanBlock];
-    const int nteams = omp_get_num_teams();
-    for (int block = omp_get_team_num(); block < grid; block += nteams) {
 #pragma omp parallel num_threads(kScanBlock)
     {
       const int lane = omp_get_thread_num();
@@ -325,19 +322,16 @@ static void scan_counts_kernel(const int *counts, std::size_t nodes,
       if (i < length) offsets[i] = exclusive;
       if (lane == 0) block_totals[block] = total;
     }
-    }
   }
 }
 
 static void scan_values_kernel(std::uint64_t *values,
                                std::uint64_t *block_totals, std::size_t length,
                                int grid) {
-#pragma omp target teams num_teams(grid) thread_limit(kScanBlock)              \
-    is_device_ptr(values, block_totals)
-  {
+#pragma omp target teams distribute dist_schedule(static, 1)                   \
+    thread_limit(kScanBlock) is_device_ptr(values, block_totals)
+  for (int block = 0; block < grid; ++block) {
     std::uint64_t shared[kScanBlock];
-    const int nteams = omp_get_num_teams();
-    for (int block = omp_get_team_num(); block < grid; block += nteams) {
 #pragma omp parallel num_threads(kScanBlock)
     {
       const int lane = omp_get_thread_num();
@@ -348,26 +342,17 @@ static void scan_values_kernel(std::uint64_t *values,
       if (i < length) values[i] = exclusive;
       if (lane == 0) block_totals[block] = total;
     }
-    }
   }
 }
 
 static void scan_offset_kernel(std::uint64_t *values,
                                const std::uint64_t *block_offsets,
                                std::size_t length, int grid) {
-#pragma omp target teams num_teams(grid) thread_limit(kScanBlock)              \
+  (void)grid;
+#pragma omp target teams distribute parallel for thread_limit(kScanBlock)      \
     is_device_ptr(values, block_offsets)
-  {
-    const int nteams = omp_get_num_teams();
-    for (int block = omp_get_team_num(); block < grid; block += nteams) {
-#pragma omp parallel num_threads(kScanBlock)
-    {
-      const std::size_t i =
-          static_cast<std::size_t>(block) * kScanBlock + omp_get_thread_num();
-      if (i < length) values[i] += block_offsets[block];
-    }
-    }
-  }
+  for (std::size_t i = 0; i < length; ++i)
+    values[i] += block_offsets[i / kScanBlock];
 }
 
 static void flatten_kernel(std::size_t nodes, const std::uint64_t *node_batch,
@@ -478,41 +463,36 @@ static void matmul_kernel(const float *input, const float *matrix,
   constexpr int tile = 16;
   const std::size_t row_groups = (rows + tile - 1) / tile;
   const std::size_t out_groups = (out_width + tile - 1) / tile;
-  const std::size_t team_count = row_groups * out_groups;
-#pragma omp target teams num_teams(team_count) thread_limit(tile * tile)        \
-    is_device_ptr(input, matrix, output)
-  {
-    float inputs[tile][tile];
-    float weights[tile][tile];
-    const std::size_t nteams = static_cast<std::size_t>(omp_get_num_teams());
-    for (std::size_t team = static_cast<std::size_t>(omp_get_team_num());
-         team < team_count; team += nteams) {
-    const std::size_t block_row = team / out_groups;
-    const std::size_t block_out = team % out_groups;
+#pragma omp target teams distribute dist_schedule(static, 1) collapse(2)       \
+    thread_limit(tile * tile) is_device_ptr(input, matrix, output)
+  for (std::size_t block_row = 0; block_row < row_groups; ++block_row) {
+    for (std::size_t block_out = 0; block_out < out_groups; ++block_out) {
+      float inputs[tile][tile];
+      float weights[tile][tile];
 #pragma omp parallel num_threads(tile * tile)
-    {
-      const int thread = omp_get_thread_num();
-      const std::size_t ly = static_cast<std::size_t>(thread / tile);
-      const std::size_t lx = static_cast<std::size_t>(thread % tile);
-      const std::size_t row = block_row * tile + ly;
-      const std::size_t out = block_out * tile + lx;
-      float sum = 0.0f;
-      for (std::size_t base = 0; base < in_width; base += tile) {
-        const std::size_t input_column = base + lx;
-        const std::size_t weight_row = base + ly;
-        inputs[ly][lx] = row < rows && input_column < in_width
-                             ? input[row * in_width + input_column] : 0.0f;
-        weights[ly][lx] = weight_row < in_width && out < out_width
-                              ? matrix[weight_row * out_width + out] : 0.0f;
+      {
+        const int thread = omp_get_thread_num();
+        const std::size_t ly = static_cast<std::size_t>(thread / tile);
+        const std::size_t lx = static_cast<std::size_t>(thread % tile);
+        const std::size_t row = block_row * tile + ly;
+        const std::size_t out = block_out * tile + lx;
+        float sum = 0.0f;
+        for (std::size_t base = 0; base < in_width; base += tile) {
+          const std::size_t input_column = base + lx;
+          const std::size_t weight_row = base + ly;
+          inputs[ly][lx] = row < rows && input_column < in_width
+                               ? input[row * in_width + input_column] : 0.0f;
+          weights[ly][lx] = weight_row < in_width && out < out_width
+                                ? matrix[weight_row * out_width + out] : 0.0f;
 #pragma omp barrier
-        const std::size_t limit =
-            in_width - base < tile ? in_width - base : tile;
-        for (std::size_t in = 0; in < limit; ++in)
-          sum += inputs[ly][in] * weights[in][lx];
+          const std::size_t limit =
+              in_width - base < tile ? in_width - base : tile;
+          for (std::size_t in = 0; in < limit; ++in)
+            sum += inputs[ly][in] * weights[in][lx];
 #pragma omp barrier
+        }
+        if (row < rows && out < out_width) output[row * out_width + out] = sum;
       }
-      if (row < rows && out < out_width) output[row * out_width + out] = sum;
-    }
     }
   }
 }
