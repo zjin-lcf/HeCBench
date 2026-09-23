@@ -23,6 +23,14 @@ constexpr std::size_t kSpecies = 118;
 constexpr std::size_t kLayers = 4;
 constexpr double kSiluScale = 1.6791767923989418;
 
+template <typename Index>
+inline Index gemm_index(std::size_t value, const char *name) {
+  if (value > static_cast<std::size_t>(std::numeric_limits<Index>::max()))
+    throw std::runtime_error(std::string("GEMM ") + name +
+                             " exceeds the BLAS index type");
+  return static_cast<Index>(value);
+}
+
 struct Tensor {
   std::vector<std::uint64_t> shape;
   std::vector<double> f64;

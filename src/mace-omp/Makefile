@@ -2,13 +2,14 @@
 # User Options
 #===============================================================================
 
-# Compiler can be set below, or via environment variable
+# icpx OpenMP GPU offload with oneMKL. CPU (DEVICE=cpu) is unsupported.
 CC        = icpx
 OPTIMIZE  = yes
 DEBUG     = no
 DEVICE    = gpu
 LAUNCHER  ?=
 FIXTURE   ?= ../data/hydragnn-sc26/mace_pipeline_capture.macepipe
+MKLROOT   ?= /opt/intel/oneapi/mkl/latest
 
 #===============================================================================
 # Program name & source code list
@@ -41,11 +42,13 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS += -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__
-else
-  CFLAGS += -qopenmp
+ifneq ($(DEVICE),gpu)
+  $(error mace-omp requires DEVICE=gpu; CPU is unsupported)
 endif
+
+CFLAGS += -fiopenmp -fopenmp-targets=spir64 -D__STRICT_ANSI__ \
+          -DMACE_OMP_ONEMKL -I$(MKLROOT)/include -qmkl
+LDFLAGS += -qmkl
 
 #===============================================================================
 # Targets to Build
@@ -62,7 +65,7 @@ clean:
 
 # The timed workload is a synthetic batch at the published SC26 dimensions:
 # 128 graphs, 2726 atoms, 45974 edges. Correctness is validated on the captured
-# fixture first.
+# fixture first. Default GEMM is oneMKL cblas_sgemm.
 run: $(program)
-	$(LAUNCHER) ./$(program) --fixture $(FIXTURE) --gemm custom \
+	$(LAUNCHER) ./$(program) --fixture $(FIXTURE) --gemm blas \
 	  --warmup 100 --repeat 100

@@ -32,6 +32,17 @@ using namespace mace_pipeline;
 
 constexpr int kBlock = 256;
 
+struct BlasContext {
+  rocblas_handle handle = nullptr;
+  BlasContext() {
+    ROCBLAS_CHECK(rocblas_create_handle(&handle));
+    ROCBLAS_CHECK(rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host));
+  }
+  ~BlasContext() { if (handle) (void)rocblas_destroy_handle(handle); }
+  BlasContext(const BlasContext &) = delete;
+  BlasContext &operator=(const BlasContext &) = delete;
+};
+
 struct Buffer {
   float *data = nullptr;
   std::size_t capacity = 0;
@@ -729,8 +740,8 @@ struct Pipeline {
   TypedBuffer<std::uint64_t> scan_totals;
   std::vector<std::size_t> scan_lengths, scan_bases;
 
-  explicit Pipeline(const Fixture &fixture)
-      : host(fixture), device(fixture),
+  explicit Pipeline(const Fixture &fixture, rocblas_handle blas)
+      : host(fixture), device(fixture), rocblas(blas),
         nodes(fixture.at("positions").shape[0]),
         edges(fixture.at("edge_index").shape[0]) {
     if (fixture.version < 2)
@@ -776,13 +787,6 @@ struct Pipeline {
     }
     HIP_CHECK(hipMemcpy(node_species.data, species.data(), species.size(),
                         hipMemcpyHostToDevice));
-    ROCBLAS_CHECK(rocblas_create_handle(&rocblas));
-    ROCBLAS_CHECK(rocblas_set_pointer_mode(rocblas,
-                                           rocblas_pointer_mode_host));
-  }
-
-  ~Pipeline() {
-    if (rocblas) (void)rocblas_destroy_handle(rocblas);
   }
 
   void prefix_scan() {
@@ -931,10 +935,11 @@ struct Pipeline {
     const float alpha = 1.0f, beta = 0.0f;
     ROCBLAS_CHECK(rocblas_sgemm(
         rocblas, rocblas_operation_none, rocblas_operation_none,
-        static_cast<int>(out_width), static_cast<int>(rows),
-        static_cast<int>(in_width), &alpha,
-        device.at(matrix_name).f32, static_cast<int>(out_width), x,
-        static_cast<int>(in_width), &beta, y, static_cast<int>(out_width)));
+        gemm_index<int>(out_width, "N"), gemm_index<int>(rows, "M"),
+        gemm_index<int>(in_width, "K"), &alpha,
+        device.at(matrix_name).f32, gemm_index<int>(out_width, "ldA"), x,
+        gemm_index<int>(in_width, "ldB"), &beta, y,
+        gemm_index<int>(out_width, "ldC")));
   }
 
   void checkpoint(Validation *v, const std::string &name, const Buffer &b,
@@ -1135,7 +1140,8 @@ int main(int argc, char **argv) {
     HIP_CHECK(hipGetDevice(&device_id));
     HIP_CHECK(hipGetDeviceProperties(&properties, device_id));
     const Fixture fixture = read_fixture(fixture_path);
-    Pipeline pipeline(fixture);
+    BlasContext blas;
+    Pipeline pipeline(fixture, blas.handle);
     std::cout << "MACE combined convolution pipeline\n"
               << "Backend: HIP (" << properties.name << ", "
               << properties.gcnArchName << ")\n"
@@ -1183,7 +1189,7 @@ int main(int argc, char **argv) {
     // input with reference tensors. The timed region then runs a synthetic batch
     // at the published SC26 dimensions.
     const production::Workload workload = production::generate(fixture);
-    Pipeline scaled(workload.fixture);
+    Pipeline scaled(workload.fixture, blas.handle);
     Pipeline *timed = &scaled;
     std::cout << "Timed workload: synthetic production batch ("
               << workload.graphs << " graphs, " << workload.nodes

@@ -1,10 +1,24 @@
 #include <chrono>
 #include <cstdlib>
 #include <iomanip>
+#include <limits>
 #include <memory>
 #include <unordered_map>
 
 #include <omp.h>
+
+#ifdef MACE_OMP_CUBLAS
+#include <cublas_v2.h>
+#include <cuda_runtime.h>
+#endif
+#ifdef MACE_OMP_ROCBLAS
+#include <hip/hip_runtime.h>
+#include <rocblas/rocblas.h>
+#endif
+#ifdef MACE_OMP_ONEMKL
+#include <mkl.h>
+#include <mkl_omp_offload.h>
+#endif
 
 #include "mace_nlist.hpp"
 #include "mace_pipeline.hpp"
@@ -12,6 +26,59 @@
 using namespace mace_pipeline;
 
 enum class GemmMode { Custom, Blas };
+
+#if defined(MACE_OMP_CUBLAS) || defined(MACE_OMP_ROCBLAS) || \
+    defined(MACE_OMP_ONEMKL)
+#define MACE_OMP_HAS_BLAS 1
+#endif
+
+#ifdef MACE_OMP_CUBLAS
+#define CUDA_CHECK(call)                                                        \
+  do {                                                                          \
+    cudaError_t status_ = (call);                                                \
+    if (status_ != cudaSuccess)                                                  \
+      throw std::runtime_error(std::string(#call) + ": " +                       \
+                               cudaGetErrorString(status_));                     \
+  } while (0)
+#define CUBLAS_CHECK(call)                                                      \
+  do {                                                                          \
+    cublasStatus_t status_ = (call);                                             \
+    if (status_ != CUBLAS_STATUS_SUCCESS)                                        \
+      throw std::runtime_error(std::string(#call) +                              \
+                               ": cuBLAS status " +                              \
+                               std::to_string(static_cast<int>(status_)));       \
+  } while (0)
+#endif
+#ifdef MACE_OMP_ROCBLAS
+#define HIP_CHECK(call)                                                         \
+  do {                                                                          \
+    hipError_t status_ = (call);                                                 \
+    if (status_ != hipSuccess)                                                   \
+      throw std::runtime_error(std::string(#call) + ": " +                       \
+                               hipGetErrorString(status_));                      \
+  } while (0)
+#define ROCBLAS_CHECK(call)                                                     \
+  do {                                                                          \
+    rocblas_status status_ = (call);                                             \
+    if (status_ != rocblas_status_success)                                       \
+      throw std::runtime_error(std::string(#call) +                              \
+                               ": rocBLAS status " +                             \
+                               std::to_string(static_cast<int>(status_)));       \
+  } while (0)
+#endif
+
+inline const char *gemm_label(GemmMode mode) {
+  if (mode != GemmMode::Blas) return "custom";
+#if defined(MACE_OMP_CUBLAS)
+  return "cuBLAS";
+#elif defined(MACE_OMP_ROCBLAS)
+  return "rocBLAS";
+#elif defined(MACE_OMP_ONEMKL)
+  return "oneMKL";
+#else
+  return "blas";
+#endif
+}
 
 // Constants referenced from target regions must themselves be mapped, so the
 // device copies are spelled out here and tied back to the fixture header.
@@ -165,6 +232,32 @@ static void copy_to_host(void *destination, const void *source,
                         host_id(), device_id()))
     throw std::runtime_error("device-to-host copy failed");
 }
+
+#if defined(MACE_OMP_CUBLAS) || defined(MACE_OMP_ROCBLAS)
+struct BlasContext {
+#ifdef MACE_OMP_CUBLAS
+  cublasHandle_t handle = nullptr;
+  explicit BlasContext(bool enable) {
+    if (!enable) return;
+    CUDA_CHECK(cudaSetDevice(device_id()));
+    CUBLAS_CHECK(cublasCreate(&handle));
+  }
+  ~BlasContext() { if (handle) cublasDestroy(handle); }
+#endif
+#ifdef MACE_OMP_ROCBLAS
+  rocblas_handle handle = nullptr;
+  explicit BlasContext(bool enable) {
+    if (!enable) return;
+    HIP_CHECK(hipSetDevice(device_id()));
+    ROCBLAS_CHECK(rocblas_create_handle(&handle));
+    ROCBLAS_CHECK(rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host));
+  }
+  ~BlasContext() { if (handle) (void)rocblas_destroy_handle(handle); }
+#endif
+  BlasContext(const BlasContext &) = delete;
+  BlasContext &operator=(const BlasContext &) = delete;
+};
+#endif
 
 struct Buffer {
   float *data = nullptr;
@@ -440,7 +533,7 @@ static void one_hot_kernel(const float *raw, float *output, std::size_t nodes) {
   for (std::size_t i = 0; i < nodes * kDeviceSpecies; ++i) {
     const std::size_t n = i / kDeviceSpecies;
     output[i] = i % kDeviceSpecies ==
-                        static_cast<std::size_t>(llrint(raw[n]) - 1)
+                        static_cast<std::size_t>(raw[n] + 0.5f) - 1
                     ? 1.0f : 0.0f;
   }
 }
@@ -463,7 +556,12 @@ static void matmul_kernel(const float *input, const float *matrix,
   constexpr int tile = 16;
   const std::size_t row_groups = (rows + tile - 1) / tile;
   const std::size_t out_groups = (out_width + tile - 1) / tile;
-#pragma omp target teams distribute dist_schedule(static, 1) collapse(2)       \
+  const int team_count =
+      static_cast<int>(row_groups * out_groups > 0 ? row_groups * out_groups
+                                                   : 1);
+  // num_teams is a hint so AMD can match the tile grid; distribute still
+  // partitions work if the runtime creates a smaller league.
+#pragma omp target teams distribute num_teams(team_count) collapse(2)          \
     thread_limit(tile * tile) is_device_ptr(input, matrix, output)
   for (std::size_t block_row = 0; block_row < row_groups; ++block_row) {
     for (std::size_t block_out = 0; block_out < out_groups; ++block_out) {
@@ -862,6 +960,12 @@ struct Pipeline {
   const Fixture &host;
   DeviceFixture device;
   GemmMode gemm_mode;
+#ifdef MACE_OMP_CUBLAS
+  cublasHandle_t cublas = nullptr;
+#endif
+#ifdef MACE_OMP_ROCBLAS
+  rocblas_handle rocblas = nullptr;
+#endif
   std::size_t nodes, edges;
   Buffer node_attrs, embedded, edge_attrs, edge_features, scalar, equivariant;
   Buffer input, up, down, skip, fc_a, fc_b, messages, aggregate;
@@ -875,8 +979,20 @@ struct Pipeline {
   TypedBuffer<std::uint64_t> scan_totals;
   std::vector<std::size_t> scan_lengths, scan_bases;
 
+#ifdef MACE_OMP_CUBLAS
+  explicit Pipeline(const Fixture &fixture, GemmMode mode, cublasHandle_t blas)
+#elif defined(MACE_OMP_ROCBLAS)
+  explicit Pipeline(const Fixture &fixture, GemmMode mode, rocblas_handle blas)
+#else
   explicit Pipeline(const Fixture &fixture, GemmMode mode)
+#endif
       : host(fixture), device(fixture), gemm_mode(mode),
+#ifdef MACE_OMP_CUBLAS
+        cublas(blas),
+#endif
+#ifdef MACE_OMP_ROCBLAS
+        rocblas(blas),
+#endif
         nodes(fixture.at("positions").shape[0]),
         edges(fixture.at("edge_index").shape[0]) {
     if (fixture.version < 2)
@@ -921,6 +1037,9 @@ struct Pipeline {
     }
     copy_to_device(node_species.data, species.data(), species.size());
   }
+
+  Pipeline(const Pipeline &) = delete;
+  Pipeline &operator=(const Pipeline &) = delete;
 
   void prefix_scan() {
     const std::size_t levels = scan_lengths.size();
@@ -1061,6 +1180,50 @@ struct Pipeline {
               std::size_t rows) {
     const Tensor &m = host.at(matrix_name);
     const std::size_t in_width = m.shape[0], out_width = m.shape[1];
+#ifdef MACE_OMP_CUBLAS
+    if (gemm_mode == GemmMode::Blas) {
+      const float alpha = 1.0f, beta = 0.0f;
+      const int n_out = gemm_index<int>(out_width, "N");
+      const int n_rows = gemm_index<int>(rows, "M");
+      const int k = gemm_index<int>(in_width, "K");
+      CUBLAS_CHECK(cublasSgemm(cublas, CUBLAS_OP_N, CUBLAS_OP_N, n_out, n_rows, k,
+                               &alpha, device.at(matrix_name).f32, n_out, x, k,
+                               &beta, y, n_out));
+      CUDA_CHECK(cudaDeviceSynchronize());
+      return;
+    }
+#endif
+#ifdef MACE_OMP_ROCBLAS
+    if (gemm_mode == GemmMode::Blas) {
+      const float alpha = 1.0f, beta = 0.0f;
+      ROCBLAS_CHECK(rocblas_sgemm(
+          rocblas, rocblas_operation_none, rocblas_operation_none,
+          gemm_index<int>(out_width, "N"), gemm_index<int>(rows, "M"),
+          gemm_index<int>(in_width, "K"), &alpha, device.at(matrix_name).f32,
+          gemm_index<int>(out_width, "ldA"), x, gemm_index<int>(in_width, "ldB"),
+          &beta, y, gemm_index<int>(out_width, "ldC")));
+      HIP_CHECK(hipDeviceSynchronize());
+      return;
+    }
+#endif
+#ifdef MACE_OMP_ONEMKL
+    if (gemm_mode == GemmMode::Blas) {
+      const float alpha = 1.0f, beta = 0.0f;
+      const float *a = device.at(matrix_name).f32;
+      const float *b = x;
+      float *c = y;
+#pragma omp dispatch is_device_ptr(a, b, c)
+      cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+                  gemm_index<MKL_INT>(out_width, "N"),
+                  gemm_index<MKL_INT>(rows, "M"),
+                  gemm_index<MKL_INT>(in_width, "K"), alpha, a,
+                  gemm_index<MKL_INT>(out_width, "ldA"), b,
+                  gemm_index<MKL_INT>(in_width, "ldB"), beta, c,
+                  gemm_index<MKL_INT>(out_width, "ldC"));
+      return;
+    }
+#endif
+    (void)gemm_mode;
     matmul_kernel(x, device.at(matrix_name).f32, y, rows, in_width, out_width);
   }
 
@@ -1226,7 +1389,11 @@ static double measure(Function function, int repeat) {
 int main(int argc, char **argv) {
   try {
     std::string fixture_path;
+#ifdef MACE_OMP_HAS_BLAS
+    GemmMode gemm_mode = GemmMode::Blas;
+#else
     GemmMode gemm_mode = GemmMode::Custom;
+#endif
     int warmup = 1, repeat = 3;
     for (int i = 1; i < argc; ++i) {
       const std::string argument = argv[i];
@@ -1247,24 +1414,41 @@ int main(int argc, char **argv) {
         repeat = parse_count(value(), "--repeat", true);
       else if (argument == "--help" || argument == "-h") {
         std::cout << "Usage: " << argv[0]
+#ifdef MACE_OMP_HAS_BLAS
+                  << " --fixture FILE [--gemm blas|custom]"
+#else
                   << " --fixture FILE [--gemm custom]"
-                     " [--warmup N] [--repeat N]\n";
+#endif
+                     " [--warmup N] [--repeat N]\n"
+#ifdef MACE_OMP_HAS_BLAS
+                  << "Default --gemm is blas (" << gemm_label(GemmMode::Blas)
+                  << ").\n"
+#endif
+            ;
         return 0;
       } else throw std::runtime_error("unknown option: " + argument);
     }
     if (fixture_path.empty()) throw std::runtime_error("--fixture is required");
+#ifndef MACE_OMP_HAS_BLAS
     if (gemm_mode == GemmMode::Blas)
       throw std::runtime_error(
-          "--gemm blas is unavailable: OpenMP target offload has no BLAS "
-          "binding in this benchmark");
+          "--gemm blas is unavailable: rebuild with the vendor Makefile "
+          "(Makefile.nvc, Makefile.aomp, or Makefile)");
+#endif
     if (omp_get_num_devices() < 1)
-      throw std::runtime_error("no OpenMP offload device is available");
+      throw std::runtime_error(
+          "no OpenMP offload device is available (CPU is unsupported)");
     const Fixture fixture = read_fixture(fixture_path);
+#if defined(MACE_OMP_CUBLAS) || defined(MACE_OMP_ROCBLAS)
+    BlasContext blas(gemm_mode == GemmMode::Blas);
+    Pipeline pipeline(fixture, gemm_mode, blas.handle);
+#else
     Pipeline pipeline(fixture, gemm_mode);
+#endif
     std::cout << "MACE combined convolution pipeline\n"
               << "Backend: OpenMP target offload (device " << device_id()
               << " of " << omp_get_num_devices() << ")\n"
-              << "GEMM: custom\n"
+              << "GEMM: " << gemm_label(gemm_mode) << "\n"
               << "Precision: FP32 (MACE), FP64 (neighbor geometry)\nNodes: "
               << pipeline.nodes
               << "\nEdges: " << pipeline.edges
@@ -1306,7 +1490,11 @@ int main(int argc, char **argv) {
     // input with reference tensors. The timed region then runs a synthetic batch
     // at the published SC26 dimensions.
     const production::Workload workload = production::generate(fixture);
+#if defined(MACE_OMP_CUBLAS) || defined(MACE_OMP_ROCBLAS)
+    Pipeline scaled(workload.fixture, gemm_mode, blas.handle);
+#else
     Pipeline scaled(workload.fixture, gemm_mode);
+#endif
     Pipeline *timed = &scaled;
     std::cout << "Timed workload: synthetic production batch ("
               << workload.graphs << " graphs, " << workload.nodes

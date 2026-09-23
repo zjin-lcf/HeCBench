@@ -1074,11 +1074,12 @@ struct Pipeline {
     // row_major it is implemented by every oneMath backend.
     math_ns::blas::column_major::gemm(
         queue, math_ns::transpose::nontrans, math_ns::transpose::nontrans,
-        static_cast<std::int64_t>(out_width), static_cast<std::int64_t>(rows),
-        static_cast<std::int64_t>(in_width), 1.0f, device.at(matrix_name).f32,
-        static_cast<std::int64_t>(out_width), x,
-        static_cast<std::int64_t>(in_width), 0.0f, y,
-        static_cast<std::int64_t>(out_width));
+        gemm_index<std::int64_t>(out_width, "N"),
+        gemm_index<std::int64_t>(rows, "M"),
+        gemm_index<std::int64_t>(in_width, "K"), 1.0f,
+        device.at(matrix_name).f32, gemm_index<std::int64_t>(out_width, "ldA"),
+        x, gemm_index<std::int64_t>(in_width, "ldB"), 0.0f, y,
+        gemm_index<std::int64_t>(out_width, "ldC"));
   }
 
   void checkpoint(Validation *v, const std::string &name, const Buffer &b,
