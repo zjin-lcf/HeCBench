@@ -21,11 +21,15 @@ make ARCH=sm_90
 /opt/nvidia/hpc_sdk/Linux_x86_64/25.7/comm_libs/mpi/bin/mpirun --mca coll ^hcoll -n 2 ./main-mpi
 ```
 
-**Pass:** no probe error on stderr; rank 0 prints
+**Pass:** no error on stderr; rank 0 prints
 `MPI : Transfer size (B): ... Bandwidth (GB/s): ...` from 512 KiB through 1 GiB.
 
-Startup probes GPU-aware MPI (2 doubles, 64 KiB, and the first timed size)
-and checks that **device** memory was updated, not only that MPI returned.
+Startup asks the MPI library with `MPIX_Query_cuda_support()` when that
+function is in the MPI headers (Open MPI `mpi-ext.h`, or MPICH 4.0.1 and
+later). If the library reports no CUDA buffer support, the program aborts
+before any device pointer is passed to MPI. If the library reports support,
+or the headers have no query, one 512 KiB device transfer is checked. A
+watchdog aborts that transfer if it is still running after 30 s.
 
 ## Non-GPU-aware MPI test (must fail quickly)
 
@@ -37,9 +41,9 @@ make ARCH=sm_90 MPI_ROOT=/usr/lib/x86_64-linux-gnu/openmpi
 /usr/bin/mpirun -n 2 ./main-mpi
 ```
 
-**Pass for this test:** exit within about 30 s with a stderr error, such as
+**Pass for this test:** the process exits instead of blocking in `MPI_Recv`.
+Typical stderr lines:
 
-- `GPU-aware MPI probe failed` — MPI returned, device buffers were wrong
-- `GPU-aware MPI probe timed out` — MPI hung on a device pointer; a watchdog aborts
-
-It must not block in `MPI_Recv` indefinitely.
+- `MPI library reports no CUDA GPU-buffer support` — the library query returned no
+- `GPU-aware MPI probe failed` — the query was missing or said yes, and the device buffer was wrong
+- `GPU-aware MPI probe timed out` — MPI hung on a device pointer; a watchdog aborts within about 30 s

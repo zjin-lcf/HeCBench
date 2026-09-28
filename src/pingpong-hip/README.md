@@ -25,11 +25,18 @@ make MPI_ROOT=/path/to/rocm-aware-openmpi
 /path/to/rocm-aware-openmpi/bin/mpirun -n 2 ./main-mpi
 ```
 
-**Pass:** no probe error on stderr; rank 0 prints
+**Pass:** no error on stderr; rank 0 prints
 `MPI : Transfer size (B): ... Bandwidth (GB/s): ...` from 512 KiB through 1 GiB.
 
-Startup probes GPU-aware MPI (2 doubles, 64 KiB, and the first timed size)
-and checks that **device** memory was updated, not only that MPI returned.
+Startup asks the MPI library with `MPIX_Query_hip_support()` (MPICH 4.0.1
+and later) or `MPIX_Query_rocm_support()` (Open MPI 5, from `mpi-ext.h`).
+Open MPI 4 has no ROCm query. If the library reports no HIP buffer support,
+the program aborts before any device pointer is passed to MPI. If the
+library reports support, or the headers have no query, one 512 KiB device
+transfer is checked. A watchdog aborts that transfer if it is still running
+after 30 s. `MPICH_GPU_SUPPORT_ENABLED=0` can still reach that transfer:
+Cray MPICH may report HIP support while the variable has GPU support turned
+off.
 
 ## Non-GPU-aware MPI test (must fail quickly)
 
@@ -49,9 +56,9 @@ make MPI_ROOT=/usr/lib/x86_64-linux-gnu/openmpi
 /usr/bin/mpirun -n 2 ./main-mpi
 ```
 
-**Pass for this test:** exit within about 30 s with a stderr error, such as
+**Pass for this test:** the process exits instead of blocking in `MPI_Recv`.
+Typical stderr lines:
 
-- `GPU-aware MPI probe failed` — MPI returned, device buffers were wrong
-- `GPU-aware MPI probe timed out` — MPI hung on a device pointer; a watchdog aborts
-
-It must not block in `MPI_Recv` indefinitely.
+- `MPI library reports no HIP GPU-buffer support` — the library query returned no
+- `GPU-aware MPI probe failed` — the query was missing or said yes, and the device buffer was wrong
+- `GPU-aware MPI probe timed out` — MPI hung on a device pointer; a watchdog aborts within about 30 s

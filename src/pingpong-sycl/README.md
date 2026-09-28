@@ -19,11 +19,13 @@ export ONEAPI_DEVICE_SELECTOR=hip:gpu
 srun -n 2 ./main-mpi
 ```
 
-Intel GPU / Level Zero and Intel MPI (Makefile `MPI_ROOT`):
+Intel GPU / Level Zero and Intel MPI (Makefile `MPI_ROOT`).
+`I_MPI_OFFLOAD` defaults to 0, which turns GPU buffers off:
 
 ```bash
 make clean
 make
+export I_MPI_OFFLOAD=1
 /opt/intel/oneapi/2024.1/bin/mpirun -n 2 ./main-mpi
 ```
 
@@ -35,11 +37,17 @@ make CUDA=yes CUDA_ARCH=sm_90
 # launch with the NVHPC mpirun used at link time
 ```
 
-**Pass:** no probe error on stderr; rank 0 prints
+**Pass:** no error on stderr; rank 0 prints
 `MPI: Transfer size (B): ... Bandwidth (GB/s): ...` from 512 KiB through 1 GiB.
 
-Startup probes GPU-aware MPI (2 doubles, 64 KiB, and the first timed size)
-and checks that **device** memory was updated, not only that MPI returned.
+Startup picks the query from the device vendor: `MPIX_Query_cuda_support()`
+for NVIDIA, `MPIX_Query_hip_support()` or `MPIX_Query_rocm_support()` for
+AMD, and `MPIX_Query_ze_support()` for Intel. Intel MPI is decided by its
+own `I_MPI_OFFLOAD` (unset or 0 means no). If the library reports no support
+for that buffer type, the program aborts before any device pointer is passed
+to MPI. If the library reports support, or the headers have no query, one
+512 KiB device transfer is checked. A watchdog aborts that transfer if it is
+still running after 30 s.
 
 ## Non-GPU-aware MPI test (must fail quickly)
 
@@ -56,9 +64,15 @@ make MPI_ROOT=/usr/lib/x86_64-linux-gnu/openmpi
 /usr/bin/mpirun -n 2 ./main-mpi
 ```
 
-**Pass for this test:** exit within about 30 s with a stderr error, such as
+```bash
+# Intel MPI: GPU buffers off (this is the default)
+export I_MPI_OFFLOAD=0
+/opt/intel/oneapi/2024.1/bin/mpirun -n 2 ./main-mpi
+```
 
-- `GPU-aware MPI probe failed` — MPI returned, device buffers were wrong
-- `GPU-aware MPI probe timed out` — MPI hung on a device pointer; a watchdog aborts
+**Pass for this test:** the process exits instead of blocking in `MPI_Recv`.
+Typical stderr lines:
 
-It must not block in `MPI_Recv` indefinitely.
+- `MPI library reports no ... GPU-buffer support` — the library query returned no, or Intel MPI has `I_MPI_OFFLOAD` unset or 0
+- `GPU-aware MPI probe failed` — the query was missing or said yes, and the device buffer was wrong
+- `GPU-aware MPI probe timed out` — MPI hung on a device pointer; a watchdog aborts within about 30 s

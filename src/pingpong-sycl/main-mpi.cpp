@@ -4,8 +4,11 @@
 #include <atomic>
 #include <chrono>
 #include <thread>
+#include <cctype>
+#include <string>
 #include <sycl/sycl.hpp>
 #include <mpi.h>
+#include "../pingpong-cuda/gpu_aware_mpi.h"
 
 void test(sycl::nd_item<1> item, double *d, const long int n) {
   for (long i = item.get_global_id(0);
@@ -21,7 +24,6 @@ static const double kPoisonA = -1.0;
 static const double kPoisonB = -2.0;
 static const int kProbeTimeoutSec = 30;
 static const long kTinyN = 2;
-static const long kRendezN = 8192;      // 64 KiB; typical eager vs rendezvous boundary
 static const long kFirstBenchN = 1 << 16;  // same element count as the first timed size
 
 static std::atomic<int> g_probe_done{0};
@@ -105,9 +107,7 @@ static void launch_inc(sycl::queue &q, double *d, long ninc)
 }
 
 // MPI_SUCCESS is not enough: copy device memory back and check payload plus a
-// device-side increment. Tiny messages can take an eager/host-staging path, so
-// also probe 64 KiB and the first timed size. Host MPI of a flag is used only
-// to agree on the result after those checks.
+// device-side increment. Host MPI of a flag is used only to agree on the result.
 static int probe_roundtrip(sycl::queue &q, int rank, long n, int inc_all, int tag)
 {
   MPI_Status stat;
@@ -182,6 +182,21 @@ static int probe_roundtrip(sycl::queue &q, int rank, long n, int inc_all, int ta
   return ok;
 }
 
+static int sycl_mpi_gpu_kind(const sycl::device &dev)
+{
+  std::string vendor = dev.get_info<sycl::info::device::vendor>();
+  for (char &c : vendor)
+    c = (char)std::tolower((unsigned char)c);
+  if (vendor.find("nvidia") != std::string::npos)
+    return PINGPONG_GPU_KIND_CUDA;
+  if (vendor.find("amd") != std::string::npos ||
+      vendor.find("advanced micro") != std::string::npos)
+    return PINGPONG_GPU_KIND_HIP;
+  if (vendor.find("intel") != std::string::npos)
+    return PINGPONG_GPU_KIND_ZE;
+  return PINGPONG_GPU_KIND_UNKNOWN;
+}
+
 static void probe_gpu_aware_mpi(sycl::queue &q, int rank, int use_watchdog)
 {
   g_probe_done.store(0, std::memory_order_relaxed);
@@ -189,11 +204,8 @@ static void probe_gpu_aware_mpi(sycl::queue &q, int rank, int use_watchdog)
   if (use_watchdog)
     watchdog = std::thread(gpu_aware_probe_watchdog);
 
-  // Always run every size so the two ranks cannot skip a matching Send/Recv.
-  const int ok_tiny = probe_roundtrip(q, rank, kTinyN, 0, 91);
-  const int ok_rendez = probe_roundtrip(q, rank, kRendezN, 1, 92);
-  const int ok_bench = probe_roundtrip(q, rank, kFirstBenchN, 1, 93);
-  const int ok = ok_tiny && ok_rendez && ok_bench;
+  // One transfer at the first timed size. Ranks always match Send with Recv.
+  const int ok = probe_roundtrip(q, rank, kFirstBenchN, 1, 91);
 
   int ok_all = 0;
   mpi_or_abort(MPI_Allreduce(&ok, &ok_all, 1, MPI_INT, MPI_LAND, MPI_COMM_WORLD),
@@ -247,6 +259,7 @@ int main(int argc, char *argv[])
     probe_abort("no SYCL GPU devices");
   sycl::queue q(gpu_devices[rank % num_devices], sycl::property::queue::in_order());
 
+  pingpong_require_gpu_aware_mpi(sycl_mpi_gpu_kind(q.get_device()), rank);
   probe_gpu_aware_mpi(q, rank, use_watchdog);
 
   //   Loop from 512 KiB to 1 GB (8 * 2^i bytes, i = 16..27)

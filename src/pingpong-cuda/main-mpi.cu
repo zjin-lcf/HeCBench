@@ -6,6 +6,7 @@
 #include <thread>
 #include <cuda.h>
 #include <mpi.h>
+#include "gpu_aware_mpi.h"
 
 // Macro for checking errors in CUDA API calls
 #define cudaErrorCheck(call)                                                              \
@@ -33,7 +34,6 @@ static const double kPoisonA = -1.0;
 static const double kPoisonB = -2.0;
 static const int kProbeTimeoutSec = 30;
 static const long kTinyN = 2;
-static const long kRendezN = 8192;      // 64 KiB; typical eager vs rendezvous boundary
 static const long kFirstBenchN = 1 << 16;  // same element count as the first timed size
 
 static std::atomic<int> g_probe_done{0};
@@ -124,9 +124,7 @@ static void launch_inc(double *d, long ninc)
 }
 
 // MPI_SUCCESS is not enough: copy device memory back and check payload plus a
-// device-side increment. Tiny messages can take an eager/host-staging path, so
-// also probe 64 KiB and the first timed size. Host MPI of a flag is used only
-// to agree on the result after those checks.
+// device-side increment. Host MPI of a flag is used only to agree on the result.
 static int probe_roundtrip(int rank, long n, int inc_all, int tag)
 {
   MPI_Status stat;
@@ -220,11 +218,8 @@ static void probe_gpu_aware_mpi(int rank, int use_watchdog)
   if (use_watchdog)
     watchdog = std::thread(gpu_aware_probe_watchdog);
 
-  // Always run every size so the two ranks cannot skip a matching Send/Recv.
-  const int ok_tiny = probe_roundtrip(rank, kTinyN, 0, 91);
-  const int ok_rendez = probe_roundtrip(rank, kRendezN, 1, 92);
-  const int ok_bench = probe_roundtrip(rank, kFirstBenchN, 1, 93);
-  const int ok = ok_tiny && ok_rendez && ok_bench;
+  // One transfer at the first timed size. Ranks always match Send with Recv.
+  const int ok = probe_roundtrip(rank, kFirstBenchN, 1, 91);
 
   int ok_all = 0;
   mpi_or_abort(MPI_Allreduce(&ok, &ok_all, 1, MPI_INT, MPI_LAND, MPI_COMM_WORLD),
@@ -279,6 +274,7 @@ int main(int argc, char *argv[])
     probe_abort("no CUDA devices");
   probe_cuda(cudaSetDevice(rank % num_devices), "cudaSetDevice");
 
+  pingpong_require_gpu_aware_mpi(PINGPONG_GPU_KIND_CUDA, rank);
   probe_gpu_aware_mpi(rank, use_watchdog);
 
   //   Loop from 512 KiB to 1 GB (8 * 2^i bytes, i = 16..27)
