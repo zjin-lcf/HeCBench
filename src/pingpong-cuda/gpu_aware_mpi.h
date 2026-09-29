@@ -74,7 +74,7 @@ static const char *gpu_aware_mpi_kind_name(int kind)
 
 // Map a device vendor string (for example SYCL's info::device::vendor) to a
 // GPU kind. Matching is case-insensitive.
-static int gpu_aware_mpi_kind_from_vendor(const char *vendor)
+static inline int gpu_aware_mpi_kind_from_vendor(const char *vendor)
 {
   char lower[256];
   size_t i = 0;
