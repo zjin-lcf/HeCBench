@@ -9,6 +9,26 @@ tests below; `make run` also launches `main-nccl`.
 Rebuild against the MPI you launch with. Mixing an NVHPC-linked binary with
 distro `mpirun` (or the reverse) is not a valid test.
 
+## How main-mpi decides whether MPI is GPU-aware
+
+Before any device pointer reaches MPI, `main-mpi` asks the MPI library
+(`gpu_aware_mpi.h`, shared with pingpong-hip and pingpong-sycl):
+
+| MPI | Decided by |
+|-----|------------|
+| Cray MPICH | `MPICH_GPU_SUPPORT_ENABLED=1` (default off), then `MPIX_Query_cuda_support()` |
+| Intel MPI | `I_MPI_OFFLOAD` nonzero (default 0) |
+| MVAPICH2 | `MV2_USE_CUDA` (`1` yes, `0` no, unset: cannot tell) |
+| MPICH 4.0.1 and later | `MPIX_Query_cuda_support()` (honors `MPIR_CVAR_ENABLE_GPU`) |
+| Open MPI with the CUDA extension (`mpi-ext.h`) | `MPIX_Query_cuda_support()` |
+| Anything else | cannot tell |
+
+If the library reports no support, the program aborts and names what
+decided it and how to enable GPU buffers. If the library cannot tell, the
+program also aborts unless `MPI_GPU_AWARE=1` is set. Set it only when you
+know the MPI is GPU-aware. It does not override a library that reports no
+support.
+
 ## GPU-aware MPI test (must pass)
 
 Link and launch with the CUDA-aware MPI from the NVIDIA HPC SDK (Makefile
@@ -24,14 +44,7 @@ make ARCH=sm_90
 **Pass:** no error on stderr; rank 0 prints
 `MPI : Transfer size (B): ... Bandwidth (GB/s): ...` from 512 KiB through 1 GiB.
 
-Startup asks the MPI library with `MPIX_Query_cuda_support()` when that
-function is in the MPI headers (Open MPI `mpi-ext.h`, or MPICH 4.0.1 and
-later). If the library reports no CUDA buffer support, the program aborts
-before any device pointer is passed to MPI. If the library reports support,
-or the headers have no query, one 512 KiB device transfer is checked. A
-watchdog aborts that transfer if it is still running after 30 s.
-
-## Non-GPU-aware MPI test (must fail quickly)
+## Non-GPU-aware MPI test (must fail immediately)
 
 Rebuild against a **host-only** MPI, then run **that** `mpirun`:
 
@@ -41,9 +54,8 @@ make ARCH=sm_90 MPI_ROOT=/usr/lib/x86_64-linux-gnu/openmpi
 /usr/bin/mpirun -n 2 ./main-mpi
 ```
 
-**Pass for this test:** the process exits instead of blocking in `MPI_Recv`.
-Typical stderr lines:
+**Pass for this test:** the program aborts at startup, before any transfer,
+with one of
 
-- `MPI library reports no CUDA GPU-buffer support` — the library query returned no
-- `GPU-aware MPI probe failed` — the query was missing or said yes, and the device buffer was wrong
-- `GPU-aware MPI probe timed out` — MPI hung on a device pointer; a watchdog aborts within about 30 s
+- `MPI library reports no CUDA GPU-buffer support (...)`
+- `MPI library cannot report CUDA GPU-buffer support (...)`

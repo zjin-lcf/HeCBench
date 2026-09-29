@@ -37,7 +37,7 @@ mpi-obj = $(mpi-source:.cpp=.o)
 ccl-obj = $(ccl-source:.cpp=.o)
 
 # Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -pthread -I$(MPI_ROOT)/include \
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -I$(MPI_ROOT)/include \
            -fsycl --gcc-toolchain=$(GCC_TOOLCHAIN)
 
 ifeq ($(VENDOR), AdaptiveCpp)
@@ -46,7 +46,7 @@ ifeq ($(VENDOR), AdaptiveCpp)
 endif
 
 # Linker Flags
-LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lccl -pthread
+LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lccl
 
 ifeq ($(CUDA), yes)
   CFLAGS += -fsycl-targets=nvptx64-nvidia-cuda \

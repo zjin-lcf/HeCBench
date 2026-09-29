@@ -33,10 +33,10 @@ nccl-obj = $(nccl-source:.cu=.o)
 
 # Standard Flags
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I$(MPI_ROOT)/include \
-          -Xcompiler -Wall -Xcompiler -pthread -arch=$(ARCH)
+          -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
-LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lnccl -lpthread
+LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lnccl
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

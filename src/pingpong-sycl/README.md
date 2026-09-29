@@ -9,6 +9,28 @@ tests below; `make run` also launches `main-ccl`.
 Match the SYCL backend, the MPI you **link**, and the launcher. Do not mix
 `make HIP=yes` with the Makefile default Intel `MPI_ROOT`.
 
+## How main-mpi decides whether MPI is GPU-aware
+
+Before any device pointer reaches MPI, `main-mpi` picks the buffer type from
+the SYCL device vendor (NVIDIA: CUDA, AMD: HIP, Intel: Level Zero) and asks
+the MPI library (`../pingpong-cuda/gpu_aware_mpi.h`, shared with
+pingpong-cuda and pingpong-hip):
+
+| MPI | Decided by |
+|-----|------------|
+| Cray MPICH | `MPICH_GPU_SUPPORT_ENABLED=1` (default off), then the MPICH query for the vendor |
+| Intel MPI | `I_MPI_OFFLOAD` nonzero (default 0) |
+| MVAPICH2 | `MV2_USE_CUDA` / `MV2_USE_ROCM` (`1` yes, `0` no, unset: cannot tell) |
+| MPICH 4.0.1 and later | `MPIX_Query_cuda_support()`, `MPIX_Query_hip_support()`, or `MPIX_Query_ze_support()` (honor `MPIR_CVAR_ENABLE_GPU`) |
+| Open MPI with the CUDA or ROCm extension (`mpi-ext.h`) | `MPIX_Query_cuda_support()` or `MPIX_Query_rocm_support()` |
+| Open MPI without the extension, Open MPI on Level Zero, other vendors or MPIs | cannot tell |
+
+If the library reports no support, the program aborts and names what
+decided it and how to enable GPU buffers. If the library cannot tell, the
+program also aborts unless `MPI_GPU_AWARE=1` is set. Set it only when you
+know the MPI is GPU-aware. It does not override a library that reports no
+support.
+
 ## GPU-aware MPI test (must pass)
 
 HIP backend and Cray MPICH (link `libmpi_gtl_hsa`):
@@ -40,18 +62,9 @@ make CUDA=yes CUDA_ARCH=sm_90
 **Pass:** no error on stderr; rank 0 prints
 `MPI: Transfer size (B): ... Bandwidth (GB/s): ...` from 512 KiB through 1 GiB.
 
-Startup picks the query from the device vendor: `MPIX_Query_cuda_support()`
-for NVIDIA, `MPIX_Query_hip_support()` or `MPIX_Query_rocm_support()` for
-AMD, and `MPIX_Query_ze_support()` for Intel. Intel MPI is decided by its
-own `I_MPI_OFFLOAD` (unset or 0 means no). If the library reports no support
-for that buffer type, the program aborts before any device pointer is passed
-to MPI. If the library reports support, or the headers have no query, one
-512 KiB device transfer is checked. A watchdog aborts that transfer if it is
-still running after 30 s.
+## Non-GPU-aware MPI test (must fail immediately)
 
-## Non-GPU-aware MPI test (must fail quickly)
-
-Rebuild against host-only MPI, or disable GPU support on Cray:
+Rebuild against host-only MPI, or disable GPU support on Cray or Intel MPI:
 
 ```bash
 export MPICH_GPU_SUPPORT_ENABLED=0
@@ -70,9 +83,8 @@ export I_MPI_OFFLOAD=0
 /opt/intel/oneapi/2024.1/bin/mpirun -n 2 ./main-mpi
 ```
 
-**Pass for this test:** the process exits instead of blocking in `MPI_Recv`.
-Typical stderr lines:
+**Pass for this test:** the program aborts at startup, before any transfer,
+with one of
 
-- `MPI library reports no ... GPU-buffer support` — the library query returned no, or Intel MPI has `I_MPI_OFFLOAD` unset or 0
-- `GPU-aware MPI probe failed` — the query was missing or said yes, and the device buffer was wrong
-- `GPU-aware MPI probe timed out` — MPI hung on a device pointer; a watchdog aborts within about 30 s
+- `MPI library reports no ... GPU-buffer support (...)`
+- `MPI library cannot report ... GPU-buffer support (...)`
