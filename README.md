@@ -55,7 +55,7 @@ Each benchmark falls into a single category. While such classification is not ac
     daphne
 
 ### Bandwidth
-    allreduce, cmembench, babelstream, ccl, memcpy, memtest, p2p, pingpong, randomAccess, reshapeKVCache, shmembench, storeKVCache, threadcpy, triad, vadd
+    allreduce, cmembench, babelstream, ccl, memcpy, memtest, p2p, pingpong, putget, randomAccess, reshapeKVCache, shmembench, storeKVCache, threadcpy, triad, vadd
 
 ### Bioinformatics
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, local-ht, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
@@ -1377,6 +1377,9 @@ Early results are shown [here](results/README.md)
 
 ### pso (cuda)
   A modified implementation of particle swarm optimization using Levy function (https://github.com/wiseodd/cuda-pso, https://github.com/chensohg/GPU_CUDA_PSO)
+
+### putget (cuda)
+  One-sided put and get by device loads and stores through a peer GPU pointer. Each timed iteration copies, then executes a system fence and a grid barrier. Bandwidth uses 32 blocks and the latency column uses one block; both are timed from the host and include launch overhead (https://github.com/ROCm/mori/tree/main/benchmark/cco)
 
 ### qem (cuda)
   A quartic equation minimizer (https://github.com/qureshizawar/CUDA-quartic-solver)
