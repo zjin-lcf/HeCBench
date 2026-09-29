@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
   hipErrorCheck( hipGetDeviceCount(&num_devices) );
   hipErrorCheck( hipSetDevice(rank % num_devices) );
 
-  pingpong_require_gpu_aware_mpi(PINGPONG_GPU_KIND_HIP, rank);
+  gpu_aware_mpi_require(GPU_AWARE_MPI_KIND_HIP, rank);
 
   //   Loop from 512 KiB to 1 GB (8 * 2^i bytes, i = 16..27)
   for(int i=16; i<=27; i++){

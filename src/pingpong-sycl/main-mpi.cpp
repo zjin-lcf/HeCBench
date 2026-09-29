@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <cctype>
-#include <string>
 #include <sycl/sycl.hpp>
 #include <mpi.h>
 #include "../pingpong-cuda/gpu_aware_mpi.h"
@@ -11,21 +9,6 @@ void test(sycl::nd_item<1> item, double *d, const long int n) {
        i < n; i += item.get_local_range(0) * item.get_group_range(0)) {
     d[i] = d[i] + 1;
   }
-}
-
-static int sycl_mpi_gpu_kind(const sycl::device &dev)
-{
-  std::string vendor = dev.get_info<sycl::info::device::vendor>();
-  for (char &c : vendor)
-    c = (char)std::tolower((unsigned char)c);
-  if (vendor.find("nvidia") != std::string::npos)
-    return PINGPONG_GPU_KIND_CUDA;
-  if (vendor.find("amd") != std::string::npos ||
-      vendor.find("advanced micro") != std::string::npos)
-    return PINGPONG_GPU_KIND_HIP;
-  if (vendor.find("intel") != std::string::npos)
-    return PINGPONG_GPU_KIND_ZE;
-  return PINGPONG_GPU_KIND_UNKNOWN;
 }
 
 int main(int argc, char *argv[])
@@ -56,7 +39,10 @@ int main(int argc, char *argv[])
   int num_devices = gpu_devices.size();
   sycl::queue q(gpu_devices[rank % num_devices], sycl::property::queue::in_order());
 
-  pingpong_require_gpu_aware_mpi(sycl_mpi_gpu_kind(q.get_device()), rank);
+  gpu_aware_mpi_require(
+      gpu_aware_mpi_kind_from_vendor(
+          q.get_device().get_info<sycl::info::device::vendor>().c_str()),
+      rank);
 
   //   Loop from 512 KiB to 1 GB (8 * 2^i bytes, i = 16..27)
   for(int i=16; i<=27; i++){

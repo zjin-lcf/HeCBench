@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
   cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
   cudaErrorCheck( cudaSetDevice(rank % num_devices) );
 
-  pingpong_require_gpu_aware_mpi(PINGPONG_GPU_KIND_CUDA, rank);
+  gpu_aware_mpi_require(GPU_AWARE_MPI_KIND_CUDA, rank);
 
   //   Loop from 512 KiB to 1 GB (8 * 2^i bytes, i = 16..27)
   for(int i=16; i<=27; i++){
