@@ -64,11 +64,9 @@ int main(int argc, char *argv[])
       if(rank == 0){
         MPI_Send(d_A, N, MPI_DOUBLE, 1, tag1, MPI_COMM_WORLD);
         MPI_Recv(d_A, N, MPI_DOUBLE, 1, tag2, MPI_COMM_WORLD, &stat);
-        q.wait();
       }
       else if(rank == 1){
         MPI_Recv(d_A, N, MPI_DOUBLE, 0, tag1, MPI_COMM_WORLD, &stat);
-        q.wait();
         q.submit([&] (sycl::handler &cgh) {
           cgh.parallel_for(
             sycl::nd_range<1>(1024*256, 256), [=] (sycl::nd_item<1> item) {

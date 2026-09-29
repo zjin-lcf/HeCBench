@@ -74,11 +74,9 @@ int main(int argc, char *argv[])
       if(rank == 0){
         MPI_Send(d_A, N, MPI_DOUBLE, 1, tag1, MPI_COMM_WORLD);
         MPI_Recv(d_A, N, MPI_DOUBLE, 1, tag2, MPI_COMM_WORLD, &stat);
-        hipErrorCheck( hipDeviceSynchronize() );
       }
       else if(rank == 1){
         MPI_Recv(d_A, N, MPI_DOUBLE, 0, tag1, MPI_COMM_WORLD, &stat);
-        hipErrorCheck( hipDeviceSynchronize() );
         test<<<1024, 256>>>(d_A, N);
         hipErrorCheck( hipDeviceSynchronize() );
         MPI_Send(d_A, N, MPI_DOUBLE, 0, tag2, MPI_COMM_WORLD);
