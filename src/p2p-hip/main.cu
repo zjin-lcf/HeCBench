@@ -73,6 +73,22 @@ void pair_access(int i, int j, int repeat)
   float *g1;
   GPU_CHECK(hipMalloc(&g1, buf_size));
 
+  // Warmup: exclude one-time costs of the first peer copies from the timing
+  for (int i=0; i<4; i++)
+  {
+    if (i % 2 == 0)
+    {
+      GPU_CHECK(hipMemcpy(g1, g0, buf_size, hipMemcpyDefault));
+    }
+    else
+    {
+      GPU_CHECK(hipMemcpy(g0, g1, buf_size, hipMemcpyDefault));
+    }
+  }
+
+  GPU_CHECK(hipSetDevice(gpuid[0]));
+  GPU_CHECK(hipDeviceSynchronize());
+  GPU_CHECK(hipSetDevice(gpuid[1]));
   GPU_CHECK(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
 
