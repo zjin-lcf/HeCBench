@@ -86,9 +86,6 @@ void pair_access(int i, int j, int repeat)
     }
   }
 
-  GPU_CHECK(hipSetDevice(gpuid[0]));
-  GPU_CHECK(hipDeviceSynchronize());
-  GPU_CHECK(hipSetDevice(gpuid[1]));
   GPU_CHECK(hipDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
 

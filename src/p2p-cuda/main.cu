@@ -86,9 +86,6 @@ void pair_access(int i, int j, int repeat)
     }
   }
 
-  GPU_CHECK(cudaSetDevice(gpuid[0]));
-  GPU_CHECK(cudaDeviceSynchronize());
-  GPU_CHECK(cudaSetDevice(gpuid[1]));
   GPU_CHECK(cudaDeviceSynchronize());
   auto start = std::chrono::steady_clock::now();
 
