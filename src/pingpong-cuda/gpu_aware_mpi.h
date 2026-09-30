@@ -63,7 +63,7 @@ typedef struct {
   const char *hint;  // how to turn GPU support on, if known
 } gpu_aware_mpi_result_t;
 
-static const char *gpu_aware_mpi_kind_name(int kind)
+static inline const char *gpu_aware_mpi_kind_name(int kind)
 {
   if (kind == GPU_AWARE_MPI_KIND_CUDA)
     return "CUDA";
@@ -94,7 +94,7 @@ static inline int gpu_aware_mpi_kind_from_vendor(const char *vendor)
   return GPU_AWARE_MPI_KIND_UNKNOWN;
 }
 
-static int gpu_aware_mpi_library_version_has(const char *needle)
+static inline int gpu_aware_mpi_library_version_has(const char *needle)
 {
   char version[MPI_MAX_LIBRARY_VERSION_STRING];
   int length = 0;
@@ -110,7 +110,7 @@ static int gpu_aware_mpi_library_version_has(const char *needle)
 
 // 1 when the variable is set to a nonzero integer, 0 when set to zero,
 // -1 when unset or empty.
-static int gpu_aware_mpi_env_flag(const char *name)
+static inline int gpu_aware_mpi_env_flag(const char *name)
 {
   const char *value = getenv(name);
   if (value == NULL || value[0] == '\0')
@@ -118,8 +118,8 @@ static int gpu_aware_mpi_env_flag(const char *name)
   return atoi(value) != 0;
 }
 
-static gpu_aware_mpi_result_t gpu_aware_mpi_result(int answer, const char *why,
-                                            const char *hint)
+static inline gpu_aware_mpi_result_t gpu_aware_mpi_result(int answer, const char *why,
+                                                   const char *hint)
 {
   gpu_aware_mpi_result_t r;
   r.answer = answer;
@@ -129,7 +129,7 @@ static gpu_aware_mpi_result_t gpu_aware_mpi_result(int answer, const char *why,
 }
 
 #if defined(GPU_AWARE_MPI_HAVE_MPICH_QUERY)
-static gpu_aware_mpi_result_t gpu_aware_mpi_mpich_query(int kind, const char *hint)
+static inline gpu_aware_mpi_result_t gpu_aware_mpi_mpich_query(int kind, const char *hint)
 {
   if (kind == GPU_AWARE_MPI_KIND_CUDA)
     return MPIX_Query_cuda_support() == 1
@@ -147,7 +147,7 @@ static gpu_aware_mpi_result_t gpu_aware_mpi_mpich_query(int kind, const char *hi
 }
 #endif
 
-static gpu_aware_mpi_result_t gpu_aware_mpi_cray_mpich(int kind)
+static inline gpu_aware_mpi_result_t gpu_aware_mpi_cray_mpich(int kind)
 {
   const char *hint = "set MPICH_GPU_SUPPORT_ENABLED=1 and link the Cray GTL library "
                      "(libmpi_gtl_cuda or libmpi_gtl_hsa)";
@@ -162,7 +162,7 @@ static gpu_aware_mpi_result_t gpu_aware_mpi_cray_mpich(int kind)
 #endif
 }
 
-static gpu_aware_mpi_result_t gpu_aware_mpi_intel_mpi(int kind)
+static inline gpu_aware_mpi_result_t gpu_aware_mpi_intel_mpi(int kind)
 {
   if (kind == GPU_AWARE_MPI_KIND_HIP)
     return gpu_aware_mpi_result(GPU_AWARE_MPI_NO,
@@ -175,7 +175,7 @@ static gpu_aware_mpi_result_t gpu_aware_mpi_intel_mpi(int kind)
   return gpu_aware_mpi_result(GPU_AWARE_MPI_NO, "Intel MPI with I_MPI_OFFLOAD unset or 0", hint);
 }
 
-static gpu_aware_mpi_result_t gpu_aware_mpi_mvapich2(int kind)
+static inline gpu_aware_mpi_result_t gpu_aware_mpi_mvapich2(int kind)
 {
   const char *name = NULL;
   const char *hint = NULL;
@@ -207,7 +207,7 @@ static gpu_aware_mpi_result_t gpu_aware_mpi_mvapich2(int kind)
 }
 
 #if defined(OPEN_MPI) && OPEN_MPI
-static gpu_aware_mpi_result_t gpu_aware_mpi_openmpi(int kind)
+static inline gpu_aware_mpi_result_t gpu_aware_mpi_openmpi(int kind)
 {
   if (kind == GPU_AWARE_MPI_KIND_CUDA) {
     const char *hint = "use an Open MPI built with CUDA support (for example the NVIDIA HPC-X or HPC SDK MPI)";
@@ -238,7 +238,7 @@ static gpu_aware_mpi_result_t gpu_aware_mpi_openmpi(int kind)
 #endif
 
 // Call after MPI_Init. Does not abort.
-static gpu_aware_mpi_result_t gpu_aware_mpi_query(int kind)
+static inline gpu_aware_mpi_result_t gpu_aware_mpi_query(int kind)
 {
   if (kind == GPU_AWARE_MPI_KIND_UNKNOWN)
     return gpu_aware_mpi_result(GPU_AWARE_MPI_UNKNOWN, "the GPU vendor is not recognized", NULL);
@@ -267,7 +267,7 @@ static gpu_aware_mpi_result_t gpu_aware_mpi_query(int kind)
 
 // Abort unless the MPI library reports GPU-buffer support, or it cannot tell
 // and MPI_GPU_AWARE=1 is set.
-static void gpu_aware_mpi_require(int kind, int rank)
+static inline void gpu_aware_mpi_require(int kind, int rank)
 {
   const gpu_aware_mpi_result_t r = gpu_aware_mpi_query(kind);
   const char *kind_name = gpu_aware_mpi_kind_name(kind);
