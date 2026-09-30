@@ -11,7 +11,16 @@ void test(sycl::nd_item<1> item, double *d, const long int n) {
   }
 }
 
+static void abort_all(int rank, const char *what)
+{
+  fprintf(stderr, "ERROR: rank %d: %s\n", rank, what);
+  fflush(stderr);
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  exit(1);
+}
+
 int main(int argc, char *argv[])
+try
 {
   /* -------------------------------------------------------------------------------------------
      MPI Initialization
@@ -37,6 +46,8 @@ int main(int argc, char *argv[])
   // Map MPI ranks to GPUs
   auto const& gpu_devices = sycl::device::get_devices(sycl::info::device_type::gpu);
   int num_devices = gpu_devices.size();
+  if (num_devices == 0)
+    abort_all(rank, "no SYCL GPU device found");
   sycl::queue q(gpu_devices[rank % num_devices], sycl::property::queue::in_order());
 
   gpu_aware_mpi_require(
@@ -52,6 +63,8 @@ int main(int argc, char *argv[])
     double *h_A, *d_A;
     h_A = (double*) malloc (N*sizeof(double)); 
     d_A = sycl::malloc_device<double>(N, q);
+    if (d_A == nullptr)
+      abort_all(rank, "sycl::malloc_device failed");
     q.memset(d_A, 0, N*sizeof(double)).wait();
 
     const int tag1 = 10;
@@ -127,4 +140,10 @@ int main(int argc, char *argv[])
   MPI_Finalize();
 
   return 0;
+}
+catch (std::exception const &e)
+{
+  int rank = -1;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  abort_all(rank, e.what());
 }

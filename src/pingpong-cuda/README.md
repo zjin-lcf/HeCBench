@@ -6,6 +6,10 @@ GPU ping-pong bandwidth. `main-mpi` passes **device pointers** to
 Use exactly two MPI ranks (one GPU per rank). Run `./main-mpi` only for the
 tests below; `make run` also launches `main-nccl`.
 
+On a GPU or MPI error, a rank calls `MPI_Abort`. Under Slurm, launch with
+`srun --kill-on-bad-exit=1` (`-K`) unless the site sets `KillOnBadExit=1`;
+otherwise the other rank can keep waiting in `MPI_Send` / `MPI_Recv`.
+
 Rebuild against the MPI you launch with. Mixing an NVHPC-linked binary with
 distro `mpirun` (or the reverse) is not a valid test.
 

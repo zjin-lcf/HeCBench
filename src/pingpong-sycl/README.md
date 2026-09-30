@@ -6,6 +6,10 @@ GPU ping-pong bandwidth. `main-mpi` passes **device pointers** to
 Use exactly two MPI ranks (one GPU per rank). Run `./main-mpi` only for the
 tests below; `make run` also launches `main-ccl`.
 
+On a GPU or MPI error, a rank calls `MPI_Abort`. Under Slurm, launch with
+`srun --kill-on-bad-exit=1` (`-K`) unless the site sets `KillOnBadExit=1`;
+otherwise the other rank can keep waiting in `MPI_Send` / `MPI_Recv`.
+
 Match the SYCL backend, the MPI you **link**, and the launcher. Do not mix
 `make HIP=yes` with the Makefile default Intel `MPI_ROOT`.
 
@@ -38,7 +42,7 @@ HIP backend and Cray MPICH (link `libmpi_gtl_hsa`):
 ```bash
 export MPICH_GPU_SUPPORT_ENABLED=1
 export ONEAPI_DEVICE_SELECTOR=hip:gpu
-srun -n 2 ./main-mpi
+srun -K -n 2 ./main-mpi
 ```
 
 Intel GPU / Level Zero and Intel MPI (Makefile `MPI_ROOT`).
@@ -68,7 +72,7 @@ Rebuild against host-only MPI, or disable GPU support on Cray or Intel MPI:
 
 ```bash
 export MPICH_GPU_SUPPORT_ENABLED=0
-srun -n 2 ./main-mpi
+srun -K -n 2 ./main-mpi
 ```
 
 ```bash
