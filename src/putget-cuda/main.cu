@@ -68,7 +68,6 @@ __device__ void copy_strided(double* __restrict__ dst, const double* __restrict_
 __device__ void grid_barrier(unsigned int* counter, int nblocks, int round) {
   __syncthreads();
   if (threadIdx.x == 0) {
-    __threadfence();
     unsigned int c = atomicAdd(counter, 1u);
     if (c == static_cast<unsigned int>(nblocks * (round + 1) - 1))
       atomicAdd(counter + 1, 1u);
@@ -88,6 +87,8 @@ __global__ void putget(double* __restrict__ dst, const double* __restrict__ src,
 
   for (int i = 0; i < iters; ++i) {
     copy_strided(dst + begin, src + begin, end - begin, threadIdx.x, blockDim.x);
+    // System fence forces each round's cross-GPU stores out, otherwise the
+    // repeated same-region traffic is cache-absorbed and we'd time cache BW.
     __threadfence_system();
     grid_barrier(counter, nblocks, i);
   }

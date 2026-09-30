@@ -52,7 +52,6 @@ static void copy_strided(double* dst, const double* src, size_t n, int lane, int
 static void grid_barrier(sycl::nd_item<1> item, unsigned int* counter, int nblocks, int round) {
   sycl::group_barrier(item.get_group());
   if (item.get_local_id(0) == 0) {
-    sycl::atomic_fence(sycl::memory_order::acq_rel, sycl::memory_scope::device);
     device_atomic arrivals(counter[0]);
     device_atomic phase(counter[1]);
     const unsigned int c = arrivals.fetch_add(1u);
@@ -76,6 +75,8 @@ static void putget(sycl::nd_item<1> item, double* dst, const double* src, size_t
 
   for (int i = 0; i < iters; ++i) {
     copy_strided(dst + begin, src + begin, end - begin, lane, nlanes);
+    // System fence forces each round's cross-GPU stores out, otherwise the
+    // repeated same-region traffic is cache-absorbed and we'd time cache BW.
     sycl::atomic_fence(sycl::memory_order::seq_cst, sycl::memory_scope::system);
     grid_barrier(item, counter, nblocks, i);
   }

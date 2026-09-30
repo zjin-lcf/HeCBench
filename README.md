@@ -1379,7 +1379,7 @@ Early results are shown [here](results/README.md)
   A modified implementation of particle swarm optimization using Levy function (https://github.com/wiseodd/cuda-pso, https://github.com/chensohg/GPU_CUDA_PSO)
 
 ### putget (cuda)
-  One-sided put and get by device loads and stores through a peer GPU pointer. Each timed iteration copies, then executes a system fence and a grid barrier. Bandwidth uses 32 blocks and the latency column uses one block; both are timed from the host and include launch overhead (https://github.com/ROCm/mori/tree/main/benchmark/cco)
+  One-sided put and get using loads and stores through a peer GPU pointer. Bandwidth uses 32 blocks and latency uses one block, both timed on the host (https://github.com/ROCm/mori/tree/main/benchmark/cco)
 
 ### qem (cuda)
   A quartic equation minimizer (https://github.com/qureshizawar/CUDA-quartic-solver)
