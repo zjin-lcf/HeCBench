@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
 #include <sycl/sycl.hpp>
 #include <mpi.h>
 #include "../pingpong-cuda/gpu_aware_mpi.h"
@@ -43,8 +44,16 @@ try
     exit(0);
   }
 
-  // Map MPI ranks to GPUs
-  auto const& gpu_devices = sycl::device::get_devices(sycl::info::device_type::gpu);
+  // Map MPI ranks to GPUs. An Intel GPU is listed once per backend (Level Zero
+  // and OpenCL); GPU-aware MPI needs Level Zero buffers, so when any Level Zero
+  // GPU exists, use only Level Zero GPUs.
+  auto gpu_devices = sycl::device::get_devices(sycl::info::device_type::gpu);
+  std::vector<sycl::device> ze_devices;
+  for (auto const& d : gpu_devices)
+    if (d.get_backend() == sycl::backend::ext_oneapi_level_zero)
+      ze_devices.push_back(d);
+  if (!ze_devices.empty())
+    gpu_devices = ze_devices;
   int num_devices = gpu_devices.size();
   if (num_devices == 0)
     abort_all(rank, "no SYCL GPU device found");

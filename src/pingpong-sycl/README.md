@@ -46,7 +46,9 @@ srun -K -n 2 ./main-mpi
 ```
 
 Intel GPU / Level Zero and Intel MPI (Makefile `MPI_ROOT`).
-`I_MPI_OFFLOAD` defaults to 0, which turns GPU buffers off:
+`I_MPI_OFFLOAD` defaults to 0, which turns GPU buffers off. When Level Zero
+GPUs are present, `main-mpi` uses only those (not the OpenCL view of the same
+GPU), so both ranks may share one GPU:
 
 ```bash
 make clean
