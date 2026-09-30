@@ -31,8 +31,7 @@ nccl-obj = $(nccl-source:.cu=.o)
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I$(MPI_ROOT)/include -Wall
 
 # Linker Flags
-#LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lrccl
-LDFLAGS = -lmpi -lrccl
+LDFLAGS = -L$(MPI_ROOT)/lib -Wl,-rpath,$(MPI_ROOT)/lib -lmpi -lrccl
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

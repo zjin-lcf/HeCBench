@@ -10,7 +10,9 @@
     cudaError_t cuErr = call;                                                             \
     if(cudaSuccess != cuErr){                                                             \
       printf("CUDA Error - %s:%d: '%s'\n", __FILE__, __LINE__, cudaGetErrorString(cuErr));\
-      exit(0);                                                                            \
+      fflush(stdout);                                                                     \
+      MPI_Abort(MPI_COMM_WORLD, 1);                                                       \
+      exit(1);                                                                            \
     }                                                                                     \
   }while(0)
 

@@ -19,9 +19,9 @@ pingpong-sycl):
 | MPI | Decided by |
 |-----|------------|
 | Cray MPICH | `MPICH_GPU_SUPPORT_ENABLED=1` (default off), then `MPIX_Query_hip_support()` |
-| Intel MPI | `I_MPI_OFFLOAD` nonzero (default 0) |
+| Intel MPI | always no (Intel MPI does not support AMD GPU buffers) |
 | MVAPICH2 | `MV2_USE_ROCM` (`1` yes, `0` no, unset: cannot tell) |
-| MPICH 4.0.1 and later | `MPIX_Query_hip_support()` (honors `MPIR_CVAR_ENABLE_GPU`) |
+| MPICH 4.0 and later | `MPIX_Query_hip_support()` (honors `MPIR_CVAR_ENABLE_GPU`) |
 | Open MPI 5 with the ROCm extension (`mpi-ext.h`) | `MPIX_Query_rocm_support()` |
 | Open MPI 4 (for example 4.1 + ROCm-enabled UCX), anything else | cannot tell |
 

@@ -36,7 +36,7 @@ CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -I$(MPI_ROOT)/include \
           -Xcompiler -Wall -arch=$(ARCH)
 
 # Linker Flags
-LDFLAGS = -L$(MPI_ROOT)/lib -lmpi -lnccl
+LDFLAGS = -L$(MPI_ROOT)/lib -Xlinker -rpath=$(MPI_ROOT)/lib -lmpi -lnccl
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

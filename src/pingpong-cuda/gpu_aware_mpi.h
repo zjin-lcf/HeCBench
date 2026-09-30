@@ -7,9 +7,10 @@
 // Each MPI is asked the way it documents:
 //   Cray MPICH    MPICH_GPU_SUPPORT_ENABLED=1 (default off), then the MPICH
 //                 query below when the headers have it.
-//   Intel MPI     I_MPI_OFFLOAD nonzero (default 0).
+//   Intel MPI     I_MPI_OFFLOAD nonzero (default 0). Intel and NVIDIA GPUs
+//                 only; always no for AMD GPUs.
 //   MVAPICH2      MV2_USE_CUDA / MV2_USE_ROCM (unset: cannot tell).
-//   MPICH >= 4.0.1 (and derivatives)
+//   MPICH >= 4.0 (and derivatives)
 //                 MPIX_Query_cuda_support / _hip_support / _ze_support. They
 //                 honor MPIR_CVAR_ENABLE_GPU.
 //   Open MPI      MPIX_Query_cuda_support (CUDA extension in mpi-ext.h) and
@@ -27,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #if defined(OPEN_MPI) && OPEN_MPI
 #  if defined(__has_include)
@@ -47,9 +49,9 @@
 #define GPU_AWARE_MPI_YES 1
 #define GPU_AWARE_MPI_UNKNOWN (-1)
 
-// MPICH 4.0.1 in MPICH_NUMVERSION (major*1e7 + minor*1e5 + rev*1e3 +
+// MPICH 4.0 in MPICH_NUMVERSION (major*1e7 + minor*1e5 + rev*1e3 +
 // release_type*100 + patch, with a regular release type of 3).
-#define GPU_AWARE_MPI_MPICH_QUERY_VERSION 40001300
+#define GPU_AWARE_MPI_MPICH_QUERY_VERSION 40000300
 
 #if defined(MPICH_NUMVERSION) && (MPICH_NUMVERSION >= GPU_AWARE_MPI_MPICH_QUERY_VERSION)
 #  define GPU_AWARE_MPI_HAVE_MPICH_QUERY 1
@@ -160,8 +162,13 @@ static gpu_aware_mpi_result_t gpu_aware_mpi_cray_mpich(int kind)
 #endif
 }
 
-static gpu_aware_mpi_result_t gpu_aware_mpi_intel_mpi(void)
+static gpu_aware_mpi_result_t gpu_aware_mpi_intel_mpi(int kind)
 {
+  if (kind == GPU_AWARE_MPI_KIND_HIP)
+    return gpu_aware_mpi_result(GPU_AWARE_MPI_NO,
+                           "Intel MPI supports Intel and NVIDIA GPU buffers, not AMD",
+                           "use a ROCm-aware MPI (Cray MPICH with libmpi_gtl_hsa, "
+                           "Open MPI with ROCm, or MPICH built with HIP)");
   const char *hint = "set I_MPI_OFFLOAD=1";
   if (gpu_aware_mpi_env_flag("I_MPI_OFFLOAD") == 1)
     return gpu_aware_mpi_result(GPU_AWARE_MPI_YES, "Intel MPI with I_MPI_OFFLOAD nonzero", hint);
@@ -242,7 +249,7 @@ static gpu_aware_mpi_result_t gpu_aware_mpi_query(int kind)
     return gpu_aware_mpi_cray_mpich(kind);
   if (gpu_aware_mpi_library_version_has("Intel(R) MPI") ||
       gpu_aware_mpi_library_version_has("Intel MPI"))
-    return gpu_aware_mpi_intel_mpi();
+    return gpu_aware_mpi_intel_mpi(kind);
   if (gpu_aware_mpi_library_version_has("MVAPICH2"))
     return gpu_aware_mpi_mvapich2(kind);
 
@@ -254,7 +261,7 @@ static gpu_aware_mpi_result_t gpu_aware_mpi_query(int kind)
 #else
   return gpu_aware_mpi_result(GPU_AWARE_MPI_UNKNOWN,
                          "this MPI has no GPU-buffer query (not Cray MPICH, Intel MPI, "
-                         "MVAPICH2, Open MPI, or MPICH >= 4.0.1)", NULL);
+                         "MVAPICH2, Open MPI, or MPICH >= 4.0)", NULL);
 #endif
 }
 
@@ -292,6 +299,8 @@ static void gpu_aware_mpi_require(int kind, int rank)
   fprintf(stderr, "This program passes GPU device pointers to MPI.\n");
   fflush(stderr);
   MPI_Abort(MPI_COMM_WORLD, 1);
+  // MPI_Abort may return; never fall through to passing device pointers.
+  _exit(1);
 }
 
 #endif

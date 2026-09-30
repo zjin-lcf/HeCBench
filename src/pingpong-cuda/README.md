@@ -19,7 +19,7 @@ Before any device pointer reaches MPI, `main-mpi` asks the MPI library
 | Cray MPICH | `MPICH_GPU_SUPPORT_ENABLED=1` (default off), then `MPIX_Query_cuda_support()` |
 | Intel MPI | `I_MPI_OFFLOAD` nonzero (default 0) |
 | MVAPICH2 | `MV2_USE_CUDA` (`1` yes, `0` no, unset: cannot tell) |
-| MPICH 4.0.1 and later | `MPIX_Query_cuda_support()` (honors `MPIR_CVAR_ENABLE_GPU`) |
+| MPICH 4.0 and later | `MPIX_Query_cuda_support()` (honors `MPIR_CVAR_ENABLE_GPU`) |
 | Open MPI with the CUDA extension (`mpi-ext.h`) | `MPIX_Query_cuda_support()` |
 | Anything else | cannot tell |
 
