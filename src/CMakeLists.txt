@@ -547,6 +547,7 @@ set(HECBENCH_POC_BENCHMARKS
     oziMMU
     pointerchase
     rmsnorm
+    rmsnorm-quant
     saxpy-ompt
     silu
     softmax-fused
