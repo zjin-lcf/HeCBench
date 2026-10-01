@@ -435,6 +435,7 @@ set(HECBENCH_POC_BENCHMARKS
     tonemapping
     tpacf
     tqs
+    trimul
     tsne
     tsp
     unfold
