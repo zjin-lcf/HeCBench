@@ -4,6 +4,6 @@ add_hecbench_benchmark(
     NAME mace
     MODEL hip
     SOURCES main.cu
-    CATEGORIES machine-learning
+    CATEGORIES ml
     LINK_LIBRARIES rocblas
 )

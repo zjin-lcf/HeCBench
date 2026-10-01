@@ -28,7 +28,7 @@ add_hecbench_benchmark(
     NAME mace
     MODEL omp
     SOURCES main.cpp
-    CATEGORIES machine-learning
+    CATEGORIES ml
     COMPILE_OPTIONS ${_mace_omp_compile_options}
     LINK_LIBRARIES ${_mace_omp_link_libraries}
     INCLUDE_DIRS ${_mace_omp_include_dirs}

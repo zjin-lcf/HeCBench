@@ -4,6 +4,7 @@ add_hecbench_benchmark(
     NAME mace
     MODEL cuda
     SOURCES main.cu
-    CATEGORIES machine-learning
-    LINK_LIBRARIES cublas
+    CATEGORIES ml
+    COMPILE_OPTIONS -Xcompiler -fopenmp
+    LINK_LIBRARIES cublas -fopenmp
 )
