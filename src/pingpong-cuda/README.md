@@ -3,7 +3,8 @@
 GPU ping-pong bandwidth. `main-mpi` passes **device pointers** to
 `MPI_Send` / `MPI_Recv` (GPU-aware MPI required). `main-nccl` does not.
 
-Use exactly two MPI ranks (one GPU per rank). Run `./main-mpi` only for the
+Use exactly two MPI ranks. Each rank uses visible GPU `rank % count`, so
+with one visible GPU both ranks share it. Run `./main-mpi` only for the
 tests below; `make run` also launches `main-nccl`.
 
 On a GPU or MPI error, a rank calls `MPI_Abort`. Under Slurm, launch with
