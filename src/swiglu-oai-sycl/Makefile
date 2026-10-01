@@ -91,7 +91,7 @@ clean:
 
 run: $(program)
 	@run_case() { \
-	  output="$$($(LAUNCHER) ./$(program) "$$@" 2>&1)"; status=$$?; \
+	  status=0; output="$$($(LAUNCHER) ./$(program) "$$@" 2>&1)" || status=$$?; \
 	  printf '%s\n' "$$output"; \
 	  if [ $$status -ne 0 ] || \
 	     ! printf '%s\n' "$$output" | \
