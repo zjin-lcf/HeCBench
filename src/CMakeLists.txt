@@ -423,6 +423,7 @@ set(HECBENCH_POC_BENCHMARKS
     stsg
     surfel
     svd3x3
+    svt
     sw4ck
     # Batch 14: T-Z benchmarks (33 benchmarks)
     tensorAccessor
