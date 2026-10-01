@@ -54,6 +54,12 @@ void segreduce(offset_t num_items, int repeat)
   SegProblem p = make_zipf_problem(num_items);
   print_problem(p);
 
+  // hipCUB DeviceSegmentedReduce takes num_segments as int.
+  if (p.num_segments > std::numeric_limits<int>::max()) {
+    printf("num_segments exceeds the int range of hipCUB DeviceSegmentedReduce\n");
+    return;
+  }
+
   std::vector<value_t> ref_sum, ref_min, ref_max;
   cpu_segmented(p, ref_sum, ref_min, ref_max);
 
