@@ -300,7 +300,7 @@ set(HECBENCH_POC_BENCHMARKS
     nosync
     nqueen
     ntt
-    # Batch 11: O-P benchmarks (27 benchmarks)
+    # Batch 11: O-P benchmarks (28 benchmarks)
     openmp
     opticalFlow
     overlap
@@ -328,6 +328,7 @@ set(HECBENCH_POC_BENCHMARKS
     prna
     projectile
     pso
+    putget
     # Batch 12: Q-R benchmarks (31 benchmarks)
     qem
     qkv
