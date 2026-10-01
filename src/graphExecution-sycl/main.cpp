@@ -209,6 +209,9 @@ static void benchmark(sycl::queue &q, float *inputVec_h, float *inputVec_d,
   // 3. One graph replay (do not print)
   q.submit([&](sycl::handler &cgh) { cgh.ext_oneapi_graph(ExecGraph); }).wait();
 
+  result_h = 0.0;
+  q.memset(result_d, 0, sizeof(double)).wait();
+
   // 4. Timed graph replays
   auto t_g0 = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
@@ -218,6 +221,9 @@ static void benchmark(sycl::queue &q, float *inputVec_h, float *inputVec_d,
   printf("%s\n", (std::fabs(result_h - result_r) < 1e-6) ? "PASS" : "FAIL");
   printf("Average execution time of using Graph: %f (us)\n\n",
          elapsed_us(t_g0, t_g1) / repeat);
+
+  result_h = 0.0;
+  q.memset(result_d, 0, sizeof(double)).wait();
 
   // 5. Timed eager (kernels already hot)
   auto t_s0 = std::chrono::steady_clock::now();

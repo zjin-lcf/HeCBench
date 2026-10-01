@@ -186,6 +186,9 @@ static void benchmark(float *inputVec_h, float *inputVec_d, double *outputVec_d,
   hipGraphLaunch(graphExec, stream);
   hipStreamSynchronize(stream);
 
+  result_h = 0.0;
+  hipMemset(result_d, 0, sizeof(double));
+
   // 4. Timed graph replays
   auto t_g0 = std::chrono::steady_clock::now();
   for (int i = 0; i < repeat; i++) {
@@ -196,6 +199,9 @@ static void benchmark(float *inputVec_h, float *inputVec_d, double *outputVec_d,
   printf("%s\n", (std::fabs(result_h - result_r) < 1e-6) ? "PASS" : "FAIL");
   printf("Average execution time of using Graph: %f (us)\n\n",
          elapsed_us(t_g0, t_g1) / repeat);
+
+  result_h = 0.0;
+  hipMemset(result_d, 0, sizeof(double));
 
   // 5. Timed eager (kernels already hot)
   auto t_s0 = std::chrono::steady_clock::now();
