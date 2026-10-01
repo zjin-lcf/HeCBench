@@ -6,7 +6,7 @@ add_hecbench_benchmark(
     SOURCES main.cu
     CATEGORIES ml
     COMPILE_OPTIONS -Xcompiler=-fopenmp
-    LINK_LIBRARIES -Xcompiler=-fopenmp
+    LINK_LIBRARIES -fopenmp
     TEST_REGEX "PASS"
     TEST_ARGS 1 16 2
 )
