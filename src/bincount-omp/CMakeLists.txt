@@ -9,7 +9,7 @@ add_hecbench_benchmark(
 
 # Exact histogram validation requires the host reference and Intel GPU kernel
 # to use the same floating-point division semantics.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM")
+if(TARGET bincount-omp AND CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM")
     target_compile_options(bincount-omp PRIVATE -fp-model=precise)
     target_compile_definitions(bincount-omp PRIVATE
         __STRICT_ANSI__
