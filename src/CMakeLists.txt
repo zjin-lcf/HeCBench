@@ -209,6 +209,7 @@ set(HECBENCH_POC_BENCHMARKS
     jaccard
     jenkins-hash
     kalman
+    kda
     keccaktreehash
     keogh
     kernelLaunch
