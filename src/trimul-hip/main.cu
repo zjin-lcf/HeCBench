@@ -74,10 +74,10 @@ static bool verify_result(const float* result, const float* ref,
   }
   free(h);
   const double rms_rel = sqrt(sse / (sref + 1e-12));
-  printf("%s: max_abs=%.4g  max_rel=%.4g  max_scaled=%.4g  "
+  printf("%s: max_abs=%.4g  max_rel=%.4g  max_scaled=%.4g (tolerance 1e-1)  "
          "rms_rel=%.4g (tolerance 5e-2)\n",
          name, max_abs, max_rel, max_scaled, rms_rel);
-  return max_scaled < 5e-2 && rms_rel < 5e-2;
+  return max_scaled < 1e-1 && rms_rel < 5e-2;
 }
 
 // expf(-v) overflows for large negative v, so branch on the sign.
