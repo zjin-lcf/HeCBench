@@ -3,11 +3,9 @@
 #===============================================================================
 
 # Compiler can be set below, or via environment variable
-CC        = clang++
+CC        = hipcc
 OPTIMIZE  = yes
 DEBUG     = no
-DEVICE    = gpu
-ARCH      = gfx906
 LAUNCHER  ?=
 
 #===============================================================================
@@ -15,52 +13,40 @@ LAUNCHER  ?=
 #===============================================================================
 
 program = main
-
-source = main.cpp
-
-obj = $(source:.cpp=.o)
+source  = main.cu
+obj     = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
-# Standard Flags
-CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall
+CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fopenmp -I../kda-cuda
+LDFLAGS = -fopenmp
 
-# Linker Flags
-LDFLAGS =
-
-# Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+  CFLAGS  += -g -DDEBUG
+  LDFLAGS += -g
 endif
 
-# Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-ifeq ($(DEVICE),gpu)
-  CFLAGS += -target x86_64-pc-linux-gnu \
-          -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa \
-          -Xopenmp-target=amdgcn-amd-amdhsa \
-          -march=$(ARCH)
-else
-  CFLAGS +=-fopenmp
-endif
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) Makefile.aomp
+$(program): $(obj) Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp Makefile.aomp
+%.o: %.cu kernels.h benchmark_utils.h ../kda-cuda/kda_tune.h \
+     ../kda-cuda/reference.h ../kda-cuda/host_utils.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program)
+	$(LAUNCHER) ./$(program) 8 1024 100
+
+.PHONY: clean run
