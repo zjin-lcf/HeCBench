@@ -184,6 +184,7 @@ set(HECBENCH_POC_BENCHMARKS
     grrt
     gru
     gru2
+    gsplat4d
     haccmk
     hausdorff
     haversine
@@ -300,7 +301,7 @@ set(HECBENCH_POC_BENCHMARKS
     nosync
     nqueen
     ntt
-    # Batch 11: O-P benchmarks (27 benchmarks)
+    # Batch 11: O-P benchmarks (28 benchmarks)
     openmp
     opticalFlow
     overlap
@@ -328,6 +329,7 @@ set(HECBENCH_POC_BENCHMARKS
     prna
     projectile
     pso
+    putget
     # Batch 12: Q-R benchmarks (31 benchmarks)
     qem
     qkv
@@ -377,6 +379,7 @@ set(HECBENCH_POC_BENCHMARKS
     seam-carving
     secp256k1
     segment-reduce
+    segment-reduce2
     segsort
     sheath
     shmembench
@@ -421,6 +424,7 @@ set(HECBENCH_POC_BENCHMARKS
     stsg
     surfel
     svd3x3
+    svt
     sw4ck
     # Batch 14: T-Z benchmarks (33 benchmarks)
     tensorAccessor
@@ -545,10 +549,12 @@ set(HECBENCH_POC_BENCHMARKS
     oziMMU
     pointerchase
     rmsnorm
+    rmsnorm-quant
     saxpy-ompt
     silu
     softmax-fused
     softmax-online
+    swiglu-oai
     sundials
     ssm
     storeKVCache
