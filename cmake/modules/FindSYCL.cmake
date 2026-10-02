@@ -117,6 +117,12 @@ if(HECBENCH_SYCL_TARGET)
     list(APPEND SYCL_FLAGS -DUSE_GPU)
     list(APPEND SYCL_FLAGS "-fsycl-targets=${HECBENCH_SYCL_TARGET}")
     list(APPEND SYCL_LINK_FLAGS "-fsycl-targets=${HECBENCH_SYCL_TARGET}")
+    # Separate compilation with this AMD SYCL Clang tags each object
+    # unknown-gfx*. A generic bundle lets the final link apply
+    # --offload-arch and produce a loadable image.
+    if(HECBENCH_SYCL_TARGET MATCHES "amdgcn")
+        list(APPEND SYCL_FLAGS -fno-bundle-offload-arch)
+    endif()
 endif()
 if(HECBENCH_SYCL_TARGET_BACKEND)
     list(APPEND SYCL_FLAGS -Xsycl-target-backend "${HECBENCH_SYCL_TARGET_BACKEND}")
