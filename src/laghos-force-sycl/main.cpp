@@ -229,14 +229,15 @@ int main(int argc, char **argv) {
   int iterations = 100;
   int warmup = 100;
   for (int i = 1; i < argc; ++i) {
-    if (!std::strcmp(argv[i], "--points") && ++i < argc)
-      points = integer_arg(argv[i], "sample points", 1);
-    else if (!std::strcmp(argv[i], "--elements") && ++i < argc)
-      elements = integer_arg(argv[i], "element count", 1);
-    else if (!std::strcmp(argv[i], "--iters") && ++i < argc)
-      iterations = integer_arg(argv[i], "iteration count", 1);
-    else if (!std::strcmp(argv[i], "--warmup") && ++i < argc)
-      warmup = integer_arg(argv[i], "warmup count", 0);
+    const bool has_value = i + 1 < argc;
+    if (has_value && !std::strcmp(argv[i], "--points"))
+      points = integer_arg(argv[++i], "sample points", 1);
+    else if (has_value && !std::strcmp(argv[i], "--elements"))
+      elements = integer_arg(argv[++i], "element count", 1);
+    else if (has_value && !std::strcmp(argv[i], "--iters"))
+      iterations = integer_arg(argv[++i], "iteration count", 1);
+    else if (has_value && !std::strcmp(argv[i], "--warmup"))
+      warmup = integer_arg(argv[++i], "warmup count", 0);
     else {
       std::fprintf(stderr,
                    "usage: %s [--points 8|64|216|512] [--elements N] "
@@ -253,7 +254,7 @@ int main(int argc, char **argv) {
     elements = default_elements(points);
 
   try {
-    sycl::queue q{sycl::gpu_selector_v};
+    sycl::queue q{sycl::gpu_selector_v, sycl::property::queue::in_order()};
     const sycl::device device = q.get_device();
     if (!device.has(sycl::aspect::fp64)) {
       std::fprintf(stderr, "selected device does not support fp64\n");

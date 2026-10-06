@@ -275,7 +275,10 @@ inline double max_relative_error(int ne, int checked, int d1d, int q1d, int l1d,
         const std::size_t got_i = output_index(d, c, e, ddd);
         const std::size_t ref_i = output_index(d, c, e, ddd);
         const double scale = std::max(1.0, std::abs(ref[ref_i]));
-        error = std::max(error, std::abs(velocity[got_i] - ref[ref_i]) / scale);
+        const double err = std::abs(velocity[got_i] - ref[ref_i]) / scale;
+        if (!std::isfinite(err))
+          return err;
+        error = std::max(error, err);
       }
   }
   return error;
