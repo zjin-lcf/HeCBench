@@ -1,22 +1,35 @@
-// SYCL MoE combine. One MPI rank owns one GPU.
-// Multi-GPU traffic uses GPU-aware MPI on device allocations, so ranks 0 and 1
-// first run the pingpong benchmark's device-buffer check. The peer-IPC path
-// used by the CUDA and HIP variants is not portable across SYCL backends.
-
-#include <sycl/sycl.hpp>
+// Multi-GPU MoE combine. One MPI rank owns one GPU.
+//
+// Each rank maps its expert-output buffer into the others with
+// sycl::ext::oneapi::experimental::ipc::memory and reads it from the combine
+// kernel. That is the intra-node path measured by the MORI EP benchmark. MPI
+// carries the IPC handle bytes and the host barriers. It does not move
+// device buffers.
 
 #include <algorithm>
 #include <chrono>
 #include <climits>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <new>
+#include <string>
 #include <vector>
 
 #include <mpi.h>
+#include <sycl/sycl.hpp>
+#include "combine.hpp"
 #include "reference.hpp"
 
+namespace ipc_mem = sycl::ext::oneapi::experimental::ipc::memory;
+using ipc_handle = sycl::ext::oneapi::experimental::ipc::handle;
+using ipc_bytes = sycl::ext::oneapi::experimental::ipc::handle_data_t;
+
+static_assert(sizeof(std::size_t) == 8, "handle lengths are exchanged with MPI_UINT64_T");
+
+// Parse one decimal flag value, or exit if it is missing or out of range.
 static int integer_arg(const char *text, const char *name, long minimum, long maximum) {
   char *end = nullptr;
   const long value = std::strtol(text, &end, 10);
@@ -27,143 +40,87 @@ static int integer_arg(const char *text, const char *name, long minimum, long ma
   return static_cast<int>(value);
 }
 
-static std::uint16_t dev_f32_to_bf16(float x) {
-  const std::uint32_t bits0 = sycl::bit_cast<std::uint32_t>(x);
-  const std::uint32_t lsb = (bits0 >> 16) & 1u;
-  return static_cast<std::uint16_t>((bits0 + 0x7fffu + lsb) >> 16);
-}
-
-static float dev_bf16_to_f32(std::uint16_t b) {
-  return sycl::bit_cast<float>(static_cast<std::uint32_t>(b) << 16);
-}
-
-// pingpong-*/main-mpi: five device round trips, rank 1 adds one, rank 0 expects 5.
-static int gpu_aware_mpi_check(sycl::queue &q, int rank, int world) {
-  if (world < 2)
-    return 1;
-  const long n = 1L << 16;
-  int ok = 1;
-  if (rank < 2) {
-    double *d_a = sycl::malloc_device<double>(n, q);
-    if (!d_a)
-      return 0;
-    q.memset(d_a, 0, sizeof(double) * n).wait();
-    const int tag1 = 10;
-    const int tag2 = 20;
-    for (int i = 1; i <= 5; ++i) {
-      if (rank == 0) {
-        MPI_Send(d_a, n, MPI_DOUBLE, 1, tag1, MPI_COMM_WORLD);
-        MPI_Recv(d_a, n, MPI_DOUBLE, 1, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      } else {
-        MPI_Recv(d_a, n, MPI_DOUBLE, 0, tag1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        q.parallel_for(sycl::range<1>(static_cast<std::size_t>(n)),
-                       [=](sycl::id<1> id) { d_a[id] += 1.0; })
-            .wait();
-        MPI_Send(d_a, n, MPI_DOUBLE, 0, tag2, MPI_COMM_WORLD);
-      }
-    }
-    if (rank == 0) {
-      std::vector<double> host(n);
-      q.memcpy(host.data(), d_a, sizeof(double) * n).wait();
-      for (long i = 0; i < n; ++i) {
-        if (host[i] != 5.0) {
-          std::printf("ERROR: MPI pingpong test failed\n");
-          ok = 0;
-          break;
-        }
-      }
-    }
-    sycl::free(d_a, q);
+// All-gather one byte blob per rank. Lengths are std::size_t and must fit in an MPI int count.
+static std::vector<std::byte> allgather_bytes(const void *local, std::size_t local_bytes,
+                                              const std::vector<std::size_t> &sizes,
+                                              std::vector<int> *displs) {
+  if (local_bytes > INT_MAX) {
+    std::fprintf(stderr, "IPC handle is larger than MPI can send\n");
+    std::exit(EXIT_FAILURE);
   }
-  int all_ok = 0;
-  MPI_Allreduce(&ok, &all_ok, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
-  MPI_Barrier(MPI_COMM_WORLD);
-  return all_ok;
-}
-
-static void exchange(int rank, int world, int hidden, const std::vector<int> &recv,
-                     std::uint16_t *stage, const std::vector<std::uint16_t *> &copies) {
-  std::vector<MPI_Request> reqs;
-  reqs.reserve(static_cast<std::size_t>(world - 1) * 2);
-  for (int peer = 0; peer < world; ++peer) {
-    if (peer == rank)
-      continue;
-    const std::size_t send_bytes =
-        static_cast<std::size_t>(recv[rank]) * hidden * sizeof(std::uint16_t);
-    const std::size_t recv_bytes =
-        static_cast<std::size_t>(recv[peer]) * hidden * sizeof(std::uint16_t);
-    if (send_bytes > static_cast<std::size_t>(INT_MAX) ||
-        recv_bytes > static_cast<std::size_t>(INT_MAX)) {
-      std::fprintf(stderr, "exchange is larger than MPI can send in one message\n");
+  std::vector<int> counts(sizes.size());
+  displs->assign(sizes.size(), 0);
+  std::size_t total = 0;
+  for (std::size_t i = 0; i < sizes.size(); ++i) {
+    if (sizes[i] > INT_MAX || total > INT_MAX - sizes[i]) {
+      std::fprintf(stderr, "IPC handle is larger than MPI can send\n");
       std::exit(EXIT_FAILURE);
     }
-    MPI_Request send_req, recv_req;
-    MPI_Irecv(copies[peer], static_cast<int>(recv_bytes), MPI_BYTE, peer, 42,
-              MPI_COMM_WORLD, &recv_req);
-    MPI_Isend(stage, static_cast<int>(send_bytes), MPI_BYTE, peer, 42, MPI_COMM_WORLD,
-              &send_req);
-    reqs.push_back(recv_req);
-    reqs.push_back(send_req);
+    counts[i] = sizes[i];
+    (*displs)[i] = total;
+    total += sizes[i];
   }
-  if (!reqs.empty())
-    MPI_Waitall(static_cast<int>(reqs.size()), reqs.data(), MPI_STATUSES_IGNORE);
+  std::vector<std::byte> all(total > 0 ? total : 1);
+  std::byte dummy{};
+  const void *send = local_bytes == 0 ? &dummy : local;
+  MPI_Allgatherv(send, local_bytes, MPI_BYTE, all.data(), counts.data(), displs->data(),
+                 MPI_BYTE, MPI_COMM_WORLD);
+  if (total == 0)
+    all.clear();
+  return all;
 }
 
+// Enqueue combine_kernel for one top-k.
 template <int kTopk>
-static void launch_combine(sycl::queue &q, int blocks, int tokens, int hidden,
-                           const int *dest, const int *slot,
-                           const std::uint16_t *const *stage, std::uint16_t *out) {
+static void launch_combine(sycl::queue &q, int blocks, int tokens, int hidden, int world,
+                           int rank, const int *dest, const int *slot,
+                           const std::uint16_t *const *stage, std::uint16_t *out,
+                           unsigned *arrival, unsigned long long *local_flags,
+                           unsigned long long *const *peer_flags, unsigned long long epoch) {
   q.parallel_for(sycl::nd_range<1>(static_cast<std::size_t>(blocks) * 256, 256),
                  [=](sycl::nd_item<1> item) {
-                   const int nvec = hidden >> 3;
-                   const int thread = item.get_local_id(0);
-                   for (int token = item.get_group(0); token < tokens; token += blocks) {
-                     for (int vec = thread; vec < nvec; vec += 256) {
-                       float acc[8] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
-                       const int *td = dest + static_cast<std::size_t>(token) * kTopk;
-                       const int *ts = slot + static_cast<std::size_t>(token) * kTopk;
-                       for (int k = 0; k < kTopk; ++k) {
-                         const std::uint16_t *src =
-                             stage[td[k]] + (static_cast<std::size_t>(ts[k]) * hidden +
-                                             (static_cast<std::size_t>(vec) << 3));
-                         const std::uint32_t *w =
-                             reinterpret_cast<const std::uint32_t *>(src);
-                         float x[8];
-#pragma unroll
-                         for (int i = 0; i < 4; ++i) {
-                           x[2 * i] = dev_bf16_to_f32(static_cast<std::uint16_t>(w[i]));
-                           x[2 * i + 1] =
-                               dev_bf16_to_f32(static_cast<std::uint16_t>(w[i] >> 16));
-                         }
-                         const float weight = weight_of(token, k, kTopk);
-#pragma unroll
-                         for (int j = 0; j < 8; ++j)
-                           acc[j] += weight * x[j];
-                       }
-                       std::uint16_t *dst = out + static_cast<std::size_t>(token) * hidden +
-                                            (static_cast<std::size_t>(vec) << 3);
-                       std::uint32_t packed[4];
-#pragma unroll
-                       for (int i = 0; i < 4; ++i) {
-                         const unsigned lo = dev_f32_to_bf16(acc[2 * i]);
-                         const unsigned hi = dev_f32_to_bf16(acc[2 * i + 1]);
-                         packed[i] = lo | (hi << 16);
-                       }
-                       *reinterpret_cast<sycl::vec<std::uint32_t, 4> *>(dst) =
-                           sycl::vec<std::uint32_t, 4>(packed[0], packed[1], packed[2],
-                                                       packed[3]);
-                     }
-                   }
+                   combine_kernel<kTopk>(item, tokens, hidden, world, rank, dest, slot, stage,
+                                         out, arrival, local_flags, peer_flags, epoch);
                  });
 }
 
+// Enqueue combine_kernel for a top-k of 1, 2, 4, or 8.
+static void launch_combine(sycl::queue &q, int topk, int blocks, int tokens, int hidden,
+                           int world, int rank, const int *dest, const int *slot,
+                           const std::uint16_t *const *stage, std::uint16_t *out, unsigned *arrival,
+                           unsigned long long *local_flags, unsigned long long *const *peer_flags,
+                           unsigned long long epoch) {
+  switch (topk) {
+  case 1:
+    launch_combine<1>(q, blocks, tokens, hidden, world, rank, dest, slot, stage, out, arrival,
+                      local_flags, peer_flags, epoch);
+    break;
+  case 2:
+    launch_combine<2>(q, blocks, tokens, hidden, world, rank, dest, slot, stage, out, arrival,
+                      local_flags, peer_flags, epoch);
+    break;
+  case 4:
+    launch_combine<4>(q, blocks, tokens, hidden, world, rank, dest, slot, stage, out, arrival,
+                      local_flags, peer_flags, epoch);
+    break;
+  case 8:
+    launch_combine<8>(q, blocks, tokens, hidden, world, rank, dest, slot, stage, out, arrival,
+                      local_flags, peer_flags, epoch);
+    break;
+  default:
+    std::fprintf(stderr, "topk must be 1, 2, 4, or 8\n");
+    std::exit(EXIT_FAILURE);
+  }
+}
+
+// Map peer expert buffers, time the combine, and check it against the host reference.
 int main(int argc, char **argv) {
   int tokens = 4096;
   int hidden = 7168;
   int topk = 8;
   int experts = 32;
-  int iterations = 10;
-  int warmup = 5;
+  int iterations = 100;
+  int warmup = 100;
   for (int i = 1; i < argc; ++i) {
     const bool has_value = i + 1 < argc;
     if (has_value && !std::strcmp(argv[i], "--tokens"))
@@ -196,6 +153,12 @@ int main(int argc, char **argv) {
   int world = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &world);
+  if (world > 256) {
+    if (rank == 0)
+      std::fprintf(stderr, "at most 256 MPI ranks are supported\n");
+    MPI_Finalize();
+    return EXIT_FAILURE;
+  }
 
   try {
     const auto gpus = sycl::device::get_devices(sycl::info::device_type::gpu);
@@ -205,9 +168,10 @@ int main(int argc, char **argv) {
       MPI_Finalize();
       return EXIT_FAILURE;
     }
-    sycl::queue q{gpus[rank % static_cast<int>(gpus.size())],
-                  sycl::property::queue::in_order()};
-    const std::string name = q.get_device().get_info<sycl::info::device::name>();
+    const sycl::device dev = gpus[rank % static_cast<int>(gpus.size())];
+    sycl::queue q{dev, sycl::property::queue::in_order()};
+    const sycl::context ctx = q.get_context();
+    const std::string name = dev.get_info<sycl::info::device::name>();
 
     const CombineRoute route = build_route(world, tokens, topk, hidden, experts);
     const int slots = route.recv[rank];
@@ -218,55 +182,165 @@ int main(int argc, char **argv) {
 
     std::uint16_t *stage = sycl::malloc_device<std::uint16_t>(stage_n, q);
     std::uint16_t *out = sycl::malloc_device<std::uint16_t>(out_n, q);
+    unsigned long long *flags = sycl::malloc_device<unsigned long long>(world, q);
+    unsigned *arrival = sycl::malloc_device<unsigned>(1, q);
     int *dest = sycl::malloc_device<int>(map_n, q);
     int *slot = sycl::malloc_device<int>(map_n, q);
-    if (!stage || !out || !dest || !slot)
+    if (!stage || !out || !flags || !arrival || !dest || !slot)
       throw std::bad_alloc();
+    q.memset(flags, 0, sizeof(unsigned long long) * world);
+    q.memset(arrival, 0, sizeof(unsigned));
     const std::size_t base = route.index(rank, 0, 0);
     q.memcpy(dest, route.dest.data() + base, sizeof(int) * map_n);
     q.memcpy(slot, route.slot.data() + base, sizeof(int) * map_n);
-    q.parallel_for(sycl::range<1>(static_cast<std::size_t>(slots) * hidden), [=](sycl::id<1> id) {
-          const int index = static_cast<int>(id);
-          const int local_slot = index / hidden;
-          const int h = index - local_slot * hidden;
-          stage[id] = dev_f32_to_bf16(stage_unit(rank, local_slot, h));
-        })
-        .wait();
-
-    if (world > 1 && !gpu_aware_mpi_check(q, rank, world)) {
-      MPI_Finalize();
-      return EXIT_FAILURE;
-    }
 
     std::vector<std::uint16_t *> stage_ptrs(world, nullptr);
-    std::vector<std::uint16_t *> copies(world, nullptr);
-    stage_ptrs[rank] = stage;
-    for (int peer = 0; peer < world; ++peer) {
-      if (peer == rank)
-        continue;
-      const std::size_t n =
-          std::max(static_cast<std::size_t>(route.recv[peer]) * hidden, std::size_t{1});
-      copies[peer] = sycl::malloc_device<std::uint16_t>(n, q);
-      if (!copies[peer])
-        throw std::bad_alloc();
-      stage_ptrs[peer] = copies[peer];
+    std::vector<unsigned long long *> flag_ptrs(world, nullptr);
+    std::vector<void *> opened;
+    std::vector<ipc_handle> exports;
+    exports.reserve(2);
+
+    // Drop exported handle references after every rank has opened them.
+    auto put_exports = [&] {
+      for (ipc_handle &handle : exports)
+        ipc_mem::put(handle, ctx);
+      exports.clear();
+    };
+    // Close peer allocations imported by this rank.
+    auto close_opened = [&] {
+      for (void *p : opened)
+        ipc_mem::close(p, ctx);
+      opened.clear();
+    };
+    std::uint16_t **d_stage_ptrs = nullptr;
+    unsigned long long **d_flag_ptrs = nullptr;
+    // Close imports, then free this rank's allocations.
+    auto release_device = [&] {
+      close_opened();
+      if (d_stage_ptrs)
+        sycl::free(d_stage_ptrs, q);
+      if (d_flag_ptrs)
+        sycl::free(d_flag_ptrs, q);
+      // Every rank drops its imports before any rank frees the exported buffers.
+      MPI_Barrier(MPI_COMM_WORLD);
+      sycl::free(stage, q);
+      sycl::free(out, q);
+      sycl::free(flags, q);
+      sycl::free(arrival, q);
+      sycl::free(dest, q);
+      sycl::free(slot, q);
+    };
+
+    if (world > 1) {
+      ipc_bytes stage_bytes;
+      ipc_bytes flag_bytes;
+      int local_ok = 0;
+      try {
+        if (dev.has(sycl::aspect::ext_oneapi_ipc_memory)) {
+          exports.push_back(ipc_mem::get(stage, ctx));
+          exports.push_back(ipc_mem::get(flags, ctx));
+          stage_bytes = exports[0].data();
+          flag_bytes = exports[1].data();
+          local_ok = !stage_bytes.empty() && !flag_bytes.empty();
+        }
+      } catch (const sycl::exception &) {
+        local_ok = 0;
+      }
+      if (!local_ok) {
+        stage_bytes.clear();
+        flag_bytes.clear();
+      }
+      std::vector<int> oks(world, 0);
+      MPI_Allgather(&local_ok, 1, MPI_INT, oks.data(), 1, MPI_INT, MPI_COMM_WORLD);
+      bool all_exported = true;
+      for (int ok : oks)
+        all_exported = all_exported && ok;
+
+      int opened_ok = 0;
+      if (all_exported) {
+        std::size_t local_sizes[2] = {stage_bytes.size(), flag_bytes.size()};
+        std::vector<std::size_t> all_sizes(static_cast<std::size_t>(world) * 2);
+        MPI_Allgather(local_sizes, 2, MPI_UINT64_T, all_sizes.data(), 2, MPI_UINT64_T,
+                      MPI_COMM_WORLD);
+        std::vector<std::size_t> stage_sizes(world), flag_sizes(world);
+        for (int p = 0; p < world; ++p) {
+          stage_sizes[p] = all_sizes[static_cast<std::size_t>(p) * 2];
+          flag_sizes[p] = all_sizes[static_cast<std::size_t>(p) * 2 + 1];
+        }
+        std::vector<int> stage_displ;
+        std::vector<int> flag_displ;
+        const std::vector<std::byte> all_stage = allgather_bytes(
+            stage_bytes.empty() ? nullptr : stage_bytes.data(), stage_bytes.size(), stage_sizes,
+            &stage_displ);
+        const std::vector<std::byte> all_flags = allgather_bytes(
+            flag_bytes.empty() ? nullptr : flag_bytes.data(), flag_bytes.size(), flag_sizes,
+            &flag_displ);
+        stage_ptrs[rank] = stage;
+        flag_ptrs[rank] = flags;
+        bool all_ok = true;
+        for (int p = 0; p < world && all_ok; ++p) {
+          if (p == rank)
+            continue;
+          void *sp = nullptr;
+          void *fp = nullptr;
+          try {
+            const ipc_bytes stage_h(all_stage.begin() + stage_displ[p],
+                                    all_stage.begin() + stage_displ[p] + stage_sizes[p]);
+            const ipc_bytes flag_h(all_flags.begin() + flag_displ[p],
+                                   all_flags.begin() + flag_displ[p] + flag_sizes[p]);
+            sp = ipc_mem::open(stage_h, ctx, dev);
+            fp = ipc_mem::open(flag_h, ctx, dev);
+            stage_ptrs[p] = static_cast<std::uint16_t *>(sp);
+            flag_ptrs[p] = static_cast<unsigned long long *>(fp);
+            opened.push_back(sp);
+            opened.push_back(fp);
+          } catch (const sycl::exception &) {
+            if (sp)
+              ipc_mem::close(sp, ctx);
+            all_ok = false;
+          }
+        }
+        opened_ok = all_ok ? 1 : 0;
+      }
+      int opened_all = 0;
+      MPI_Allreduce(&opened_ok, &opened_all, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+      // Opened peer pointers stay valid after put. The exporting allocation
+      // has to stay allocated until those peers close.
+      put_exports();
+      if (!opened_all) {
+        close_opened();
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (rank == 0)
+          std::fprintf(stderr, "peer transport is not available between these GPUs\n");
+        release_device();
+        MPI_Finalize();
+        return EXIT_FAILURE;
+      }
+    } else {
+      stage_ptrs[rank] = stage;
+      flag_ptrs[rank] = flags;
     }
-    auto **d_stage = sycl::malloc_device<std::uint16_t *>(world, q);
-    q.memcpy(d_stage, stage_ptrs.data(), sizeof(std::uint16_t *) * world).wait();
+
+    d_stage_ptrs = sycl::malloc_device<std::uint16_t *>(world, q);
+    d_flag_ptrs = sycl::malloc_device<unsigned long long *>(world, q);
+    if (!d_stage_ptrs || !d_flag_ptrs)
+      throw std::bad_alloc();
+    q.memcpy(d_stage_ptrs, stage_ptrs.data(), sizeof(std::uint16_t *) * world);
+    q.memcpy(d_flag_ptrs, flag_ptrs.data(), sizeof(unsigned long long *) * world);
+    const int fill_blocks = 256;
+    q.parallel_for(sycl::nd_range<1>(static_cast<std::size_t>(fill_blocks) * 256, 256),
+                   [=](sycl::nd_item<1> item) { fill_stage(item, stage, rank, slots, hidden); })
+        .wait();
     MPI_Barrier(MPI_COMM_WORLD);
 
     const int blocks = tokens < 256 ? tokens : 256;
+    unsigned long long epoch = 1;
+    // One kernel at a time. A newer launch stores a newer epoch into the same
+    // flag slots, and an in-flight kernel waiting on the older epoch would hang.
     auto step = [&] {
-      if (world > 1)
-        exchange(rank, world, hidden, route.recv, stage, copies);
-      if (topk == 1)
-        launch_combine<1>(q, blocks, tokens, hidden, dest, slot, d_stage, out);
-      else if (topk == 2)
-        launch_combine<2>(q, blocks, tokens, hidden, dest, slot, d_stage, out);
-      else if (topk == 4)
-        launch_combine<4>(q, blocks, tokens, hidden, dest, slot, d_stage, out);
-      else
-        launch_combine<8>(q, blocks, tokens, hidden, dest, slot, d_stage, out);
+      launch_combine(q, topk, blocks, tokens, hidden, world, rank, dest, slot, d_stage_ptrs, out,
+                     arrival, flags, d_flag_ptrs, epoch);
+      ++epoch;
       q.wait_and_throw();
     };
     for (int i = 0; i < warmup; ++i)
@@ -277,8 +351,7 @@ int main(int argc, char **argv) {
       step();
     const auto t1 = std::chrono::steady_clock::now();
 
-    const double ms =
-        std::chrono::duration<double, std::milli>(t1 - t0).count() / iterations;
+    const double ms = std::chrono::duration<double, std::milli>(t1 - t0).count() / iterations;
     std::vector<std::uint16_t> host(out_n);
     q.memcpy(host.data(), out, out_n * sizeof(std::uint16_t)).wait();
     const double local_error = max_abs_error(route, rank, host.data(), 8);
@@ -297,9 +370,9 @@ int main(int argc, char **argv) {
       const double fabric_bytes =
           static_cast<double>(remote_slots(route, 0)) * hidden * sizeof(std::uint16_t);
       std::printf("device: %s\n", name.c_str());
-      std::printf("ranks: %d  tokens: %d  hidden: %d  topk: %d  experts_per_rank: %d\n",
-                  world, tokens, hidden, topk, experts);
-      std::printf("transport: %s\n", world > 1 ? "mpi" : "local");
+      std::printf("ranks: %d  tokens: %d  hidden: %d  topk: %d  experts_per_rank: %d\n", world,
+                  tokens, hidden, topk, experts);
+      std::printf("transport: peer\n");
       std::printf("recv_tokens: %d  iterations: %d  warmup: %d\n", route.recv[0], iterations,
                   warmup);
       std::printf("kernel: %.6f ms\n", max_ms);
@@ -309,19 +382,16 @@ int main(int argc, char **argv) {
       std::printf("moe-combine: %s\n", all_pass ? "PASS" : "FAIL");
     }
 
-    sycl::free(d_stage, q);
-    for (std::uint16_t *p : copies)
-      if (p)
-        sycl::free(p, q);
-    sycl::free(stage, q);
-    sycl::free(out, q);
-    sycl::free(dest, q);
-    sycl::free(slot, q);
+    release_device();
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
     return all_pass ? EXIT_SUCCESS : EXIT_FAILURE;
   } catch (const sycl::exception &ex) {
     std::fprintf(stderr, "SYCL error: %s\n", ex.what());
+    MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    return EXIT_FAILURE;
+  } catch (const std::bad_alloc &) {
+    std::fprintf(stderr, "device allocation failed\n");
     MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     return EXIT_FAILURE;
   }

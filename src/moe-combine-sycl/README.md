@@ -1,9 +1,12 @@
 # moe-combine-sycl
 
 SYCL build of the multi-GPU MoE combine. Routing, the host reference, and the
-reported byte counts match `moe-combine-cuda`. See that README for the workload.
+reported byte counts match `moe-combine-cuda`. `combine.hpp` uses the same
+entry points as `combine.cuh`: `combine_kernel`, `fill_stage`,
+`cross_device_barrier`, `load_raw8`, `decode8`, and `store8`. See that README
+for the workload and the bandwidth definitions.
 
-SYCL moves expert outputs with GPU-aware MPI rather than CUDA/HIP IPC. When
-more than one rank is used, ranks 0 and 1 run the pingpong benchmark's
-device-buffer check before any timed transfer. On Cray MPICH, link the `libmpi_gtl_cuda` or `libmpi_gtl_hsa` that matches
-the installed ROCm or CUDA, and export `MPICH_GPU_SUPPORT_ENABLED=1`.
+Each rank maps its expert-output buffer with
+`sycl::ext::oneapi::experimental::ipc::memory` and reads it from the combine
+kernel. MPI carries the IPC handle bytes and the host barriers. It does not
+move device buffers.

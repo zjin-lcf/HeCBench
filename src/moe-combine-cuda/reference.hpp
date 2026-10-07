@@ -35,21 +35,25 @@ struct CombineRoute {
   std::vector<int> slot;
   std::vector<int> recv;
 
+  // Flat index of expert slot (source rank, token, k).
   std::size_t index(int src, int token, int k) const {
     return (static_cast<std::size_t>(src) * tokens + token) * topk + k;
   }
 };
 
+// Deterministic expert value in [0, 251).
 COMBINE_HD inline int stage_mod(int rank, int slot, int h) {
   const std::int64_t m = static_cast<std::int64_t>(rank + 1) * 17 +
                          static_cast<std::int64_t>(slot) * 3 + (h % 251);
   return static_cast<int>(m % 251);
 }
 
+// stage_mod scaled into [0, 1).
 COMBINE_HD inline float stage_unit(int rank, int slot, int h) {
   return static_cast<float>(stage_mod(rank, slot, h)) / 251.0f;
 }
 
+// Router weight (1 + (token * topk + k) % 7) / 8.
 COMBINE_HD inline float weight_of(int token, int k, int topk) {
   return static_cast<float>((token * topk + k) % 7 + 1) / 8.0f;
 }
@@ -63,6 +67,7 @@ inline std::uint16_t f32_to_bf16(float x) {
   return static_cast<std::uint16_t>(bits >> 16);
 }
 
+// Expand a bf16 bit pattern to fp32.
 inline float bf16_to_f32(std::uint16_t b) {
   const std::uint32_t bits = static_cast<std::uint32_t>(b) << 16;
   float x = 0.f;
@@ -70,6 +75,7 @@ inline float bf16_to_f32(std::uint16_t b) {
   return x;
 }
 
+// Round-robin destinations and the receive count of each rank.
 inline CombineRoute build_route(int world, int tokens, int topk, int hidden,
                                 int experts) {
   CombineRoute route;
@@ -97,6 +103,7 @@ inline CombineRoute build_route(int world, int tokens, int topk, int hidden,
   return route;
 }
 
+// Slots this rank reads from other ranks.
 inline std::size_t remote_slots(const CombineRoute &route, int rank) {
   std::size_t n = 0;
   for (int token = 0; token < route.tokens; ++token)
@@ -110,6 +117,7 @@ inline std::size_t remote_slots(const CombineRoute &route, int rank) {
 inline double max_abs_error(const CombineRoute &route, int rank,
                             const std::uint16_t *got, int checked) {
   double error = 0.0;
+  // Compare one token with the host reference. A non-finite difference is returned.
   auto consider = [&](int token) {
     for (int h = 0; h < route.hidden; ++h) {
       float acc = 0.f;
@@ -133,12 +141,12 @@ inline double max_abs_error(const CombineRoute &route, int rank,
   const int n = std::min(checked, route.tokens);
   for (int token = 0; token < n; ++token) {
     const double bad = consider(token);
-    if (bad != 0.0)
+    if (!std::isfinite(bad))
       return bad;
   }
   if (route.tokens > n) {
     const double bad = consider(route.tokens - 1);
-    if (bad != 0.0)
+    if (!std::isfinite(bad))
       return bad;
   }
   return error;

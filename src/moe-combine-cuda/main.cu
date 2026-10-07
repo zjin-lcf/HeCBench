@@ -1,18 +1,15 @@
 // Multi-GPU MoE combine. One MPI rank owns one GPU.
 //
-// The default transport maps each rank's expert-output buffer into the others
-// with CUDA/HIP IPC and reads it from the combine kernel. That is the
-// intra-node path measured by the MORI EP benchmark, and it does not need
-// GPU-aware MPI.
-//
-// `--transport mpi`, or a failed IPC setup in `--transport auto`, moves those
-// buffers with MPI_Isend/MPI_Irecv on device pointers. Before any such
-// transfer, ranks 0 and 1 run the pingpong benchmark's GPU-aware MPI check
-// (five device-buffer round trips, the receiver adding one each time).
+// Each rank maps its expert-output buffer into the others with CUDA IPC and
+// reads it from the combine kernel. That is the intra-node path measured by
+// the MORI EP benchmark. MPI carries the IPC handle bytes and the host
+// barriers. It does not move device buffers.
 
 #include <algorithm>
 #include <chrono>
 #include <climits>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -22,64 +19,17 @@
 #include <mpi.h>
 #include "combine.cuh"
 
-#if defined(__HIPCC__)
-#define MC_CHECK(call)                                                         \
-  do {                                                                         \
-    hipError_t err_ = (call);                                                  \
-    if (err_ != hipSuccess) {                                                  \
-      std::fprintf(stderr, "HIP error %s:%d: %s\n", __FILE__, __LINE__,        \
-                   hipGetErrorString(err_));                                   \
-      std::exit(EXIT_FAILURE);                                                 \
-    }                                                                          \
-  } while (0)
-using mc_ipc_t = hipIpcMemHandle_t;
-static constexpr unsigned mc_ipc_flag = hipIpcMemLazyEnablePeerAccess;
-#define mcMalloc hipMalloc
-#define mcFree hipFree
-#define mcMemcpy hipMemcpy
-#define mcMemset hipMemset
-#define mcDeviceSynchronize hipDeviceSynchronize
-#define mcGetDeviceCount hipGetDeviceCount
-#define mcSetDevice hipSetDevice
-#define mcGetDeviceProperties hipGetDeviceProperties
-#define mcGetLastError hipGetLastError
-#define mcIpcGetMemHandle hipIpcGetMemHandle
-#define mcIpcOpenMemHandle hipIpcOpenMemHandle
-#define mcIpcCloseMemHandle hipIpcCloseMemHandle
-#define mcMemcpyHostToDevice hipMemcpyHostToDevice
-#define mcMemcpyDeviceToHost hipMemcpyDeviceToHost
-using mc_prop_t = hipDeviceProp_t;
-#else
 #define MC_CHECK(call)                                                         \
   do {                                                                         \
     cudaError_t err_ = (call);                                                 \
-    if (err_ != cudaSuccess) {                                                  \
+    if (err_ != cudaSuccess) {                                                 \
       std::fprintf(stderr, "CUDA error %s:%d: %s\n", __FILE__, __LINE__,       \
                    cudaGetErrorString(err_));                                  \
       std::exit(EXIT_FAILURE);                                                 \
     }                                                                          \
   } while (0)
-using mc_ipc_t = cudaIpcMemHandle_t;
-static constexpr unsigned mc_ipc_flag = cudaIpcMemLazyEnablePeerAccess;
-#define mcMalloc cudaMalloc
-#define mcFree cudaFree
-#define mcMemcpy cudaMemcpy
-#define mcMemset cudaMemset
-#define mcDeviceSynchronize cudaDeviceSynchronize
-#define mcGetDeviceCount cudaGetDeviceCount
-#define mcSetDevice cudaSetDevice
-#define mcGetDeviceProperties cudaGetDeviceProperties
-#define mcGetLastError cudaGetLastError
-#define mcIpcGetMemHandle cudaIpcGetMemHandle
-#define mcIpcOpenMemHandle cudaIpcOpenMemHandle
-#define mcIpcCloseMemHandle cudaIpcCloseMemHandle
-#define mcMemcpyHostToDevice cudaMemcpyHostToDevice
-#define mcMemcpyDeviceToHost cudaMemcpyDeviceToHost
-using mc_prop_t = cudaDeviceProp;
-#endif
 
-enum class Transport { Auto, Peer, Mpi };
-
+// Parse one decimal flag value, or exit if it is missing or out of range.
 static int integer_arg(const char *text, const char *name, long minimum,
                        long maximum) {
   char *end = nullptr;
@@ -91,141 +41,94 @@ static int integer_arg(const char *text, const char *name, long minimum,
   return static_cast<int>(value);
 }
 
-// pingpong-*/main-mpi: five round trips of a device buffer. Rank 1 adds one
-// on each trip, so rank 0 must observe 5.
-static int gpu_aware_mpi_check(int rank, int world) {
-  if (world < 2)
-    return 1;
-  const long n = 1L << 16;
-  int ok = 1;
-  if (rank < 2) {
-    double *d_a = nullptr;
-    MC_CHECK(mcMalloc(&d_a, sizeof(double) * n));
-    MC_CHECK(mcMemset(d_a, 0, sizeof(double) * n));
-    MC_CHECK(mcDeviceSynchronize());
-    const int tag1 = 10;
-    const int tag2 = 20;
-    for (int i = 1; i <= 5; ++i) {
-      if (rank == 0) {
-        MPI_Send(d_a, n, MPI_DOUBLE, 1, tag1, MPI_COMM_WORLD);
-        MPI_Recv(d_a, n, MPI_DOUBLE, 1, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      } else {
-        MPI_Recv(d_a, n, MPI_DOUBLE, 0, tag1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        mpi_check_add<<<1024, 256>>>(d_a, n);
-        MC_CHECK(mcGetLastError());
-        MC_CHECK(mcDeviceSynchronize());
-        MPI_Send(d_a, n, MPI_DOUBLE, 0, tag2, MPI_COMM_WORLD);
-      }
-    }
-    if (rank == 0) {
-      std::vector<double> host(n);
-      MC_CHECK(mcMemcpy(host.data(), d_a, sizeof(double) * n, mcMemcpyDeviceToHost));
-      for (long i = 0; i < n; ++i) {
-        if (host[i] != 5.0) {
-          std::printf("ERROR: MPI pingpong test failed\n");
-          ok = 0;
-          break;
-        }
-      }
-    }
-    MC_CHECK(mcFree(d_a));
-  }
-  int all_ok = 0;
-  MPI_Allreduce(&ok, &all_ok, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
-  MPI_Barrier(MPI_COMM_WORLD);
-  return all_ok;
-}
-
-static void exchange(int rank, int world, int hidden, const std::vector<int> &recv,
-                     std::uint16_t *stage, const std::vector<std::uint16_t *> &copies) {
-  std::vector<MPI_Request> reqs;
-  reqs.reserve(static_cast<std::size_t>(world - 1) * 2);
-  for (int peer = 0; peer < world; ++peer) {
-    if (peer == rank)
-      continue;
-    MPI_Request send_req, recv_req;
-    const std::size_t send_bytes =
-        static_cast<std::size_t>(recv[rank]) * hidden * sizeof(std::uint16_t);
-    const std::size_t recv_bytes =
-        static_cast<std::size_t>(recv[peer]) * hidden * sizeof(std::uint16_t);
-    if (send_bytes > static_cast<std::size_t>(INT_MAX) ||
-        recv_bytes > static_cast<std::size_t>(INT_MAX)) {
-      std::fprintf(stderr, "exchange is larger than MPI can send in one message\n");
-      std::exit(EXIT_FAILURE);
-    }
-    MPI_Irecv(copies[peer], static_cast<int>(recv_bytes), MPI_BYTE, peer, 42,
-              MPI_COMM_WORLD, &recv_req);
-    MPI_Isend(stage, static_cast<int>(send_bytes), MPI_BYTE, peer, 42, MPI_COMM_WORLD,
-              &send_req);
-    reqs.push_back(recv_req);
-    reqs.push_back(send_req);
-  }
-  if (!reqs.empty())
-    MPI_Waitall(static_cast<int>(reqs.size()), reqs.data(), MPI_STATUSES_IGNORE);
-}
-
-static void launch_combine(bool peer, int topk, int blocks, int tokens, int hidden,
-                           int world, int rank, const int *dest, const int *slot,
+// Launch combine_kernel for a top-k of 1, 2, 4, or 8.
+static void launch_combine(int topk, int blocks, int tokens, int hidden, int world, int rank,
+                           const int *dest, const int *slot,
                            const std::uint16_t *const *stage, std::uint16_t *out,
                            unsigned *arrival, unsigned long long *local_flags,
                            unsigned long long *const *peer_flags,
                            unsigned long long epoch) {
   switch (topk) {
   case 1:
-    if (peer)
-      combine_kernel<1, true><<<blocks, 256>>>(tokens, hidden, world, rank, dest,
-                                              slot, stage, out, arrival, local_flags,
-                                              peer_flags, epoch);
-    else
-      combine_kernel<1, false><<<blocks, 256>>>(tokens, hidden, world, rank, dest,
-                                               slot, stage, out, arrival, local_flags,
-                                               peer_flags, epoch);
+    combine_kernel<1><<<blocks, 256>>>(tokens, hidden, world, rank, dest, slot, stage, out,
+                                       arrival, local_flags, peer_flags, epoch);
     break;
   case 2:
-    if (peer)
-      combine_kernel<2, true><<<blocks, 256>>>(tokens, hidden, world, rank, dest,
-                                              slot, stage, out, arrival, local_flags,
-                                              peer_flags, epoch);
-    else
-      combine_kernel<2, false><<<blocks, 256>>>(tokens, hidden, world, rank, dest,
-                                               slot, stage, out, arrival, local_flags,
-                                               peer_flags, epoch);
+    combine_kernel<2><<<blocks, 256>>>(tokens, hidden, world, rank, dest, slot, stage, out,
+                                       arrival, local_flags, peer_flags, epoch);
     break;
   case 4:
-    if (peer)
-      combine_kernel<4, true><<<blocks, 256>>>(tokens, hidden, world, rank, dest,
-                                              slot, stage, out, arrival, local_flags,
-                                              peer_flags, epoch);
-    else
-      combine_kernel<4, false><<<blocks, 256>>>(tokens, hidden, world, rank, dest,
-                                               slot, stage, out, arrival, local_flags,
-                                               peer_flags, epoch);
+    combine_kernel<4><<<blocks, 256>>>(tokens, hidden, world, rank, dest, slot, stage, out,
+                                       arrival, local_flags, peer_flags, epoch);
     break;
   case 8:
-    if (peer)
-      combine_kernel<8, true><<<blocks, 256>>>(tokens, hidden, world, rank, dest,
-                                              slot, stage, out, arrival, local_flags,
-                                              peer_flags, epoch);
-    else
-      combine_kernel<8, false><<<blocks, 256>>>(tokens, hidden, world, rank, dest,
-                                               slot, stage, out, arrival, local_flags,
-                                               peer_flags, epoch);
+    combine_kernel<8><<<blocks, 256>>>(tokens, hidden, world, rank, dest, slot, stage, out,
+                                       arrival, local_flags, peer_flags, epoch);
     break;
   default:
     std::fprintf(stderr, "topk must be 1, 2, 4, or 8\n");
     std::exit(EXIT_FAILURE);
   }
-  MC_CHECK(mcGetLastError());
+  MC_CHECK(cudaGetLastError());
 }
 
+// Export a device allocation. A failure is returned with the per-thread error cleared.
+static cudaError_t ipc_get_handle(cudaIpcMemHandle_t *handle, void *ptr) {
+  const cudaError_t err = cudaIpcGetMemHandle(handle, ptr);
+  if (err == cudaSuccess)
+    return cudaSuccess;
+  const cudaError_t stored = cudaGetLastError();
+  return stored == cudaSuccess ? err : stored;
+}
+
+// Import a peer allocation. A failure is returned with the per-thread error cleared.
+static cudaError_t ipc_open_handle(void **ptr, cudaIpcMemHandle_t handle) {
+  const cudaError_t err =
+      cudaIpcOpenMemHandle(ptr, handle, cudaIpcMemLazyEnablePeerAccess);
+  if (err == cudaSuccess)
+    return cudaSuccess;
+  const cudaError_t stored = cudaGetLastError();
+  return stored == cudaSuccess ? err : stored;
+}
+
+// All-gather one byte blob per rank. Lengths are std::size_t and must fit in an MPI int count.
+static std::vector<std::byte> allgather_bytes(const void *local, std::size_t local_bytes,
+                                              const std::vector<std::size_t> &sizes,
+                                              std::vector<int> *displs) {
+  if (local_bytes > INT_MAX) {
+    std::fprintf(stderr, "IPC handle is larger than MPI can send\n");
+    std::exit(EXIT_FAILURE);
+  }
+  std::vector<int> counts(sizes.size());
+  displs->assign(sizes.size(), 0);
+  std::size_t total = 0;
+  for (std::size_t i = 0; i < sizes.size(); ++i) {
+    if (sizes[i] > INT_MAX || total > INT_MAX - sizes[i]) {
+      std::fprintf(stderr, "IPC handle is larger than MPI can send\n");
+      std::exit(EXIT_FAILURE);
+    }
+    counts[i] = sizes[i];
+    (*displs)[i] = total;
+    total += sizes[i];
+  }
+  std::vector<std::byte> all(total > 0 ? total : 1);
+  std::byte dummy{};
+  const void *send = local_bytes == 0 ? &dummy : local;
+  MPI_Allgatherv(send, local_bytes, MPI_BYTE, all.data(), counts.data(), displs->data(),
+                 MPI_BYTE, MPI_COMM_WORLD);
+  if (total == 0)
+    all.clear();
+  return all;
+}
+
+// Map peer expert buffers, time the combine, and check it against the host reference.
 int main(int argc, char **argv) {
   int tokens = 4096;
   int hidden = 7168;
   int topk = 8;
   int experts = 32;
-  int iterations = 10;
-  int warmup = 5;
-  Transport transport = Transport::Auto;
+  int iterations = 100;
+  int warmup = 100;
   for (int i = 1; i < argc; ++i) {
     const bool has_value = i + 1 < argc;
     if (has_value && !std::strcmp(argv[i], "--tokens"))
@@ -240,23 +143,10 @@ int main(int argc, char **argv) {
       iterations = integer_arg(argv[++i], "iteration count", 1, 100000);
     else if (has_value && !std::strcmp(argv[i], "--warmup"))
       warmup = integer_arg(argv[++i], "warmup count", 0, 100000);
-    else if (has_value && !std::strcmp(argv[i], "--transport")) {
-      ++i;
-      if (!std::strcmp(argv[i], "auto"))
-        transport = Transport::Auto;
-      else if (!std::strcmp(argv[i], "peer"))
-        transport = Transport::Peer;
-      else if (!std::strcmp(argv[i], "mpi"))
-        transport = Transport::Mpi;
-      else {
-        std::fprintf(stderr, "invalid transport: %s\n", argv[i]);
-        return EXIT_FAILURE;
-      }
-    } else {
+    else {
       std::fprintf(stderr,
                    "usage: %s [--tokens N] [--hidden N] [--topk 1|2|4|8] "
-                   "[--experts N] [--iters N] [--warmup N] "
-                   "[--transport auto|peer|mpi]\n",
+                   "[--experts N] [--iters N] [--warmup N]\n",
                    argv[0]);
       return EXIT_FAILURE;
     }
@@ -270,10 +160,6 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  // Cray MPICH uses this to send device buffers. It has to be set before
-  // MPI_Init, and only the explicit MPI transport needs it.
-  if (transport == Transport::Mpi)
-    setenv("MPICH_GPU_SUPPORT_ENABLED", "1", 0);
   MPI_Init(&argc, &argv);
   int rank = 0;
   int world = 1;
@@ -287,16 +173,16 @@ int main(int argc, char **argv) {
   }
 
   int devices = 0;
-  MC_CHECK(mcGetDeviceCount(&devices));
+  MC_CHECK(cudaGetDeviceCount(&devices));
   if (devices < 1) {
     if (rank == 0)
       std::fprintf(stderr, "no GPU was found\n");
     MPI_Finalize();
     return EXIT_FAILURE;
   }
-  MC_CHECK(mcSetDevice(rank % devices));
-  mc_prop_t prop{};
-  MC_CHECK(mcGetDeviceProperties(&prop, rank % devices));
+  MC_CHECK(cudaSetDevice(rank % devices));
+  cudaDeviceProp prop{};
+  MC_CHECK(cudaGetDeviceProperties(&prop, rank % devices));
 
   const CombineRoute route = build_route(world, tokens, topk, hidden, experts);
   const int slots = route.recv[rank];
@@ -313,68 +199,84 @@ int main(int argc, char **argv) {
   unsigned *arrival = nullptr;
   int *dest = nullptr;
   int *slot = nullptr;
-  MC_CHECK(mcMalloc(&stage, stage_alloc));
-  MC_CHECK(mcMalloc(&out, out_bytes));
-#if defined(__HIPCC__)
-  if (hipExtMallocWithFlags(reinterpret_cast<void **>(&flags),
-                            sizeof(unsigned long long) * world,
-                            hipDeviceMallocFinegrained) != hipSuccess)
-#endif
-    MC_CHECK(mcMalloc(&flags, sizeof(unsigned long long) * world));
-  MC_CHECK(mcMalloc(&arrival, sizeof(unsigned) * 2));
-  MC_CHECK(mcMalloc(&dest, sizeof(int) * map_n));
-  MC_CHECK(mcMalloc(&slot, sizeof(int) * map_n));
-  MC_CHECK(mcMemset(flags, 0, sizeof(unsigned long long) * world));
-  MC_CHECK(mcMemset(arrival, 0, sizeof(unsigned) * 2));
+  MC_CHECK(cudaMalloc(&stage, stage_alloc));
+  MC_CHECK(cudaMalloc(&out, out_bytes));
+  MC_CHECK(cudaMalloc(&flags, sizeof(unsigned long long) * world));
+  MC_CHECK(cudaMalloc(&arrival, sizeof(unsigned)));
+  MC_CHECK(cudaMalloc(&dest, sizeof(int) * map_n));
+  MC_CHECK(cudaMalloc(&slot, sizeof(int) * map_n));
+  MC_CHECK(cudaMemset(flags, 0, sizeof(unsigned long long) * world));
+  MC_CHECK(cudaMemset(arrival, 0, sizeof(unsigned)));
   const std::size_t base = route.index(rank, 0, 0);
-  MC_CHECK(mcMemcpy(dest, route.dest.data() + base, sizeof(int) * map_n,
-                    mcMemcpyHostToDevice));
-  MC_CHECK(mcMemcpy(slot, route.slot.data() + base, sizeof(int) * map_n,
-                    mcMemcpyHostToDevice));
+  MC_CHECK(cudaMemcpy(dest, route.dest.data() + base, sizeof(int) * map_n,
+                    cudaMemcpyHostToDevice));
+  MC_CHECK(cudaMemcpy(slot, route.slot.data() + base, sizeof(int) * map_n,
+                    cudaMemcpyHostToDevice));
 
   std::vector<std::uint16_t *> stage_ptrs(world, nullptr);
   std::vector<unsigned long long *> flag_ptrs(world, nullptr);
   std::vector<void *> opened;
-  bool peer = transport != Transport::Mpi && world > 1;
-  if (world == 1)
-    peer = true;
-
-  if (peer && world > 1) {
-    mc_ipc_t stage_handle{};
-    mc_ipc_t flag_handle{};
-    int local_ok = mcIpcGetMemHandle(&stage_handle, stage) ==
-#if defined(__HIPCC__)
-                       hipSuccess
-#else
-                       cudaSuccess
-#endif
-                   && mcIpcGetMemHandle(&flag_handle, flags) ==
-#if defined(__HIPCC__)
-                          hipSuccess;
-#else
-                          cudaSuccess;
-#endif
-    std::vector<int> oks(world, 0);
-    MPI_Allgather(&local_ok, 1, MPI_INT, oks.data(), 1, MPI_INT, MPI_COMM_WORLD);
-    std::vector<mc_ipc_t> stage_handles(world), flag_handles(world);
-    MPI_Allgather(&stage_handle, sizeof(mc_ipc_t), MPI_BYTE, stage_handles.data(),
-                  sizeof(mc_ipc_t), MPI_BYTE, MPI_COMM_WORLD);
-    MPI_Allgather(&flag_handle, sizeof(mc_ipc_t), MPI_BYTE, flag_handles.data(),
-                  sizeof(mc_ipc_t), MPI_BYTE, MPI_COMM_WORLD);
-    bool all_ok = true;
-    for (int ok : oks)
-      all_ok = all_ok && ok;
-    if (all_ok) {
+  std::uint16_t **d_stage_ptrs = nullptr;
+  unsigned long long **d_flag_ptrs = nullptr;
+  // Close imports, then free this rank's allocations.
+  auto release_device = [&] {
+    if (d_stage_ptrs)
+      MC_CHECK(cudaFree(d_stage_ptrs));
+    if (d_flag_ptrs)
+      MC_CHECK(cudaFree(d_flag_ptrs));
+    for (void *p : opened)
+      (void)cudaIpcCloseMemHandle(p);
+    opened.clear();
+    // Every rank drops its imports before any rank frees the exported buffers.
+    MPI_Barrier(MPI_COMM_WORLD);
+    MC_CHECK(cudaFree(stage));
+    MC_CHECK(cudaFree(out));
+    MC_CHECK(cudaFree(flags));
+    MC_CHECK(cudaFree(arrival));
+    MC_CHECK(cudaFree(dest));
+    MC_CHECK(cudaFree(slot));
+  };
+  if (world > 1) {
+    cudaIpcMemHandle_t stage_handle{};
+    cudaIpcMemHandle_t flag_handle{};
+    int local_ok = ipc_get_handle(&stage_handle, stage) == cudaSuccess &&
+                   ipc_get_handle(&flag_handle, flags) == cudaSuccess;
+    int all_exported = 0;
+    MPI_Allreduce(&local_ok, &all_exported, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    int opened_ok = 0;
+    if (all_exported) {
+      const std::vector<std::size_t> handle_sizes(world, sizeof(cudaIpcMemHandle_t));
+      std::vector<int> stage_displ;
+      std::vector<int> flag_displ;
+      const std::vector<std::byte> stage_raw =
+          allgather_bytes(&stage_handle, sizeof(stage_handle), handle_sizes, &stage_displ);
+      const std::vector<std::byte> flag_raw =
+          allgather_bytes(&flag_handle, sizeof(flag_handle), handle_sizes, &flag_displ);
+      std::vector<cudaIpcMemHandle_t> stage_handles(static_cast<std::size_t>(world));
+      std::vector<cudaIpcMemHandle_t> flag_handles(static_cast<std::size_t>(world));
+      for (int p = 0; p < world; ++p) {
+        std::memcpy(&stage_handles[static_cast<std::size_t>(p)],
+                    stage_raw.data() + stage_displ[static_cast<std::size_t>(p)],
+                    sizeof(cudaIpcMemHandle_t));
+        std::memcpy(&flag_handles[static_cast<std::size_t>(p)],
+                    flag_raw.data() + flag_displ[static_cast<std::size_t>(p)],
+                    sizeof(cudaIpcMemHandle_t));
+      }
       stage_ptrs[rank] = stage;
       flag_ptrs[rank] = flags;
-      for (int p = 0; p < world && all_ok; ++p) {
+      bool open_ok = true;
+      for (int p = 0; p < world && open_ok; ++p) {
         if (p == rank)
           continue;
         void *sp = nullptr;
         void *fp = nullptr;
-        if (mcIpcOpenMemHandle(&sp, stage_handles[p], mc_ipc_flag) ||
-            mcIpcOpenMemHandle(&fp, flag_handles[p], mc_ipc_flag)) {
-          all_ok = false;
+        if (ipc_open_handle(&sp, stage_handles[p]) != cudaSuccess ||
+            ipc_open_handle(&fp, flag_handles[p]) != cudaSuccess) {
+          if (sp)
+            (void)cudaIpcCloseMemHandle(sp);
+          if (fp)
+            (void)cudaIpcCloseMemHandle(fp);
+          open_ok = false;
           break;
         }
         stage_ptrs[p] = static_cast<std::uint16_t *>(sp);
@@ -382,60 +284,37 @@ int main(int argc, char **argv) {
         opened.push_back(sp);
         opened.push_back(fp);
       }
+      opened_ok = open_ok ? 1 : 0;
     }
-    int opened_ok = all_ok ? 1 : 0;
     int opened_all = 0;
     MPI_Allreduce(&opened_ok, &opened_all, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
     if (!opened_all) {
       for (void *p : opened)
-        (void)mcIpcCloseMemHandle(p);
+        (void)cudaIpcCloseMemHandle(p);
       opened.clear();
-      peer = false;
-      if (transport == Transport::Peer) {
-        if (rank == 0)
-          std::fprintf(stderr, "peer transport is not available between these GPUs\n");
-        MPI_Finalize();
-        return EXIT_FAILURE;
-      }
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (rank == 0)
+        std::fprintf(stderr, "peer transport is not available between these GPUs\n");
+      release_device();
+      MPI_Finalize();
+      return EXIT_FAILURE;
     }
   } else {
     stage_ptrs[rank] = stage;
     flag_ptrs[rank] = flags;
   }
 
-  std::vector<std::uint16_t *> copies(world, nullptr);
-  if (!peer && world > 1) {
-    if (!gpu_aware_mpi_check(rank, world)) {
-      MPI_Finalize();
-      return EXIT_FAILURE;
-    }
-    for (int p = 0; p < world; ++p) {
-      if (p == rank) {
-        stage_ptrs[p] = stage;
-        continue;
-      }
-      const std::size_t bytes = std::max(
-          static_cast<std::size_t>(route.recv[p]) * hidden * sizeof(std::uint16_t),
-          sizeof(std::uint16_t));
-      MC_CHECK(mcMalloc(&copies[p], bytes));
-      stage_ptrs[p] = copies[p];
-    }
-    flag_ptrs[rank] = flags;
-  }
-
-  std::uint16_t **d_stage_ptrs = nullptr;
-  unsigned long long **d_flag_ptrs = nullptr;
-  MC_CHECK(mcMalloc(&d_stage_ptrs, sizeof(std::uint16_t *) * world));
-  MC_CHECK(mcMalloc(&d_flag_ptrs, sizeof(unsigned long long *) * world));
-  MC_CHECK(mcMemcpy(d_stage_ptrs, stage_ptrs.data(), sizeof(std::uint16_t *) * world,
-                    mcMemcpyHostToDevice));
-  MC_CHECK(mcMemcpy(d_flag_ptrs, flag_ptrs.data(), sizeof(unsigned long long *) * world,
-                    mcMemcpyHostToDevice));
+  MC_CHECK(cudaMalloc(&d_stage_ptrs, sizeof(std::uint16_t *) * world));
+  MC_CHECK(cudaMalloc(&d_flag_ptrs, sizeof(unsigned long long *) * world));
+  MC_CHECK(cudaMemcpy(d_stage_ptrs, stage_ptrs.data(), sizeof(std::uint16_t *) * world,
+                    cudaMemcpyHostToDevice));
+  MC_CHECK(cudaMemcpy(d_flag_ptrs, flag_ptrs.data(), sizeof(unsigned long long *) * world,
+                    cudaMemcpyHostToDevice));
 
   const int fill_blocks = 256;
   fill_stage<<<fill_blocks, 256>>>(stage, rank, slots, hidden);
-  MC_CHECK(mcGetLastError());
-  MC_CHECK(mcDeviceSynchronize());
+  MC_CHECK(cudaGetLastError());
+  MC_CHECK(cudaDeviceSynchronize());
   MPI_Barrier(MPI_COMM_WORLD);
 
   const int blocks = tokens < 256 ? tokens : 256;
@@ -443,12 +322,10 @@ int main(int argc, char **argv) {
   // One kernel at a time. A newer launch stores a newer epoch into the same
   // flag slots, and an in-flight kernel waiting on the older epoch would hang.
   auto step = [&] {
-    if (!peer && world > 1)
-      exchange(rank, world, hidden, route.recv, stage, copies);
-    launch_combine(peer && world > 1, topk, blocks, tokens, hidden, world, rank, dest,
-                   slot, d_stage_ptrs, out, arrival, flags, d_flag_ptrs, epoch);
+    launch_combine(topk, blocks, tokens, hidden, world, rank, dest, slot, d_stage_ptrs, out,
+                   arrival, flags, d_flag_ptrs, epoch);
     ++epoch;
-    MC_CHECK(mcDeviceSynchronize());
+    MC_CHECK(cudaDeviceSynchronize());
   };
   for (int i = 0; i < warmup; ++i)
     step();
@@ -462,7 +339,7 @@ int main(int argc, char **argv) {
   const double ms =
       std::chrono::duration<double, std::milli>(t1 - t0).count() / iterations;
   std::vector<std::uint16_t> host(static_cast<std::size_t>(tokens) * hidden);
-  MC_CHECK(mcMemcpy(host.data(), out, out_bytes, mcMemcpyDeviceToHost));
+  MC_CHECK(cudaMemcpy(host.data(), out, out_bytes, cudaMemcpyDeviceToHost));
   const double local_error = max_abs_error(route, rank, host.data(), 8);
   const bool local_pass = std::isfinite(local_error) && local_error < 2.0e-2;
 
@@ -483,7 +360,7 @@ int main(int argc, char **argv) {
     std::printf("device: %s\n", prop.name);
     std::printf("ranks: %d  tokens: %d  hidden: %d  topk: %d  experts_per_rank: %d\n",
                 world, tokens, hidden, topk, experts);
-    std::printf("transport: %s\n", (peer && world > 1) || world == 1 ? "peer" : "mpi");
+    std::printf("transport: peer\n");
     std::printf("recv_tokens: %d  iterations: %d  warmup: %d\n", route.recv[0],
                 iterations, warmup);
     std::printf("kernel: %.6f ms\n", max_ms);
@@ -493,19 +370,7 @@ int main(int argc, char **argv) {
     std::printf("moe-combine: %s\n", all_pass ? "PASS" : "FAIL");
   }
 
-  MC_CHECK(mcFree(d_stage_ptrs));
-  MC_CHECK(mcFree(d_flag_ptrs));
-  for (void *p : opened)
-    MC_CHECK(mcIpcCloseMemHandle(p));
-  for (std::uint16_t *p : copies)
-    if (p)
-      MC_CHECK(mcFree(p));
-  MC_CHECK(mcFree(stage));
-  MC_CHECK(mcFree(out));
-  MC_CHECK(mcFree(flags));
-  MC_CHECK(mcFree(arrival));
-  MC_CHECK(mcFree(dest));
-  MC_CHECK(mcFree(slot));
+  release_device();
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
   return all_pass ? EXIT_SUCCESS : EXIT_FAILURE;

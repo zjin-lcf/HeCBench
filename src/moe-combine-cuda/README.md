@@ -19,17 +19,13 @@ out[token, h] = sum_k weight[token, k] * expert_output[dest_rank, slot, h]
 Accumulation is fp32. The result is stored as bf16 and checked against a host
 reference.
 
-CUDA and HIP map each rank's expert-output buffer into the other ranks with
-IPC and load it directly in the combine kernel (MORI's P2P-read combine). A
-device barrier makes every rank wait until the others have entered the kernel
-before those loads. This path does not need GPU-aware MPI.
-
-`--transport mpi` (or a failed IPC setup under `--transport auto`) sends the
-buffers with `MPI_Isend` / `MPI_Irecv` on device pointers. Before any of those
-transfers, ranks 0 and 1 run the same GPU-aware check as `pingpong-*/main-mpi`:
-five round trips of a device buffer of 65536 doubles, with rank 1 adding one
-on each trip. Rank 0 requires every element to come back as 5. A failure prints
-`ERROR: MPI pingpong test failed` and the benchmark stops.
+Each rank maps its expert-output buffer into the other ranks with IPC and
+loads it directly in the combine kernel (MORI's P2P-read combine). CUDA and
+HIP use runtime IPC handles. SYCL uses
+`sycl::ext::oneapi::experimental::ipc::memory`. A device barrier makes every
+rank wait until the others have entered the kernel before those loads. MPI
+carries the IPC handle bytes and the host barriers. It does not move device
+buffers.
 
 ## Bandwidth
 
@@ -48,17 +44,13 @@ The time is the slowest rank.
 ```bash
 # one GPU, no peer traffic
 make
-./main --tokens 128 --hidden 1024 --iters 2 --warmup 1
+./main --tokens 128 --hidden 1024 --iters 100 --warmup 100
 
-# one rank per GPU. Peer IPC is the default.
-srun -n 2 ./main --tokens 4096 --hidden 7168 --topk 8 --iters 10 --warmup 5
-
-# GPU-aware MPI instead of IPC. On Cray MPICH, link the matching
-# libmpi_gtl_hsa or libmpi_gtl_cuda and export MPICH_GPU_SUPPORT_ENABLED=1.
-# The program sets that variable when --transport mpi is selected, if unset.
-srun -n 2 ./main --transport mpi --tokens 512 --hidden 7168
+# one rank per GPU
+srun -n 2 ./main --tokens 4096 --hidden 7168 --topk 8
 ```
 
-`hidden` must be a multiple of 8. `topk` is 1, 2, 4, or 8. MPI roots default to
-Cray MPICH when that installation is present, otherwise OpenMPI; override
-`MPI_ROOT` and `MPI_LIB`.
+`hidden` must be a multiple of 8. `topk` is 1, 2, 4, or 8. Warmup and timed iterations both default to 100. A loaded Cray MPICH module
+(`CRAY_MPICH_DIR` or `MPICH_DIR`) selects that prefix and `-lmpi_cray`.
+Otherwise the build uses OpenMPI. Override either choice with `MPI_ROOT`
+and `MPI_LIB`.

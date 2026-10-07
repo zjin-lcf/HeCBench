@@ -7,8 +7,11 @@ OPTIMIZE  = yes
 DEBUG     = no
 LAUNCHER  ?=
 
-ifneq ($(wildcard /opt/cray/pe/mpich/9.0.1/ofi/cray/20.0/include/mpi.h),)
-  MPI_ROOT ?= /opt/cray/pe/mpich/9.0.1/ofi/cray/20.0
+# A loaded Cray MPICH module sets these to that version's prefix, including
+# installs that are not 9.0.1 and not under /opt. Otherwise use OpenMPI.
+CRAY_MPI_DIR := $(or $(CRAY_MPICH_DIR),$(MPICH_DIR))
+ifneq ($(wildcard $(CRAY_MPI_DIR)/include/mpi.h),)
+  MPI_ROOT ?= $(CRAY_MPI_DIR)
   MPI_LIB  ?= mpi_cray
 else
   MPI_ROOT ?= /usr/lib/x86_64-linux-gnu/openmpi
@@ -53,6 +56,6 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) --tokens 128 --hidden 1024 --iters 2 --warmup 1
+	$(LAUNCHER) ./$(program) --tokens 128 --hidden 1024 --iters 100 --warmup 100
 
 .PHONY: clean run
