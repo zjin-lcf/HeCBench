@@ -1214,11 +1214,11 @@ Early results are shown [here](results/README.md)
 ### moe-align (cuda)
   Sort the indices of padded tokens by expert in a Mixture-of-Experts layer (https://github.com/vllm-project/vllm)
 
-### moe-sum (cuda)
-  Element-wise summation operation across the top-k expert outputs in a Mixture-of-Experts layer (https://github.com/vllm-project/vllm)
-
 ### moe-combine (cuda, hip, sycl)
   Multi-GPU Mixture-of-Experts combine. Expert outputs are read back across the intra-node fabric and reduced with the router weights, following the MORI EP benchmark's round-robin combine and its algo/fabric byte counts (https://github.com/ROCm/mori/blob/main/docs/MORI-EP-BENCHMARK.md). CUDA, HIP, and SYCL use IPC peer reads. MPI carries the IPC handle bytes and the host barriers.
+
+### moe-sum (cuda)
+  Element-wise summation operation across the top-k expert outputs in a Mixture-of-Experts layer (https://github.com/vllm-project/vllm)
 
 ### morphology (cuda)
   Morphological operators: Erosion and Dilation (https://github.com/yszheda/CUDA-Morphology)
