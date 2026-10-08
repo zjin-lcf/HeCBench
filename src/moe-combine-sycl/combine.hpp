@@ -1,6 +1,6 @@
 // SYCL counterpart of moe-combine-cuda/combine.cuh. Function names match that
 // header: mc_bf16_to_f32, mc_f32_to_bf16, load_raw8, decode8, store8,
-// cross_device_barrier, combine_kernel, and fill_stage.
+// peer_rendezvous, combine_kernel, and fill_stage.
 
 #pragma once
 
@@ -21,9 +21,6 @@ inline float mc_bf16_to_f32(std::uint16_t b) {
   return sycl::bit_cast<float>(static_cast<std::uint32_t>(b) << 16);
 }
 
-using dev_atomic_u =
-    sycl::atomic_ref<unsigned, sycl::memory_order::acq_rel, sycl::memory_scope::device,
-                     sycl::access::address_space::global_space>;
 using sys_atomic_u64 =
     sycl::atomic_ref<unsigned long long, sycl::memory_order::relaxed,
                      sycl::memory_scope::system, sycl::access::address_space::global_space>;
@@ -69,41 +66,28 @@ inline void store8(std::uint16_t *p, const float *a) {
       sycl::vec<std::uint32_t, 4>(packed[0], packed[1], packed[2], packed[3]);
 }
 
-// One thread publishes this epoch and waits for every rank. Other blocks wait on that release.
-inline void cross_device_barrier(sycl::nd_item<1> item, unsigned *arrival,
-                                 unsigned long long *local_flags,
-                                 unsigned long long *const *peer_flags, int rank, int world,
-                                 unsigned long long epoch) {
-  const unsigned epoch_u = static_cast<unsigned>(epoch);
-  if (item.get_local_id(0) == 0) {
-    if (item.get_group(0) == 0) {
-      sycl::atomic_fence(sycl::memory_order::acq_rel, sycl::memory_scope::system);
-      for (int peer = 0; peer < world; ++peer)
-        mc_store_u64(peer_flags[peer] + rank, epoch);
-      sycl::atomic_fence(sycl::memory_order::acq_rel, sycl::memory_scope::system);
-      for (int peer = 0; peer < world; ++peer)
-        while (mc_load_u64(local_flags + peer) != epoch)
-          mc_pause();
-      sycl::atomic_fence(sycl::memory_order::acq_rel, sycl::memory_scope::system);
-      dev_atomic_u(arrival[0]).store(epoch_u);
-    } else {
-      dev_atomic_u seen(arrival[0]);
-      while (seen.load() != epoch_u)
-        mc_pause();
-    }
-  }
-  sycl::group_barrier(item.get_group());
+// One work-group publishes this epoch and waits until every rank has published
+// this epoch or a later one. Ranks do not barrier between iterations, so a
+// peer can already hold a newer epoch; equality would miss it and spin.
+inline void peer_rendezvous(sycl::nd_item<1> item, unsigned long long *local_flags,
+                            unsigned long long *const *peer_flags, int rank, int world,
+                            unsigned long long epoch) {
+  if (item.get_local_id(0) != 0)
+    return;
+  sycl::atomic_fence(sycl::memory_order::acq_rel, sycl::memory_scope::system);
+  for (int peer = 0; peer < world; ++peer)
+    mc_store_u64(peer_flags[peer] + rank, epoch);
+  sycl::atomic_fence(sycl::memory_order::acq_rel, sycl::memory_scope::system);
+  for (int peer = 0; peer < world; ++peer)
+    while (mc_load_u64(local_flags + peer) < epoch)
+      mc_pause();
+  sycl::atomic_fence(sycl::memory_order::acq_rel, sycl::memory_scope::system);
 }
 
-// Weighted bf16 combine. More than one rank waits on the peer barrier first.
+// Weighted bf16 combine. The peer rendezvous has already completed.
 template <int kTopk>
-void combine_kernel(sycl::nd_item<1> item, int tokens, int hidden, int world, int rank,
-                    const int *dest, const int *slot, const std::uint16_t *const *stage,
-                    std::uint16_t *out, unsigned *arrival, unsigned long long *local_flags,
-                    unsigned long long *const *peer_flags, unsigned long long epoch) {
-  if (world > 1)
-    cross_device_barrier(item, arrival, local_flags, peer_flags, rank, world, epoch);
-
+void combine_kernel(sycl::nd_item<1> item, int tokens, int hidden, const int *dest,
+                    const int *slot, const std::uint16_t *const *stage, std::uint16_t *out) {
   const int nvec = hidden >> 3;
   const int thread = item.get_local_id(0);
   const int stride = static_cast<int>(item.get_local_range(0));
@@ -114,8 +98,12 @@ void combine_kernel(sycl::nd_item<1> item, int tokens, int hidden, int world, in
       const int *td = dest + static_cast<std::size_t>(token) * kTopk;
       const int *ts = slot + static_cast<std::size_t>(token) * kTopk;
       sycl::vec<std::uint32_t, 4> raw[kTopk];
+      // A negative destination is not read. Dispatch keeps one expert per
+      // destination rank, and a top-k larger than the pool leaves the rest empty.
 #pragma unroll
       for (int k = 0; k < kTopk; ++k) {
+        if (td[k] < 0)
+          continue;
         const std::uint16_t *src =
             stage[td[k]] + (static_cast<std::size_t>(ts[k]) * hidden +
                             (static_cast<std::size_t>(vec) << 3));
@@ -123,6 +111,8 @@ void combine_kernel(sycl::nd_item<1> item, int tokens, int hidden, int world, in
       }
 #pragma unroll
       for (int k = 0; k < kTopk; ++k) {
+        if (td[k] < 0)
+          continue;
         float x[8];
         decode8(raw[k], x);
         const float w = weight_of(token, k, kTopk);

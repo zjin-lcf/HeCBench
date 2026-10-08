@@ -1,13 +1,27 @@
 // Host routing and reference for the intra-node MoE combine.
-// Round-robin dispatch matches MORI's benchmark initializer: expert slot
-// (token * topk + k) is sent to rank (token * topk + k) % world, and each
-// destination packs arrivals in source-rank order. Combine then reads those
-// expert outputs back and applies the router's weights:
-//   out[token] = sum_k weight[token, k] * expert_output[dest_rank, slot]
+// Each token draws `topk` distinct experts from the full pool
+// (experts per rank * world). A fixed hash of (source rank, token) stands in
+// for the random scores of the balanced-gate baseline (random scores, then
+// top-k), so every rank builds the same route and the host reference matches
+// the device.
+// Expert e lives on rank e / experts, the usual contiguous placement.
+// Measured on this hash at 8 ranks and 4096 tokens, a token's experts land on
+// 5.29 ranks on average. In that draw every token's experts occupy more than
+// one rank.
+//
+// Dispatch still sends the token once per destination rank, as MORI does. A
+// later expert whose rank was already chosen for this token is dropped and is
+// not read. Each destination packs the kept arrivals in source-rank, token,
+// then top-k order. MORI adds those kept hidden vectors and reduces the router
+// weights in a separate buffer. This benchmark scales each kept vector by the
+// router weight of the expert that kept the slot:
+//   out[token] = sum_{kept k} weight[token, k] * expert_output[dest_rank, slot]
 //
 // Bandwidth follows the MORI EP benchmark. Algo bytes are
-// recv_tokens * hidden * sizeof(bf16), including expert outputs that land on
-// the same rank. Fabric bytes count only reads from other ranks.
+// recv_tokens * hidden * sizeof(bf16): one hidden vector per kept token,
+// including tokens that stay on this rank. Fabric bytes count only reads from
+// other ranks. The driver reports the slowest rank and uses that rank's
+// counts, so the numerator and the time belong to the same rank.
 
 #pragma once
 
@@ -75,7 +89,18 @@ inline float bf16_to_f32(std::uint16_t b) {
   return x;
 }
 
-// Round-robin destinations and the receive count of each rank.
+// SplitMix64. The low bits select an expert; the same seed always yields the
+// same expert.
+inline std::uint64_t route_mix(std::uint64_t x) {
+  x ^= x >> 30;
+  x *= 0xbf58476d1ce4e5b9ull;
+  x ^= x >> 27;
+  x *= 0x94d049bb133111ebull;
+  x ^= x >> 31;
+  return x;
+}
+
+// Scattered top-k destinations and the receive count of each rank.
 inline CombineRoute build_route(int world, int tokens, int topk, int hidden,
                                 int experts) {
   CombineRoute route;
@@ -89,14 +114,45 @@ inline CombineRoute build_route(int world, int tokens, int topk, int hidden,
   route.dest.assign(n, 0);
   route.slot.assign(n, 0);
   route.recv.assign(world, 0);
+  const std::int64_t total_experts =
+      static_cast<std::int64_t>(experts) * world;
+  const int pool = static_cast<int>(total_experts);
+  const int need = topk < pool ? topk : pool;
+  std::vector<int> picked;
+  picked.reserve(static_cast<std::size_t>(need));
   for (int src = 0; src < world; ++src) {
     for (int token = 0; token < tokens; ++token) {
+      std::uint64_t state = route_mix(
+          (static_cast<std::uint64_t>(static_cast<std::uint32_t>(src)) << 32) |
+          static_cast<std::uint32_t>(token));
+      picked.clear();
+      while (static_cast<int>(picked.size()) < need) {
+        state = route_mix(state + 0x9e3779b97f4a7c15ull);
+        const int expert =
+            static_cast<int>(state % static_cast<std::uint64_t>(pool));
+        if (std::find(picked.begin(), picked.end(), expert) == picked.end())
+          picked.push_back(expert);
+      }
       for (int k = 0; k < topk; ++k) {
-        const int disp = token * topk + k;
-        const int dest = disp % world;
         const std::size_t id = route.index(src, token, k);
-        route.dest[id] = dest;
-        route.slot[id] = route.recv[dest]++;
+        // A top-k larger than the pool has no further expert to send.
+        if (k >= static_cast<int>(picked.size())) {
+          route.dest[id] = -1;
+          route.slot[id] = -1;
+          continue;
+        }
+        const int dest = picked[k] / experts;
+        bool seen = false;
+        for (int prev = 0; prev < k; ++prev)
+          seen = seen || route.dest[route.index(src, token, prev)] == dest;
+        // MORI dispatch keeps the earliest expert for a (token, rank) pair.
+        if (seen) {
+          route.dest[id] = -1;
+          route.slot[id] = -1;
+        } else {
+          route.dest[id] = dest;
+          route.slot[id] = route.recv[dest]++;
+        }
       }
     }
   }
@@ -106,11 +162,43 @@ inline CombineRoute build_route(int world, int tokens, int topk, int hidden,
 // Slots this rank reads from other ranks.
 inline std::size_t remote_slots(const CombineRoute &route, int rank) {
   std::size_t n = 0;
-  for (int token = 0; token < route.tokens; ++token)
-    for (int k = 0; k < route.topk; ++k)
-      if (route.dest[route.index(rank, token, k)] != rank)
+  for (int token = 0; token < route.tokens; ++token) {
+    for (int k = 0; k < route.topk; ++k) {
+      const int dest = route.dest[route.index(rank, token, k)];
+      if (dest >= 0 && dest != rank)
         ++n;
+    }
+  }
   return n;
+}
+
+// Algo bytes for one rank: one hidden vector per kept token packed there.
+inline double algo_bytes_of(const CombineRoute &route, int rank) {
+  return static_cast<double>(route.recv[rank]) * route.hidden *
+         sizeof(std::uint16_t);
+}
+
+// Fabric bytes for one rank: kept tokens that rank reads from other ranks.
+inline double fabric_bytes_of(const CombineRoute &route, int rank) {
+  return static_cast<double>(remote_slots(route, rank)) * route.hidden *
+         sizeof(std::uint16_t);
+}
+
+// Rank whose time is reported. Byte counts reported with that time are this
+// rank's. Equal times keep the rank with more fabric bytes, then more algo
+// bytes, then the smaller index.
+inline int slowest_rank(const double *ms, const double *fabric, const double *algo,
+                        int world) {
+  int slow = 0;
+  for (int r = 1; r < world; ++r) {
+    if (ms[r] > ms[slow])
+      slow = r;
+    else if (ms[r] == ms[slow] &&
+             (fabric[r] > fabric[slow] ||
+              (fabric[r] == fabric[slow] && algo[r] > algo[slow])))
+      slow = r;
+  }
+  return slow;
 }
 
 // Largest absolute error over the first `checked` tokens and the last token.
@@ -123,6 +211,8 @@ inline double max_abs_error(const CombineRoute &route, int rank,
       float acc = 0.f;
       for (int k = 0; k < route.topk; ++k) {
         const std::size_t id = route.index(rank, token, k);
+        if (route.dest[id] < 0)
+          continue;
         const float x = bf16_to_f32(f32_to_bf16(
             stage_unit(route.dest[id], route.slot[id], h)));
         acc += weight_of(token, k, route.topk) * x;

@@ -42,28 +42,20 @@ static int integer_arg(const char *text, const char *name, long minimum,
 }
 
 // Launch combine_kernel for a top-k of 1, 2, 4, or 8.
-static void launch_combine(int topk, int blocks, int tokens, int hidden, int world, int rank,
-                           const int *dest, const int *slot,
-                           const std::uint16_t *const *stage, std::uint16_t *out,
-                           unsigned *arrival, unsigned long long *local_flags,
-                           unsigned long long *const *peer_flags,
-                           unsigned long long epoch) {
+static void launch_combine(int topk, int blocks, int tokens, int hidden, const int *dest,
+                           const int *slot, const std::uint16_t *const *stage, std::uint16_t *out) {
   switch (topk) {
   case 1:
-    combine_kernel<1><<<blocks, 256>>>(tokens, hidden, world, rank, dest, slot, stage, out,
-                                       arrival, local_flags, peer_flags, epoch);
+    combine_kernel<1><<<blocks, 256>>>(tokens, hidden, dest, slot, stage, out);
     break;
   case 2:
-    combine_kernel<2><<<blocks, 256>>>(tokens, hidden, world, rank, dest, slot, stage, out,
-                                       arrival, local_flags, peer_flags, epoch);
+    combine_kernel<2><<<blocks, 256>>>(tokens, hidden, dest, slot, stage, out);
     break;
   case 4:
-    combine_kernel<4><<<blocks, 256>>>(tokens, hidden, world, rank, dest, slot, stage, out,
-                                       arrival, local_flags, peer_flags, epoch);
+    combine_kernel<4><<<blocks, 256>>>(tokens, hidden, dest, slot, stage, out);
     break;
   case 8:
-    combine_kernel<8><<<blocks, 256>>>(tokens, hidden, world, rank, dest, slot, stage, out,
-                                       arrival, local_flags, peer_flags, epoch);
+    combine_kernel<8><<<blocks, 256>>>(tokens, hidden, dest, slot, stage, out);
     break;
   default:
     std::fprintf(stderr, "topk must be 1, 2, 4, or 8\n");
@@ -196,17 +188,14 @@ int main(int argc, char **argv) {
   std::uint16_t *stage = nullptr;
   std::uint16_t *out = nullptr;
   unsigned long long *flags = nullptr;
-  unsigned *arrival = nullptr;
   int *dest = nullptr;
   int *slot = nullptr;
   MC_CHECK(cudaMalloc(&stage, stage_alloc));
   MC_CHECK(cudaMalloc(&out, out_bytes));
   MC_CHECK(cudaMalloc(&flags, sizeof(unsigned long long) * world));
-  MC_CHECK(cudaMalloc(&arrival, sizeof(unsigned)));
   MC_CHECK(cudaMalloc(&dest, sizeof(int) * map_n));
   MC_CHECK(cudaMalloc(&slot, sizeof(int) * map_n));
   MC_CHECK(cudaMemset(flags, 0, sizeof(unsigned long long) * world));
-  MC_CHECK(cudaMemset(arrival, 0, sizeof(unsigned)));
   const std::size_t base = route.index(rank, 0, 0);
   MC_CHECK(cudaMemcpy(dest, route.dest.data() + base, sizeof(int) * map_n,
                     cudaMemcpyHostToDevice));
@@ -232,7 +221,6 @@ int main(int argc, char **argv) {
     MC_CHECK(cudaFree(stage));
     MC_CHECK(cudaFree(out));
     MC_CHECK(cudaFree(flags));
-    MC_CHECK(cudaFree(arrival));
     MC_CHECK(cudaFree(dest));
     MC_CHECK(cudaFree(slot));
   };
@@ -319,11 +307,14 @@ int main(int argc, char **argv) {
 
   const int blocks = tokens < 256 ? tokens : 256;
   unsigned long long epoch = 1;
-  // One kernel at a time. A newer launch stores a newer epoch into the same
-  // flag slots, and an in-flight kernel waiting on the older epoch would hang.
+  // One pair of kernels at a time. The rendezvous is its own one-block launch
+  // so the combine grid never spins on a block the device has not scheduled.
+  // The wait accepts a later epoch: the next iteration on a faster rank can
+  // overwrite the flag before a slower rank observes this one.
   auto step = [&] {
-    launch_combine(topk, blocks, tokens, hidden, world, rank, dest, slot, d_stage_ptrs, out,
-                   arrival, flags, d_flag_ptrs, epoch);
+    if (world > 1)
+      peer_rendezvous<<<1, 256>>>(flags, d_flag_ptrs, rank, world, epoch);
+    launch_combine(topk, blocks, tokens, hidden, dest, slot, d_stage_ptrs, out);
     ++epoch;
     MC_CHECK(cudaDeviceSynchronize());
   };
@@ -343,29 +334,42 @@ int main(int argc, char **argv) {
   const double local_error = max_abs_error(route, rank, host.data(), 8);
   const bool local_pass = std::isfinite(local_error) && local_error < 2.0e-2;
 
-  double max_ms = 0;
+  const double local_algo = algo_bytes_of(route, rank);
+  const double local_fabric = fabric_bytes_of(route, rank);
+  const int local_recv = route.recv[rank];
+  std::vector<double> all_ms(static_cast<std::size_t>(world));
+  std::vector<double> all_algo(static_cast<std::size_t>(world));
+  std::vector<double> all_fabric(static_cast<std::size_t>(world));
+  std::vector<int> all_recv(static_cast<std::size_t>(world));
   double max_error = 0;
   int all_pass = 0;
   const int pass_bit = local_pass ? 1 : 0;
-  MPI_Reduce(&ms, &max_ms, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  MPI_Gather(&ms, 1, MPI_DOUBLE, rank == 0 ? all_ms.data() : nullptr, 1, MPI_DOUBLE, 0,
+             MPI_COMM_WORLD);
+  MPI_Gather(&local_algo, 1, MPI_DOUBLE, rank == 0 ? all_algo.data() : nullptr, 1, MPI_DOUBLE, 0,
+             MPI_COMM_WORLD);
+  MPI_Gather(&local_fabric, 1, MPI_DOUBLE, rank == 0 ? all_fabric.data() : nullptr, 1,
+             MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Gather(&local_recv, 1, MPI_INT, rank == 0 ? all_recv.data() : nullptr, 1, MPI_INT, 0,
+             MPI_COMM_WORLD);
   MPI_Reduce(&local_error, &max_error, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
   MPI_Allreduce(&pass_bit, &all_pass, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
 
   if (rank == 0) {
+    const int slow = slowest_rank(all_ms.data(), all_fabric.data(), all_algo.data(), world);
+    const double max_ms = all_ms[static_cast<std::size_t>(slow)];
     const double seconds = max_ms / 1.0e3;
-    const double algo_bytes =
-        static_cast<double>(route.recv[0]) * hidden * sizeof(std::uint16_t);
-    const double fabric_bytes =
-        static_cast<double>(remote_slots(route, 0)) * hidden * sizeof(std::uint16_t);
     std::printf("device: %s\n", prop.name);
     std::printf("ranks: %d  tokens: %d  hidden: %d  topk: %d  experts_per_rank: %d\n",
                 world, tokens, hidden, topk, experts);
     std::printf("transport: peer\n");
-    std::printf("recv_tokens: %d  iterations: %d  warmup: %d\n", route.recv[0],
-                iterations, warmup);
+    std::printf("recv_tokens: %d  iterations: %d  warmup: %d\n",
+                all_recv[static_cast<std::size_t>(slow)], iterations, warmup);
     std::printf("kernel: %.6f ms\n", max_ms);
-    std::printf("algo_bandwidth: %.3f GB/s\n", algo_bytes / 1.0e9 / seconds);
-    std::printf("fabric_bandwidth: %.3f GB/s\n", fabric_bytes / 1.0e9 / seconds);
+    std::printf("algo_bandwidth: %.3f GB/s\n",
+                all_algo[static_cast<std::size_t>(slow)] / 1.0e9 / seconds);
+    std::printf("fabric_bandwidth: %.3f GB/s\n",
+                all_fabric[static_cast<std::size_t>(slow)] / 1.0e9 / seconds);
     std::printf("max_abs_error: %.3e\n", max_error);
     std::printf("moe-combine: %s\n", all_pass ? "PASS" : "FAIL");
   }

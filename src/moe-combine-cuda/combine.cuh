@@ -1,9 +1,11 @@
 // Intra-node MoE combine, bf16 expert outputs, fp32 accumulation.
 // Expert outputs are read through IPC-mapped pointers (the MORI P2P-read
-// combine). One thread per rank exchanges system-scope flags, then releases
-// the other blocks. Remote vector loads are issued before the weighted sum
-// so their latency overlaps the arithmetic. A single rank skips the flag
-// exchange.
+// combine). peer_rendezvous is a one-block kernel: it publishes this rank's
+// epoch and waits for every rank. The combine grid is launched after it.
+// A spin inside the combine grid can deadlock, because the device does not
+// promise to schedule the publishing block while other blocks are resident.
+// Remote vector loads are issued before the weighted sum so their latency
+// overlaps the arithmetic. A single rank skips the flag exchange.
 
 #pragma once
 
@@ -89,45 +91,31 @@ __device__ inline void store8(std::uint16_t *p, const float *a) {
   *reinterpret_cast<uint4 *>(p) = make_uint4(w[0], w[1], w[2], w[3]);
 }
 
-// One thread publishes this epoch and waits for every rank. Other blocks wait on that release.
-__device__ void cross_device_barrier(unsigned *arrival,
-                                    unsigned long long *local_flags,
-                                    unsigned long long *const *peer_flags,
-                                    int rank, int world,
-                                    unsigned long long epoch) {
-  const unsigned epoch_u = static_cast<unsigned>(epoch);
-  if (threadIdx.x == 0) {
-    if (blockIdx.x == 0) {
-      __threadfence_system();
-      for (int peer = 0; peer < world; ++peer)
-        mc_store_u64(peer_flags[peer] + rank, epoch);
-      __threadfence_system();
-      for (int peer = 0; peer < world; ++peer)
-        while (mc_load_u64(local_flags + peer) != epoch)
-          mc_pause();
-      __threadfence_system();
-      atomicExch(arrival, epoch_u);
-    } else {
-      while (atomicAdd(arrival, 0u) != epoch_u)
-        mc_pause();
-    }
-  }
-  __syncthreads();
+// One block publishes this epoch and waits until every rank has published
+// this epoch or a later one. Ranks do not barrier between iterations, so a
+// peer can already hold a newer epoch; equality would miss it and spin.
+__global__ void peer_rendezvous(unsigned long long *local_flags,
+                                unsigned long long *const *peer_flags, int rank, int world,
+                                unsigned long long epoch) {
+  if (threadIdx.x != 0)
+    return;
+  __threadfence_system();
+  for (int peer = 0; peer < world; ++peer)
+    mc_store_u64(peer_flags[peer] + rank, epoch);
+  __threadfence_system();
+  for (int peer = 0; peer < world; ++peer)
+    while (mc_load_u64(local_flags + peer) < epoch)
+      mc_pause();
+  __threadfence_system();
 }
 
-// Weighted bf16 combine. More than one rank waits on the peer barrier first.
+// Weighted bf16 combine. The peer rendezvous has already completed.
 template <int kTopk>
 __global__ void __launch_bounds__(256)
-    combine_kernel(int tokens, int hidden, int world, int rank,
-                   const int *__restrict__ dest, const int *__restrict__ slot,
+    combine_kernel(int tokens, int hidden, const int *__restrict__ dest,
+                   const int *__restrict__ slot,
                    const std::uint16_t *const *__restrict__ stage,
-                   std::uint16_t *__restrict__ out, unsigned *arrival,
-                   unsigned long long *local_flags,
-                   unsigned long long *const *peer_flags,
-                   unsigned long long epoch) {
-  if (world > 1)
-    cross_device_barrier(arrival, local_flags, peer_flags, rank, world, epoch);
-
+                   std::uint16_t *__restrict__ out) {
   const int nvec = hidden >> 3;
   for (int token = blockIdx.x; token < tokens; token += gridDim.x) {
     for (int vec = threadIdx.x; vec < nvec; vec += blockDim.x) {
@@ -135,8 +123,12 @@ __global__ void __launch_bounds__(256)
       const int *td = dest + static_cast<std::size_t>(token) * kTopk;
       const int *ts = slot + static_cast<std::size_t>(token) * kTopk;
       uint4 raw[kTopk];
+      // A negative destination is not read. Dispatch keeps one expert per
+      // destination rank, and a top-k larger than the pool leaves the rest empty.
 #pragma unroll
       for (int k = 0; k < kTopk; ++k) {
+        if (td[k] < 0)
+          continue;
         const std::uint16_t *src =
             stage[td[k]] +
             (static_cast<std::size_t>(ts[k]) * hidden +
@@ -145,6 +137,8 @@ __global__ void __launch_bounds__(256)
       }
 #pragma unroll
       for (int k = 0; k < kTopk; ++k) {
+        if (td[k] < 0)
+          continue;
         float x[8];
         decode8(raw[k], x);
         const float w = weight_of(token, k, kTopk);
