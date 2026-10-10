@@ -2209,7 +2209,7 @@ namespace cimg_library_suffixed {
     CImgException() { *_message = 0; }
     CImgException(const char *const format, ...) { _cimg_exception_err("CImgException",true); }
     //! Return a C-string containing the error message associated to the thrown exception.
-    const char *what() const throw() { return _message; }
+    const char *what() const noexcept { return _message; }
   };
 
   // The CImgInstanceException class is used to throw an exception related
