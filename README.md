@@ -56,7 +56,7 @@ Each benchmark falls into a single category. While such classification is not ac
     daphne
 
 ### Bandwidth
-    allreduce, cmembench, babelstream, ccl, memcpy, memtest, p2p, pingpong, putget, randomAccess, reshapeKVCache, shmembench, storeKVCache, threadcpy, triad, vadd
+    allreduce, cmembench, babelstream, ccl, memcpy, memtest, p2p, pingpong, putget, randomAccess, reshapeKVCache, sdma, shmembench, storeKVCache, threadcpy, triad, vadd
 
 ### Bioinformatics
     all-pairs-distance, bsw, ccs, cm, deredundancy, diamond, epistasis, extend2, frna, fsm, ga, local-ht, logan, minibude, minimap2, nbnxm, nw, pcc, prna, sa, snake
@@ -1556,6 +1556,9 @@ Early results are shown [here](results/README.md)
 
 ### sddmm-batch (cuda)
   Batched dense matrix - dense matrix multiplication into sparse matrix (https://docs.nvidia.com/cuda/cusparse/index.html#cusparsesddmm)
+
+### sdma (hip)
+  Device-to-device copy bandwidth from 256 bytes to 1 GiB. HIP times hipMemcpyDeviceToDeviceNoCU (SDMA) and hipMemcpyDeviceToDevice, and labels each size against GPU_FORCE_BLIT_COPY_SIZE (default 16 KiB; size <= value * 1024 is inside the shader-blit window). CUDA times cudaMemcpyDeviceToDevice and SYCL times queue::memcpy; those models have no SDMA copy kind.
 
 ### secp256k1 (cuda)
   Part of BIP39 solver
