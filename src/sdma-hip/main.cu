@@ -45,12 +45,22 @@ static void report(const char* kind, const char* note, size_t bytes, long long n
             << avg_us << " us (" << gbps << " GB/s)" << std::endl;
 }
 
-// ROCm: sdmaCopyThreshold_ = GPU_FORCE_BLIT_COPY_SIZE * 1024, default 16 KiB.
-// copyBuffer treats size <= threshold as eligible for a shader blit when the
-// caller did not request SDMA. hipMemcpyDeviceToDeviceNoCU requests SDMA on
-// both sides of that line. The sweep itself is a fixed power-of-two range and
-// does not move when GPU_FORCE_BLIT_COPY_SIZE changes. Keep kMinShift/kMaxShift
-// identical in sdma-cuda and sdma-sycl.
+// HIP flag GPU_FORCE_BLIT_COPY_SIZE, in KiB. The default in flags.hpp is 16.
+// OpenCL replaces an unset value with 0; HIP keeps 16. rocclr stores
+// sdmaCopyThreshold_ = GPU_FORCE_BLIT_COPY_SIZE * 1024.
+//
+// KernelBlitManager::useShaderCopyBufferPath uses that threshold when the
+// caller did not request SDMA and the copy is not already forced to a shader
+// blit. Same-device hipMalloc memory is not host-direct-access, so
+// hipMemcpyDeviceToDevice takes the shader blit at every size.
+// hipMemcpyDeviceToDeviceNoCU is hipCopyBufferSDMA
+// (CopyEnginePreference::SDMA): SDMA at every size, with no shader fallback.
+// The threshold does select the engine for a transfer that has a
+// host-accessible buffer: size <= sdmaCopyThreshold_ uses a shader blit.
+//
+// The sweep is a fixed power-of-two range and does not move when
+// GPU_FORCE_BLIT_COPY_SIZE changes. Keep kMinShift/kMaxShift identical in
+// sdma-cuda and sdma-sycl.
 static constexpr unsigned long long kDefaultBlitKib = 16;
 static constexpr int kMinShift = 8;   // 256 B
 static constexpr int kMaxShift = 30;  // 1 GiB
@@ -95,10 +105,10 @@ static std::vector<size_t> copy_sizes() {
   return sizes;
 }
 
-static const char* copy_note(hipMemcpyKind kind, size_t bytes, size_t threshold) {
-  if (kind == hipMemcpyDeviceToDeviceNoCU) return "SDMA requested";
-  if (bytes <= threshold) return "size <= blit threshold";
-  return "size > blit threshold";
+// Per-copy engine for same-device hipMalloc. Independent of sdmaCopyThreshold_.
+static const char* copy_note(hipMemcpyKind kind) {
+  if (kind == hipMemcpyDeviceToDeviceNoCU) return "SDMA";
+  return "shader blit";
 }
 
 // Host time for `repeat` ordered copies, after one untimed warmup copy.
@@ -144,27 +154,15 @@ int main(int argc, char** argv) {
   const unsigned long long blit_kib = blit_copy_kib(&blit_is_default);
   const size_t blit_threshold = blit_threshold_bytes(blit_kib);
   const std::vector<size_t> sizes = copy_sizes();
-  bool saw_le = false;
-  bool saw_gt = false;
-  for (size_t bytes : sizes) {
-    if (bytes <= blit_threshold) saw_le = true;
-    else saw_gt = true;
-  }
   std::cout << "GPU_FORCE_BLIT_COPY_SIZE=" << blit_kib;
-  if (blit_is_default) std::cout << " (unset, ROCm default)";
-  std::cout << ", blit threshold " << blit_threshold
-            << " bytes (shader blit eligible when size <= threshold)." << std::endl;
+  if (blit_is_default) std::cout << " (unset, HIP default)";
+  std::cout << ", sdmaCopyThreshold " << blit_threshold << " bytes." << std::endl;
+  std::cout << "That threshold selects a shader blit for host-accessible copies "
+               "with size <= threshold. It does not select the engine for these "
+               "hipMalloc device-to-device copies." << std::endl;
   std::cout << "Sweep is powers of two from " << (size_t{1} << kMinShift)
             << " bytes to " << (size_t{1} << kMaxShift)
             << " bytes and does not depend on GPU_FORCE_BLIT_COPY_SIZE." << std::endl;
-  std::cout << "hipMemcpyDeviceToDeviceNoCU requests SDMA at every size." << std::endl;
-  if (blit_threshold > 0 && !saw_le) {
-    std::cout << "Blit threshold exceeds the fixed sweep, so every measured "
-                 "copy is inside the window." << std::endl;
-  }
-  if (!saw_gt) {
-    std::cout << "No measured size is above the blit threshold." << std::endl;
-  }
 
   const hipMemcpyKind kinds[] = {hipMemcpyDeviceToDeviceNoCU, hipMemcpyDeviceToDevice};
   const char* names[] = {"hipMemcpyDeviceToDeviceNoCU", "hipMemcpyDeviceToDevice"};
@@ -184,7 +182,7 @@ int main(int argc, char** argv) {
     for (int k = 0; k < 2; ++k) {
       CHECK(hipMemset(d_dst, 0, bytes));
       long long ns = time_copy(d_dst, d_src, bytes, repeat, kinds[k]);
-      report(names[k], copy_note(kinds[k], bytes, blit_threshold), bytes, ns, repeat);
+      report(names[k], copy_note(kinds[k]), bytes, ns, repeat);
       CHECK(hipMemcpy(h_dst.data(), d_dst, bytes, hipMemcpyDeviceToHost));
       ok = verify(h_dst.data(), bytes) && ok;
     }
