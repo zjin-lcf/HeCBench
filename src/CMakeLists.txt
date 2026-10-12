@@ -553,6 +553,7 @@ set(HECBENCH_POC_BENCHMARKS
     rmsnorm
     rmsnorm-quant
     saxpy-ompt
+    shampoo
     silu
     softmax-fused
     softmax-online
