@@ -112,8 +112,9 @@ void GSimulation::Start() {
   dim3 grids((n+255)/256);
   dim3 threads(256);
 
-  TimeInterval t0;
   int nsteps = get_nsteps();
+
+  TimeInterval t0;
   // Looping across integration steps
   for (int s = 1; s <= nsteps; ++s) {
     TimeInterval ts0;
