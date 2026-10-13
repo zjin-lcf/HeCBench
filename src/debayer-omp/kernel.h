@@ -25,6 +25,16 @@ void malvar_he_cutler_demosaic (
   const bool valid_pixel_task = (g_r < height) & (g_c < width);
 
   const uint tile_flat_id = tile_row * tile_cols + tile_col;
+  // The launched team can be smaller than n_tile_pixels, so clear the
+  // whole tile buffer before the fill. Leftover team memory otherwise
+  // changes the result after another kernel, such as the device memset.
+  {
+    const int tid = omp_get_thread_num();
+    const int nthreads = omp_get_num_threads();
+    for (int zid = tid; zid < (int)n_apron_fill_tasks; zid += nthreads)
+      apron[zid] = 0;
+  }
+  #pragma omp barrier
   for(uint apron_fill_task_id = tile_flat_id; apron_fill_task_id < n_apron_fill_tasks; apron_fill_task_id += n_tile_pixels){
     const uint apron_read_row = apron_fill_task_id / apron_cols;
     const uint apron_read_col = apron_fill_task_id % apron_cols;
