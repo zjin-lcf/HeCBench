@@ -8,10 +8,11 @@
 #include <hip/hip_runtime.h>
 #include <hip/hip_version.h>
 
-// hipMemcpyDeviceToDeviceNoCU was added in HIP 6.0. Older headers have no
+// hipMemcpyDeviceToDeviceNoCU was added in HIP 6.1. Older headers have no
 // enumerator, so those builds time hipMemcpyDeviceToDevice only.
 #ifndef SDMA_HAS_NOCU
-#if defined(HIP_VERSION_MAJOR) && (HIP_VERSION_MAJOR >= 6)
+#if (HIP_VERSION_MAJOR > 6) || \
+    (HIP_VERSION_MAJOR == 6 && HIP_VERSION_MINOR >= 1)
 #define SDMA_HAS_NOCU 1
 #else
 #define SDMA_HAS_NOCU 0
@@ -184,7 +185,7 @@ int main(int argc, char** argv) {
   const hipMemcpyKind kinds[] = {hipMemcpyDeviceToDeviceNoCU, hipMemcpyDeviceToDevice};
   const char* names[] = {"hipMemcpyDeviceToDeviceNoCU", "hipMemcpyDeviceToDevice"};
 #else
-  std::cout << "hipMemcpyDeviceToDeviceNoCU requires HIP 6.0 or newer; "
+  std::cout << "hipMemcpyDeviceToDeviceNoCU requires HIP 6.1 or newer; "
                "timing hipMemcpyDeviceToDevice only." << std::endl;
   const hipMemcpyKind kinds[] = {hipMemcpyDeviceToDevice};
   const char* names[] = {"hipMemcpyDeviceToDevice"};
