@@ -1558,7 +1558,7 @@ Early results are shown [here](results/README.md)
   Batched dense matrix - dense matrix multiplication into sparse matrix (https://docs.nvidia.com/cuda/cusparse/index.html#cusparsesddmm)
 
 ### sdma (hip)
-  Device-to-device copy bandwidth from 256 bytes to 1 GiB. HIP times hipMemcpyDeviceToDeviceNoCU (SDMA at every size) and hipMemcpyDeviceToDevice (shader blit at every size for same-device hipMalloc). GPU_FORCE_BLIT_COPY_SIZE (HIP default 16 KiB) sets sdmaCopyThreshold_ for host-accessible copies and does not select the engine for these copies. CUDA times cudaMemcpyDeviceToDevice and SYCL times queue::memcpy; those models have no SDMA copy kind.
+  Device-to-device copy bandwidth from 256 bytes to 1 GiB. HIP times hipMemcpyDeviceToDeviceNoCU (SDMA at every size; HIP 6.0 or newer) and hipMemcpyDeviceToDevice (shader blit at every size for same-device hipMalloc). Older HIP builds time hipMemcpyDeviceToDevice only. GPU_FORCE_BLIT_COPY_SIZE (HIP default 16 KiB) sets sdmaCopyThreshold_ for host-accessible copies and does not select the engine for these copies. CUDA times cudaMemcpyDeviceToDevice and SYCL times queue::memcpy; those models have no SDMA copy kind.
 
 ### secp256k1 (cuda)
   Part of BIP39 solver

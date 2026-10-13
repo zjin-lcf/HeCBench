@@ -6,6 +6,17 @@
 #include <limits>
 #include <vector>
 #include <hip/hip_runtime.h>
+#include <hip/hip_version.h>
+
+// hipMemcpyDeviceToDeviceNoCU was added in HIP 6.0. Older headers have no
+// enumerator, so those builds time hipMemcpyDeviceToDevice only.
+#ifndef SDMA_HAS_NOCU
+#if defined(HIP_VERSION_MAJOR) && (HIP_VERSION_MAJOR >= 6)
+#define SDMA_HAS_NOCU 1
+#else
+#define SDMA_HAS_NOCU 0
+#endif
+#endif
 
 #define CHECK(cmd)                                                         \
   do {                                                                     \
@@ -107,7 +118,11 @@ static std::vector<size_t> copy_sizes() {
 
 // Per-copy engine for same-device hipMalloc. Independent of sdmaCopyThreshold_.
 static const char* copy_note(hipMemcpyKind kind) {
+#if SDMA_HAS_NOCU
   if (kind == hipMemcpyDeviceToDeviceNoCU) return "SDMA";
+#else
+  (void)kind;
+#endif
   return "shader blit";
 }
 
@@ -164,8 +179,17 @@ int main(int argc, char** argv) {
             << " bytes to " << (size_t{1} << kMaxShift)
             << " bytes and does not depend on GPU_FORCE_BLIT_COPY_SIZE." << std::endl;
 
+#if SDMA_HAS_NOCU
+  std::cout << "hipMemcpyDeviceToDeviceNoCU requests SDMA at every size." << std::endl;
   const hipMemcpyKind kinds[] = {hipMemcpyDeviceToDeviceNoCU, hipMemcpyDeviceToDevice};
   const char* names[] = {"hipMemcpyDeviceToDeviceNoCU", "hipMemcpyDeviceToDevice"};
+#else
+  std::cout << "hipMemcpyDeviceToDeviceNoCU requires HIP 6.0 or newer; "
+               "timing hipMemcpyDeviceToDevice only." << std::endl;
+  const hipMemcpyKind kinds[] = {hipMemcpyDeviceToDevice};
+  const char* names[] = {"hipMemcpyDeviceToDevice"};
+#endif
+  const int nkinds = static_cast<int>(sizeof(kinds) / sizeof(kinds[0]));
 
   bool ok = true;
   for (size_t bytes : sizes) {
@@ -179,7 +203,7 @@ int main(int argc, char** argv) {
     CHECK(hipMalloc(reinterpret_cast<void**>(&d_dst), bytes));
     CHECK(hipMemcpy(d_src, h_src.data(), bytes, hipMemcpyHostToDevice));
 
-    for (int k = 0; k < 2; ++k) {
+    for (int k = 0; k < nkinds; ++k) {
       CHECK(hipMemset(d_dst, 0, bytes));
       long long ns = time_copy(d_dst, d_src, bytes, repeat, kinds[k]);
       report(names[k], copy_note(kinds[k]), bytes, ns, repeat);
