@@ -1,6 +1,8 @@
 // Element-balanced isomer network with the species and reaction counts of the
 // detailed n-heptane mechanism (mechanism.h). Its chemistry is not meant to be
-// representative; it gives the solver a dense 560x560 Jacobian.
+// representative. Every reaction is a first-order edge inside one of 11
+// element families, so the analytic Jacobian is sparse. The solver still
+// stores that matrix and factors it with a dense 560x560 LU.
 #pragma once
 
 #include "mechanism.h"

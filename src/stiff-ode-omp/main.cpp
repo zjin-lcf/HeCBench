@@ -653,7 +653,7 @@ int run(int zones, int iters, int steps, int warmup, double dt_user, const Devic
     }
     o.states.resize(state0.size());
     d2h(o.states.data(), d_C, sizeof(double) * state0.size());
-    if (o.newton_bad) printf("newton_fail %s zones %d\n", name, o.newton_bad);
+    if (o.newton_bad) printf("newton_fail full zones %d\n", o.newton_bad);
     return o;
   };
 

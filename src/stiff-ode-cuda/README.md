@@ -1,6 +1,6 @@
 # stiff-ode-cuda
 
-CUDA port of `src/stiff-ode-hip`: a backward-Euler chemistry step at the size of the detailed n-heptane mechanism (560 species, 2500 reactions), with an analytic Jacobian, modified Newton, and a dense 560×560 LU with partial pivoting. The reaction table is the element-balanced isomer network in `workload.h`. `mechanism.h`, `workload.h`, and the host reference `reference.h` live here and are shared with the HIP, SYCL, and OpenMP ports.
+CUDA port of `src/stiff-ode-hip`: a backward-Euler chemistry step at the size of the detailed n-heptane mechanism (560 species, 2500 reactions), with an analytic Jacobian, modified Newton, and a dense 560×560 LU with partial pivoting. The reaction table is the element-balanced isomer network in `workload.h`. Each reaction is a first-order edge inside one element family, so the analytic Jacobian is sparse; the solver stores that matrix and factors it with a dense LU. `mechanism.h`, `workload.h`, and the host reference `reference.h` live here and are shared with the HIP, SYCL, and OpenMP ports.
 
 One zone is one block. `kinetics.cuh` keeps the HIP function names and operation order. The kernel runs a 512-thread block:
 

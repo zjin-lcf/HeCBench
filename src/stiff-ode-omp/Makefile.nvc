@@ -60,7 +60,7 @@ endif
 $(program): $(obj) Makefile.nvc
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp kinetics.h ../stiff-ode-cuda/mechanism.h 
+%.o: %.cpp kinetics.h ../stiff-ode-cuda/mechanism.h \
            ../stiff-ode-cuda/workload.h ../stiff-ode-cuda/reference.h Makefile.nvc
 	$(CC) $(CFLAGS) -c $< -o $@
 

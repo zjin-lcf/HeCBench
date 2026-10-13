@@ -4,7 +4,7 @@ A stiff chemistry step at the size of the detailed n-heptane mechanism (560 spec
 
 Each zone is an isothermal, constant-density reactor. The advance is backward Euler with an analytic Jacobian and a dense 560×560 LU with partial pivoting. Temperature is fixed per zone, so the Arrhenius coefficients and \(K_c\) are write-once. Each step assembles and factors \(I - \Delta t\,J\) on its first Newton iteration and reuses the factors for the rest of the step (modified Newton), so later iterations reassemble only \(\omega\).
 
-The reaction table is an element-balanced isomer network with the published species and reaction counts (`../stiff-ode-cuda/workload.h`). It gives the solver a dense Jacobian; its chemistry is not meant to be representative. The rate code still handles third-body, Lindemann, and Troe reactions.
+The reaction table is an element-balanced isomer network with the published species and reaction counts (`../stiff-ode-cuda/workload.h`). Every reaction stays inside one element family, so the analytic Jacobian is sparse; the solver stores that matrix and factors it with a dense LU. Its chemistry is not meant to be representative. The rate code still handles third-body, Lindemann, and Troe reactions.
 
 The workload, mechanism size, and host reference (`workload.h`, `mechanism.h`, `reference.h`) live in `../stiff-ode-cuda/` and are shared by the HIP, CUDA, SYCL, and OpenMP ports.
 
