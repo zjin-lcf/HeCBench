@@ -103,19 +103,17 @@ void GSimulation::Start() {
 
   Particle *p;
   cudaMalloc((void**)&p, sizeof(Particle) * n);
-  cudaMemcpyAsync(p, particles_.data(), sizeof(Particle) * n, cudaMemcpyHostToDevice, 0);
+  cudaMemcpy(p, particles_.data(), sizeof(Particle) * n, cudaMemcpyHostToDevice);
 
   RealType *e;
   cudaMalloc((void**)&e, sizeof(RealType) * n);
-  cudaMemcpyAsync(e, energy.data(), sizeof(RealType) * n, cudaMemcpyHostToDevice, 0);
+  cudaMemcpy(e, energy.data(), sizeof(RealType) * n, cudaMemcpyHostToDevice);
 
   dim3 grids((n+255)/256);
   dim3 threads(256);
 
   int nsteps = get_nsteps();
 
-  // The uploads above are asynchronous. Wait so they are outside the timer.
-  cudaStreamSynchronize(0);
   TimeInterval t0;
   // Looping across integration steps
   for (int s = 1; s <= nsteps; ++s) {
