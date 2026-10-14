@@ -114,6 +114,8 @@ void GSimulation::Start() {
 
   int nsteps = get_nsteps();
 
+  // The uploads above are asynchronous. Wait so they are outside the timer.
+  hipStreamSynchronize(0);
   TimeInterval t0;
   // Looping across integration steps
   for (int s = 1; s <= nsteps; ++s) {
