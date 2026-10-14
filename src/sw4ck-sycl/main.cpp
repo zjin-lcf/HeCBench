@@ -40,32 +40,43 @@ int main(int argc, char *argv[]) {
   std::vector<int*> onesided;
   std::string line;
   int lc = 0;
+  // One dataset is a 14-integer header plus 15 Sarray records.
+  const int N = 16;
   std::cout << "Reading from file " << argv[1] << "\n";
   while (std::getline(iff, line)) {
     std::istringstream iss(line);
-    int* optr = new int[14];
-    const int N = 16;
     if ((lc % N) == 0) {
+      int* optr = new int[14];
       if (!(iss >> optr[0] >> optr[1] >> optr[2] >> optr[3] >> optr[4] >>
             optr[5] >> optr[6] >> optr[7] >> optr[8] >> optr[9] >> optr[10] >>
             optr[11] >> optr[12] >> optr[13])) {
+        delete[] optr;
         std::cerr << "Error reading data on line " << lc + 1 << "\n";
-        break;
+        return 1;
       }
       onesided.push_back(optr);
       arrays.emplace_back();
     } else {
       Sarray* s = new Sarray();
+      s->m_data = nullptr;
       auto name = s->fill(iss);
       if (name == "Break") {
+        delete s;
         std::cerr << "Error reading Sarray data on line " << lc + 1 << "\n";
-        break;
+        return 1;
       } else {
         arrays[lc / N][name] = s;
       }
     }
     lc++;
   } // while
+
+  // A header is stored before its 15 records. Do not run that partial case.
+  if (lc % N != 0) {
+    std::cerr << "Error: truncated dataset in " << argv[1]
+              << " at line " << lc + 1 << "\n";
+    return 1;
+  }
 
   const int ndata = static_cast<int>(onesided.size());
   if (ndata == 0) {
