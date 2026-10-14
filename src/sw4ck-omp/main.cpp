@@ -27,12 +27,15 @@ int main(int argc, char* argv[]) {
   // Open an input data file
   std::ifstream iff;
   iff.open(argv[1]);
+  if (!iff.is_open()) {
+    std::cerr << "Error: failed to open input file " << argv[1] << "\n";
+    return 1;
+  }
 
   // Repeat the execution of kernels 
   const int repeat = atoi(argv[2]);
 
-  // At most 10 input datasets
-  std::map<std::string, Sarray*> arrays[10];
+  std::vector<std::map<std::string, Sarray*>> arrays;
   std::vector<int*> onesided;
   std::string line;
   int lc = 0;
@@ -49,6 +52,7 @@ int main(int argc, char* argv[]) {
         break;
       }
       onesided.push_back(optr);
+      arrays.emplace_back();
     } else {
       Sarray* s = new Sarray();
       auto name = s->fill(iss);
@@ -62,10 +66,16 @@ int main(int argc, char* argv[]) {
     lc++;
   } // while
 
+  const int ndata = static_cast<int>(onesided.size());
+  if (ndata == 0) {
+    std::cerr << "Error: no input datasets in " << argv[1] << "\n";
+    return 1;
+  }
+
 #ifdef VERBOSE
   std::cout << "\nCurrent state of map array\n";
 #endif
-  for (int i = 0; i < 2; i++)
+  for (int i = 0; i < ndata; i++)
     for (auto const& x : arrays[i]) {
 #ifdef VERBOSE
       std::cout << x.first << " " << x.second->g << " " << x.second->m_npts
@@ -93,10 +103,12 @@ int main(int argc, char* argv[]) {
   float_sw4 *d_ghcof_no_gp = acof_no_gp + 384;
 */
 
-  // Expected norm values after executing five kernels for the two input dataset
-  float_sw4 exact_norm[2] = {2.2502232733796421194, 202.0512747393526638}; 
+  // Reference norms for the cases shipped in sw4ck.in. Further cases are
+  // still executed; their norms are printed without a percentage error.
+  const float_sw4 exact_norm[] = {2.2502232733796421194, 202.0512747393526638};
+  const int nref = sizeof(exact_norm) / sizeof(exact_norm[0]);
 
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < ndata; i++) {
     int* optr = onesided[i];
     float_sw4* alpha_ptr = arrays[i]["a_AlphaVE_0"]->m_data;
     int alpha_size = arrays[i]["a_AlphaVE_0"]->m_nc * 
@@ -177,15 +189,21 @@ int main(int argc, char* argv[]) {
 
     // Display the norms in hex and decimal formats before verification
     float_sw4 norm = arrays[i]["a_Uacc"]->norm();
-    float_sw4 err = (norm - exact_norm[i]) / exact_norm[i] * 100;
-    std::cout << "Error = " << err << " %\n";
+    if (i < nref) {
+      float_sw4 err = (norm - exact_norm[i]) / exact_norm[i] * 100;
+      std::cout << "Error = " << err << " %\n";
+    } else {
+      auto prec = std::cout.precision();
+      std::cout << "Norm = " << std::setprecision(17) << norm << "\n";
+      std::cout.precision(prec);
+    }
 
     free(sg_str);
     delete(optr);
   }
 
   #pragma omp target exit data map(delete: cof_ptr[0:cof_size])
-  for (int i = 0; i < 2; i++)
+  for (int i = 0; i < ndata; i++)
     for (auto const& x : arrays[i]) 
       delete(x.second);
   return 0;
