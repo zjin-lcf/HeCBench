@@ -441,6 +441,7 @@ set(HECBENCH_POC_BENCHMARKS
     trimul
     tsne
     tsp
+    twell
     unfold
     urng
     vanGenuchten
