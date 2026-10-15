@@ -564,6 +564,9 @@ set(HECBENCH_POC_BENCHMARKS
     sundials
     ssm
     storeKVCache
+    axpby
+    f8cast
+    minimap2
     threadcpy
     tridiagonal
     topk
