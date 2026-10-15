@@ -393,6 +393,7 @@ set(HECBENCH_POC_BENCHMARKS
     slit
     slu
     snake
+    snicit
     sobel
     sobol
     sort
