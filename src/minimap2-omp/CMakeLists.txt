@@ -8,6 +8,7 @@ add_hecbench_benchmark(
         src/host_kernel.cpp
         src/main.cpp
         src/memory_scheduler.cpp
+        device/device_kernel_wrapper.cpp
     INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include
     CATEGORIES bioinformatics algorithms
 )
