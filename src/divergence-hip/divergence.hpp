@@ -7,6 +7,14 @@
 #define ALIGN(vardec) __declspec(align) vardec
 #define ALIGNTO(vardec, boundary) \
   __declspec(align(boundary)) vardec
+#elif defined(__clang__)
+/* Clang (including hipcc and Clang CUDA) defines __GNUG__ == 4 for
+   compatibility, which would otherwise look like G++ < 4.9. */
+#define NOVECDEP _Pragma("clang loop vectorize(assume_safety)")
+#define ALWAYSVECTORIZE _Pragma("clang loop vectorize(enable)")
+#define ALIGN(vardec) __attribute__((aligned)) vardec
+#define ALIGNTO(vardec, boundary) \
+  __attribute__((aligned(boundary))) vardec
 #elif defined(__GNUG__)
 #if(__GNUG__ == 4 && __GNUC_MINOR__ >= 9) || __GNUG__ > 4
 #define NOVECDEP _Pragma("GCC ivdep")
