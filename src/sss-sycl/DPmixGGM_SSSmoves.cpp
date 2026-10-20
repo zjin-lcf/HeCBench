@@ -1045,8 +1045,8 @@ long int splitMerge(State a, List list, List bestlist, myInt lookForwardLength,
   delete[] pll_clus_old;
   delete[] pll_clus_new;
   delete[] plp_store;
-  delete newgraphlist1;
-  delete newgraphlist2;
+  delete[] newgraphlist1;
+  delete[] newgraphlist2;
   delete[] thisl;
   delete[] thisL;
   delete[] which_ones;

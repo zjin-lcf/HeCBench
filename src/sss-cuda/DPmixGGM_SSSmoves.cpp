@@ -1253,8 +1253,8 @@ int Merge(State a, List bestlist, myInt lookForwardLength, bool force) {
   delete[] pll_clus_old;
   delete[] pll_clus_new;
   delete[] plp_store;
-  delete newgraphlist1;
-  delete newgraphlist2;
+  delete[] newgraphlist1;
+  delete[] newgraphlist2;
   return (num_cases);
 }
 
