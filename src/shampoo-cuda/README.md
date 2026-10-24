@@ -34,16 +34,16 @@ The eigenvalue benchmark is tridiagonal bisection, not this dense inverse root.
 ```
 
 `make run` checks a rectangular block (`33 31 3 1`) against the OpenMP
-reference in `reference.h`, then times one production block (`8192 8192 2 0`)
-without that reference. The check uses three steps of a changing gradient,
+reference in `reference.h`, then times the 4K and 8K production blocks
+(`4096 4096 2 0` and `8192 8192 2 0`) without that reference. The check uses
+three steps of a changing gradient,
 and `33 x 31` is not a multiple of four, so the scalar tail in the vector
 kernels runs. It compares the factor matrices and the preconditioned block
 before grafting; grafting alone hides a wrong EMA weight or bias correction.
-CMake uses the same check and defaults to `both`. The timed run keeps one
-gradient fixed. For the 4K and 8K factor sizes emphasized by
-arXiv:2610.22230, run `./main 4096 4096 2 0 both` or
-`./main 8192 8192 2 0 both`. Solver timings depend on the vendor library and
-driver versions; the paper does not specify those versions.
+CMake uses the same check and defaults to `both`. The timed runs keep one
+gradient fixed. The 4K and 8K factor sizes are the ones emphasized by
+arXiv:2610.22230. Solver timings depend on the vendor library and driver
+versions; the paper does not specify those versions.
 
 CUDA, HIP, and SYCL use the same 256-thread mapping. Contiguous stages load
 and store 128 bits per thread, and the Frobenius norm is one 256-wide

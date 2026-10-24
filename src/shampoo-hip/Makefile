@@ -55,6 +55,7 @@ clean:
 run: $(program)
 	$(LAUNCHER) ./$(program) 33 31 3 1 both
 	$(LAUNCHER) ./$(program) 1024 1024 1 1 both
+	$(LAUNCHER) ./$(program) 4096 4096 2 0 both
 	$(LAUNCHER) ./$(program) 8192 8192 2 0 both
 
 .PHONY: clean run
