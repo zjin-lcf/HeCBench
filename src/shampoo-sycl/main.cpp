@@ -128,10 +128,14 @@ static void set_diag(sycl::queue& q, float* Z, int n) {
 // roundoff-level negative values from an fp32 symmetric eigendecomposition.
 static void scale_eigenvectors(sycl::queue& q, float* Q, const float* w, int n) {
   const int count = n * n;
-  q.parallel_for(sycl::range<1>(count), [=](sycl::id<1> id) {
-    const int i = id[0];
-    const int col = i / n;
-    Q[i] *= sycl::pow(sycl::fmax(w[col], kEpsilon), -0.25f);
+  const int blocks = (count + kThreads - 1) / kThreads;
+  q.parallel_for(sycl::nd_range<1>(blocks * kThreads, kThreads),
+                 [=](sycl::nd_item<1> it) [[sycl::reqd_work_group_size(256)]] {
+    const int i = it.get_global_id(0);
+    if (i < count) {
+      const int col = i / n;
+      Q[i] *= sycl::pow(sycl::fmax(w[col], kEpsilon), -0.25f);
+    }
   });
 }
 
@@ -505,7 +509,22 @@ int main(int argc, char* argv[]) {
       frobenius_nrm(q, d_T, d_nrm + 1, gcount);
       scale_by_graft(q, d_out, d_nrm + 1, d_nrm, gcount);
     }
-    q.wait();
+    try {
+      if (verify)
+        q.wait_and_throw();
+      else
+        q.wait();
+    } catch (const oneapi::mkl::lapack::exception& e) {
+      fprintf(stderr, "oneMKL syevd failed (info=%ld)\n", (long)e.info());
+      printf("%s FAIL\n", names[mi]);
+      rc = 1;
+      break;
+    } catch (const sycl::exception& e) {
+      fprintf(stderr, "SYCL error: %s\n", e.what());
+      printf("%s FAIL\n", names[mi]);
+      rc = 1;
+      break;
+    }
     auto end = std::chrono::steady_clock::now();
     double ms = std::chrono::duration<double, std::milli>(end - start).count();
     printf("rows %d cols %d steps %d method %s\n", M, N, steps, names[mi]);
@@ -523,7 +542,10 @@ int main(int argc, char* argv[]) {
                shampoo_match("pre-graft", pre, ref_pre, gcount) &&
                shampoo_match("grafted", out, ref, gcount);
       printf("%s %s\n", names[mi], ok ? "PASS" : "FAIL");
-      rc |= ok ? 0 : 1;
+      if (!ok) {
+        rc = 1;
+        break;
+      }
     }
   }
   sycl::free(d_G, q); sycl::free(d_L, q); sycl::free(d_R, q);

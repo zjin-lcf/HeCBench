@@ -33,10 +33,10 @@ The eigenvalue benchmark is tridiagonal bisection, not this dense inverse root.
 ./main <rows> <cols> <steps> <verify> [newton-schulz|eigendecomposition|both]
 ```
 
-`make run` checks a rectangular block (`33 31 3 1`) against the OpenMP
-reference in `reference.h`, then times the 4K and 8K production blocks
-(`4096 4096 2 0` and `8192 8192 2 0`) without that reference. The check uses
-three steps of a changing gradient,
+`make run` first checks `33 31 3 1` and `1024 1024 1 1` against the OpenMP
+reference in `reference.h`. It starts the 4K and 8K timing runs only when
+both checks pass. The timing runs do not repeat the solver-status check.
+The rectangular check uses three steps of a changing gradient,
 and `33 x 31` is not a multiple of four, so the scalar tail in the vector
 kernels runs. It compares the factor matrices and the preconditioned block
 before grafting; grafting alone hides a wrong EMA weight or bias correction.

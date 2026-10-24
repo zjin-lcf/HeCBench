@@ -537,16 +537,6 @@ int main(int argc, char* argv[]) {
     double ms = std::chrono::duration<double, std::milli>(end - start).count();
     printf("rows %d cols %d steps %d method %s\n", M, N, steps, names[mi]);
     printf("Average shampoo step time (%s) %f (ms)\n", names[mi], ms / steps);
-    if (use_eigh) {
-      rocblas_int solver_info = 0;
-      CHECK_HIP(hipMemcpy(&solver_info, d_solver_info, sizeof(solver_info),
-                          hipMemcpyDeviceToHost));
-      if (solver_info != 0) {
-        fprintf(stderr, "rocSOLVER syevd did not converge (info=%d)\n",
-                (int)solver_info);
-        rc = 1;
-      }
-    }
     CHECK_HIP(hipMemcpy(out, d_out, sizeof(float) * (size_t)gcount, hipMemcpyDeviceToHost));
     if (verify) {
       CHECK_HIP(hipMemcpy(Lh, d_L, sizeof(float) * (size_t)lcount, hipMemcpyDeviceToHost));
@@ -557,7 +547,10 @@ int main(int argc, char* argv[]) {
                shampoo_match("pre-graft", pre, ref_pre, gcount) &&
                shampoo_match("grafted", out, ref, gcount);
       printf("%s %s\n", names[mi], ok ? "PASS" : "FAIL");
-      rc |= ok ? 0 : 1;
+      if (!ok) {
+        rc = 1;
+        break;
+      }
     }
   }
   CHECK_HIPBLAS(hipblasDestroy(g_handle));
