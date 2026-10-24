@@ -537,6 +537,18 @@ int main(int argc, char* argv[]) {
     double ms = std::chrono::duration<double, std::milli>(end - start).count();
     printf("rows %d cols %d steps %d method %s\n", M, N, steps, names[mi]);
     printf("Average shampoo step time (%s) %f (ms)\n", names[mi], ms / steps);
+    if (verify && use_eigh) {
+      rocblas_int solver_info = 0;
+      CHECK_HIP(hipMemcpy(&solver_info, d_solver_info, sizeof(solver_info),
+                          hipMemcpyDeviceToHost));
+      if (solver_info != 0) {
+        fprintf(stderr, "rocSOLVER syevd did not converge (info=%d)\n",
+                (int)solver_info);
+        printf("%s FAIL\n", names[mi]);
+        rc = 1;
+        break;
+      }
+    }
     CHECK_HIP(hipMemcpy(out, d_out, sizeof(float) * (size_t)gcount, hipMemcpyDeviceToHost));
     if (verify) {
       CHECK_HIP(hipMemcpy(Lh, d_L, sizeof(float) * (size_t)lcount, hipMemcpyDeviceToHost));

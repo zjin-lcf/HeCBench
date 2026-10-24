@@ -533,6 +533,17 @@ int main(int argc, char* argv[]) {
     double ms = std::chrono::duration<double, std::milli>(end - start).count();
     printf("rows %d cols %d steps %d method %s\n", M, N, steps, names[mi]);
     printf("Average shampoo step time (%s) %f (ms)\n", names[mi], ms / steps);
+    if (verify && use_eigh) {
+      int solver_info = 0;
+      CHECK_CUDA(cudaMemcpy(&solver_info, d_solver_info, sizeof(solver_info),
+                            cudaMemcpyDeviceToHost));
+      if (solver_info != 0) {
+        fprintf(stderr, "cuSOLVER syevd did not converge (info=%d)\n", solver_info);
+        printf("%s FAIL\n", names[mi]);
+        rc = 1;
+        break;
+      }
+    }
     CHECK_CUDA(cudaMemcpy(out, d_out, sizeof(float) * (size_t)gcount,
                           cudaMemcpyDeviceToHost));
     if (verify) {
