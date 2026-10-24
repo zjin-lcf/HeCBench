@@ -360,7 +360,7 @@ static void eigh_inverse_root(float* A, float* Q, float* result, float* nrm,
 // compares the preconditioned gradient with the host reference.
 int main(int argc, char* argv[]) {
   if (argc != 5 && argc != 6) {
-    printf("Usage: %s <rows> <cols> <steps> <verify> [ns|eigh|both]\n", argv[0]);
+    printf("Usage: %s <rows> <cols> <steps> <verify> [newton-schulz|eigendecomposition|both]\n", argv[0]);
     printf("  rows x cols is one order-2 Shampoo block\n");
     return 1;
   }
@@ -370,14 +370,14 @@ int main(int argc, char* argv[]) {
   const int steps = atoi(argv[3]);
   const int verify = atoi(argv[4]);
   const char* method = argc == 6 ? argv[5] : "both";
-  const bool run_ns = strcmp(method, "ns") == 0 || strcmp(method, "both") == 0;
-  const bool run_eigh = strcmp(method, "eigh") == 0 || strcmp(method, "both") == 0;
+  const bool run_ns = strcmp(method, "newton-schulz") == 0 || strcmp(method, "both") == 0;
+  const bool run_eigh = strcmp(method, "eigendecomposition") == 0 || strcmp(method, "both") == 0;
   if (M < 1 || N < 1 || M > 8192 || N > 8192 || steps < 1) {
     fprintf(stderr, "rows and cols must be in [1, 8192], steps >= 1\n");
     return 1;
   }
   if (!run_ns && !run_eigh) {
-    fprintf(stderr, "method must be ns, eigh, or both\n");
+    fprintf(stderr, "method must be newton-schulz, eigendecomposition, or both\n");
     return 1;
   }
 
@@ -511,7 +511,7 @@ int main(int argc, char* argv[]) {
   };
 
   int rc = 0;
-  const char* names[] = {"ns", "eigh"};
+  const char* names[] = {"newton-schulz", "eigendecomposition"};
   const bool selected[] = {run_ns, run_eigh};
   for (int mi = 0; mi < 2; ++mi) {
     if (!selected[mi]) continue;

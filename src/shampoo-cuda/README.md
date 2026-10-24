@@ -12,9 +12,10 @@ dimension normalization), the coupled Newton-Schulz inverse fourth root
 and the two-sided precondition `Linv^T G Rinv`. An order-2 block uses inverse
 exponent `1/4`, so the root is 4. The amortized inverse root runs on every
 timed step. The benchmark can use the original coupled Newton-Schulz path
-(`ns`) or an eigendecomposition path (`eigh`): cuSOLVER on CUDA, rocSOLVER
-on HIP, and oneMKL LAPACK on SYCL. `both` runs independent, identically
-initialized trials and reports one average step time for each path.
+(`newton-schulz`) or the eigendecomposition path (`eigendecomposition`):
+cuSOLVER on CUDA, rocSOLVER on HIP, and oneMKL LAPACK on SYCL. `both` runs
+independent, identically initialized trials and reports one average step
+time for each path.
 
 The direction is then rescaled by AdaGrad grafting from Shi et al.,
 arXiv:2309.06497, Section 2.4 and Algorithm 1. The grafted state is the sum
@@ -29,7 +30,7 @@ from `muon` (quintic Newton-Schulz orthogonalization of a rectangular matrix).
 The eigenvalue benchmark is tridiagonal bisection, not this dense inverse root.
 
 ```text
-./main <rows> <cols> <steps> <verify> [ns|eigh|both]
+./main <rows> <cols> <steps> <verify> [newton-schulz|eigendecomposition|both]
 ```
 
 `make run` checks a rectangular block (`33 31 3 1`) against the OpenMP
