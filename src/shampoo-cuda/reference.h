@@ -284,7 +284,8 @@ static int shampoo_match(const char* name, const float* got, const float* refv,
     if (ar > max_ref) max_ref = ar;
   }
   int ok = finite && max_ref > 0.0 && max_abs <= 1e-3 * max_ref + 1e-6;
-  //printf("%s max abs error %g, peak %g\n", name, max_abs, max_ref);
+  if (!ok)
+    printf("%s max abs error %g, peak %g\n", name, max_abs, max_ref);
   return ok;
 }
 

@@ -7,6 +7,8 @@
 #include <random>
 #include <cuda.h>
 #include <cublas_v2.h>
+#include <cusolverDn.h>
+#include <string.h>
 #include "reference.h"
 
 // One order-2 root-inverse Shampoo step on a single blocked parameter of
@@ -42,7 +44,18 @@
     }                                                                          \
   } while (0)
 
+#define CHECK_CUSOLVER(call)                                                   \
+  do {                                                                         \
+    cusolverStatus_t st__ = (call);                                            \
+    if (st__ != CUSOLVER_STATUS_SUCCESS) {                                    \
+      fprintf(stderr, "cuSOLVER error %d at %s:%d\n", (int)st__, __FILE__,    \
+              __LINE__);                                                      \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
+  } while (0)
+
 static cublasHandle_t g_handle;
+static cusolverDnHandle_t g_solver;
 static cudaStream_t g_stream = 0;
 
 // 256-thread kernels. Contiguous stages move 128 bits per thread.
@@ -119,6 +132,19 @@ __global__ void
 set_diag(float* __restrict__ Z, int n) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n) Z[(size_t)i * n + i] = 1.f;
+}
+
+// Scale eigensolver output Q in-place to Q diag(lambda^(-1/4)).  The input
+// factor was ridge-regularized before the decomposition, but clamp again to
+// make tiny negative eigenvalues from fp32 roundoff harmless.
+__global__ void
+scale_eigenvectors(float* Q, const float* w, int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  const int count = n * n;
+  if (i < count) {
+    int col = i / n;
+    Q[i] *= powf(fmaxf(w[col], kEpsilon), -0.25f);
+  }
 }
 
 // Bias-correct the EMA factors following paper Section 3.1.1 after
@@ -312,11 +338,31 @@ static void inverse_root(float* A, float* Y, float* Z, float* T, float* B,
   }
 }
 
+// The paper's rocSOLVER path is an eigendecomposition.  This CUDA analogue
+// uses the complete symmetric eigensolve, then reconstructs A^(-1/4).
+static void eigh_inverse_root(float* A, float* Q, float* result, float* nrm,
+                              float* w, float* work, int lwork, int* info,
+                              int n) {
+  frobenius_nrm<<<1, kThreads, 0, g_stream>>>(A, nrm, n * n);
+  add_ridge<<<(n + kThreads - 1) / kThreads, kThreads, 0, g_stream>>>(
+      A, nrm, kRelativeEpsilon, kEpsilon, n);
+  CHECK_CUSOLVER(cusolverDnSsyevd(
+      g_solver, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, n, A, n,
+      w, work, lwork, info));
+  CHECK_CUDA(cudaMemcpyAsync(Q, A, sizeof(float) * (size_t)n * n,
+                             cudaMemcpyDeviceToDevice, g_stream));
+  scale_eigenvectors<<<(n * n + kThreads - 1) / kThreads, kThreads, 0,
+                       g_stream>>>(A, w, n);
+  rgemm(CUBLAS_OP_T, CUBLAS_OP_N, n, n, n, A, Q, result, 1.f, 0.f);
+  CHECK_CUDA(cudaMemcpyAsync(A, result, sizeof(float) * (size_t)n * n,
+                             cudaMemcpyDeviceToDevice, g_stream));
+}
+
 // Time `steps` Shampoo updates of one frozen M x N gradient. verify != 0
 // compares the preconditioned gradient with the host reference.
 int main(int argc, char* argv[]) {
-  if (argc != 5) {
-    printf("Usage: %s <rows> <cols> <steps> <verify>\n", argv[0]);
+  if (argc != 5 && argc != 6) {
+    printf("Usage: %s <rows> <cols> <steps> <verify> [ns|eigh|both]\n", argv[0]);
     printf("  rows x cols is one order-2 Shampoo block\n");
     return 1;
   }
@@ -325,8 +371,15 @@ int main(int argc, char* argv[]) {
   const int N = atoi(argv[2]);
   const int steps = atoi(argv[3]);
   const int verify = atoi(argv[4]);
+  const char* method = argc == 6 ? argv[5] : "both";
+  const bool run_ns = strcmp(method, "ns") == 0 || strcmp(method, "both") == 0;
+  const bool run_eigh = strcmp(method, "eigh") == 0 || strcmp(method, "both") == 0;
   if (M < 1 || N < 1 || M > 8192 || N > 8192 || steps < 1) {
     fprintf(stderr, "rows and cols must be in [1, 8192], steps >= 1\n");
+    return 1;
+  }
+  if (!run_ns && !run_eigh) {
+    fprintf(stderr, "method must be ns, eigh, or both\n");
     return 1;
   }
 
@@ -373,7 +426,8 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < gcount; i++) H[i] = dist(gen);
 
   float *d_G, *d_L, *d_R, *d_Linv, *d_Rinv, *d_out, *d_A;
-  float *d_Y, *d_Z, *d_T, *d_B, *d_nrm;
+  float *d_Y, *d_Z, *d_T, *d_B, *d_nrm, *d_eigenvalues, *d_solver_work;
+  int* d_solver_info;
   CHECK_CUDA(cudaMalloc(&d_G, sizeof(float) * gcount));
   CHECK_CUDA(cudaMalloc(&d_L, sizeof(float) * lcount));
   CHECK_CUDA(cudaMalloc(&d_R, sizeof(float) * rcount));
@@ -388,6 +442,8 @@ int main(int argc, char* argv[]) {
   // Two scalars: ||P_shampoo||_F and ||P_graft||_F. The inverse root uses
   // the first slot and finishes before grafting writes either one.
   CHECK_CUDA(cudaMalloc(&d_nrm, sizeof(float) * 2));
+  CHECK_CUDA(cudaMalloc(&d_eigenvalues, sizeof(float) * nmax));
+  CHECK_CUDA(cudaMalloc(&d_solver_info, sizeof(int)));
 
   CHECK_CUDA(cudaMemcpy(d_G, G, sizeof(float) * gcount, cudaMemcpyHostToDevice));
   CHECK_CUDA(cudaMemset(d_L, 0, sizeof(float) * lcount));
@@ -395,11 +451,18 @@ int main(int argc, char* argv[]) {
   CHECK_CUDA(cudaMemset(d_A, 0, sizeof(float) * gcount));
 
   CHECK_CUBLAS(cublasCreate(&g_handle));
+  CHECK_CUSOLVER(cusolverDnCreate(&g_solver));
   // Pedantic math is full fp32: no TF32 tensor cores, no reduced-precision
   // reductions. HIP requests the same mode; SYCL requests oneMKL standard.
   CHECK_CUBLAS(cublasSetMathMode(g_handle, CUBLAS_PEDANTIC_MATH));
   CHECK_CUDA(cudaStreamCreate(&g_stream));
   CHECK_CUBLAS(cublasSetStream(g_handle, g_stream));
+  CHECK_CUSOLVER(cusolverDnSetStream(g_solver, g_stream));
+  int solver_lwork = 0;
+  CHECK_CUSOLVER(cusolverDnSsyevd_bufferSize(
+      g_solver, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, nmax, d_Y,
+      nmax, d_eigenvalues, &solver_lwork));
+  CHECK_CUDA(cudaMalloc(&d_solver_work, sizeof(float) * (size_t)solver_lwork));
 
   // One step on d_G. Verification replaces d_G each step; timing leaves it
   // fixed. L and R are the row and column factors. Launched directly each
@@ -409,16 +472,24 @@ int main(int argc, char* argv[]) {
   //   Eq. (17): out = Linv^T G Rinv (Linv is symmetric)
   //   Section 2.2, Eqs. (9) and (13): diagonal AdaGrad state and direction
   //   Eq. (20): rescale out by ||P_graft||_F / ||out||_F
-  auto run_step = [&](float bc, float* save_pre) {
+  auto run_step = [&](float bc, float* save_pre, bool use_eigh) {
     rgemm(CUBLAS_OP_N, CUBLAS_OP_T, M, M, N, d_G, d_G, d_T, 1.f, 0.f);
     axpy<<<blocks_for4(lcount), kThreads, 0, g_stream>>>(d_L, d_T, kBeta2, kWeight, lcount);
     rgemm(CUBLAS_OP_T, CUBLAS_OP_N, N, N, M, d_G, d_G, d_T, 1.f, 0.f);
     axpy<<<blocks_for4(rcount), kThreads, 0, g_stream>>>(d_R, d_T, kBeta2, kWeight, rcount);
 
     scale_div<<<blocks_for4(lcount), kThreads, 0, g_stream>>>(d_Linv, d_L, bc, lcount);
-    inverse_root(d_Linv, d_Y, d_Z, d_T, d_B, d_nrm, M);
+    if (use_eigh)
+      eigh_inverse_root(d_Linv, d_Y, d_Z, d_nrm, d_eigenvalues, d_solver_work,
+                        solver_lwork, d_solver_info, M);
+    else
+      inverse_root(d_Linv, d_Y, d_Z, d_T, d_B, d_nrm, M);
     scale_div<<<blocks_for4(rcount), kThreads, 0, g_stream>>>(d_Rinv, d_R, bc, rcount);
-    inverse_root(d_Rinv, d_Y, d_Z, d_T, d_B, d_nrm, N);
+    if (use_eigh)
+      eigh_inverse_root(d_Rinv, d_Y, d_Z, d_nrm, d_eigenvalues, d_solver_work,
+                        solver_lwork, d_solver_info, N);
+    else
+      inverse_root(d_Rinv, d_Y, d_Z, d_T, d_B, d_nrm, N);
 
     rgemm(CUBLAS_OP_T, CUBLAS_OP_N, M, N, M, d_Linv, d_G, d_T, 1.f, 0.f);
     rgemm(CUBLAS_OP_N, CUBLAS_OP_N, M, N, N, d_T, d_Rinv, d_out, 1.f, 0.f);
@@ -435,30 +506,58 @@ int main(int argc, char* argv[]) {
         d_out, d_nrm + 1, d_nrm, gcount);
   };
 
-  auto start = std::chrono::steady_clock::now();
-
-  for (int step = 1; step <= steps; step++) {
-    if (verify) {
-      shampoo_gradient_at_step(G, H, Gs, gcount, step);
-      CHECK_CUDA(cudaMemcpyAsync(d_G, Gs, sizeof(float) * gcount,
-                                 cudaMemcpyHostToDevice, g_stream));
+  int rc = 0;
+  const char* names[] = {"ns", "eigh"};
+  const bool selected[] = {run_ns, run_eigh};
+  for (int mi = 0; mi < 2; ++mi) {
+    if (!selected[mi]) continue;
+    const bool use_eigh = mi == 1;
+    CHECK_CUDA(cudaMemcpyAsync(d_G, G, sizeof(float) * (size_t)gcount,
+                               cudaMemcpyHostToDevice, g_stream));
+    CHECK_CUDA(cudaMemsetAsync(d_L, 0, sizeof(float) * (size_t)lcount, g_stream));
+    CHECK_CUDA(cudaMemsetAsync(d_R, 0, sizeof(float) * (size_t)rcount, g_stream));
+    CHECK_CUDA(cudaMemsetAsync(d_A, 0, sizeof(float) * (size_t)gcount, g_stream));
+    CHECK_CUDA(cudaStreamSynchronize(g_stream));
+    auto start = std::chrono::steady_clock::now();
+    for (int step = 1; step <= steps; step++) {
+      if (verify) {
+        shampoo_gradient_at_step(G, H, Gs, gcount, step);
+        CHECK_CUDA(cudaMemcpyAsync(d_G, Gs, sizeof(float) * (size_t)gcount,
+                                   cudaMemcpyHostToDevice, g_stream));
+      }
+      run_step(shampoo_bias_correction2(step),
+               (verify && step == steps) ? pre : nullptr, use_eigh);
     }
-    run_step(shampoo_bias_correction2(step),
-             (verify && step == steps) ? pre : nullptr);
-  }
-
-  CHECK_CUDA(cudaStreamSynchronize(g_stream));
-  auto end = std::chrono::steady_clock::now();
-  double ms = std::chrono::duration<double, std::milli>(end - start).count();
-  printf("rows %d cols %d steps %d\n", M, N, steps);
-  printf("Average shampoo step time %f (ms)\n", ms / steps);
-
-  CHECK_CUDA(cudaMemcpy(out, d_out, sizeof(float) * gcount, cudaMemcpyDeviceToHost));
-  if (verify) {
-    CHECK_CUDA(cudaMemcpy(Lh, d_L, sizeof(float) * lcount, cudaMemcpyDeviceToHost));
-    CHECK_CUDA(cudaMemcpy(Rh, d_R, sizeof(float) * rcount, cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaStreamSynchronize(g_stream));
+    auto end = std::chrono::steady_clock::now();
+    double ms = std::chrono::duration<double, std::milli>(end - start).count();
+    printf("rows %d cols %d steps %d method %s\n", M, N, steps, names[mi]);
+    printf("Average shampoo step time (%s) %f (ms)\n", names[mi], ms / steps);
+    if (use_eigh) {
+      int solver_info = 0;
+      CHECK_CUDA(cudaMemcpy(&solver_info, d_solver_info, sizeof(solver_info),
+                            cudaMemcpyDeviceToHost));
+      if (solver_info != 0) {
+        fprintf(stderr, "cuSOLVER syevd did not converge (info=%d)\n", solver_info);
+        rc = 1;
+      }
+    }
+    CHECK_CUDA(cudaMemcpy(out, d_out, sizeof(float) * (size_t)gcount,
+                          cudaMemcpyDeviceToHost));
+    if (verify) {
+      CHECK_CUDA(cudaMemcpy(Lh, d_L, sizeof(float) * (size_t)lcount, cudaMemcpyDeviceToHost));
+      CHECK_CUDA(cudaMemcpy(Rh, d_R, sizeof(float) * (size_t)rcount, cudaMemcpyDeviceToHost));
+      int ok = ref_shampoo(G, H, ref_L, ref_R, ref_pre, ref, M, N, steps) == 0 &&
+               shampoo_match("L", Lh, ref_L, lcount) &&
+               shampoo_match("R", Rh, ref_R, rcount) &&
+               shampoo_match("pre-graft", pre, ref_pre, gcount) &&
+               shampoo_match("grafted", out, ref, gcount);
+      printf("%s %s\n", names[mi], ok ? "PASS" : "FAIL");
+      rc |= ok ? 0 : 1;
+    }
   }
   CHECK_CUBLAS(cublasDestroy(g_handle));
+  CHECK_CUSOLVER(cusolverDnDestroy(g_solver));
   CHECK_CUDA(cudaFree(d_G));
   CHECK_CUDA(cudaFree(d_L));
   CHECK_CUDA(cudaFree(d_R));
@@ -471,21 +570,10 @@ int main(int argc, char* argv[]) {
   CHECK_CUDA(cudaFree(d_T));
   CHECK_CUDA(cudaFree(d_B));
   CHECK_CUDA(cudaFree(d_nrm));
+  CHECK_CUDA(cudaFree(d_eigenvalues));
+  CHECK_CUDA(cudaFree(d_solver_work));
+  CHECK_CUDA(cudaFree(d_solver_info));
   CHECK_CUDA(cudaStreamDestroy(g_stream));
-
-  int rc = 0;
-  if (verify) {
-    // Factors and the pre-graft block catch a wrong EMA, bias correction, or
-    // inverse-root scale. Grafting forces the output norm, so the grafted
-    // block alone cannot see those errors.
-    int ok = ref_shampoo(G, H, ref_L, ref_R, ref_pre, ref, M, N, steps) == 0 &&
-             shampoo_match("L", Lh, ref_L, lcount) &&
-             shampoo_match("R", Rh, ref_R, rcount) &&
-             shampoo_match("pre-graft", pre, ref_pre, gcount) &&
-             shampoo_match("grafted", out, ref, gcount);
-    printf("%s\n", ok ? "PASS" : "FAIL");
-    rc = ok ? 0 : 1;
-  }
 
   free(G);
   free(out);

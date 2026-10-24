@@ -27,7 +27,7 @@ obj = $(source:.cu=.o)
 CFLAGS := $(EXTRA_CFLAGS) -std=c++17 -Wall -fopenmp -I$(ROCM_PATH)/include -I../shampoo-cuda
 
 # Linker Flags
-LDFLAGS = -fopenmp -L$(ROCM_PATH)/lib -lhipblas
+LDFLAGS = -fopenmp -L$(ROCM_PATH)/lib -lhipblas -lrocsolver -lrocblas
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -53,8 +53,8 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 33 31 100 1
-	$(LAUNCHER) ./$(program) 1024 1024 1 1
-	$(LAUNCHER) ./$(program) 8192 8192 2 0
+	$(LAUNCHER) ./$(program) 33 31 3 1 both
+	$(LAUNCHER) ./$(program) 1024 1024 1 1 both
+	$(LAUNCHER) ./$(program) 8192 8192 2 0 both
 
 .PHONY: clean run

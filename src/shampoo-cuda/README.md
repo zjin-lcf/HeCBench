@@ -11,7 +11,10 @@ dimension normalization), the coupled Newton-Schulz inverse fourth root
 (`NewtonSchulzRootInvConfig`, Polar Express schedule, `relative_epsilon = 1e-6`),
 and the two-sided precondition `Linv^T G Rinv`. An order-2 block uses inverse
 exponent `1/4`, so the root is 4. The amortized inverse root runs on every
-timed step.
+timed step. The benchmark can use the original coupled Newton-Schulz path
+(`ns`) or an eigendecomposition path (`eigh`): cuSOLVER on CUDA, rocSOLVER
+on HIP, and oneMKL LAPACK on SYCL. `both` runs independent, identically
+initialized trials and reports one average step time for each path.
 
 The direction is then rescaled by AdaGrad grafting from Shi et al.,
 arXiv:2309.06497, Section 2.4 and Algorithm 1. The grafted state is the sum
@@ -26,7 +29,7 @@ from `muon` (quintic Newton-Schulz orthogonalization of a rectangular matrix).
 The eigenvalue benchmark is tridiagonal bisection, not this dense inverse root.
 
 ```text
-./main <rows> <cols> <steps> <verify>
+./main <rows> <cols> <steps> <verify> [ns|eigh|both]
 ```
 
 `make run` checks a rectangular block (`33 31 3 1`) against the OpenMP
@@ -35,7 +38,11 @@ without that reference. The check uses three steps of a changing gradient,
 and `33 x 31` is not a multiple of four, so the scalar tail in the vector
 kernels runs. It compares the factor matrices and the preconditioned block
 before grafting; grafting alone hides a wrong EMA weight or bias correction.
-CMake uses the same check. The timed run keeps one gradient fixed.
+CMake uses the same check and defaults to `both`. The timed run keeps one
+gradient fixed. For the 4K and 8K factor sizes emphasized by
+arXiv:2610.22230, run `./main 4096 4096 2 0 both` or
+`./main 8192 8192 2 0 both`. Solver timings depend on the vendor library and
+driver versions; the paper does not specify those versions.
 
 CUDA, HIP, and SYCL use the same 256-thread mapping. Contiguous stages load
 and store 128 bits per thread, and the Frobenius norm is one 256-wide

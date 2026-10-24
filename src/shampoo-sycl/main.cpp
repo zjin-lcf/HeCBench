@@ -3,6 +3,7 @@
 #include <math.h>
 #include <chrono>
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 #include <random>
 #include <sycl/sycl.hpp>
@@ -13,6 +14,8 @@
 #define MKL_BLAS_COMPUTE_MODE oneapi::mkl::blas::compute_mode::standard
 #endif
 #include <oneapi/mkl.hpp>
+#include <oneapi/mkl/lapack.hpp>
+#include <string.h>
 #include "reference.h"
 
 // One order-2 root-inverse Shampoo step on a single blocked parameter of
@@ -118,6 +121,17 @@ static void set_diag(sycl::queue& q, float* Z, int n) {
                  [=](sycl::nd_item<1> it) [[sycl::reqd_work_group_size(256)]] {
     int i = it.get_global_id(0);
     if (i < n) Z[(size_t)i * n + i] = 1.f;
+  });
+}
+
+// Convert eigensolver output Q into Q diag(lambda^(-1/4)).  The clamp covers
+// roundoff-level negative values from an fp32 symmetric eigendecomposition.
+static void scale_eigenvectors(sycl::queue& q, float* Q, const float* w, int n) {
+  const int count = n * n;
+  q.parallel_for(sycl::range<1>(count), [=](sycl::id<1> id) {
+    const int i = id[0];
+    const int col = i / n;
+    Q[i] *= sycl::pow(sycl::fmax(w[col], kEpsilon), -0.25f);
   });
 }
 
@@ -317,11 +331,30 @@ static void inverse_root(sycl::queue& q, float* A, float* Y, float* Z,
   }
 }
 
+// oneMKL LAPACK's complete eigendecomposition provides the portable SYCL
+// counterpart to cuSOLVER/rocSOLVER. A is symmetric, so row-major storage is
+// also a valid column-major view; the reconstructed result is symmetric too.
+static void eigh_inverse_root(sycl::queue& q, float* A, float* Q,
+                              float* result, float* nrm, float* w,
+                              float* scratchpad,
+                              std::int64_t scratchpad_size, int n) {
+  frobenius_nrm(q, A, nrm, n * n);
+  add_ridge(q, A, nrm, kRelativeEpsilon, kEpsilon, n);
+  oneapi::mkl::lapack::syevd(
+      q, oneapi::mkl::job::vec, oneapi::mkl::uplo::lower, n, A, n, w,
+      scratchpad, scratchpad_size);
+  q.memcpy(Q, A, sizeof(float) * (size_t)n * n);
+  scale_eigenvectors(q, A, w, n);
+  rgemm(q, transpose::trans, transpose::nontrans, n, n, n, A, Q, result,
+        1.f, 0.f);
+  q.memcpy(A, result, sizeof(float) * (size_t)n * n);
+}
+
 // Time `steps` Shampoo updates of one frozen M x N gradient. verify != 0
 // compares the preconditioned gradient with the host reference.
 int main(int argc, char* argv[]) {
-  if (argc != 5) {
-    printf("Usage: %s <rows> <cols> <steps> <verify>\n", argv[0]);
+  if (argc != 5 && argc != 6) {
+    printf("Usage: %s <rows> <cols> <steps> <verify> [ns|eigh|both]\n", argv[0]);
     printf("  rows x cols is one order-2 Shampoo block\n");
     return 1;
   }
@@ -330,8 +363,15 @@ int main(int argc, char* argv[]) {
   const int N = atoi(argv[2]);
   const int steps = atoi(argv[3]);
   const int verify = atoi(argv[4]);
+  const char* method = argc == 6 ? argv[5] : "both";
+  const bool run_ns = strcmp(method, "ns") == 0 || strcmp(method, "both") == 0;
+  const bool run_eigh = strcmp(method, "eigh") == 0 || strcmp(method, "both") == 0;
   if (M < 1 || N < 1 || M > 8192 || N > 8192 || steps < 1) {
     fprintf(stderr, "rows and cols must be in [1, 8192], steps >= 1\n");
+    return 1;
+  }
+  if (!run_ns && !run_eigh) {
+    fprintf(stderr, "method must be ns, eigh, or both\n");
     return 1;
   }
 
@@ -397,19 +437,18 @@ int main(int argc, char* argv[]) {
   // Two scalars: ||P_shampoo||_F and ||P_graft||_F. The inverse root uses
   // the first slot and finishes before grafting writes either one.
   float* d_nrm = sycl::malloc_device<float>(2, q);
+  float* d_eigenvalues = sycl::malloc_device<float>(nmax, q);
+  const std::int64_t solver_scratchpad_size =
+      oneapi::mkl::lapack::syevd_scratchpad_size<float>(
+          q, oneapi::mkl::job::vec, oneapi::mkl::uplo::lower, nmax, nmax);
+  float* d_solver_scratchpad =
+      sycl::malloc_device<float>(solver_scratchpad_size, q);
   if (!d_G || !d_L || !d_R || !d_Linv || !d_Rinv || !d_out || !d_A ||
-      !d_Y || !d_Z || !d_T || !d_B || !d_nrm) {
+      !d_Y || !d_Z || !d_T || !d_B || !d_nrm || !d_eigenvalues ||
+      !d_solver_scratchpad) {
     fprintf(stderr, "device allocation failed\n");
     return 1;
   }
-
-  q.memcpy(d_G, G, sizeof(float) * (size_t)gcount);
-  q.memset(d_L, 0, sizeof(float) * (size_t)lcount);
-  q.memset(d_R, 0, sizeof(float) * (size_t)rcount);
-  q.memset(d_A, 0, sizeof(float) * (size_t)gcount);
-  q.wait();
-
-  auto start = std::chrono::steady_clock::now();
 
   // One step on d_G. Verification replaces d_G each step; timing leaves it
   // fixed. L and R are the row and column factors. Launched directly each
@@ -420,65 +459,79 @@ int main(int argc, char* argv[]) {
   //   Eq. (17): out = Linv^T G Rinv (Linv is symmetric)
   //   Section 2.2, Eqs. (9) and (13): diagonal AdaGrad state and direction
   //   Eq. (20): rescale out by ||P_graft||_F / ||out||_F
-  for (int step = 1; step <= steps; step++) {
-    if (verify) {
-      shampoo_gradient_at_step(G, H, Gs, gcount, step);
-      q.memcpy(d_G, Gs, sizeof(float) * (size_t)gcount);
+  int rc = 0;
+  const char* names[] = {"ns", "eigh"};
+  const bool selected[] = {run_ns, run_eigh};
+  for (int mi = 0; mi < 2; ++mi) {
+    if (!selected[mi]) continue;
+    const bool use_eigh = mi == 1;
+    q.memcpy(d_G, G, sizeof(float) * (size_t)gcount);
+    q.memset(d_L, 0, sizeof(float) * (size_t)lcount);
+    q.memset(d_R, 0, sizeof(float) * (size_t)rcount);
+    q.memset(d_A, 0, sizeof(float) * (size_t)gcount);
+    q.wait();
+    auto start = std::chrono::steady_clock::now();
+    for (int step = 1; step <= steps; step++) {
+      if (verify) {
+        shampoo_gradient_at_step(G, H, Gs, gcount, step);
+        q.memcpy(d_G, Gs, sizeof(float) * (size_t)gcount);
+      }
+      rgemm(q, transpose::nontrans, transpose::trans, M, M, N, d_G, d_G, d_T, 1.f, 0.f);
+      axpy(q, d_L, d_T, kBeta2, kWeight, lcount);
+      rgemm(q, transpose::trans, transpose::nontrans, N, N, M, d_G, d_G, d_T, 1.f, 0.f);
+      axpy(q, d_R, d_T, kBeta2, kWeight, rcount);
+
+      float bc = shampoo_bias_correction2(step);
+      scale_div(q, d_Linv, d_L, bc, lcount);
+      if (use_eigh)
+        eigh_inverse_root(q, d_Linv, d_Y, d_Z, d_nrm, d_eigenvalues,
+                          d_solver_scratchpad, solver_scratchpad_size, M);
+      else
+        inverse_root(q, d_Linv, d_Y, d_Z, d_T, d_B, d_nrm, M);
+      scale_div(q, d_Rinv, d_R, bc, rcount);
+      if (use_eigh)
+        eigh_inverse_root(q, d_Rinv, d_Y, d_Z, d_nrm, d_eigenvalues,
+                          d_solver_scratchpad, solver_scratchpad_size, N);
+      else
+        inverse_root(q, d_Rinv, d_Y, d_Z, d_T, d_B, d_nrm, N);
+
+      rgemm(q, transpose::trans, transpose::nontrans, M, N, M, d_Linv, d_G, d_T, 1.f, 0.f);
+      rgemm(q, transpose::nontrans, transpose::nontrans, M, N, N, d_T, d_Rinv, d_out, 1.f, 0.f);
+      if (verify && step == steps)
+        q.memcpy(pre, d_out, sizeof(float) * (size_t)gcount);
+      square_accum(q, d_A, d_G, gcount);
+      graft_direction(q, d_T, d_G, d_A, kGraftEpsilon, gcount);
+      frobenius_nrm(q, d_out, d_nrm, gcount);
+      frobenius_nrm(q, d_T, d_nrm + 1, gcount);
+      scale_by_graft(q, d_out, d_nrm + 1, d_nrm, gcount);
     }
-    rgemm(q, transpose::nontrans, transpose::trans, M, M, N, d_G, d_G, d_T, 1.f, 0.f);
-    axpy(q, d_L, d_T, kBeta2, kWeight, lcount);
-    rgemm(q, transpose::trans, transpose::nontrans, N, N, M, d_G, d_G, d_T, 1.f, 0.f);
-    axpy(q, d_R, d_T, kBeta2, kWeight, rcount);
-
-    float bc = shampoo_bias_correction2(step);
-    scale_div(q, d_Linv, d_L, bc, lcount);
-    inverse_root(q, d_Linv, d_Y, d_Z, d_T, d_B, d_nrm, M);
-    scale_div(q, d_Rinv, d_R, bc, rcount);
-    inverse_root(q, d_Rinv, d_Y, d_Z, d_T, d_B, d_nrm, N);
-
-    rgemm(q, transpose::trans, transpose::nontrans, M, N, M, d_Linv, d_G, d_T, 1.f, 0.f);
-    rgemm(q, transpose::nontrans, transpose::nontrans, M, N, N, d_T, d_Rinv, d_out, 1.f, 0.f);
-    if (verify && step == steps)
-      q.memcpy(pre, d_out, sizeof(float) * (size_t)gcount);
-
-    square_accum(q, d_A, d_G, gcount);
-    graft_direction(q, d_T, d_G, d_A, kGraftEpsilon, gcount);
-    frobenius_nrm(q, d_out, d_nrm, gcount);
-    frobenius_nrm(q, d_T, d_nrm + 1, gcount);
-    scale_by_graft(q, d_out, d_nrm + 1, d_nrm, gcount);
+    q.wait();
+    auto end = std::chrono::steady_clock::now();
+    double ms = std::chrono::duration<double, std::milli>(end - start).count();
+    printf("rows %d cols %d steps %d method %s\n", M, N, steps, names[mi]);
+    printf("Average shampoo step time (%s) %f (ms)\n", names[mi], ms / steps);
+    q.memcpy(out, d_out, sizeof(float) * (size_t)gcount);
+    if (verify) {
+      q.memcpy(Lh, d_L, sizeof(float) * (size_t)lcount);
+      q.memcpy(Rh, d_R, sizeof(float) * (size_t)rcount);
+    }
+    q.wait();
+    if (verify) {
+      int ok = ref_shampoo(G, H, ref_L, ref_R, ref_pre, ref, M, N, steps) == 0 &&
+               shampoo_match("L", Lh, ref_L, lcount) &&
+               shampoo_match("R", Rh, ref_R, rcount) &&
+               shampoo_match("pre-graft", pre, ref_pre, gcount) &&
+               shampoo_match("grafted", out, ref, gcount);
+      printf("%s %s\n", names[mi], ok ? "PASS" : "FAIL");
+      rc |= ok ? 0 : 1;
+    }
   }
-
-  q.wait();
-  auto end = std::chrono::steady_clock::now();
-  double ms = std::chrono::duration<double, std::milli>(end - start).count();
-  printf("rows %d cols %d steps %d\n", M, N, steps);
-  printf("Average shampoo step time %f (ms)\n", ms / steps);
-
-  q.memcpy(out, d_out, sizeof(float) * (size_t)gcount);
-  if (verify) {
-    q.memcpy(Lh, d_L, sizeof(float) * (size_t)lcount);
-    q.memcpy(Rh, d_R, sizeof(float) * (size_t)rcount);
-  }
-  q.wait();
   sycl::free(d_G, q); sycl::free(d_L, q); sycl::free(d_R, q);
   sycl::free(d_Linv, q); sycl::free(d_Rinv, q); sycl::free(d_out, q);
   sycl::free(d_A, q);
   sycl::free(d_Y, q); sycl::free(d_Z, q); sycl::free(d_T, q);
   sycl::free(d_B, q); sycl::free(d_nrm, q);
-
-  int rc = 0;
-  if (verify) {
-    // Factors and the pre-graft block catch a wrong EMA, bias correction, or
-    // inverse-root scale. Grafting forces the output norm, so the grafted
-    // block alone cannot see those errors.
-    int ok = ref_shampoo(G, H, ref_L, ref_R, ref_pre, ref, M, N, steps) == 0 &&
-             shampoo_match("L", Lh, ref_L, lcount) &&
-             shampoo_match("R", Rh, ref_R, rcount) &&
-             shampoo_match("pre-graft", pre, ref_pre, gcount) &&
-             shampoo_match("grafted", out, ref, gcount);
-    printf("%s\n", ok ? "PASS" : "FAIL");
-    rc = ok ? 0 : 1;
-  }
+  sycl::free(d_eigenvalues, q); sycl::free(d_solver_scratchpad, q);
 
   free(G);
   free(out);
