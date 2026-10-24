@@ -443,7 +443,10 @@ int main(int argc, char* argv[]) {
   // the first slot and finishes before grafting writes either one.
   CHECK_CUDA(cudaMalloc(&d_nrm, sizeof(float) * 2));
   CHECK_CUDA(cudaMalloc(&d_eigenvalues, sizeof(float) * nmax));
-  CHECK_CUDA(cudaMalloc(&d_solver_info, sizeof(int)));
+  // Verification keeps one status per factor solve. Timing reuses one slot
+  // and does not read it.
+  const int solver_info_count = (verify && run_eigh) ? 2 * steps : 1;
+  CHECK_CUDA(cudaMalloc(&d_solver_info, sizeof(int) * (size_t)solver_info_count));
 
   CHECK_CUDA(cudaMemcpy(d_G, G, sizeof(float) * gcount, cudaMemcpyHostToDevice));
   CHECK_CUDA(cudaMemset(d_L, 0, sizeof(float) * lcount));
@@ -472,7 +475,8 @@ int main(int argc, char* argv[]) {
   //   Eq. (17): out = Linv^T G Rinv (Linv is symmetric)
   //   Section 2.2, Eqs. (9) and (13): diagonal AdaGrad state and direction
   //   Eq. (20): rescale out by ||P_graft||_F / ||out||_F
-  auto run_step = [&](float bc, float* save_pre, bool use_eigh) {
+  auto run_step = [&](float bc, float* save_pre, bool use_eigh,
+                      int* info_l, int* info_r) {
     rgemm(CUBLAS_OP_N, CUBLAS_OP_T, M, M, N, d_G, d_G, d_T, 1.f, 0.f);
     axpy<<<blocks_for4(lcount), kThreads, 0, g_stream>>>(d_L, d_T, kBeta2, kWeight, lcount);
     rgemm(CUBLAS_OP_T, CUBLAS_OP_N, N, N, M, d_G, d_G, d_T, 1.f, 0.f);
@@ -481,13 +485,13 @@ int main(int argc, char* argv[]) {
     scale_div<<<blocks_for4(lcount), kThreads, 0, g_stream>>>(d_Linv, d_L, bc, lcount);
     if (use_eigh)
       eigh_inverse_root(d_Linv, d_Y, d_Z, d_nrm, d_eigenvalues, d_solver_work,
-                        solver_lwork, d_solver_info, M);
+                        solver_lwork, info_l, M);
     else
       inverse_root(d_Linv, d_Y, d_Z, d_T, d_B, d_nrm, M);
     scale_div<<<blocks_for4(rcount), kThreads, 0, g_stream>>>(d_Rinv, d_R, bc, rcount);
     if (use_eigh)
       eigh_inverse_root(d_Rinv, d_Y, d_Z, d_nrm, d_eigenvalues, d_solver_work,
-                        solver_lwork, d_solver_info, N);
+                        solver_lwork, info_r, N);
     else
       inverse_root(d_Rinv, d_Y, d_Z, d_T, d_B, d_nrm, N);
 
@@ -517,6 +521,9 @@ int main(int argc, char* argv[]) {
     CHECK_CUDA(cudaMemsetAsync(d_L, 0, sizeof(float) * (size_t)lcount, g_stream));
     CHECK_CUDA(cudaMemsetAsync(d_R, 0, sizeof(float) * (size_t)rcount, g_stream));
     CHECK_CUDA(cudaMemsetAsync(d_A, 0, sizeof(float) * (size_t)gcount, g_stream));
+    if (verify && use_eigh)
+      CHECK_CUDA(cudaMemsetAsync(d_solver_info, 0,
+                                 sizeof(int) * (size_t)solver_info_count, g_stream));
     CHECK_CUDA(cudaStreamSynchronize(g_stream));
     auto start = std::chrono::steady_clock::now();
     for (int step = 1; step <= steps; step++) {
@@ -525,8 +532,10 @@ int main(int argc, char* argv[]) {
         CHECK_CUDA(cudaMemcpyAsync(d_G, Gs, sizeof(float) * (size_t)gcount,
                                    cudaMemcpyHostToDevice, g_stream));
       }
+      int* info_l = d_solver_info + ((verify && use_eigh) ? (step - 1) * 2 : 0);
       run_step(shampoo_bias_correction2(step),
-               (verify && step == steps) ? pre : nullptr, use_eigh);
+               (verify && step == steps) ? pre : nullptr, use_eigh,
+               info_l, info_l + ((verify && use_eigh) ? 1 : 0));
     }
     CHECK_CUDA(cudaStreamSynchronize(g_stream));
     auto end = std::chrono::steady_clock::now();
@@ -534,11 +543,25 @@ int main(int argc, char* argv[]) {
     printf("rows %d cols %d steps %d method %s\n", M, N, steps, names[mi]);
     printf("Average shampoo step time (%s) %f (ms)\n", names[mi], ms / steps);
     if (verify && use_eigh) {
-      int solver_info = 0;
-      CHECK_CUDA(cudaMemcpy(&solver_info, d_solver_info, sizeof(solver_info),
+      int* solver_info = (int*)malloc(sizeof(int) * (size_t)solver_info_count);
+      if (!solver_info) {
+        fprintf(stderr, "host allocation failed\n");
+        rc = 1;
+        break;
+      }
+      CHECK_CUDA(cudaMemcpy(solver_info, d_solver_info,
+                            sizeof(int) * (size_t)solver_info_count,
                             cudaMemcpyDeviceToHost));
-      if (solver_info != 0) {
-        fprintf(stderr, "cuSOLVER syevd did not converge (info=%d)\n", solver_info);
+      int bad = 0;
+      for (int i = 0; i < solver_info_count; ++i) {
+        if (solver_info[i] != 0) {
+          bad = solver_info[i];
+          break;
+        }
+      }
+      free(solver_info);
+      if (bad != 0) {
+        fprintf(stderr, "cuSOLVER syevd did not converge (info=%d)\n", bad);
         printf("%s FAIL\n", names[mi]);
         rc = 1;
         break;
