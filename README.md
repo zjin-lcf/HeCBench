@@ -926,15 +926,6 @@ Early results are shown [here](results/README.md)
 ### index-shuffle (cuda)
   MetaShuffling IndexShuffling: fused top-k, per-expert histogram, and expert-order token-index placement for MoE routing (https://github.com/meta-pytorch/MSLK, https://pytorch.org/blog/metashuffling-accelerating-llama-4-moe-inference/)
 
-### index-shuffle (hip)
-  HIP port of MetaShuffling IndexShuffling that shares its kernel, benchmark driver, and invariant-based verification with the CUDA implementation (https://github.com/meta-pytorch/MSLK, https://pytorch.org/blog/metashuffling-accelerating-llama-4-moe-inference/)
-
-### index-shuffle (sycl)
-  SYCL port of MetaShuffling IndexShuffling that shares deterministic routing inputs and invariant-based verification with the CUDA and HIP implementations (https://github.com/meta-pytorch/MSLK, https://pytorch.org/blog/metashuffling-accelerating-llama-4-moe-inference/)
-
-### index-shuffle (omp)
-  OpenMP target port of MetaShuffling IndexShuffling that shares deterministic routing inputs and invariant-based verification with the CUDA, HIP, and SYCL implementations (https://github.com/meta-pytorch/MSLK, https://pytorch.org/blog/metashuffling-accelerating-llama-4-moe-inference/)
-
 ### interleave (cuda)
   Interleaved and non-interleaved global memory accesses (Shane Cook. 2012. CUDA Programming: A Developer's Guide to Parallel Computing with GPUs (1st. ed.). Morgan Kaufmann Publishers Inc., San Francisco, CA, USA.)
 
