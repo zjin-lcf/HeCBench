@@ -6,7 +6,8 @@
 CC        = nvcc
 OPTIMIZE  = yes
 DEBUG     = no
-ARCH      = sm_60
+# bf16 loads need Ampere or newer. sm_80 also runs on Hopper.
+ARCH      = sm_80
 LAUNCHER  ?=
 
 #===============================================================================
@@ -54,6 +55,6 @@ clean:
 	rm -rf $(program) $(obj)
 
 run: $(program)
-	$(LAUNCHER) ./$(program) 4096 32 8 128 128 0 100
-	$(LAUNCHER) ./$(program) 1024 16 2 128 64 1 100
-	$(LAUNCHER) ./$(program) 4096 16 2 256 64 2 100
+	$(LAUNCHER) ./$(program) 4096 18 256 1 100
+	$(LAUNCHER) ./$(program) 1024 18 256 0 100
+	$(LAUNCHER) ./$(program) 1024 8 128 1 100

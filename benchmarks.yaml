@@ -2390,11 +2390,11 @@ romberg:
 
 rmsnorm-fused:
   categories: [ml]
-  description: Fused Gemma RMSNorm, NeoX RoPE, and Q/gate deinterleave
+  description: Fused Ideogram v4 per-head QK RMSNorm and interleaved MRoPE
   models: [cuda, hip]
   test:
     regex: '(?:Average kernel execution time: )([0-9.+-e]+)(?: \(ms\))'
-    args: ["32", "4", "2", "128", "64", "2", "2"]
+    args: ["32", "4", "256", "1", "2"]
     timeout: 300
 
 rotary:
