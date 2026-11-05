@@ -163,7 +163,7 @@ set(HECBENCH_POC_BENCHMARKS
     frna
     fsm
     fwt
-    # Batch 8: G-I benchmarks (39 benchmarks)
+    # Batch 8: G-I benchmarks (40 benchmarks)
     ga
     gabor
     gamma-correction
@@ -175,6 +175,7 @@ set(HECBENCH_POC_BENCHMARKS
     gelu
     gemv
     ge-spmm
+    gis
     gibbs
     goulash
     gpp
@@ -200,6 +201,7 @@ set(HECBENCH_POC_BENCHMARKS
     hungarian
     hwt1d
     hypterm
+    index-shuffle
     interval
     intrinsics-cast
     intrinsics-simd
@@ -218,6 +220,7 @@ set(HECBENCH_POC_BENCHMARKS
     kmeans
     kurtosis
     lanczos
+    laghos-force
     langevin
     langford
     laplace
@@ -233,6 +236,7 @@ set(HECBENCH_POC_BENCHMARKS
     lid-driven-cavity
     lif
     linearprobing
+    local-ht
     logan
     log2
     logic-rewrite
@@ -278,6 +282,7 @@ set(HECBENCH_POC_BENCHMARKS
     mnist
     moe
     moe-align
+    moe-combine
     moe-sum
     morphology
     mpc
@@ -346,6 +351,7 @@ set(HECBENCH_POC_BENCHMARKS
     reaction
     recursiveGaussian
     relu
+    reshapeKVCache
     resize
     resnet-kernels
     reverse
@@ -363,7 +369,7 @@ set(HECBENCH_POC_BENCHMARKS
     rsmt
     rtm8
     rushlarsen
-    # Batch 13: S benchmarks (59 benchmarks)
+    # Batch 13: S benchmarks (60 benchmarks)
     s3d
     s8n
     sa
@@ -377,6 +383,7 @@ set(HECBENCH_POC_BENCHMARKS
     schur-complement
     score
     sddmm-batch
+    sdma
     seam-carving
     secp256k1
     segment-reduce
@@ -391,6 +398,7 @@ set(HECBENCH_POC_BENCHMARKS
     slit
     slu
     snake
+    snicit
     sobel
     sobol
     sort
@@ -427,7 +435,8 @@ set(HECBENCH_POC_BENCHMARKS
     svd3x3
     svt
     sw4ck
-    # Batch 14: T-Z benchmarks (33 benchmarks)
+    # Batch 14: T-Z benchmarks (34 benchmarks)
+    tbe
     tensorAccessor
     tensorT
     testSNAP
@@ -440,6 +449,7 @@ set(HECBENCH_POC_BENCHMARKS
     trimul
     tsne
     tsp
+    twell
     unfold
     urng
     vanGenuchten
@@ -527,6 +537,7 @@ set(HECBENCH_POC_BENCHMARKS
     complex
     concat
     concurrentKernels
+    condor
     contract
     conversion
     convolution3D
@@ -552,19 +563,28 @@ set(HECBENCH_POC_BENCHMARKS
     pointerchase
     rmsnorm
     rmsnorm-quant
+    rmsnorm-rope
     saxpy-ompt
+    shampoo
     silu
     softmax-fused
     softmax-online
     swiglu-oai
     sundials
+    stiff-ode
     ssm
+    ssm2
     storeKVCache
+    axpby
+    f8cast
+    minimap2
+    tgvnn
     threadcpy
     tridiagonal
     topk
     upsample
     vadd
+    vdi
     wenofv
 )
 
