@@ -13,6 +13,7 @@ set(HECBENCH_POC_BENCHMARKS
     softmax
     attention
     # Batch 1: A-F alphabetically (15 benchmarks)
+    abacus
     accuracy
     ace
     adam
@@ -185,6 +186,7 @@ set(HECBENCH_POC_BENCHMARKS
     grrt
     gru
     gru2
+    gsplat3d
     gsplat4d
     haccmk
     hausdorff
@@ -290,6 +292,7 @@ set(HECBENCH_POC_BENCHMARKS
     mrc
     mrg32k3a
     mriQ
+    msm
     mt
     mtf
     multimaterial
@@ -392,6 +395,7 @@ set(HECBENCH_POC_BENCHMARKS
     sheath
     shmembench
     shuffle
+    si
     simplemoc
     simpleMultiDevice
     simpleSpmv
@@ -551,6 +555,7 @@ set(HECBENCH_POC_BENCHMARKS
     groupnorm
     hadamard
     halo-finder
+    heun
     jacobian
     leukocyte
     miniFE
