@@ -83,7 +83,7 @@ Each benchmark falls into a single category. While such classification is not ac
     cc, floydwarshall, floydwarshall2, gc, graphB+, hbc, hungarian, mis, sssp, rsmt
 
 ### Language and kernel features
-    adjacent, aligned-types, assert, asta, asyncAllocation, awbarrier, blockAccess, blockexchange, blockScan, clock, collision, concurrentKernels, conversion, dispatch, dp4a, graphExecution, ert, interleave, intrinsics-cast, intrinsics-simd, kernelLaunch, layout, mallocFree, maxFlops, mixbench, nosync, openmp, overlap, pad, pitch, popcount, pointerchase, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamCreateCopyDestroy, streamOrderedAllocation, streamPriority, streamUM, tensorAccessor, threadfence, warpexchange, vote, wmma, wordcount, zerocopy
+    adjacent, aligned-types, assert, asta, asyncAllocation, awbarrier, blockAccess, blockexchange, blockScan, clock, collision, concurrentKernels, conversion, dispatch, dp4a, graphExecution, ert, interleave, intrinsics-cast, intrinsics-simd, kernelLaunch, layout, mallocFree, maxFlops, mixbench, nosync, openmp, overlap, pad, pitch, popcount, pointerchase, prefetch, reverse, ring, saxpy-ompt, shuffle, simpleMultiDevice, streamCreateCopyDestroy, streamOrderedAllocation, streamPriority, streamUM, tensorAccessor, threadfence, warpexchange, vote, wavefront, wmma, wordcount, zerocopy
 
 ### Machine learning  
     accuracy, adam, adamw, addBiasQKV, addBiasResidualLayerNorm, attention, attention-paged, attentionMergeState, attentionMultiHead, attentionMultiHeadKVCache, backprop, bincount, bmf, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, dwconv1d, expdist, flip, gd, gelu, ge-spmm, geglu, gis, glu, gmm, gru, gru2, heun, index-shuffle, kalman, kda, kmc, kmeans, knn, layernorm, lda, lif, logprob, lr, lrn, mace, mask, matern, maxpool3d, mcpr, meanshift, megablocks, mergeVS, mf-sgd, mlaDecode, mlp, mmcsf, mnist, moe, moe-align, moe-combine, moe-sum, mrc, multinomial, muon, nlll, nn, nonzero, overlay, p4, page-rank, permute, perplexity, pointwise, pool, qkv, qtclustering, remap, relu, resnet-kernels, rmsnorm, rmsnorm-quant, rmsnorm-rope, rowwiseMoments, rotary, sampling, scel, shampoo, silu, snicit, softmax, softmax-fused, softmax-online, ssm, ssm2, stddev, streamcluster, swiglu-oai, tbe, trimul, tsne, twell, unfold, vol2col, wedford, winograd, word2vec
@@ -1874,6 +1874,9 @@ Early results are shown [here](results/README.md)
 
 ### warpsort (cuda)
   Sort small numbers (https://github.com/facebookarchive/fbcuda)
+
+### wavefront (cuda)
+  Wavefront lane operations, reductions, and voting (https://rocm-handbook.amd.com/projects/amd-rocm-optimization-guide/en/latest/compiler-builtins/cross-arch/wavefront-builtins.html)
 
 ### wedford (cuda)
   Compute mean and variance using the Welford algorithm (https://github.com/hpcaitech/ColossalAI)
