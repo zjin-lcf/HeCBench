@@ -2975,6 +2975,14 @@ warpsort:
   models: [cuda, hip, sycl]
   # No test metadata available
 
+wavefront:
+  categories: [algorithms]
+  models: [cuda, hip, sycl]
+  test:
+    regex: 'PASS'
+    args: ["1048576", "2"]
+    timeout: 300
+
 wedford:
   categories: [algorithms]
   models: [cuda, hip, omp, sycl]

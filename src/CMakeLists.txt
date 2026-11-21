@@ -463,6 +463,7 @@ set(HECBENCH_POC_BENCHMARKS
     voxelization
     warpexchange
     warpsort
+    wavefront
     wedford
     winograd
     wlcpow
