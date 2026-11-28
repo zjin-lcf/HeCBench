@@ -99,6 +99,7 @@ set(HECBENCH_POC_BENCHMARKS
     black-scholes
     # Batch 6: B-D benchmarks (16 benchmarks)
     blas-gemm
+    blas-zgemm
     burger
     bwt
     channelSum

@@ -370,6 +370,14 @@ blas-gemmStridedBatched:
   models: [cuda, hip, sycl]
   # No test metadata available
 
+blas-zgemm:
+  categories: [math]
+  models: [cuda, hip, sycl]
+  test:
+    regex: '(?:Average execution time of Ozaki-II 2M ZGEMM: )([0-9.+-e]+)(?: \(ms\))'
+    args: ["256", "256", "256", "2"]
+    timeout: 300
+
 blockAccess:
   categories: [algorithms]
   models: [cuda, hip, sycl]

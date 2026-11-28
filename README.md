@@ -95,7 +95,7 @@ Each benchmark falls into a single category. While such classification is not ac
     accuracy, adam, adamw, addBiasQKV, addBiasResidualLayerNorm, attention, attention-paged, attentionMergeState, attentionMultiHead, attentionMultiHeadKVCache, backprop, bincount, bmf, bn, channelShuffle, channelSum, clink, concat, crossEntropy, dense-embedding, dropout, dwconv, dwconv1d, expdist, flip, gd, gelu, ge-spmm, geglu, gis, glu, gmm, gru, gru2, heun, index-shuffle, kalman, kda, kmc, kmeans, knn, layernorm, lda, lif, logprob, lr, lrn, mace, mask, matern, maxpool3d, mcpr, meanshift, megablocks, mergeVS, mf-sgd, mlaDecode, mlp, mmcsf, mnist, moe, moe-align, moe-combine, moe-sum, mrc, multinomial, muon, nlll, nn, nonzero, overlay, p4, page-rank, permute, perplexity, pointwise, pool, qkv, qtclustering, remap, relu, resnet-kernels, rmsnorm, rmsnorm-quant, rmsnorm-rope, rowwiseMoments, rotary, sampling, scel, shampoo, silu, snicit, softmax, softmax-fused, softmax-online, ssm, ssm2, stddev, streamcluster, swiglu-oai, tbe, trimul, tsne, twell, unfold, vol2col, wedford, winograd, word2vec
 
 ### Math
-    atan2, axpby, bgmv, bicgstab, blas-dot, blas-fp4gemm, blas-fp8gemm, blas-gemm, blas-gemmBatched, blas-gemmStridedBatched, blas-gemmEx, blas-gemmEx2, blas-groupgemm, blas-mxfp6gemm, blas-mxfp8gemm, braycurtis, complex, cross, determinant, divergence, dp, eigenvalue, f16max, f16sp, f8cast, fresnel, fwt, gaussian, geam, gels, gemv, hadamard, hellinger, hmm, idivide, interval, jaccard, jacobi, jacobian, kurtosis, lanczos, langevin, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, ludb, lut-gemm, michalewicz, matrix-rotate, matrixT, minkowski, mr, mrg32k3a, norm2, nqueen, ntt, oziMMU, phmm, pnpoly, quant3MatMul, reverse2D, rfs, romberg, rsc, schur-complement, sddmm-batch, secp256k1, simpleSpmv, slu, spaxpby, spd2s, spgeam, spgemm, spmm, spmv, spnnz, sps2d, spsm, spsort, sptrsv, svd3x3, thomas, vdi, wyllie, zeropoint
+    atan2, axpby, bgmv, bicgstab, blas-dot, blas-fp4gemm, blas-fp8gemm, blas-gemm, blas-gemmBatched, blas-gemmStridedBatched, blas-gemmEx, blas-gemmEx2, blas-groupgemm, blas-mxfp6gemm, blas-mxfp8gemm, blas-zgemm, braycurtis, complex, cross, determinant, divergence, dp, eigenvalue, f16max, f16sp, f8cast, fresnel, fwt, gaussian, geam, gels, gemv, hadamard, hellinger, hmm, idivide, interval, jaccard, jacobi, jacobian, kurtosis, lanczos, langevin, langford, lci, lebesgue, leukocyte, lfib4, log2, lud, ludb, lut-gemm, michalewicz, matrix-rotate, matrixT, minkowski, mr, mrg32k3a, norm2, nqueen, ntt, oziMMU, phmm, pnpoly, quant3MatMul, reverse2D, rfs, romberg, rsc, schur-complement, sddmm-batch, secp256k1, simpleSpmv, slu, spaxpby, spd2s, spgeam, spgemm, spmm, spmv, spnnz, sps2d, spsm, spsort, sptrsv, svd3x3, thomas, vdi, wyllie, zeropoint
    
 ### Random number generation
     mt, permutate, qrg, rng-wallace, sobol, urng
@@ -457,6 +457,9 @@ Early results are shown [here](results/README.md)
 
 ### blas-mxfp8gemm (cuda)
   Scaled matrix-matrix multiplication in a 8-bit microscaling floating-point format
+
+### blas-zgemm (cuda, hip, sycl)
+  Complex double matrix-matrix multiplication (ZGEMM) emulated with the Ozaki-II scheme on INT8 GEMMs, using the 2M (two real products) and 4M (four real products) algorithms, compared with native ZGEMM and, for CUDA, the cuBLAS fixed-point emulation (https://developer.nvidia.com/blog/faster-scientific-simulations-with-new-fp64-algorithms-in-nvidia-cublas/)
 
 ### blockAccess (cuda)
   Block access from the CUB's collective primitives (https://github.com/NVIDIA/cub)
